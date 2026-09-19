@@ -2,7 +2,7 @@
 
 A small, self-hosted headless CMS written in Common Lisp.
 
-- **Server** (`koya-server`): admin UI (hsx + htmx + Tailwind), delivery API, admin API, SQLite.
+- **Server** (`koya-server`): admin UI (hsx + htmx + Quill + Tailwind), delivery API, admin API, SQLite.
 - **Library** (`koya`): schema DSL (`defspace` / `defmodel`), `plan` / `deploy` / `pull`, and an HTTP client.
 
 Design notes live in [docs/DESIGN.md](docs/DESIGN.md).
@@ -31,7 +31,9 @@ In your own project (which depends on `koya`):
 (defspace website
   :webhooks '("https://example.com/api/revalidate"))
 
-(defmodel (website blog) (:kind :list)
+(defmodel (website blog) (:kind :list
+                          :public-url "https://example.com/blog/{CONTENT_ID}"
+                          :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
   (title    :text :required t)
   (slug     :slug :from title :unique t)
   (content  :richtext)

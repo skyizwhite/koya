@@ -4,6 +4,8 @@
                 #:redirect #:set-response-status #:get-request-header)
   (:import-from #:ningle
                 #:context)
+  (:import-from #:cl-ppcre
+                #:regex-replace-all)
   (:import-from #:koya-server/lib/auth
                 #:session-owner-p)
   (:import-from #:koya-server/lib/env
@@ -18,6 +20,9 @@
            #:redirect-to
            #:same-origin-p
            #:param
+           #:set-flash
+           #:take-flash
+           #:expand-url-template
            #:~layout
            #:~status-badge
            #:~flash
@@ -37,6 +42,27 @@
 
 (defun redirect-to (path &optional (status 303))
   (redirect path status))
+
+;;; One-shot messages carried in the session across a redirect.
+
+(defun set-flash (message &optional (kind :ok))
+  (let ((session (context :session)))
+    (when session (setf (gethash "flash" session) (list message kind)))))
+
+(defun take-flash ()
+  "Return (values message kind) once, then forget it."
+  (let* ((session (context :session))
+         (flash (and session (gethash "flash" session))))
+    (when flash
+      (remhash "flash" session)
+      (values (first flash) (second flash)))))
+
+(defun expand-url-template (template &key id draft-key)
+  "Fill {CONTENT_ID} and {DRAFT_KEY} in a model's preview/public URL template."
+  (and template
+       (regex-replace-all "\\{DRAFT_KEY\\}"
+                          (regex-replace-all "\\{CONTENT_ID\\}" template (or id ""))
+                          (or draft-key ""))))
 
 (defun header-host (name)
   (let ((v (first (get-request-header name))))
@@ -72,6 +98,21 @@ Requests without either header are accepted (non-browser clients)."
 (defun model-url (space model) (format nil "/s/~a/m/~a" space model))
 (defun content-url (space model id) (format nil "/s/~a/m/~a/~a" space model id))
 
+(defcomp ~flash (&key message (kind :ok))
+  (if message
+      (hsx (div :class (clsx "mb-6 rounded-md border px-4 py-3 text-sm"
+                             (if (eq kind :error) "border-danger/40 bg-danger/5 text-danger" "border-ok/40 bg-ok/5 text-ok"))
+             message))
+      (hsx (<>))))
+
+(defcomp ~errors (&key errors)
+  (if errors
+      (hsx (div :class "mb-6 rounded-md border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger"
+             (ul :class "list-disc pl-5"
+               (loop :for e :in errors :collect
+                 (hsx (li (strong (getf e :field)) " " (getf e :message)))))))
+      (hsx (<>))))
+
 (defcomp ~layout (&key space crumbs children)
   (hsx
    (<>
@@ -89,26 +130,16 @@ Requests without either header are accepted (non-browser clients)."
                           (hsx (span :class "text-muted" label)))))))
          (form :method "post" :action "/logout"
            (button :type "submit" :class "btn" "Log out"))))
-     (main :class "mx-auto max-w-5xl px-4 py-8" children))))
+     (main :class "mx-auto max-w-5xl px-4 py-8"
+       (multiple-value-bind (message kind) (take-flash)
+         (~flash :message message :kind kind))
+       children))))
 
 (defcomp ~status-badge (&key status)
   (let ((class (cond ((string= status "published") "bg-ok/10 text-ok")
                      ((string= status "published+draft") "bg-warn/10 text-warn")
                      (t "bg-line text-muted"))))
     (hsx (span :class (clsx "badge" class) status))))
-
-(defcomp ~flash (&key message (kind :ok))
-  (when message
-    (hsx (div :class (clsx "mb-6 rounded-md border px-4 py-3 text-sm"
-                           (if (eq kind :error) "border-danger/40 bg-danger/5 text-danger" "border-ok/40 bg-ok/5 text-ok"))
-           message))))
-
-(defcomp ~errors (&key errors)
-  (when errors
-    (hsx (div :class "mb-6 rounded-md border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger"
-           (ul :class "list-disc pl-5"
-             (loop :for e :in errors :collect
-               (hsx (li (strong (getf e :field)) " " (getf e :message)))))))))
 
 (defcomp ~empty-state (&key children)
   (hsx (div :class "rounded-md border border-dashed border-line px-6 py-10 text-center text-sm text-muted" children)))

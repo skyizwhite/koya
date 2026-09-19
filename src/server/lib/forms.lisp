@@ -5,7 +5,7 @@
   (:import-from #:koya/core/json
                 #:json-null)
   (:import-from #:cl-ppcre
-                #:regex-replace-all #:split)
+                #:regex-replace-all #:split #:scan)
   (:export #:form->data
            #:field-param-name
            #:form-values
@@ -67,6 +67,10 @@ except booleans which are always present (unchecked = false)."
              ;; datetime-local gives 2026-09-20T10:00; treat it as UTC.
              (setf (gethash (field-name field) data)
                    (if (and (= (length raw) 16) (char= (char raw 10) #\T)) (format nil "~a:00Z" raw) raw))))
+          (:richtext
+           ;; Quill reports an empty document as <p></p> or <p><br></p>.
+           (when (and raw (not (scan "^(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" raw)))
+             (setf (gethash (field-name field) data) raw)))
           (t
            (when raw (setf (gethash (field-name field) data) raw))))))
     data))

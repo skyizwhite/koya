@@ -5,7 +5,7 @@
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/schema-store #:save-schema)
   (:import-from #:koya-server/db/api-keys #:create-api-key)
-  (:import-from #:koya-server/lib/webhook #:*webhook-sender*)
+  (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema #:schema->jobject)
   (:import-from #:koya/core/json #:parse-json #:to-json #:jobject #:jget #:json-null)
   (:import-from #:alexandria #:alist-hash-table)
@@ -32,6 +32,7 @@
   (migrate)
   (save-schema (test-schema))
   (setf *api-key* (create-api-key "website" :label "test"))
+  (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (push (list url (parse-json payload) headers) *webhooks*))))
 
 (teardown
@@ -143,8 +144,7 @@
       (multiple-value-bind (status json) (admin :post (format nil "/admin/api/contents/website/blog/~a/publish" post-id))
         (ok (= status 200))
         (ok (string= (jget json "status") "published"))
-        (ok (string= (jget json "published" "bodyHtml") "<h1>Hi</h1>
-")))
+        (ok (string= (jget json "published" "body") "# Hi")))
       (ok (equal (webhook-types) '("new" "new")) "tag and post publish fired webhooks")
       (ok (string= (jget (second (first *webhooks*)) "api") "blog"))
       (ok (string= (jget (second (first *webhooks*)) "contents" "new" "title") "Hello"))
@@ -163,8 +163,6 @@
         (let ((item (aref (jget json "contents") 0)))
           (ok (string= (jget item "id") post-id))
           (ok (string= (jget item "title") "Hello"))
-          (ok (string= (jget item "bodyHtml") "<h1>Hi</h1>
-"))
           (ok (string= (jget (aref (jget item "tags") 0) "name") "lisp") "depth=1 expands references")
           (ok (stringp (jget item "publishedAt")))))
       (multiple-value-bind (status json) (delivery (format nil "/api/v1/website/blog/~a" post-id) :query "fields=id,title&depth=0")
@@ -245,9 +243,7 @@
     (ok (string= (jget json "published" "body") "about me v2") "object models upsert"))
   (multiple-value-bind (status json) (delivery "/api/v1/website/about")
     (ok (= status 200))
-    (ok (string= (jget json "body") "about me v2"))
-    (ok (string= (jget json "bodyHtml") "<p>about me v2</p>
-")))
+    (ok (string= (jget json "body") "about me v2")))
   (multiple-value-bind (status json) (admin :get "/admin/api/contents/website/about")
     (ok (= status 200))
     (ok (= (jget json "totalCount") 1))))

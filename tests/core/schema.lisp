@@ -4,6 +4,7 @@
                 #:make-field #:make-model #:make-space #:make-schema
                 #:field-name #:field-type #:field-option
                 #:model-field #:model-kind #:space-model #:schema-space #:space-webhooks
+                #:model-preview-url #:model-public-url
                 #:schema-error #:schema-errors #:check-schema
                 #:schema->jobject #:jobject->schema)
   (:import-from #:koya/core/json
@@ -21,7 +22,9 @@
                                                      (make-field :tags :reference :model "tag" :many t)
                                                      (make-field :event-at :datetime)))
                                    (make-model "tag" :list (list (make-field :name :text :required t)))
-                                   (make-model "about" :object (list (make-field :body :richtext))))))))
+                                   (make-model "about" :object (list (make-field :body :richtext))
+                                               :preview-url "https://x/about?draft-key={DRAFT_KEY}"
+                                               :public-url "https://x/about"))))))
 
 (deftest constructors
   (testing "field names are camelCased"
@@ -76,6 +79,11 @@
       (ok (field-option (model-field blog :tags) :many))
       (ok (string= (field-option (model-field blog :tags) :model) "tag"))
       (ok (string= (field-option (model-field blog :slug) :from) "title")))
+    (let ((about (space-model (schema-space back :website) :about)))
+      (ok (string= (model-preview-url about) "https://x/about?draft-key={DRAFT_KEY}"))
+      (ok (string= (model-public-url about) "https://x/about"))
+      (ok (search "\"previewUrl\"" json)))
+    (ok (null (model-public-url (space-model (schema-space back :website) :blog))) "absent when not set")
     (testing "round trip is stable"
       (ok (string= json (to-json (schema->jobject back))))))
   (testing "rejects bad input"

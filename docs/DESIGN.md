@@ -108,9 +108,11 @@ koya/
 
 - リレーション(`:reference`)は同一 space 内のモデルのみ。
 - 繰り返し(repeater)、カスタムフィールド(構造体)は初期スコープ外。
-- **richtext は Markdown で入力し、API 応答時に HTML へ変換して `xxxHtml` として併せて返す**
-  (3bmd、テーブル・コードブロック拡張。コードブロックは `<pre><code class="language-x">` のみでハイライトしない)。
-  当初は保存時変換としていたが、DB にレンダラ依存の HTML を残さないため読み出し時変換に変更した。
+- **richtext は HTML 文字列**。管理 UI では Quill(`assets/js/quill`、Snow テーマ)で編集し、
+  `getSemanticHTML()` の結果を隠しフィールド経由で送る。API はその HTML をそのまま返す(`xxxHtml` は無い)。
+  当初の Markdown 入力(3bmd で HTML 化)は、Quill 採用に伴い廃止した。microCMS の HTML もそのまま取り込める。
+- モデルには `:preview-url` / `:public-url` のテンプレート(`{CONTENT_ID}` `{DRAFT_KEY}` を置換)を設定でき、
+  編集画面に「Preview draft」(下書きがあるとき)と「Published page」(公開済みのとき)のリンクを出す。
 
 ### deploy(スキーマ反映)
 
@@ -203,7 +205,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - ルーティング: ningle-fbr(ファイルベース)、部分更新エンドポイント: ningle-actions。
 - CSS: Tailwind CSS v4(スタンドアロンバイナリ、`justfile` でビルド)。
 - フォームは DB 上のモデル定義から動的生成(フィールド型 → 入力コンポーネントの対応表)。
-- richtext は Markdown のテキストエリア + プレビュー(HTMX でサーバ側変換)。
+- richtext は Quill。フォーム送信時に HTML を隠しフィールドへ書き戻す(`assets/js/koya-editor.js`)。
+- 完了メッセージはセッションに載せる一度きりの flash(リダイレクト後に一度だけ表示)。
 - 画面(実装済みパス): `/login`、`/`(space 一覧)、`/s/{space}`(モデル一覧)、`/s/{space}/keys`(API キー)、
   `/s/{space}/m/{model}`(コンテンツ一覧。object 型は単一コンテンツの編集画面へリダイレクト)、
   `/s/{space}/m/{model}/{id}`(編集。`{id}` = `new` で新規)。**メディアライブラリ**(8 章)は M2。
@@ -238,7 +241,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 ## 9. 下書き・公開・バージョニング
 
 - `contents.published` と `contents.draft` の2カラム。status は `draft` / `published` / `published+draft`。
-- `draftKey` でドラフトをプレビュー取得(microCMS 互換)。
+- `draftKey` でドラフトをプレビュー取得(microCMS 互換)。下書き保存のたびに draft key を再生成し、
+  公開すると消す(古いプレビュー URL は無効になる)。
 - 公開・更新・削除時に space の webhook を呼ぶ(website の revalidate が受け口)。
   ペイロードは microCMS 互換に近い形(`service`、`api`、`id`、`type`、`contents.old/new`)。
   space ごとに生成される秘密を `X-KOYA-WEBHOOK-KEY` ヘッダで送り、受け側で照合する。下書き保存では呼ばない。
@@ -260,7 +264,6 @@ website(skyizwhite/website)で実績のある構成をそのまま踏襲する�
 | DB | cl-dbi + dbd-sqlite3 + sxql |
 | JSON | jzon(com.inuoe.jzon)+ kebab(キー変換) |
 | HTTP クライアント(client) | dexador |
-| Markdown | 3bmd(+ tables / code-blocks 拡張、独自プレーンレンダラ) |
 | 暗号・乱数 | ironclad |
 | 日時 | local-time |
 | 環境変数 | cl-dotenv(`.env`) |
@@ -363,3 +366,5 @@ website から流用するパターン:
 | 2026-09-20 | Webhook は space ごとの秘密を `X-KOYA-WEBHOOK-KEY` で送る(管理 UI で表示・ローテート) | 受け側が呼び出し元を検証できるようにする |
 | 2026-09-20 | 作成・公開時に `id` と `publishedAt` を明示指定できる。参照 id は URL セーフ文字列なら可 | microCMS からの移行で URL と公開日を維持する |
 | 2026-09-20 | website の移行は `koya-migration` ブランチで実施(ローカル koya で全ページ表示を確認) | M1 完了条件 |
+| 2026-09-20 | richtext は Quill で編集する HTML 文字列に変更(Markdown / 3bmd 廃止) | 管理 UI の使い勝手。microCMS の HTML をそのまま移行できる |
+| 2026-09-20 | モデルに `:preview-url` / `:public-url` テンプレート、draft key は保存ごとに再生成、flash はセッション一度きり | 管理 UI 改善の要望 |

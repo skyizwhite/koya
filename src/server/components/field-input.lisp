@@ -6,8 +6,6 @@
                 #:json-null)
   (:import-from #:koya-server/lib/forms
                 #:field-param-name #:value->string)
-  (:import-from #:koya-server/actions
-                #:preview-markdown)
   (:export #:~field-input))
 (in-package #:koya-server/components/field-input)
 
@@ -33,13 +31,9 @@
           (hsx (textarea :id id :name name :rows 5 :class "input" string)))
          (:richtext
           (hsx
-           (div :class "grid gap-3 md:grid-cols-2"
-             (textarea :id id :name name :rows 16 :class "input font-mono text-xs"
-               :hx-post (preview-markdown) :hx-trigger "input changed delay:500ms, load"
-               :hx-target (format nil "#~a-preview" id) :hx-swap "innerHTML"
-               string)
-             (div :id (format nil "~a-preview" id)
-               :class "prose prose-sm max-w-none rounded-md border border-line bg-panel px-4 py-3"))))
+           (<>
+             (input :type "hidden" :id id :name name :value string)
+             (div :class "quill-editor" :data-quill-for id))))
          (:number
           (hsx (input :type "number" :id id :name name :value string :step "any" :class "input")))
          (:boolean
@@ -71,5 +65,6 @@
                          (format nil "ids of ~a contents" (field-option field :model))
                          "media id")))))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))
-       (when error
-         (hsx (p :class "text-xs text-danger" error)))))))
+       (if error
+           (hsx (p :class "text-xs text-danger" error))
+           (hsx (<>)))))))

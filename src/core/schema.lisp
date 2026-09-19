@@ -29,6 +29,9 @@
            #:model-kind
            #:model-fields
            #:model-field
+           #:model-options
+           #:model-preview-url
+           #:model-public-url
            #:space-def
            #:make-space
            #:space-name
@@ -140,12 +143,16 @@
 (defun field-many-p (field) (and (field-option field :many) t))
 
 (defstruct (model (:constructor %make-model))
-  name    ; slug string
-  kind    ; :list or :object
-  fields) ; list of FIELD
+  name     ; slug string
+  kind     ; :list or :object
+  fields   ; list of FIELD
+  options) ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY})
 
-(defun make-model (name kind fields)
+(defun make-model (name kind fields &key preview-url public-url)
   (let ((name (string-downcase (string name))))
+    (dolist (url (list preview-url public-url))
+      (unless (or (null url) (stringp url))
+        (fail "model ~s: URL templates must be strings" name)))
     (unless (slug-name-p name)
       (fail "model name ~s must be lowercase letters, digits and hyphens" name))
     (unless (member kind '(:list :object))
@@ -153,7 +160,12 @@
     (let ((names (mapcar #'field-name fields)))
       (when (/= (length names) (length (remove-duplicates names :test #'string=)))
         (fail "model ~s has duplicate field names" name)))
-    (%make-model :name name :kind kind :fields fields)))
+    (%make-model :name name :kind kind :fields fields
+                 :options (append (and preview-url (list :preview-url preview-url))
+                                  (and public-url (list :public-url public-url))))))
+
+(defun model-preview-url (model) (getf (model-options model) :preview-url))
+(defun model-public-url (model) (getf (model-options model) :public-url))
 
 (defun model-field (model name)
   (find (if (stringp name) name (camel-key name)) (model-fields model)
@@ -238,9 +250,12 @@
     obj))
 
 (defun model->jobject (model)
-  (jobject "name" (model-name model)
-           "kind" (string-downcase (symbol-name (model-kind model)))
-           "fields" (map 'vector #'field->jobject (model-fields model))))
+  (let ((obj (jobject "name" (model-name model)
+                      "kind" (string-downcase (symbol-name (model-kind model)))
+                      "fields" (map 'vector #'field->jobject (model-fields model)))))
+    (when (model-preview-url model) (setf (gethash "previewUrl" obj) (model-preview-url model)))
+    (when (model-public-url model) (setf (gethash "publicUrl" obj) (model-public-url model)))
+    obj))
 
 (defun space->jobject (space)
   (jobject "name" (space-name space)
@@ -275,7 +290,9 @@
     (unless (stringp kind) (fail "model ~s without kind" (jget obj "name")))
     (make-model (or (jget obj "name") (fail "model without a name"))
                 (intern (string-upcase kind) :keyword)
-                (map 'list #'jobject->field (or fields #())))))
+                (map 'list #'jobject->field (or fields #()))
+                :preview-url (jget obj "previewUrl")
+                :public-url (jget obj "publicUrl"))))
 
 (defun jobject->space (obj)
   (make-space (or (jget obj "name") (fail "space without a name"))

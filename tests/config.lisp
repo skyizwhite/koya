@@ -4,7 +4,8 @@
                 #:defspace #:defmodel #:current-schema #:clear-schema #:find-space #:find-model)
   (:import-from #:koya/core/schema
                 #:schema-space #:space-models #:space-webhooks #:space-model
-                #:model-field #:model-kind #:field-option #:field-type #:schema-error))
+                #:model-field #:model-kind #:field-option #:field-type #:schema-error
+                #:model-preview-url #:model-public-url))
 (in-package #:koya-tests/config)
 
 (defhook :before (clear-schema))
@@ -19,7 +20,9 @@
     (event-at :datetime))
   (defmodel (website tag) ()
     (name :text :required t))
-  (defmodel (website about) (:kind :object)
+  (defmodel (website about) (:kind :object
+                             :preview-url (format nil "~a/about?draft-key={DRAFT_KEY}" "https://x")
+                             :public-url "https://x/about")
     (body :richtext))
   (let* ((schema (current-schema))
          (space (schema-space schema "website"))
@@ -28,6 +31,9 @@
     (ok (equal (mapcar #'koya/core/schema:model-name (space-models space)) '("blog" "tag" "about")))
     (ok (eq (model-kind (space-model space "tag")) :list) "kind defaults to :list")
     (ok (eq (model-kind (space-model space "about")) :object))
+    (ok (string= (model-preview-url (space-model space "about")) "https://x/about?draft-key={DRAFT_KEY}") "options are evaluated")
+    (ok (string= (model-public-url (space-model space "about")) "https://x/about"))
+    (ok (null (model-preview-url blog)))
     (ok (= (field-option (model-field blog "title") :max-length) 100))
     (ok (string= (field-option (model-field blog "tags") :model) "tag"))
     (ok (equal (field-option (model-field blog "category") :options) '("news" "tech")))

@@ -69,10 +69,16 @@
 
 (deftest draft-keys
   (let* ((c (create-content "website" "blog" (data "{\"title\": \"x\"}")))
-         (key (ensure-draft-key (content-id c))))
-    (ok (= (length key) 32))
-    (ok (string= key (ensure-draft-key (content-id c))) "stable once generated")
-    (ok (string= key (content-draft-key (get-content (content-id c)))))))
+         (key (content-draft-key c)))
+    (ok (= (length key) 32) "a draft gets a key on creation")
+    (ok (string= key (ensure-draft-key (content-id c))) "ensure returns the current key")
+    (let ((saved (save-draft (content-id c) (data "{\"title\": \"y\"}"))))
+      (ok (string/= (content-draft-key saved) key) "every draft save rotates the key")
+      (ok (null (content-draft-key (publish-content (content-id c)))) "publishing clears it")
+      (ok (content-draft-key (unpublish-content (content-id c))) "unpublishing issues a new one"))
+    (let ((p (create-content "website" "blog" (data "{\"title\": \"pub\"}") :publish t)))
+      (ok (null (content-draft-key p)) "published content has no key")
+      (ok (= (length (ensure-draft-key (content-id p))) 32) "but one can be generated on demand"))))
 
 (deftest object-content
   (ng (find-object-content "website" "about"))

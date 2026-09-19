@@ -1,5 +1,3 @@
-(register-system-packages "3bmd-ext-code-blocks" '(:3bmd-code-blocks))
-(register-system-packages "3bmd-ext-tables" '(:3bmd-tables))
 
 (defsystem "koya"
   :version "0.1.0"

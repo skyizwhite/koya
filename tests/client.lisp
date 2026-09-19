@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server #:start #:stop)
   (:import-from #:koya-server/db/api-keys #:create-api-key)
-  (:import-from #:koya-server/lib/webhook #:*webhook-sender*)
+  (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
   (:import-from #:koya/config #:defspace #:defmodel #:clear-schema #:current-schema)
   (:import-from #:koya/core/schema #:schema-spaces #:space-name #:space-models #:model-name)
   (:import-from #:koya/client
@@ -18,6 +18,7 @@
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
+  (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (start :server :woo :port *port* :db ":memory:")
   (configure :base-url (format nil "http://127.0.0.1:~a" *port*) :secret *secret* :space "website")
@@ -67,8 +68,7 @@
     (ok (null (getf (get-list 'blog) :contents)) "draft not delivered")
     (let ((published (publish-content 'blog (getf post :id))))
       (ok (string= (getf published :status) "published"))
-      (ok (string= (getf (getf published :published) :body-html) "<h1>Hi</h1>
-")))
+      (ok (string= (getf (getf published :published) :body) "# Hi")))
     (let ((list (get-list 'blog :query '(:limit 5 :orders "-publishedAt"))))
       (ok (= (getf list :total-count) 1))
       (ok (= (getf list :limit) 5))

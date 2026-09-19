@@ -4,8 +4,6 @@
                 #:model-fields #:field-name #:field-type #:field-option #:field-many-p #:space-model)
   (:import-from #:koya/core/json
                 #:jobject #:json-array-p #:json-null)
-  (:import-from #:koya/core/markdown
-                #:render-markdown)
   (:import-from #:koya-server/db/contents
                 #:content-id #:content-status #:content-published #:content-draft #:content-draft-key
                 #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
@@ -29,14 +27,11 @@
          (content->jobject content target space :depth (1- depth)))))
 
 (defun decorate (object model space depth)
-  "Add rendered HTML for richtext fields and expand references in OBJECT (destructively)."
+  "Expand references in OBJECT (destructively). Richtext is HTML and passes through as is."
   (dolist (field (model-fields model))
     (multiple-value-bind (value found) (gethash (field-name field) object)
       (when (and found value (not (eq value json-null)))
         (case (field-type field)
-          (:richtext
-           (when (stringp value)
-             (setf (gethash (format nil "~aHtml" (field-name field)) object) (render-markdown value))))
           (:reference
            (when (and space (plusp depth))
              (let ((target (field-option field :model)))

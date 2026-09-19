@@ -8,7 +8,8 @@
   (:import-from #:bordeaux-threads-2
                 #:make-thread)
   (:export #:notify-webhooks
-           #:*webhook-sender*))
+           #:*webhook-sender*
+           #:*webhook-async*))
 (in-package #:koya-server/lib/webhook)
 
 ;;; Content change notifications, microCMS-shaped so existing receivers keep working:
@@ -25,7 +26,10 @@
 (defvar *webhook-sender* #'default-sender
   "Function (URL PAYLOAD-STRING HEADERS-ALIST) that delivers one webhook. Rebound in tests.")
 
-(defun notify-webhooks (space model id type &key old new (async t) secret)
+(defvar *webhook-async* t
+  "Deliver webhooks from a background thread. Tests bind this to NIL.")
+
+(defun notify-webhooks (space model id type &key old new (async *webhook-async*) secret)
   "Send a notification to every webhook of SPACE (a space-def). SECRET, when given,
 is sent as the X-KOYA-WEBHOOK-KEY header so receivers can authenticate the call.
 Delivery is asynchronous unless ASYNC is NIL."

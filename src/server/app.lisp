@@ -26,7 +26,6 @@
                 #:*admin-auth-middleware*)
   (:import-from #:koya-server/document
                 #:~document)
-  (:import-from #:koya-server/actions)
   (:export #:*app*
            #:*api-app*
            #:*admin-api-app*

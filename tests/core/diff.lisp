@@ -33,6 +33,17 @@
 (deftest no-changes
   (ok (null (diff-schemas (schema-a) (schema-a)))))
 
+(deftest model-options
+  (let* ((with-url (make-schema (list (make-space "website"
+                                                  :models (list (make-model "blog" :list (list (make-field :title :text :required t)
+                                                                                               (make-field :body :richtext))
+                                                                            :public-url "https://x/blog/{CONTENT_ID}")
+                                                                (make-model "about" :object (list (make-field :body :richtext))))))))
+         (changes (diff-schemas (schema-a) with-url)))
+    (ok (equal (ops changes) '(:change-model-options)))
+    (ng (destructive-changes-p changes))
+    (ok (search "options changed" (format-change (first changes))))))
+
 (deftest from-nothing
   (let ((changes (diff-schemas nil (schema-a))))
     (ok (equal (ops changes) '(:add-space :add-model :add-field :add-field :add-model :add-field)))

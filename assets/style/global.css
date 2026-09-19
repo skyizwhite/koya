@@ -37,3 +37,19 @@ body {
 .badge {
   @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium;
 }
+
+/* Quill */
+.quill-editor {
+  @apply rounded-b-md border border-line bg-panel;
+  min-height: 20rem;
+  font-size: 0.95rem;
+}
+.quill-editor .ql-editor {
+  min-height: 20rem;
+}
+.ql-toolbar.ql-snow {
+  @apply rounded-t-md border-line bg-panel;
+}
+.ql-container.ql-snow {
+  border: 0;
+}

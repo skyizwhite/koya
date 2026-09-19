@@ -9,7 +9,6 @@
                "koya-tests/core/schema"
                "koya-tests/core/validate"
                "koya-tests/core/diff"
-               "koya-tests/core/markdown"
                "koya-tests/config"
                "koya-tests/server/db"
                "koya-tests/server/contents"

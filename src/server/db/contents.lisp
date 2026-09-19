@@ -51,6 +51,9 @@
       (or (content-draft content) (content-published content))
       (content-published content)))
 
+(defun new-draft-key ()
+  (byte-array-to-hex-string (random-data 16)))
+
 (defun status-for (published draft)
   (cond ((and published draft) "published+draft")
         (published "published")
@@ -68,18 +71,20 @@
   "Insert DATA as a new content. With PUBLISH it is published immediately (at
 PUBLISHED-AT when given, for imports), otherwise saved as a draft."
   (let ((now (now-iso)))
-    (exec "INSERT INTO contents (id, space, model, status, published, draft, created_at, updated_at, published_at, revised_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           id space model (if publish "published" "draft")
           (and publish (to-json data)) (and (not publish) (to-json data))
+          (and (not publish) (new-draft-key))
           now now (and publish (or published-at now)) (and publish now))
     (get-content id)))
 
 (defun save-draft (id data)
-  "Replace the draft of content ID with DATA."
+  "Replace the draft of content ID with DATA. A fresh draft key is issued each time,
+so old preview links stop working."
   (let ((content (or (get-content id) (error "content ~a not found" id))))
-    (exec "UPDATE contents SET draft = ?, status = ?, updated_at = ? WHERE id = ?"
-          (to-json data) (status-for (content-published content) t) (now-iso) id)
+    (exec "UPDATE contents SET draft = ?, draft_key = ?, status = ?, updated_at = ? WHERE id = ?"
+          (to-json data) (new-draft-key) (status-for (content-published content) t) (now-iso) id)
     (get-content id)))
 
 (defun publish-content (id &optional data &key published-at)
@@ -88,7 +93,7 @@ PUBLISHED-AT overrides the publish date; otherwise the first publish date is kep
   (let* ((content (or (get-content id) (error "content ~a not found" id)))
          (data (or data (content-draft content) (content-published content)))
          (now (now-iso)))
-    (exec "UPDATE contents SET published = ?, draft = NULL, status = 'published', updated_at = ?,
+    (exec "UPDATE contents SET published = ?, draft = NULL, draft_key = NULL, status = 'published', updated_at = ?,
              published_at = COALESCE(?, published_at, ?), revised_at = ? WHERE id = ?"
           (to-json data) now published-at now now id)
     (get-content id)))
@@ -97,8 +102,8 @@ PUBLISHED-AT overrides the publish date; otherwise the first publish date is kep
   "Take content ID off the delivery API, keeping its data as a draft."
   (let* ((content (or (get-content id) (error "content ~a not found" id)))
          (data (or (content-draft content) (content-published content))))
-    (exec "UPDATE contents SET published = NULL, draft = ?, status = 'draft', updated_at = ?, published_at = NULL WHERE id = ?"
-          (to-json data) (now-iso) id)
+    (exec "UPDATE contents SET published = NULL, draft = ?, draft_key = ?, status = 'draft', updated_at = ?, published_at = NULL WHERE id = ?"
+          (to-json data) (new-draft-key) (now-iso) id)
     (get-content id)))
 
 (defun delete-content (id)
@@ -108,7 +113,7 @@ PUBLISHED-AT overrides the publish date; otherwise the first publish date is kep
   "Return the draft key of content ID, generating one on first use."
   (let ((content (or (get-content id) (error "content ~a not found" id))))
     (or (content-draft-key content)
-        (let ((key (byte-array-to-hex-string (random-data 16))))
+        (let ((key (new-draft-key)))
           (exec "UPDATE contents SET draft_key = ? WHERE id = ?" key id)
           key))))
 

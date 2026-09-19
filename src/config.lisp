@@ -73,15 +73,20 @@
   "Define (or redefine) a space. WEBHOOKS is evaluated and should yield a list of URLs."
   `(register-space ',name :webhooks ,webhooks))
 
-(defmacro defmodel ((space name) (&key (kind :list)) &body fields)
+(defmacro defmodel ((space name) (&key (kind :list) preview-url public-url) &body fields)
   "Define (or redefine) model NAME in SPACE. Each field is (NAME TYPE . OPTIONS)
-and is taken literally, e.g. (tags :reference :model tag :many t)."
+and is taken literally, e.g. (tags :reference :model tag :many t).
+PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI
+where {CONTENT_ID} and {DRAFT_KEY} are substituted, e.g.
+\"https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}\"."
   `(register-model ',space
                    (make-model ',name ,kind
                                (list ,@(loop :for (fname ftype . options) :in fields
                                              :collect `(make-field ',fname ,ftype
                                                                    ,@(loop :for (k v) :on options :by #'cddr
-                                                                           :append (list k `',v))))))))
+                                                                           :append (list k `',v)))))
+                               :preview-url ,preview-url
+                               :public-url ,public-url)))
 
 (defun current-schema ()
   "Return the validated schema built from all definitions so far."
