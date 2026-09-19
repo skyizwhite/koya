@@ -15,27 +15,29 @@
 ;;; {"service": SPACE, "api": MODEL, "id": ID, "type": "new"|"edit"|"delete",
 ;;;  "contents": {"old": {...}|null, "new": {...}|null}}
 
-(defun default-sender (url payload)
+(defun default-sender (url payload headers)
   (handler-case
-      (dexador:post url :headers '(("Content-Type" . "application/json")) :content payload
+      (dexador:post url :headers (cons '("Content-Type" . "application/json") headers) :content payload
                         :connect-timeout 5 :read-timeout 10)
     (error (e)
       (format *error-output* "~&[koya] webhook ~a failed: ~a~%" url e))))
 
 (defvar *webhook-sender* #'default-sender
-  "Function (URL PAYLOAD-STRING) that delivers one webhook. Rebound in tests.")
+  "Function (URL PAYLOAD-STRING HEADERS-ALIST) that delivers one webhook. Rebound in tests.")
 
-(defun notify-webhooks (space model id type &key old new (async t))
-  "Send a notification to every webhook of SPACE (a space-def). Delivery is
-asynchronous unless ASYNC is NIL."
-  (let ((urls (space-webhooks space)))
+(defun notify-webhooks (space model id type &key old new (async t) secret)
+  "Send a notification to every webhook of SPACE (a space-def). SECRET, when given,
+is sent as the X-KOYA-WEBHOOK-KEY header so receivers can authenticate the call.
+Delivery is asynchronous unless ASYNC is NIL."
+  (let ((urls (space-webhooks space))
+        (headers (and secret (list (cons "X-KOYA-WEBHOOK-KEY" secret)))))
     (when urls
       (let ((payload (to-json (jobject "service" (koya/core/schema:space-name space)
                                        "api" model
                                        "id" id
                                        "type" type
                                        "contents" (jobject "old" (or old json-null) "new" (or new json-null))))))
-        (flet ((send () (dolist (url urls) (funcall *webhook-sender* url payload))))
+        (flet ((send () (dolist (url urls) (funcall *webhook-sender* url payload headers))))
           (if async
               (make-thread #'send :name "koya-webhook")
               (send)))))))

@@ -67,7 +67,7 @@
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"labels\": \"a\"}")
              '(("labels" . "type")))
       "many requires an array")
-  (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"tags\": [\"x\"]}")
+  (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"tags\": [\"bad id!\"]}")
              '(("tags" . "type"))))
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"extra\": 1}")
              '(("extra" . "unknown_field")))))

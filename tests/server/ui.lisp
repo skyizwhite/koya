@@ -31,7 +31,7 @@
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
-  (setf *webhook-sender* (lambda (url payload) (declare (ignore url payload))))
+  (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (connect-db ":memory:")
   (migrate)
   (save-schema (make-schema (list (make-space "website" :models (list (blog-model)
@@ -96,7 +96,8 @@
     (multiple-value-bind (status body) (request :post "/s/website/keys" :form '(("action" . "create") ("label" . "ui"))
                                                 :headers '(("origin" . "http://localhost:3000")))
       (ok (= status 200))
-      (ok (search "koya_" body) "new key shown once"))))
+      (ok (search "koya_" body) "new key shown once")
+      (ok (search "Webhook secret" body)))))
 
 (deftest pages
   (multiple-value-bind (status body) (request :get "/s/website")

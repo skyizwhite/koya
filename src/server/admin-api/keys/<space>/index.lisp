@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-server/lib/http #:path-param #:read-json-body #:body-field #:fail-api #:ok-status)
-  (:import-from #:koya-server/db/schema-store #:find-space)
+  (:import-from #:koya-server/db/schema-store #:find-space #:space-webhook-secret)
   (:import-from #:koya-server/db/api-keys #:create-api-key #:list-api-keys)
   (:export #:@get #:@post))
 (in-package #:koya-server/admin-api/keys/<space>/index)
@@ -16,7 +16,9 @@
   (jobject "id" (getf key :id) "label" (getf key :label) "createdAt" (getf key :created-at)))
 
 (defun @get (params)
-  (jobject "keys" (map 'vector #'key->jobject (list-api-keys (require-space params)))))
+  (let ((space (require-space params)))
+    (jobject "keys" (map 'vector #'key->jobject (list-api-keys space))
+             "webhookSecret" (space-webhook-secret space))))
 
 (defun @post (params)
   "Create an API key. The plaintext key is only returned here."

@@ -7,8 +7,6 @@
                 #:field-option
                 #:field-required-p
                 #:field-many-p)
-  (:import-from #:koya/core/ulid
-                #:ulid-p)
   (:import-from #:koya/core/json
                 #:json-null-p
                 #:json-array-p)
@@ -19,7 +17,8 @@
   (:export #:validate-content
            #:validation-error
            #:validation-error-errors
-           #:blank-value-p))
+           #:blank-value-p
+           #:content-id-p))
 (in-package #:koya/core/validate)
 
 ;;; Validation of content data (a JSON object with camelCase keys) against a
@@ -51,6 +50,10 @@
   (and (stringp value)
        (parse-timestring value :fail-on-error nil)
        t))
+
+(defun content-id-p (value)
+  "Content ids: 1-64 URL-safe characters (ULIDs, microCMS-style ids, custom ids)."
+  (and (stringp value) (scan "^[A-Za-z0-9_-]{1,64}$" value) t))
 
 (defun slug-string-p (value)
   (and (stringp value) (scan "^[a-z0-9]+(?:-[a-z0-9]+)*$" value) t))
@@ -100,7 +103,7 @@
      (unless (and (stringp value) (member value (field-option field :options) :test #'string=))
        (list (err field "option" "must be one of ~{~a~^, ~}" (field-option field :options)))))
     ((:media :reference)
-     (unless (ulid-p value)
+     (unless (content-id-p value)
        (list (err field "type" "must be an id"))))))
 
 (defun check-value (field value)

@@ -64,14 +64,15 @@
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ? AND space = ? AND model = ?" id space model)))
     (and row (row->content row))))
 
-(defun create-content (space model data &key publish (id (make-ulid)))
-  "Insert DATA as a new content. With PUBLISH it is published immediately, otherwise saved as a draft."
+(defun create-content (space model data &key publish (id (make-ulid)) published-at)
+  "Insert DATA as a new content. With PUBLISH it is published immediately (at
+PUBLISHED-AT when given, for imports), otherwise saved as a draft."
   (let ((now (now-iso)))
     (exec "INSERT INTO contents (id, space, model, status, published, draft, created_at, updated_at, published_at, revised_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           id space model (if publish "published" "draft")
           (and publish (to-json data)) (and (not publish) (to-json data))
-          now now (and publish now) (and publish now))
+          now now (and publish (or published-at now)) (and publish now))
     (get-content id)))
 
 (defun save-draft (id data)
@@ -81,14 +82,15 @@
           (to-json data) (status-for (content-published content) t) (now-iso) id)
     (get-content id)))
 
-(defun publish-content (id &optional data)
-  "Publish DATA (or the current draft, or re-publish the published data) and clear the draft."
+(defun publish-content (id &optional data &key published-at)
+  "Publish DATA (or the current draft, or re-publish the published data) and clear the draft.
+PUBLISHED-AT overrides the publish date; otherwise the first publish date is kept."
   (let* ((content (or (get-content id) (error "content ~a not found" id)))
          (data (or data (content-draft content) (content-published content)))
          (now (now-iso)))
     (exec "UPDATE contents SET published = ?, draft = NULL, status = 'published', updated_at = ?,
-             published_at = COALESCE(published_at, ?), revised_at = ? WHERE id = ?"
-          (to-json data) now now now id)
+             published_at = COALESCE(?, published_at, ?), revised_at = ? WHERE id = ?"
+          (to-json data) now published-at now now id)
     (get-content id)))
 
 (defun unpublish-content (id)

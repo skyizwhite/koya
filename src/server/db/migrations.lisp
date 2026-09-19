@@ -19,6 +19,7 @@
      "CREATE TABLE spaces (
         name TEXT PRIMARY KEY,
         webhooks TEXT NOT NULL DEFAULT '[]',
+        webhook_secret TEXT NOT NULL,
         position INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL)"
      "CREATE TABLE models (

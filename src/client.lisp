@@ -20,7 +20,7 @@
            #:get-list #:get-item #:get-object
            #:list-contents #:get-content #:create-content #:update-content
            #:publish-content #:unpublish-content #:delete-content #:draft-key
-           #:create-api-key #:list-api-keys #:delete-api-key))
+           #:create-api-key #:list-api-keys #:delete-api-key #:webhook-secret))
 (in-package #:koya/client)
 
 ;;; HTTP client for a koya server. Delivery calls need *API-KEY*; admin calls
@@ -160,19 +160,24 @@ after interactive confirmation when CONFIRM is true. Returns the applied changes
 (defun get-content (model id &key space)
   (jvalue->lisp (request :get (admin-path space model id) :auth :owner)))
 
-(defun create-content (model data &key space publish)
-  "Create a content. DATA is a kebab plist of field values."
-  (jvalue->lisp (request :post (admin-path space model)
-                         :body (jobject "data" (lisp->jvalue data) "publish" (and publish t)) :auth :owner)))
+(defun create-content (model data &key space publish id published-at)
+  "Create a content. DATA is a kebab plist of field values. ID and PUBLISHED-AT
+(ISO 8601 string) can be given explicitly, e.g. when importing from another CMS."
+  (let ((body (jobject "data" (lisp->jvalue data) "publish" (and publish t))))
+    (when id (setf (gethash "id" body) id))
+    (when published-at (setf (gethash "publishedAt" body) published-at))
+    (jvalue->lisp (request :post (admin-path space model) :body body :auth :owner))))
 
 (defun update-content (model id data &key space)
   "Save DATA (kebab plist) as a draft, merged onto the current data."
   (jvalue->lisp (request :patch (admin-path space model id) :body (jobject "data" (lisp->jvalue data)) :auth :owner)))
 
-(defun publish-content (model id &key space data)
-  "Publish the draft of content ID, or DATA when given."
-  (jvalue->lisp (request :post (admin-path space model id "publish")
-                         :body (if data (jobject "data" (lisp->jvalue data)) (jobject)) :auth :owner)))
+(defun publish-content (model id &key space data published-at)
+  "Publish the draft of content ID, or DATA when given. PUBLISHED-AT overrides the publish date."
+  (let ((body (jobject)))
+    (when data (setf (gethash "data" body) (lisp->jvalue data)))
+    (when published-at (setf (gethash "publishedAt" body) published-at))
+    (jvalue->lisp (request :post (admin-path space model id "publish") :body body :auth :owner))))
 
 (defun unpublish-content (model id &key space)
   (jvalue->lisp (request :post (admin-path space model id "unpublish") :body (jobject) :auth :owner)))
@@ -194,6 +199,10 @@ after interactive confirmation when CONFIRM is true. Returns the applied changes
 
 (defun list-api-keys (&key space)
   (jvalue->lisp (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :owner) "keys")))
+
+(defun webhook-secret (&key space)
+  "The secret the server sends as X-KOYA-WEBHOOK-KEY for SPACE's webhooks."
+  (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :owner) "webhookSecret"))
 
 (defun delete-api-key (id &key space)
   (jvalue->lisp (request :delete (format nil "/admin/api/keys/~a/~a" (space-name space) id) :auth :owner)))

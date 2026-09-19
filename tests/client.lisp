@@ -10,7 +10,7 @@
                 #:pull #:get-list #:get-item #:get-object
                 #:list-contents #:get-content #:create-content #:update-content
                 #:publish-content #:unpublish-content #:delete-content #:draft-key
-                #:list-api-keys #:delete-api-key))
+                #:list-api-keys #:delete-api-key #:webhook-secret))
 (in-package #:koya-tests/client)
 
 (defparameter *port* 3987)
@@ -18,7 +18,7 @@
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
-  (setf *webhook-sender* (lambda (url payload) (declare (ignore url payload))))
+  (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (start :server :woo :port *port* :db ":memory:")
   (configure :base-url (format nil "http://127.0.0.1:~a" *port*) :secret *secret* :space "website")
   (clear-schema)
@@ -99,6 +99,13 @@
       (ok (string= (getf (unpublish-content 'blog (getf post :id)) :status) "draft"))
       (ok (getf (delete-content 'blog (getf post :id)) :deleted))
       (ok (= (getf (list-contents 'blog) :total-count) 0)))
+    (testing "import with explicit id and date"
+      (let ((imported (create-content 'tag '(:name "imported") :publish t :id "abc123" :published-at "2025-01-02T03:04:05.000Z")))
+        (ok (string= (getf imported :id) "abc123"))
+        (ok (string= (getf imported :published-at) "2025-01-02T03:04:05.000Z"))
+        (ok (string= (getf (get-item 'tag "abc123") :name) "imported"))))
+    (testing "webhook secret"
+      (ok (= (length (webhook-secret)) 48)))
     (testing "api keys"
       (ok (= (length (list-api-keys)) 1))
       (multiple-value-bind (key id) (koya/client:create-api-key :label "extra")

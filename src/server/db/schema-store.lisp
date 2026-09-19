@@ -11,10 +11,14 @@
                 #:diff-schemas)
   (:import-from #:koya/core/time
                 #:now-iso)
+  (:import-from #:ironclad
+                #:random-data #:byte-array-to-hex-string)
   (:export #:load-schema
            #:save-schema
            #:find-space
-           #:find-model))
+           #:find-model
+           #:space-webhook-secret
+           #:rotate-webhook-secret))
 (in-package #:koya-server/db/schema-store)
 
 ;;; The server keeps the pushed schema in the SPACES and MODELS tables. A model's
@@ -42,10 +46,22 @@
   (let ((space (find-space space-name)))
     (and space (koya/core/schema:space-model space model-name))))
 
+(defun new-secret () (byte-array-to-hex-string (random-data 24)))
+
+(defun space-webhook-secret (space-name)
+  "The secret sent as X-KOYA-WEBHOOK-KEY with every webhook of SPACE-NAME."
+  (let ((row (fetch "SELECT webhook_secret FROM spaces WHERE name = ?" space-name)))
+    (and row (col (first row) "webhook_secret"))))
+
+(defun rotate-webhook-secret (space-name)
+  (let ((secret (new-secret)))
+    (exec "UPDATE spaces SET webhook_secret = ? WHERE name = ?" secret space-name)
+    secret))
+
 (defun save-space (space position now)
-  (exec "INSERT INTO spaces (name, webhooks, position, created_at) VALUES (?, ?, ?, ?)
+  (exec "INSERT INTO spaces (name, webhooks, webhook_secret, position, created_at) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(name) DO UPDATE SET webhooks = excluded.webhooks, position = excluded.position"
-        (space-name space) (to-json (coerce (space-webhooks space) 'vector)) position now)
+        (space-name space) (to-json (coerce (space-webhooks space) 'vector)) (new-secret) position now)
   (let ((keep (mapcar #'model-name (space-models space))))
     (dolist (row (fetch "SELECT name FROM models WHERE space = ?" (space-name space)))
       (unless (member (col row "name") keep :test #'string=)

@@ -32,7 +32,7 @@
   (migrate)
   (save-schema (test-schema))
   (setf *api-key* (create-api-key "website" :label "test"))
-  (setf *webhook-sender* (lambda (url payload) (push (cons url (parse-json payload)) *webhooks*))))
+  (setf *webhook-sender* (lambda (url payload headers) (push (list url (parse-json payload) headers) *webhooks*))))
 
 (teardown
   (disconnect-db))
@@ -65,7 +65,7 @@
 (defun delivery (path &key query (key *api-key*))
   (request :get path :query query :headers (and key `(("x-koya-api-key" . ,key)))))
 
-(defun webhook-types () (mapcar (lambda (w) (jget (cdr w) "type")) (reverse *webhooks*)))
+(defun webhook-types () (mapcar (lambda (w) (jget (second w) "type")) (reverse *webhooks*)))
 
 (deftest admin-auth
   (multiple-value-bind (status json) (request :get "/admin/api/me")
@@ -146,8 +146,11 @@
         (ok (string= (jget json "published" "bodyHtml") "<h1>Hi</h1>
 ")))
       (ok (equal (webhook-types) '("new" "new")) "tag and post publish fired webhooks")
-      (ok (string= (jget (cdr (first *webhooks*)) "api") "blog"))
-      (ok (string= (jget (cdr (first *webhooks*)) "contents" "new" "title") "Hello")))
+      (ok (string= (jget (second (first *webhooks*)) "api") "blog"))
+      (ok (string= (jget (second (first *webhooks*)) "contents" "new" "title") "Hello"))
+      (ok (string= (first (first *webhooks*)) "https://example.com/hook"))
+      (ok (= (length (cdr (assoc "X-KOYA-WEBHOOK-KEY" (third (first *webhooks*)) :test #'string=))) 48)
+          "webhook carries the space secret"))
     (testing "uniqueness"
       (multiple-value-bind (status json) (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Hello")))
         (ok (= status 422))
@@ -205,6 +208,32 @@
         (ok (= status 404)))
       (ok (equal (webhook-types) '("new" "new" "edit")) "unpublish fires edit; deleting an unpublished draft fires nothing"))))
 
+(deftest import-style-create
+  (testing "explicit id and publishedAt"
+    (multiple-value-bind (status json)
+        (admin :post "/admin/api/contents/website/tag"
+               :body (jobject "data" (jobject "name" "old") "publish" t "id" "hg2papkhis4" "publishedAt" "2025-04-30T15:00:00.000Z"))
+      (ok (= status 201))
+      (ok (string= (jget json "id") "hg2papkhis4"))
+      (ok (string= (jget json "publishedAt") "2025-04-30T15:00:00.000Z")))
+    (multiple-value-bind (status json) (delivery "/api/v1/website/tag/hg2papkhis4")
+      (ok (= status 200))
+      (ok (string= (jget json "publishedAt") "2025-04-30T15:00:00.000Z")))
+    (multiple-value-bind (status json) (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "dup") "id" "hg2papkhis4"))
+      (ok (= status 409))
+      (ok (string= (jget json "error" "code") "conflict")))
+    (multiple-value-bind (status) (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "x") "id" "bad id!"))
+      (ok (= status 400)))
+    (multiple-value-bind (status) (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "x") "publish" t "publishedAt" "yesterday"))
+      (ok (= status 400))))
+  (testing "publish with publishedAt override"
+    (multiple-value-bind (status json) (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "later")))
+      (ok (= status 201))
+      (multiple-value-bind (status json) (admin :post (format nil "/admin/api/contents/website/tag/~a/publish" (jget json "id"))
+                                                :body (jobject "publishedAt" "2024-01-01T00:00:00.000Z"))
+        (ok (= status 200))
+        (ok (string= (jget json "publishedAt") "2024-01-01T00:00:00.000Z"))))))
+
 (deftest object-model
   (multiple-value-bind (status) (delivery "/api/v1/website/about")
     (ok (= status 404) "nothing yet"))
@@ -258,7 +287,8 @@
       (multiple-value-bind (status json) (admin :get "/admin/api/keys/website")
         (ok (= status 200))
         (ok (= (length (jget json "keys")) 2))
-        (ok (every (lambda (k) (null (jget k "key"))) (jget json "keys")) "plaintext never listed"))
+        (ok (every (lambda (k) (null (jget k "key"))) (jget json "keys")) "plaintext never listed")
+        (ok (= (length (jget json "webhookSecret")) 48)))
       (multiple-value-bind (status) (admin :delete (format nil "/admin/api/keys/website/~a" id))
         (ok (= status 200)))
       (multiple-value-bind (status) (delivery "/api/v1/website/blog" :key key)

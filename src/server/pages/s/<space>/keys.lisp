@@ -1,7 +1,7 @@
 (defpackage #:koya-server/pages/s/<space>/keys
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya-server/db/schema-store #:find-space)
+  (:import-from #:koya-server/db/schema-store #:find-space #:space-webhook-secret #:rotate-webhook-secret)
   (:import-from #:koya-server/db/api-keys #:create-api-key #:list-api-keys #:delete-api-key)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
@@ -38,7 +38,17 @@
        (div :class "flex-1"
          (label :for "label" :class "label" "Label")
          (input :type "text" :id "label" :name "label" :class "input mt-1.5" :placeholder "e.g. production site"))
-       (button :type "submit" :class "btn btn-primary" "Create key")))))
+       (button :type "submit" :class "btn btn-primary" "Create key"))
+     (section :class "mt-12"
+       (h2 :class "mb-2 text-lg font-bold" "Webhook secret")
+       (p :class "mb-3 text-sm text-muted"
+         "Sent as " (code "X-KOYA-WEBHOOK-KEY") " with every webhook of this space. Verify it on the receiving end.")
+       (div :class "flex items-center gap-3"
+         (code :class "select-all break-all rounded border border-line bg-panel px-2 py-1 font-mono text-sm"
+           (space-webhook-secret space))
+         (form :method "post" :action (format nil "~a/keys" (space-url space))
+           (input :type "hidden" :name "action" :value "rotate-webhook-secret")
+           (button :type "submit" :class "btn" :onclick "return confirm('Rotate the webhook secret?')" "Rotate")))))))
 
 (defun ensure-space (params)
   (let ((name (path-param params :space)))
@@ -63,4 +73,8 @@
              (delete-api-key space (or (param params "id") ""))
              (set-title (format nil "API keys · ~a · koya" space))
              (hsx (~keys-page :space space :message "Key deleted.")))
+            ((equal action "rotate-webhook-secret")
+             (rotate-webhook-secret space)
+             (set-title (format nil "API keys · ~a · koya" space))
+             (hsx (~keys-page :space space :message "Webhook secret rotated.")))
             (t (set-response-status 400) (hsx (~layout :space space (p "Unknown action"))))))))
