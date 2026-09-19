@@ -40,8 +40,10 @@ first element is a keyword become objects, other lists become arrays."
         (t value)))
 
 (defun jvalue->lisp (value)
-  "Inverse of LISP->JVALUE. Objects become kebab-keyword plists, arrays become lists."
-  (cond ((hash-table-p value) (object->plist value))
+  "Inverse of LISP->JVALUE. Objects become kebab-keyword plists, arrays become
+lists and JSON null becomes NIL (so (getf item :published-at) is NIL for drafts)."
+  (cond ((eq value 'null) nil)
+        ((hash-table-p value) (object->plist value))
         ((and (vectorp value) (not (stringp value)))
          (map 'list #'jvalue->lisp value))
         (t value)))

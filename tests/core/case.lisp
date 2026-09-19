@@ -18,6 +18,12 @@
   (ok (eq (kebab-keyword "publishedAt") :published-at))
   (ok (eq (kebab-keyword "totalCount") :total-count)))
 
+(deftest null-becomes-nil
+  (let ((back (jvalue->lisp (parse-json "{\"publishedAt\": null, \"tags\": [null, \"a\"], \"n\": 0}"))))
+    (ok (null (getf back :published-at)))
+    (ok (equal (getf back :tags) '(nil "a")))
+    (ok (eql (getf back :n) 0))))
+
 (deftest round-trip
   (let* ((lisp '(:title "Hello" :published-at "2026-01-01T00:00:00Z" :tags ("a" "b")
                  :meta (:view-count 3 :draft nil)))

@@ -78,6 +78,13 @@
         (ok (getf item :published-at))))
     (let ((item (get-item 'blog (getf post :id) :query '(:fields "id,title"))))
       (ok (equal (sort (loop :for k :in item :by #'cddr :collect k) #'string<) '(:id :title))))
+    (testing "an unpublished draft previews with a nil publishedAt"
+      (let* ((draft (create-content 'blog '(:title "Only a draft")))
+             (item (get-item 'blog (getf draft :id) :query (list :draft-key (getf draft :draft-key)))))
+        (ok (string= (getf item :title) "Only a draft"))
+        (ok (member :published-at item) "key is present")
+        (ok (null (getf item :published-at)) "but nil, not the null symbol")
+        (delete-content 'blog (getf draft :id))))
     (testing "drafts and preview"
       (update-content 'blog (getf post :id) '(:title "Hello v2"))
       (ok (string= (getf (get-item 'blog (getf post :id)) :title) "Hello"))
