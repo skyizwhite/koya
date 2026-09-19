@@ -11,7 +11,8 @@
            #:form-values
            #:form-value
            #:slugify
-           #:value->string))
+           #:value->string
+           #:normalize-richtext))
 (in-package #:koya-server/lib/forms)
 
 ;;; Conversion between HTML form submissions and content data objects.
@@ -40,6 +41,18 @@
 
 (defun split-ids (string)
   (remove "" (mapcar (lambda (s) (string-trim " " s)) (split "[,\\s]+" string)) :test #'string=))
+
+(defparameter +block-close-pattern+
+  "(</(?:p|h[1-6]|ul|ol|li|blockquote|pre|table|thead|tbody|tr|figure)>|<hr\\s*/?>)\\s*"
+  "Block-level boundaries after which the stored HTML gets a newline.")
+
+(defun normalize-richtext (html)
+  "Tidy rich text HTML coming from the editor: an empty paragraph becomes a visible
+blank line and every block element ends with a newline, so the stored source
+stays readable and diffs cleanly."
+  (let* ((html (regex-replace-all "<p>\\s*</p>" html "<p><br></p>"))
+         (html (regex-replace-all +block-close-pattern+ html (format nil "\\1~%"))))
+    (string-trim '(#\Newline #\Return #\Space) html)))
 
 (defun form->data (model params)
   "Build a content data object from PARAMS for MODEL. Blank inputs are omitted,
@@ -70,7 +83,7 @@ except booleans which are always present (unchecked = false)."
           (:richtext
            ;; Quill reports an empty document as <p></p> or <p><br></p>.
            (when (and raw (not (scan "^(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" raw)))
-             (setf (gethash (field-name field) data) raw)))
+             (setf (gethash (field-name field) data) (normalize-richtext raw))))
           (t
            (when raw (setf (gethash (field-name field) data) raw))))))
     data))

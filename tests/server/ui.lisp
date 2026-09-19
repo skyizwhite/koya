@@ -7,7 +7,7 @@
   (:import-from #:koya-server/db/contents #:list-contents #:content-status #:content-published #:content-draft #:content-id)
   (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
-  (:import-from #:koya-server/lib/forms #:slugify)
+  (:import-from #:koya-server/lib/forms #:slugify #:normalize-richtext)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema)
   (:import-from #:koya/core/json #:jget)
   (:import-from #:alexandria #:alist-hash-table)
@@ -214,6 +214,20 @@
       (declare (ignore body))
       (ok (= status 302))
       (ng (search "/new" (location headers)) "now redirects to the existing content"))))
+
+(deftest normalize-richtext-test
+  (ok (string= (normalize-richtext "<p>a</p><p></p><h2>b</h2><ul><li>x</li><li>y</li></ul><hr><p>c<br>d</p>")
+               "<p>a</p>
+<p><br></p>
+<h2>b</h2>
+<ul><li>x</li>
+<li>y</li>
+</ul>
+<hr>
+<p>c<br>d</p>"))
+  (ok (string= (normalize-richtext "<p>x</p>
+") "<p>x</p>") "already formatted input is left alone apart from trailing whitespace")
+  (ok (string= (normalize-richtext "<p>a&nbsp;b</p>") "<p>a&nbsp;b</p>") "entities are not touched server-side"))
 
 (deftest slugify-test
   (ok (string= (slugify "Hello, World!") "hello-world"))
