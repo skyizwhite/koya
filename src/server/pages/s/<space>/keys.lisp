@@ -5,7 +5,7 @@
   (:import-from #:koya-server/db/api-keys #:create-api-key #:list-api-keys #:delete-api-key)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:with-owner-post #:set-title #:param #:~layout #:~flash #:~empty-state #:space-url)
+                #:with-owner #:with-owner-post #:set-title #:param #:short-time #:~layout #:~flash #:~empty-state #:space-url)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/keys)
 
@@ -22,12 +22,12 @@
        (if (null keys)
            (hsx (~empty-state "No API keys yet."))
            (hsx (table :class "w-full text-sm"
-                  (thead (tr :class "text-left text-muted" (th :class "py-2" "Label") (th "Created") (th "")))
+                  (thead (tr :class "text-left text-muted" (th :class "py-2" "Label") (th "Created at") (th "")))
                   (tbody :class "divide-y divide-line"
                     (loop :for key :in keys :collect
                       (hsx (tr
                              (td :class "py-2 font-medium" (if (string= (getf key :label) "") (hsx (span :class "text-muted" "(no label)")) (getf key :label)))
-                             (td :class "text-muted" (getf key :created-at))
+                             (td :class "text-muted" (short-time (getf key :created-at)))
                              (td :class "text-right"
                                (form :method "post" :action (format nil "~a/keys" (space-url space))
                                  (input :type "hidden" :name "action" :value "delete")

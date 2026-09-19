@@ -7,14 +7,14 @@
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/db/contents
                 #:find-content #:content-id #:content-status #:content-published #:content-draft
-                #:content-updated-at #:content-draft-key #:content-data)
+                #:content-created-at #:content-updated-at #:content-draft-key #:content-data)
   (:import-from #:koya-server/lib/content-service
                 #:resolve-model #:create #:update-draft #:publish #:unpublish #:destroy)
   (:import-from #:koya-server/lib/http #:path-param #:api-error)
   (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:redirect-to #:param #:set-flash #:expand-url-template
-                #:~layout #:~status-badge #:~errors #:content-url #:model-url)
+                #:short-time #:~layout #:~status-badge #:~errors #:content-url #:model-url)
   (:import-from #:koya-server/components/field-input #:~field-input)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>)
@@ -28,10 +28,23 @@
 (defcomp ~external-link (&key href children)
   (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" children " ↗")))
 
+(defcomp ~action-button (&key value (class "btn") onclick children)
+  "A submit button for the editor form, usable outside the form element."
+  (hsx (button :type "submit" :form "editor-form" :name "action" :value value :class class :onclick onclick
+         children)))
+
+(defcomp ~meta (&key content)
+  (hsx
+   (div :class "mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"
+     (~status-badge :status (content-status content))
+     (span "created at " (short-time (content-created-at content)))
+     (span "updated at " (short-time (content-updated-at content))))))
+
 (defcomp ~editor (&key space model content data errors)
   (let* ((space-name (space-name space))
          (model-name (model-name model))
          (id (if content (content-id content) "new"))
+         (object-p (eq (model-kind model) :object))
          (published (and content (content-published content)))
          (draft (and content (content-draft content)))
          (preview-url (and draft (content-draft-key content)
@@ -40,36 +53,39 @@
          (public-url (and published (expand-url-template (model-public-url model) :id id))))
     (hsx
      (~layout :space space-name
-              :crumbs (list (cons model-name (model-url space-name model-name))
-                            (cons (if content id "new") nil))
-       (div :class "mb-6 flex flex-wrap items-center justify-between gap-3"
-         (div
-           (h1 :class "text-2xl font-bold" model-name
-             (span :class "ml-3 font-mono text-sm font-normal text-muted" id))
-           (if content
-               (hsx (div :class "mt-1 flex items-center gap-3 text-sm text-muted"
-                      (~status-badge :status (content-status content))
-                      (span "updated " (content-updated-at content))))
-               (hsx (<>))))
-         (div :class "flex items-center gap-2"
-           (if preview-url (hsx (~external-link :href preview-url "Preview draft")) (hsx (<>)))
-           (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>)))))
+              :crumbs (if object-p
+                          (list (cons model-name nil))
+                          (list (cons model-name (model-url space-name model-name))
+                                (cons (if content id "new") nil)))
+       ;; Sticky action bar: title and metadata on the left, links and actions on the right.
+       (div :class "sticky top-0 z-10 -mx-4 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
+         (div :class "flex flex-wrap items-start justify-between gap-4"
+           (div
+             (h1 :class "text-2xl font-bold" model-name
+               (if object-p
+                   (hsx (<>))
+                   (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
+             (if content (hsx (~meta :content content)) (hsx (<>))))
+           (div :class "flex flex-wrap items-center gap-2"
+             (if preview-url (hsx (~external-link :href preview-url "Preview draft")) (hsx (<>)))
+             (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>)))
+             (if (or preview-url public-url) (hsx (span :class "mx-1 h-6 w-px bg-line")) (hsx (<>)))
+             (if published (hsx (~action-button :value "unpublish" "Unpublish")) (hsx (<>)))
+             (~action-button :value "save" "Save draft")
+             (~action-button :value "publish" :class "btn btn-primary" "Publish"))))
        (~errors :errors errors)
-       (form :method "post" :action (content-url space-name model-name id) :class "space-y-6" :data-editor-form t
+       (form :id "editor-form" :method "post" :action (content-url space-name model-name id)
+             :class "space-y-6" :data-editor-form t
          (loop :for field :in (model-fields model) :collect
            (hsx (~field-input :field field
                               :value (and data (gethash (field-name field) data))
-                              :error (field-error errors (field-name field)))))
-         (div :class "flex flex-wrap items-center gap-3 border-t border-line pt-6"
-           (button :type "submit" :name "action" :value "save" :class "btn" "Save draft")
-           (button :type "submit" :name "action" :value "publish" :class "btn btn-primary" "Publish")
-           (if published
-               (hsx (button :type "submit" :name "action" :value "unpublish" :class "btn" "Unpublish"))
-               (hsx (<>)))
-           (if content
-               (hsx (button :type "submit" :name "action" :value "delete" :class "btn btn-danger ml-auto"
-                            :onclick "return confirm('Delete this content?')" "Delete"))
-               (hsx (<>)))))))))
+                              :error (field-error errors (field-name field))))))
+       (if content
+           (hsx (div :class "mt-12 flex items-center justify-between border-t border-line pt-6 text-sm text-muted"
+                  (span (if object-p "Delete this content and start over." "Delete this content permanently."))
+                  (~action-button :value "delete" :class "btn btn-danger"
+                                  :onclick "return confirm('Delete this content?')" "Delete")))
+           (hsx (<>)))))))
 
 (defun load-editor (params)
   "Return (values space model content) for the route, or signal 404 for unknown model."

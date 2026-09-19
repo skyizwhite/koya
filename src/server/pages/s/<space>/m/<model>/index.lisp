@@ -5,11 +5,13 @@
   (:import-from #:koya/core/json #:json-null)
   (:import-from #:koya-server/db/schema-store #:find-model)
   (:import-from #:koya-server/db/contents
-                #:list-contents #:find-object-content #:content-id #:content-status #:content-updated-at #:content-data)
+                #:list-contents #:find-object-content #:content-id #:content-status
+                #:content-created-at #:content-updated-at #:content-data)
   (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:redirect-to #:~layout #:~status-badge #:~empty-state #:content-url #:model-url)
+                #:with-owner #:set-title #:redirect-to #:short-time #:~layout #:~status-badge #:~empty-state
+                #:content-url #:model-url)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
 
@@ -39,7 +41,7 @@
              (set-title (format nil "~a · ~a · koya" model-name space))
              (multiple-value-bind (contents total)
                  (list-contents space model-name model
-                                (parse-query (list (cons "limit" "100") (cons "orders" "-updatedAt")))
+                                (parse-query (list (cons "limit" "100") (cons "orders" "-createdAt")))
                                 :status :all)
                (hsx
                 (~layout :space space :crumbs (list (cons model-name nil))
@@ -51,7 +53,7 @@
                       (hsx (~empty-state "No contents yet."))
                       (hsx (table :class "w-full text-sm"
                              (thead (tr :class "text-left text-muted"
-                                      (th :class "py-2" "Title") (th "Status") (th "Updated")))
+                                      (th :class "py-2" "Title") (th "Status") (th "Created at") (th "Updated at")))
                              (tbody :class "divide-y divide-line"
                                (loop :for content :in contents :collect
                                  (hsx (tr
@@ -60,4 +62,5 @@
                                              :class "font-medium hover:underline"
                                              (content-title content model)))
                                         (td (~status-badge :status (content-status content)))
-                                        (td :class "text-muted" (content-updated-at content)))))))))))))))))
+                                        (td :class "text-muted" (short-time (content-created-at content)))
+                                        (td :class "text-muted" (short-time (content-updated-at content))))))))))))))))))

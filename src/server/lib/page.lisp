@@ -23,6 +23,7 @@
            #:set-flash
            #:take-flash
            #:expand-url-template
+           #:short-time
            #:~layout
            #:~status-badge
            #:~flash
@@ -56,6 +57,12 @@
     (when flash
       (remhash "flash" session)
       (values (first flash) (second flash)))))
+
+(defun short-time (iso)
+  "2026-09-20T05:04:03.123Z -> 2026-09-20 05:04 UTC"
+  (if (and (stringp iso) (>= (length iso) 16))
+      (format nil "~a ~a UTC" (subseq iso 0 10) (subseq iso 11 16))
+      (or iso "")))
 
 (defun expand-url-template (template &key id draft-key)
   "Fill {CONTENT_ID} and {DRAFT_KEY} in a model's preview/public URL template."
