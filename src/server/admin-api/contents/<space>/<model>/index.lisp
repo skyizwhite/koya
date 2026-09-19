@@ -1,0 +1,30 @@
+(defpackage #:koya-server/admin-api/contents/<space>/<model>/index
+  (:use #:cl)
+  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-server/lib/http #:path-param #:read-json-body #:body-field #:fail-api #:ok-status)
+  (:import-from #:koya-server/lib/query #:parse-query #:query-limit #:query-offset)
+  (:import-from #:koya-server/lib/content-service #:resolve-model #:create)
+  (:import-from #:koya-server/lib/presenter #:admin-content->jobject)
+  (:import-from #:koya-server/db/contents #:list-contents)
+  (:export #:@get #:@post))
+(in-package #:koya-server/admin-api/contents/<space>/<model>/index)
+
+(defun @get (params)
+  "List every content of the model, drafts included."
+  (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
+    (declare (ignore space))
+    (let ((query (parse-query params)))
+      (multiple-value-bind (contents total)
+          (list-contents (path-param params :space) (path-param params :model) model query :status :all)
+        (jobject "contents" (map 'vector (lambda (c) (admin-content->jobject c model)) contents)
+                 "totalCount" total "offset" (query-offset query) "limit" (query-limit query))))))
+
+(defun @post (params)
+  "Create a content from {\"data\": {...}, \"publish\": bool}."
+  (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
+    (let* ((body (read-json-body))
+           (data (body-field body "data")))
+      (unless (hash-table-p data) (fail-api 400 "bad_request" "\"data\" must be an object"))
+      (let ((content (create space model data :publish (eq (body-field body "publish") t))))
+        (ok-status 201)
+        (admin-content->jobject content model)))))

@@ -1,0 +1,8 @@
+.qlot/
+bin/
+assets/style/dist.css
+.env
+*.db
+*.db-*
+data/
+*.fasl

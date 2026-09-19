@@ -1,0 +1,8 @@
+.git
+.qlot
+.env
+bin/
+data/
+assets/style/dist.css
+docs/
+tests/

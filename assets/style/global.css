@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@source "../../src/server";
+
+@theme {
+  --color-base: #fbfaf7;
+  --color-fg: #1f1d1a;
+  --color-muted: #6b665e;
+  --color-line: #e6e1d8;
+  --color-panel: #ffffff;
+  --color-accent: #b5541c;
+  --color-accent-fg: #ffffff;
+  --color-ok: #2f7a4d;
+  --color-warn: #b8860b;
+  --color-danger: #a83232;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.btn {
+  @apply inline-flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm font-medium text-fg hover:bg-base disabled:opacity-50;
+}
+.btn-primary {
+  @apply border-accent bg-accent text-accent-fg hover:bg-accent/90;
+}
+.btn-danger {
+  @apply border-danger text-danger hover:bg-danger/10;
+}
+.input {
+  @apply w-full rounded-md border border-line bg-panel px-3 py-2 text-sm text-fg focus:border-accent focus:outline-none;
+}
+.label {
+  @apply block text-sm font-medium text-fg;
+}
+.badge {
+  @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium;
+}

@@ -1,0 +1,21 @@
+ql clack
+ql lack
+git cl-jingle https://github.com/dnaeon/cl-jingle.git
+git hsx https://github.com/skyizwhite/hsx.git
+git ningle-fbr https://github.com/skyizwhite/ningle-fbr.git
+git ningle-actions https://github.com/skyizwhite/ningle-actions.git
+git lack-mw https://github.com/skyizwhite/lack-mw.git
+ql clack-errors
+ql cl-dotenv
+ql cl-dbi
+ql sxql
+ql jzon
+ql kebab
+ql dexador
+ql quri
+ql 3bmd
+ql ironclad
+ql local-time
+ql cl-ppcre
+ql alexandria
+git rove https://github.com/fukamachi/rove

@@ -1,0 +1,37 @@
+(defpackage #:koya-server/api/v1/<space>/<model>/index
+  (:use #:cl)
+  (:import-from #:koya/core/schema #:model-kind)
+  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-server/lib/http #:path-param #:query-param #:fail-api)
+  (:import-from #:koya-server/lib/auth #:require-api-key)
+  (:import-from #:koya-server/lib/query #:parse-query #:query-limit #:query-offset #:query-fields #:query-depth)
+  (:import-from #:koya-server/lib/content-service #:resolve-model)
+  (:import-from #:koya-server/lib/presenter #:content->jobject)
+  (:import-from #:koya-server/db/contents
+                #:list-contents #:find-object-content #:content-published #:content-draft-key)
+  (:export #:@get))
+(in-package #:koya-server/api/v1/<space>/<model>/index)
+
+(defun @get (params)
+  (let ((space-name (path-param params :space))
+        (model-name (path-param params :model)))
+    (require-api-key space-name)
+    (multiple-value-bind (space model) (resolve-model space-name model-name)
+      (let ((query (parse-query params)))
+        (if (eq (model-kind model) :object)
+            (let* ((content (find-object-content space-name model-name))
+                   (draft-key (query-param params "draftKey"))
+                   (draft (and content draft-key (content-draft-key content)
+                               (string= draft-key (content-draft-key content)))))
+              (unless (and content (or draft (content-published content)))
+                (fail-api 404 "not_found" "Content does not exist"))
+              (content->jobject content model space :draft draft
+                                :fields (query-fields query) :depth (query-depth query)))
+            (multiple-value-bind (contents total) (list-contents space-name model-name model query)
+              (jobject "contents" (map 'vector (lambda (c) (content->jobject c model space
+                                                                             :fields (query-fields query)
+                                                                             :depth (query-depth query)))
+                                       contents)
+                       "totalCount" total
+                       "offset" (query-offset query)
+                       "limit" (query-limit query))))))))
