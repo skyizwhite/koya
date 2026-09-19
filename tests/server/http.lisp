@@ -206,6 +206,22 @@
         (ok (= status 404)))
       (ok (equal (webhook-types) '("new" "new" "edit")) "unpublish fires edit; deleting an unpublished draft fires nothing"))))
 
+(deftest delete-published-webhook
+  (let ((post-id nil))
+    (multiple-value-bind (status json) (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Bye") "publish" t))
+      (ok (= status 201))
+      (setf post-id (jget json "id")))
+    (multiple-value-bind (status json) (admin :delete (format nil "/admin/api/contents/website/blog/~a" post-id))
+      (ok (= status 200))
+      (ok (eq (jget json "deleted") t)))
+    (ok (equal (webhook-types) '("new" "delete")))
+    (let ((hook (first *webhooks*)))
+      (ok (string= (jget (second hook) "id") post-id))
+      (ok (string= (jget (second hook) "contents" "old" "title") "Bye"))
+      (ok (eq (jget (second hook) "contents" "new") json-null))
+      (ok (= (length (cdr (assoc "X-KOYA-WEBHOOK-KEY" (third hook) :test #'string=))) 48)
+          "delete webhook carries the space secret"))))
+
 (deftest import-style-create
   (testing "explicit id and publishedAt"
     (multiple-value-bind (status json)

@@ -93,12 +93,15 @@
         ((get-content id) (fail-api 409 "conflict" (format nil "Content ~a already exists" id)))
         (t id)))
 
-(defun notify (space model-name content type &key old)
-  (notify-webhooks space model-name (content-id content) type
+(defun published-view (space model content)
+  (and (content-published content)
+       (content->jobject content model space :depth 0)))
+
+(defun notify (space model-name id type &key old new)
+  (notify-webhooks space model-name id type
                    :secret (space-webhook-secret (space-name space))
                    :old old
-                   :new (and (content-published content)
-                             (content->jobject content (space-model space model-name) space :depth 0))))
+                   :new new))
 
 (defun create (space model data &key publish id published-at)
   "Create a content. ID and PUBLISHED-AT (ISO 8601) may be given explicitly, e.g.
@@ -111,7 +114,8 @@ when importing. For object-kind models the single existing content is updated in
              (let ((content (apply #'create-content space-name model-name data
                                    :publish publish :published-at published-at
                                    (and (check-new-id id) (list :id id)))))
-               (when publish (notify space model-name content "new"))
+               (when publish
+                 (notify space model-name (content-id content) "new" :new (published-view space model content)))
                content)))
       (if (eq (model-kind model) :object)
           (let ((existing (find-object-content space-name model-name)))
@@ -136,28 +140,27 @@ when importing. For object-kind models the single existing content is updated in
          (content (resolve-content space-name model-name id))
          (data (or data (content-data content :draft t)))
          (published-at (check-published-at published-at))
-         (old (and (content-published content) (content->jobject content model space :depth 0)))
+         (old (published-view space model content))
          (type (if (content-published-at content) "edit" "new")))
     (check-content space-name model data :exclude-id id)
     (let ((published (publish-content id data :published-at published-at)))
-      (notify space model-name published type :old old)
+      (notify space model-name id type :old old :new (published-view space model published))
       published)))
 
 (defun unpublish (space model id)
   (let* ((space-name (space-name space))
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
-         (old (and (content-published content) (content->jobject content model space :depth 0))))
+         (old (published-view space model content)))
     (let ((result (unpublish-content id)))
-      (when old (notify space model-name result "edit" :old old))
+      (when old (notify space model-name id "edit" :old old))
       result)))
 
 (defun destroy (space model id)
   (let* ((space-name (space-name space))
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
-         (old (and (content-published content) (content->jobject content model space :depth 0))))
+         (old (published-view space model content)))
     (delete-content id)
-    (when old
-      (notify-webhooks space model-name id "delete" :old old))
+    (when old (notify space model-name id "delete" :old old))
     t))
