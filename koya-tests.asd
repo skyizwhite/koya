@@ -2,7 +2,8 @@
   :class :package-inferred-system
   :pathname "tests"
   :depends-on ("rove"
-               "dbd-sqlite3"
+               "koya"
+               "koya-server"
                "koya-tests/core/ulid"
                "koya-tests/core/case"
                "koya-tests/core/schema"

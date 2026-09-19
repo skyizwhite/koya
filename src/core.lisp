@@ -1,5 +1,4 @@
 (uiop:define-package #:koya/core
-  (:nicknames #:koya/core/main)
   (:use #:cl)
   (:use-reexport #:koya/core/ulid
                  #:koya/core/time
