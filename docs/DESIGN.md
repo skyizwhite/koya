@@ -240,7 +240,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - `contents.published` と `contents.draft` の2カラム。status は `draft` / `published` / `published+draft`。
 - `draftKey` でドラフトをプレビュー取得(microCMS 互換)。
 - 公開・更新・削除時に space の webhook を呼ぶ(website の revalidate が受け口)。
-  ペイロードは microCMS 互換に近い形(`api`、`id`、`type`、`contents.old/new`)。
+  ペイロードは microCMS 互換に近い形(`service`、`api`、`id`、`type`、`contents.old/new`)。
+  space ごとに生成される秘密を `X-KOYA-WEBHOOK-KEY` ヘッダで送り、受け側で照合する。下書き保存では呼ばない。
 - 履歴(revisions)は初期スコープ外。
 
 ## 10. 技術スタック
@@ -359,3 +360,6 @@ website から流用するパターン:
 | 2026-09-20 | 破壊的 push は 409 → `force=true` で再送 | 確認の UI をクライアント側に置きつつ判定は本体 |
 | 2026-09-20 | 管理 API は `/admin/api/contents/…` `/admin/api/keys/…` に配置 | `schema` 等の固定パスと space 名の衝突を避ける |
 | 2026-09-20 | 配信 API は `X-MICROCMS-API-KEY` も受理 | 既存 SDK からの移行を容易にする |
+| 2026-09-20 | Webhook は space ごとの秘密を `X-KOYA-WEBHOOK-KEY` で送る(管理 UI で表示・ローテート) | 受け側が呼び出し元を検証できるようにする |
+| 2026-09-20 | 作成・公開時に `id` と `publishedAt` を明示指定できる。参照 id は URL セーフ文字列なら可 | microCMS からの移行で URL と公開日を維持する |
+| 2026-09-20 | website の移行は `koya-migration` ブランチで実施(ローカル koya で全ページ表示を確認) | M1 完了条件 |
