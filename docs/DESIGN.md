@@ -21,7 +21,7 @@ koya は **本体(server)** と **ライブラリ(client)** の2つで構成す�
 ```
 ┌─ 利用側プロジェクト(例: website)────────┐      ┌─ koya 本体(Coolify 上)──────────┐
 │  (defspace website ...)                  │      │  管理 Web アプリ(hsx + HTMX)     │
-│  (defmodel (website blog) ...)  ─ push ─▶│─────▶│  管理 API   /admin/api/...        │
+│  (defmodel (website blog) ...)  ─ deploy ▶│─────▶│  管理 API   /admin/api/...        │
 │  (koya:get-list 'blog ...)      ◀ fetch ─│◀─────│  配信 API   /api/v1/{space}/...   │
 │  REPL                                    │      │  SQLite(models, contents, ...)   │
 └──────────────────────────────────────────┘      └───────────────────────────────────┘
@@ -54,20 +54,23 @@ koya/
   Dockerfile
   docs/
     DESIGN.md         ; 本書
-    SCHEMA.md         ; スキーマ JSON 仕様
-    openapi.yaml      ; 配信 API / 管理 API 仕様
+    SCHEMA.md         ; スキーマ JSON 仕様(未作成、M2)
+    openapi.yaml      ; 配信 API / 管理 API 仕様(未作成、M2)
   src/
-    core/             ; schema, field-types, validate, serialize, ulid, markdown
-    client/           ; http, push, plan, pull, get-list ...
+    main.lisp         ; koya パッケージ(config + client の再エクスポート)
+    config.lisp       ; defspace / defmodel / current-schema
+    client.lisp       ; HTTP クライアント: plan / deploy / pull、get-list ...、管理 API ラッパ
+    core/             ; schema, validate, diff, json, case, time, ulid
     server/
-      app.lisp  main.lisp  document.lisp  helper.lisp
-      pages/          ; 管理 UI(ningle-fbr)
+      app.lisp  main.lisp  document.lisp
+      pages/          ; 管理 UI(ningle-fbr。ディレクトリ = URL)
+      components/     ; フォーム入力などの hsx コンポーネント
       api/            ; 配信 API
-      admin-api/      ; 管理 API(schema push/pull/plan、contents CRUD、api-keys、media)
-      db/             ; connection, migrations, queries
-      lib/            ; env, auth, session, webhook
+      admin-api/      ; 管理 API(schema plan/deploy/pull、contents CRUD、keys)
+      db/             ; connection, migrations, schema-store, contents, api-keys
+      lib/            ; env, auth, http, query, presenter, content-service, forms, page, webhook
   tests/              ; src/ を mirror
-  assets/style/       ; Tailwind 入力 / 出力
+  assets/             ; style/(Tailwind 入力 / 出力)、js/(htmx, quill, koya-editor.js)
 ```
 
 ## 3. コンテンツモデリング
@@ -78,13 +81,13 @@ koya/
 
 ```lisp
 (defspace website
-  :webhooks ("https://skyizwhite.dev/api/revalidate"))
+  :webhooks '("https://skyizwhite.dev/api/revalidate"))   ; 評価される(関数呼び出しも可)
 
 (defmodel (website blog) (:kind :list)
   (title        :text     :required t)
   (description  :text)
   (content      :richtext)
-  (tags         :reference (website tag) :many t)
+  (tags         :reference :model tag :many t)
   (published-at :datetime))
 
 (defmodel (website about) (:kind :object)
@@ -96,10 +99,10 @@ koya/
 | 型 | 保存値 | 主なオプション |
 |---|---|---|
 | `:text` | 文字列 | `:required` `:max-length` `:pattern` `:unique` |
-| `:textarea` | 文字列 | 同上 |
-| `:richtext` | Markdown 文字列。HTML は保存時に生成し `xxxHtml` として併せて返す | `:required` |
-| `:number` | 数値 | `:min` `:max` `:integer` |
-| `:boolean` | 真偽 | `:default` |
+| `:textarea` | 文字列 | `:required` `:max-length` |
+| `:richtext` | HTML 文字列(Quill で編集、API はそのまま返す) | `:required` |
+| `:number` | 数値 | `:required` `:min` `:max` `:integer` |
+| `:boolean` | 真偽 | `:required` `:default` |
 | `:date` / `:datetime` | ISO 8601 文字列(UTC) | `:required` |
 | `:select` | 文字列(`:many` で配列) | `:options ("a" "b")` `:many` |
 | `:media` | media id。API では URL 付きオブジェクトに展開 | `:required` |
@@ -161,10 +164,11 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   `[less_than]` `[greater_than]` と `[and]` `[or]` の主要なもののみ。
 - **管理 API**: `/admin/api/...`(実装済みのパス)。
   - `GET /admin/api/me`(疎通・認証確認)
-  - `GET /admin/api/schema`(pull)、`PUT /admin/api/schema[?force=true]`(push)、`POST /admin/api/schema/plan`
-    - push に破壊的変更が含まれ `force` が無い場合は `409 destructive_changes` を返し、`details` に変更一覧を載せる。
+  - `GET /admin/api/schema`(pull)、`PUT /admin/api/schema[?force=true]`(deploy)、`POST /admin/api/schema/plan`
+    - deploy に破壊的変更が含まれ `force` が無い場合は `409 destructive_changes` を返し、`details` に変更一覧を載せる。
       クライアントはそれを表示して確認を取り、`force=true` で再送する(差分計算は本体側)。
-  - `/admin/api/contents/{space}/{model}`: `GET`(下書き含む一覧)`POST`(`{"data": {...}, "publish": bool}`)
+  - `/admin/api/contents/{space}/{model}`: `GET`(下書き含む一覧)`POST`(`{"data": {...}, "publish": bool}`。
+    移行用に `id` と `createdAt` `updatedAt` `publishedAt` `revisedAt` を任意で指定できる)
   - `/admin/api/contents/{space}/{model}/{id}`: `GET` `PATCH`(`{"data"}` を既存データにマージして下書き保存)`DELETE`
   - `/admin/api/contents/{space}/{model}/{id}/publish` `/unpublish` `/draft-key`(`POST`)
   - `/admin/api/keys/{space}`: `GET` `POST`(平文キーは作成時のみ返す)、`/admin/api/keys/{space}/{id}`: `DELETE`
@@ -192,7 +196,7 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 
 - ユーザーアカウントは持たない。
 - 管理画面・管理 API: 単一オーナーシークレット(環境変数 `KOYA_SECRET`)。
-  UI はログインフォーム → セッション Cookie、管理 API(push 等)は `Authorization: Bearer`。
+  UI はログインフォーム → セッション Cookie、管理 API(deploy 等)は `Authorization: Bearer`。
   比較は定数時間で行う。
 - 配信 API: space ごとの API キー(`X-KOYA-API-KEY`)。**本体側で生成し、管理 UI に表示**する。
   利用側は `.env` に置いてクライアントへ渡す。利用側コードにシークレットを置かない。
@@ -202,21 +206,29 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 ## 7. 管理 UI
 
 - **Lisp フルスタック**。フロントも含めて Lisp で書く。
-- SSR: hsx(HTML S 式)+ HTMX で部分更新。SPA・JS ビルドチェーンは持ち込まない。
-- ルーティング: ningle-fbr(ファイルベース)、部分更新エンドポイント: ningle-actions。
+- SSR: hsx(HTML S 式)。SPA・JS ビルドチェーンは持ち込まない。
+  HTMX と ningle-actions は配線済みだが現時点で使う画面は無い(M2 のメディアモーダルで使う予定)。
+  素の JS は `assets/js/koya-editor.js` の1ファイルのみ(Quill 初期化、一覧の行リンク、複数参照のチップ UI)。
+- ルーティング: ningle-fbr(ファイルベース)。
 - CSS: Tailwind CSS v4(スタンドアロンバイナリ、`justfile` でビルド)。
 - フォームは DB 上のモデル定義から動的生成(フィールド型 → 入力コンポーネントの対応表)。
 - richtext は Quill。フォーム送信時に HTML を隠しフィールドへ書き戻す(`assets/js/koya-editor.js`)。
 - 完了メッセージはセッションに載せる一度きりの flash(リダイレクト後に一度だけ表示)。
-- 画面(実装済みパス): `/login`、`/`(space 一覧)、`/s/{space}`(モデル一覧)、`/s/{space}/keys`(API キー)、
+- 画面(実装済みパス): `/login`、`/`(space 一覧)、`/s/{space}`(モデル一覧。種別アイコン、list 型は件数)、
+  `/s/{space}/keys`(API キー)、
   `/s/{space}/m/{model}`(コンテンツ一覧。object 型は単一コンテンツの編集画面へリダイレクト)、
   `/s/{space}/m/{model}/{id}`(編集。`{id}` = `new` で新規)。**メディアライブラリ**(8 章)は M2。
-- フォームは通常の POST(`action` = save / publish / unpublish / delete / draft-key)で送り、
-  HTMX は Markdown プレビュー(ningle-actions の `preview-markdown`)に使う。
+- コンテンツ一覧は作成日時の新しい順。列はモデルの全フィールドのプレビュー(richtext はタグ除去、
+  参照は参照先のラベル、60 文字で省略)と status で、created / updated は出さない。行全体が編集画面へのリンク。
+- フォームは通常の POST(`action` = save / publish / unpublish / delete)で送る。
 - 管理側の POST は `Origin` / `Referer` が `Host` または `KOYA_BASE_URL` と一致することを要求する(CSRF 対策)。
 - `:datetime` の入力は `datetime-local` で、値は UTC として扱う(タイムゾーン変換は M2 で JS を足す)。
 - `:slug` はフォーム・API のどちらでも、空なら `:from` のフィールドから本体側で自動生成する(ASCII のみ)。
-- `:reference` / `:media` の入力は M1 では id のテキスト入力。ピッカーは M2。
+- `:reference` の入力は参照先モデルの全コンテンツ(下書き含む、上限 1000 件)を選択肢にした `select`。
+  単一はドロップダウン、`:many` は `<select multiple>` を JS で「選択済みチップ + 追加用ドロップダウン」に置き換える
+  (JS 無効時はリストボックスのまま使える)。選択肢のラベルは最初の text / slug フィールドの値、無ければ id。
+  `select` の見た目はブラウザ標準(`select { all: revert }`)。
+- `:media` の入力はメディアライブラリができるまで id のテキスト入力。
 - `:media` フィールドはメディアライブラリをモーダルで開き、その場でアップロードと選択を行う(8 章)。
 - 実装スタイルは skyizwhite/website に準拠(10 章)。
 
@@ -259,7 +271,7 @@ website(skyizwhite/website)で実績のある構成をそのまま踏襲する�
 | 依存管理 | qlot(`qlfile`、自作ライブラリは git 指定) |
 | HTTP | Clack / Lack。開発: Hunchentoot、本番: Woo |
 | ルータ | jingle(ningle 拡張)+ ningle-fbr |
-| 部分更新 | ningle-actions + HTMX |
+| 部分更新 | ningle-actions + HTMX(配線のみ。M2 のメディアモーダルから使用) |
 | テンプレート | hsx |
 | ミドルウェア | lack-mw(trailing-slash)、clack-errors、lack accesslog / mount / session |
 | DB | cl-dbi + dbd-sqlite3 + sxql |
@@ -286,9 +298,9 @@ website から流用するパターン:
 ### テスト方針
 
 - rove。`tests/` は `src/` を mirror し、`koya-tests.asd` の `test-op` で一括実行。
-- `koya/core`(バリデーション、スキーマ差分、ULID、Markdown)はユニットテストを厚く。
+- `koya/core`(バリデーション、スキーマ差分、ULID)はユニットテストを厚く。
 - 本体はインメモリ SQLite(`:memory:`)でリポジトリ層と API をテスト。
-- クライアントは本体をテスト内で起動して結合テスト(push → get-list の往復)。
+- クライアントは本体をテスト内で起動して結合テスト(deploy → get-list の往復)。
 
 ## 11. 拡張性(Lisp らしさ)
 
@@ -307,7 +319,7 @@ website から流用するパターン:
   番号付き Lisp 関数のリストで up のみ持つ。down は持たない。
 - バックアップは Coolify のボリュームバックアップに任せる。
   `POST /admin/api/backup`(`VACUUM INTO`)は後続フェーズ。
-- 環境変数: `KOYA_SECRET`、`KOYA_DB_PATH`、`KOYA_MEDIA_DIR`、`KOYA_BASE_URL`、`KOYA_ENV`。
+- 環境変数: `KOYA_SECRET`、`KOYA_DB_PATH`、`KOYA_MEDIA_DIR`、`KOYA_BASE_URL`、`KOYA_PORT`、`KOYA_ENV`。
 - `GET /health`(認証なし、DB 疎通を含む)をヘルスチェックに使う。
 
 ## 13. マイルストーン
@@ -315,17 +327,39 @@ website から流用するパターン:
 ### M1: website が microCMS から乗り換えられる最小構成
 
 - `koya/core`: schema plist、フィールド型(text / textarea / richtext / datetime / boolean)、
-  バリデーション、JSON シリアライズ、ULID、Markdown 変換。
-- 本体: マイグレーション、schema push/pull/plan、contents CRUD、公開/下書き、`draftKey`、
+  バリデーション、JSON シリアライズ、ULID。
+- 本体: マイグレーション、schema deploy/pull/plan、contents CRUD、公開/下書き、`draftKey`、
   配信 API(`limit` `offset` `orders` `fields` `filters[equals]`)、API キー、webhook、
   管理 UI(ログイン、一覧、編集、公開)。
-- client: `defspace` `defmodel` `plan` `push` `pull` `get-list` `get-item` `get-object`。
+- client: `defspace` `defmodel` `plan` `deploy` `pull` `get-list` `get-item` `get-object`。
 - 完了条件: website の `lib/cms.lisp` を koya client に差し替え、blog / about / works が動く。
+- **完了(2026-09-20)**。website は `koya-migration` ブランチでローカル koya に対して動作確認済み。
+  本番(Coolify)へのデプロイと本番へのスキーマ反映・インポートは未実施。
 
 ### M2: 残りのフィールド型とメディア
 
-- `:number` `:date` `:select` `:reference`(`include`)`:slug` `:media`、画像アップロード、
-  `filters` の残りの演算子、`docs/SCHEMA.md` と `docs/openapi.yaml` の整備。
+- 済: `:number` `:date` `:select` `:slug` の型と入力、`:reference`(select 入力、`include` 展開、
+  一覧でのラベル表示)、`filters` の残りの演算子、作成時のシステム日時の指定(移行用)。
+- 残: メディアライブラリ(アップロード、`/media/...` 配信、管理 API、管理画面、編集画面のモーダル)、
+  `:media` の API 展開(`{url, width, height, alt}`)、`:datetime` 入力のタイムゾーン変換 JS、
+  `docs/SCHEMA.md` と `docs/openapi.yaml` の整備。
+
+### 既知の課題(2026-09-20 のコードレビューで確認、未修正)
+
+修正済み: 配信 API の数値 `filters` が `*read-eval*` 有効のまま `read-from-string` していた(任意コード実行)。
+
+- 整合性: 一意制約チェックと INSERT、object 型の「1件だけ」の判定と INSERT がトランザクション外で、並行要求で重複しうる。
+- 認証: セッション Cookie に HttpOnly / Secure が無い。管理 JSON API は Origin 検証をせず SameSite=Lax 頼み。
+  `Origin: null` はパース不能のため「Origin 無し」扱いで通る。
+- 同一オリジン判定が quri の既定ポート補完(`:443`)で Host と食い違う。`KOYA_BASE_URL` が正しく設定されていれば一致する。
+- バリデーション: `$` アンカーが末尾改行を許す(名前・id に `\n` が入る)。暦として無効な日付(`2026-02-30`)が 500。
+  `false` / `[]` が任意の型のフィールドで空扱いになり保存される。`:pattern` など option 値の型を検査せず、
+  壊れた正規表現で全保存が失敗する。`jobject->schema` の型不一致が `schema-error` にならない。
+- 数値: `1.5` が `1.5d0` として表示され `<input type="number">` に載らず、再保存で消える。
+- hsx: 属性値のエスケープが `"` のみで、`&` を含む値が編集のたびに変化する(hsx 側の修正)。
+- client: `lisp->jvalue` が NIL を `[]` にする(`false` / `null` を送れない)。
+- 管理 UI: `/new` への delete / unpublish が 500。keys ページの delete / rotate が POST 後リダイレクトしない。
+- diff: option の差分比較が `equalp` で大文字小文字の違いを検出しない。`:many` / `:required` の変更が破壊的扱いでない。
 
 ### M3: 運用・拡張
 
@@ -371,3 +405,5 @@ website から流用するパターン:
 | 2026-09-20 | richtext は Quill で編集する HTML 文字列に変更(Markdown / 3bmd 廃止) | 管理 UI の使い勝手。microCMS の HTML をそのまま移行できる |
 | 2026-09-20 | モデルに `:preview-url` / `:public-url` テンプレート、draft key は保存ごとに再生成、flash はセッション一度きり | 管理 UI 改善の要望 |
 | 2026-09-20 | 参照の展開は `depth` ではなく `include`(フィールド名指し、`a.b` で入れ子)。デフォルトは id のみ | 必要な参照だけ取る。深さ指定は不要な展開を招く |
+| 2026-09-20 | 管理 UI の一覧は全フィールドのプレビュー + status、行全体がリンク。reference は select(複数はチップ + ドロップダウン)、見た目はブラウザ標準 | 一覧で内容を判断できるように。参照 id の手入力をやめる |
+| 2026-09-20 | 運用ツール(website の schema 同期など)は just コマンドではなく REPL から呼ぶ Lisp 関数として提供する | REPL 駐在で開発するため |
