@@ -103,7 +103,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
 
 (defcomp ~preview-cell (&key field content ref-labels)
   (let ((preview (field-preview field (content-data content :draft t) ref-labels)))
-    (hsx (td :class (clsx "border-b border-line py-2 pr-4 align-top" (if preview "" "text-muted"))
+    (hsx (td :class (clsx "py-2 pr-4 align-top" (if preview "" "text-muted"))
            (div :class (column-width field) (or preview "—"))))))
 
 (defun @get (params)
@@ -135,15 +135,14 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                     (if (null contents)
                         (hsx (~empty-state "No contents yet."))
                         (hsx (div :class "overflow-x-auto"
-                               (table :class "w-full border-separate border-spacing-0 text-sm"
+                               (table :class "w-full text-sm"
                                  (thead (tr :class "text-left text-muted"
                                           (loop :for field :in fields :collect
                                             (hsx (th :class "py-2 pr-4 font-medium"
                                                    (div :class (column-width field) (field-name field)))))
-                                          ;; pinned so they stay visible when the row scrolls sideways
-                                          (th :class "sticky right-6 bg-base py-2 font-medium" "Status")
-                                          (th :class "sticky right-0 w-6 bg-base")))
-                                 (tbody :class "[&>tr:last-child>td]:border-0"
+                                          (th :class "py-2 whitespace-nowrap font-medium" "Status")
+                                          (th)))
+                                 (tbody :class "divide-y divide-line"
                                    (loop :for content :in contents :collect
                                      ;; the whole row opens the editor (see koya-editor.js)
                                      (hsx (tr :class "group cursor-pointer transition hover:bg-accent/5"
@@ -151,6 +150,6 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                                               :tabindex "0" :role "link"
                                             (loop :for field :in fields :collect
                                               (hsx (~preview-cell :field field :content content :ref-labels ref-labels)))
-                                            (td :class "sticky right-6 border-b border-line bg-base py-2 align-top group-hover:bg-[#f8f2ec]"
+                                            (td :class "py-2 whitespace-nowrap align-top"
                                               (~status-badge :status (content-status content)))
-                                            (td :class "sticky right-0 w-6 border-b border-line bg-base py-2 text-right align-top text-muted group-hover:bg-[#f8f2ec] group-hover:text-accent" "›"))))))))))))))))))
+                                            (td :class "py-2 pl-4 text-right align-top text-muted group-hover:text-accent" "›"))))))))))))))))))

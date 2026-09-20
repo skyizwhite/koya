@@ -236,8 +236,9 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   `/s/{space}/m/{model}`(コンテンツ一覧。object 型は単一コンテンツの編集画面へリダイレクト)、
   `/s/{space}/m/{model}/{id}`(編集。`{id}` = `new` で新規)。**メディアライブラリ**(8 章)は M2。
 - コンテンツ一覧は作成日時の新しい順。列はモデルの全フィールドのプレビュー(richtext はタグ除去、
-  参照は参照先のラベル、60 文字で省略)と status で、created / updated は出さない。フィールドが多ければ横スクロール。
-  status と行末の矢印は右端に固定(sticky)され、横スクロールしても見える。行全体が編集画面へのリンク。
+  参照は参照先のラベル、60 文字で省略)と status で、created / updated は出さない。
+  列幅はフィールドの型ごとに下限と上限を決め、その間でプレビューを折り返す。下限があるのでフィールドが
+  多いモデルは横スクロールになる。行全体が編集画面へのリンク。
 - フォームは通常の POST(`action` = save / publish / unpublish / discard / delete)で送る。
   「Discard draft」は `published+draft` のときだけ出る。未公開の下書きは Delete が破棄に相当する。
 - 管理側の POST は `Origin` / `Referer` が `Host` または `KOYA_BASE_URL` と一致することを要求する(CSRF 対策)。

@@ -534,7 +534,7 @@ is a list of parts for MULTIPART-BODY."
       (ok (= status 413) "a huge Content-Length is refused before the body is read")
       (ok (search "too_large" (first body))))))
 
-(deftest list-status-is-pinned
+(deftest list-columns-are-bounded
   (multiple-value-bind (status body headers)
       (request :post "/s/website/m/blog/new" :form '(("action" . "save") ("f-title" . "Columns") ("f-body" . "<p>x</p>"))
                :headers '(("origin" . "http://localhost:3000")))
@@ -544,5 +544,6 @@ is a list of parts for MULTIPART-BODY."
       (multiple-value-bind (status body) (request :get "/s/website/m/blog")
         (ok (= status 200))
         (ok (search ">related<" body) "every field keeps its column")
-        (ok (search "sticky right-6" body) "Status column is pinned"))
+        (ok (search "min-w-20 max-w-24" body) "a boolean column stays narrow")
+        (ok (search "min-w-48 max-w-80" body) "a richtext column is allowed to be wide"))
       (request :post path :form '(("action" . "delete")) :headers '(("origin" . "http://localhost:3000"))))))
