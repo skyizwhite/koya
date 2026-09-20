@@ -495,7 +495,7 @@ is a list of parts for MULTIPART-BODY."
       (multiple-value-bind (status) (request :post "/login" :form '(("secret" . "nope")))
         (ok (= status 401))))
     (multiple-value-bind (status body) (request :post "/login" :form `(("secret" . ,*secret*)))
-      (ok (= status 429) "even the right secret is refused while locked")
+      (ok (= status 403) "even the right secret is refused while locked")
       (ok (search "Too many attempts" body)))
     (clear-login-failures "127.0.0.1")
     (multiple-value-bind (status) (request :post "/login" :form `(("secret" . ,*secret*)))

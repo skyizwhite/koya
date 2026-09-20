@@ -40,7 +40,8 @@
          (set-response-status 403)
          (hsx (~login-form :error "Cross-origin request rejected")))
         ((login-locked-p (request-remote-addr ningle:*request*))
-         (set-response-status 429)
+         ;; 403, not 429: Woo has no status line for 429 and fails to write the response
+         (set-response-status 403)
          (hsx (~login-form :error "Too many attempts. Wait a few minutes and try again.")))
         (t
          (let* ((address (request-remote-addr ningle:*request*))
