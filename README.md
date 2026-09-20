@@ -64,7 +64,7 @@ In your own project (which depends on `koya`):
   (content  :richtext)
   (tags     :reference :model tag :many t))
 
-(defmodel (website tag) ()          ; :kind defaults to :list
+(defmodel (website tag) (:kind :list)
   (name :text :required t))
 
 (defmodel (website about) (:kind :object)

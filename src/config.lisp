@@ -81,12 +81,15 @@
 bare URL strings, which every model of the space fires."
   `(register-space ',name :webhooks ,webhooks))
 
-(defmacro defmodel ((space name) (&key (kind :list) preview-url public-url webhooks) &body fields)
-  "Define (or redefine) model NAME in SPACE. Each field is (NAME TYPE . OPTIONS)
-and is taken literally, e.g. (tags :reference :model tag :many t).
+(defmacro defmodel ((space name) (&key kind preview-url public-url webhooks) &body fields)
+  "Define (or redefine) model NAME in SPACE. KIND is :list or :object and must be
+given. Each field is (NAME TYPE . OPTIONS) and is taken literally, e.g.
+(tags :reference :model tag :many t).
 PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI
 where {CONTENT_ID} and {DRAFT_KEY} are substituted, e.g.
 \"https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}\"."
+  (unless (member kind '(:list :object))
+    (error "defmodel (~(~a ~a~)): :kind must be given as :list or :object, got ~s" space name kind))
   `(register-model ',space
                    (make-model ',name ,kind
                                (list ,@(loop :for (fname ftype . options) :in fields
