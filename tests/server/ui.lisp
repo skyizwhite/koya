@@ -78,7 +78,9 @@ is a list of parts for MULTIPART-BODY."
         (when set-cookie
           (setf *set-cookie* set-cookie
                 *cookie* (subseq set-cookie 0 (position #\; set-cookie)))))
-      (values status (apply #'concatenate 'string (if (listp body) body (list body))) response-headers))))
+      (values status
+              (if (pathnamep body) "" (apply #'concatenate 'string (if (listp body) body (list body))))
+              response-headers))))
 
 (defun location (headers) (getf headers :location))
 
@@ -468,3 +470,19 @@ is a list of parts for MULTIPART-BODY."
         (let ((*cookie* nil))
           (multiple-value-bind (status) (request :post "/login" :form `(("secret" . ,*secret*)))
             (ok (= status 303) "secret alone logs in again")))))))
+
+(deftest cache-control
+  (multiple-value-bind (status body headers) (request :get "/assets/style/dist.css")
+    (declare (ignore body))
+    (ok (= status 200))
+    (ok (string= (getf headers :cache-control) "public, max-age=31536000, immutable") "assets are immutable"))
+  (multiple-value-bind (status body headers) (request :get "/assets/nope.css")
+    (declare (ignore body))
+    (ok (= status 404))
+    (ok (string= (getf headers :cache-control) "no-store") "a missing asset is not cached"))
+  (let ((*cookie* nil))
+    (multiple-value-bind (status body headers) (request :get "/login")
+      (ok (= status 200))
+      (ok (string= (getf headers :cache-control) "no-store") "pages are not cached")
+      (ok (search "/assets/style/dist.css?v=" body) "asset URLs carry a version")
+      (ok (search "/assets/icon.svg?v=" body)))))

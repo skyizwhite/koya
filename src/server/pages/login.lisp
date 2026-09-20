@@ -3,6 +3,7 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/lib/auth #:session-login)
   (:import-from #:koya-server/lib/totp #:totp-enabled-p)
+  (:import-from #:koya-server/lib/assets #:asset-url)
   (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:same-origin-p)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/login)
@@ -11,7 +12,7 @@
   (hsx
    (main :class "mx-auto max-w-sm px-4 py-24"
      (h1 :class "mb-6 flex items-center gap-3 text-2xl font-bold tracking-tight"
-       (img :src "/assets/icon.svg" :alt "" :width "32" :height "32" :class "h-8 w-8 rounded-md")
+       (img :src (asset-url "icon.svg") :alt "" :width "32" :height "32" :class "h-8 w-8 rounded-md")
        "koya")
      (form :method "post" :action "/login" :class "space-y-4"
        (div

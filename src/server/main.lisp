@@ -7,6 +7,7 @@
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/lib/totp #:generate-totp-secret #:otpauth-uri #:totp)
+  (:import-from #:koya-server/lib/assets #:refresh-asset-version)
   (:export #:start
            #:stop
            #:reload
@@ -38,6 +39,7 @@
 (defun reload ()
   (stop)
   (asdf:load-system :koya-server/app)
+  (refresh-asset-version)
   (start))
 
 (defun main ()

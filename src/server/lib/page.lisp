@@ -10,6 +10,8 @@
                 #:session-owner-p)
   (:import-from #:koya-server/lib/http
                 #:origin-allowed-p)
+  (:import-from #:koya-server/lib/assets
+                #:asset-url)
   (:import-from #:koya/core/schema
                 #:model-fields #:field-name #:field-type)
   (:import-from #:koya/core/json
@@ -136,7 +138,7 @@ See ORIGIN-ALLOWED-P."
        (div :class "mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3"
          (nav :class "flex items-center gap-2 text-sm"
            (a :href "/" :class "inline-flex items-center gap-2 font-bold tracking-tight text-fg"
-              (img :src "/assets/icon.svg" :alt "" :width "20" :height "20" :class "h-5 w-5 rounded")
+              (img :src (asset-url "icon.svg") :alt "" :width "20" :height "20" :class "h-5 w-5 rounded")
               "koya")
            (when space
              (hsx (<> (span :class "text-muted" "/")

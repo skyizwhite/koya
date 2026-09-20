@@ -445,6 +445,20 @@
       (multiple-value-bind (status) (admin-upload "/admin/api/media/nowhere" (list (list "file" "a.png" "image/png" (png-bytes))))
         (ok (= status 404))))))
 
+(deftest api-cache-control
+  (multiple-value-bind (status json raw) (delivery "/api/v1/website/blog")
+    (declare (ignore json raw))
+    (ok (= status 200)))
+  (let ((env (list :request-method :get :script-name "" :path-info "/api/v1/website/blog" :query-string ""
+                   :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                   :request-uri "/api/v1/website/blog" :url-scheme "http" :remote-addr "127.0.0.1"
+                   :headers (alist-hash-table `(("x-koya-api-key" . ,*api-key*)) :test 'equal)
+                   :content-type nil :content-length nil :raw-body nil)))
+    (destructuring-bind (status headers body) (funcall *app* env)
+      (declare (ignore body))
+      (ok (= status 200))
+      (ok (string= (getf headers :cache-control) "no-store") "delivery responses are not cached by intermediaries"))))
+
 (deftest delivery-auth
   (multiple-value-bind (status json) (delivery "/api/v1/website/blog" :key nil)
     (ok (= status 401))

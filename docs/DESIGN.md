@@ -346,6 +346,10 @@ website から流用するパターン:
   `POST /admin/api/backup`(`VACUUM INTO`)は後続フェーズ。
 - 環境変数: `KOYA_SECRET`、`KOYA_TOTP_SECRET`(任意)、`KOYA_DB_PATH`、`KOYA_MEDIA_DIR`、`KOYA_BASE_URL`、`KOYA_PORT`、`KOYA_ENV`。
 - `GET /health`(認証なし、DB 疎通を含む)をヘルスチェックに使う。
+- **キャッシュ**: `/assets/*` の URL は `?v=<assets/ 配下の最新更新時刻>` を付けて参照し、
+  `public, max-age=31536000, immutable` で配る(デプロイでファイルが変わると URL も変わる)。
+  `/media/*` は id を使い回さないので同じく immutable。それ以外(管理画面、管理 API、配信 API)は
+  `no-store`。配信 API は API キー付きで利用側(website)が自前でキャッシュするため、中間キャッシュには載せない。
 
 ## 13. マイルストーン
 

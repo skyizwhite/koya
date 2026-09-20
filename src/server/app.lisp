@@ -56,6 +56,26 @@
   (set-response-header :content-type "text/html; charset=utf-8")
   (call-next-method app (and result (hsx:render-to-string (hsx:hsx result)))))
 
+(defun prefix-p (prefix path)
+  (and (>= (length path) (length prefix)) (string= prefix path :end2 (length prefix))))
+
+(defparameter *cache-control-middleware*
+  (lambda (app)
+    (lambda (env)
+      ;; taken before the call: the static middleware strips its prefix from path-info
+      (let* ((path (getf env :path-info))
+             (response (funcall app env)))
+        (when (and (listp response) (not (getf (second response) :cache-control)))
+          (setf (getf (second response) :cache-control)
+                (if (and (prefix-p "/assets/" path) (eql (first response) 200))
+                    ;; asset URLs carry ?v=<version> (see lib/assets), so the file behind one never changes
+                    "public, max-age=31536000, immutable"
+                    ;; pages and both APIs are per-request and often per-owner
+                    "no-store")))
+        response)))
+  "Cache-Control for everything that did not set one: immutable assets, no-store otherwise.
+/media/ sets its own (see *media-middleware*).")
+
 (defun session-cookie-state ()
   "The owner session cookie: HttpOnly so scripts cannot read it, SameSite=Lax so
 other sites cannot post with it, Secure when the site is served over HTTPS."
@@ -69,6 +89,7 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
 (defun build-app ()
   (clear-middlewares *page-app*)
   (install-middleware *page-app* (with-args *clack-error-middleware* :debug (dev-mode-p)))
+  (install-middleware *page-app* *cache-control-middleware*)
   (install-middleware *page-app* *lack-middleware-accesslog*)
   (install-middleware *page-app* (with-args *lack-middleware-session* :state (session-cookie-state)))
   (install-middleware *page-app* *trim-trailing-slash*)
