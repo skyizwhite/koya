@@ -20,6 +20,9 @@
   (let ((name (path-param params :space)))
     (and (find-space name) name)))
 
+(defun page-link (page search)
+  (format nil "?page=~a~@[&q=~a~]" page (and search (plusp (length search)) (quri:url-encode search))))
+
 (defun page-number (params)
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
 
@@ -51,11 +54,11 @@
        (when (> pages 1)
          (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
                 (if (> page 1)
-                    (hsx (a :href (format nil "?page=~a~@[&q=~a~]" (1- page) search) :class "btn" "Previous"))
+                    (hsx (a :href (page-link (1- page) search) :class "btn" "Previous"))
                     (hsx (<>)))
                 (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
                 (if (< page pages)
-                    (hsx (a :href (format nil "?page=~a~@[&q=~a~]" (1+ page) search) :class "btn" "Next"))
+                    (hsx (a :href (page-link (1+ page) search) :class "btn" "Next"))
                     (hsx (<>))))))))))
 
 (defun @get (params)

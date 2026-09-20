@@ -465,8 +465,6 @@
     (ok (string= (jget json "error" "code") "unauthorized")))
   (multiple-value-bind (status) (delivery "/api/v1/website/blog" :key "koya_wrong")
     (ok (= status 401)))
-  (multiple-value-bind (status) (request :get "/api/v1/website/blog" :headers `(("x-microcms-api-key" . ,*api-key*)))
-    (ok (= status 200) "microCMS header name is accepted"))
   (save-schema (make-schema (list (make-space "website" :webhooks '("https://example.com/hook")
                                               :models (list (make-model "blog" :list (list (make-field :title :text :required t :unique t)
                                                                                            (make-field :body :richtext)

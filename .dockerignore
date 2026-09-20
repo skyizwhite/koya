@@ -1,8 +1,15 @@
 .git
 .qlot
 .env
+.env.*
 bin/
 data/
+*.db
+*.db-*
+*.fasl
 assets/style/dist.css
 docs/
 tests/
+README.md
+justfile
+.claude/

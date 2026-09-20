@@ -1,7 +1,8 @@
 (defpackage #:koya-server/pages/login
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya-server/lib/auth #:session-login)
+  (:import-from #:koya-server/lib/auth #:session-login #:login-locked-p #:note-login-failure #:clear-login-failures)
+  (:import-from #:lack/request #:request-remote-addr)
   (:import-from #:koya-server/lib/totp #:totp-enabled-p)
   (:import-from #:koya-server/lib/assets #:asset-url)
   (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:same-origin-p)
@@ -38,8 +39,19 @@
   (cond ((not (same-origin-p))
          (set-response-status 403)
          (hsx (~login-form :error "Cross-origin request rejected")))
+        ((login-locked-p (request-remote-addr ningle:*request*))
+         (set-response-status 429)
+         (hsx (~login-form :error "Too many attempts. Wait a few minutes and try again.")))
         (t
-         (let ((result (session-login (or (param params "secret") "") (param params "code"))))
-           (cond ((eq result t) (redirect-to "/"))
-                 (t (set-response-status 401)
-                    (hsx (~login-form :error (if (eq result :code) "Wrong or expired one-time code" "Wrong secret")))))))))
+         (let* ((address (request-remote-addr ningle:*request*))
+                (result (session-login (or (param params "secret") "") (param params "code"))))
+           (cond ((eq result t)
+                  (clear-login-failures address)
+                  (redirect-to "/"))
+                 (t
+                  (note-login-failure address)
+                  (set-response-status 401)
+                  ;; one message for both factors: not saying which one was wrong
+                  (hsx (~login-form :error (if (totp-enabled-p)
+                                                "Wrong secret or one-time code"
+                                                "Wrong secret")))))))))

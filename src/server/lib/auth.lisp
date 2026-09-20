@@ -10,9 +10,13 @@
                 #:constant-time-equal)
   (:import-from #:babel
                 #:string-to-octets)
+  (:import-from #:bordeaux-threads-2)
   (:import-from #:koya-server/lib/totp
                 #:totp-enabled-p #:totp-code-valid-p)
   (:export #:secure-string=
+           #:login-locked-p
+           #:note-login-failure
+           #:clear-login-failures
            #:owner-env-p
            #:*admin-auth-middleware*
            #:require-api-key
@@ -37,6 +41,36 @@
 
 (defun session-owner-p (&optional (session (ningle:context :session)))
   (and session (gethash "owner" session) t))
+
+;;; Failed logins are counted per client address; after +LOGIN-ATTEMPTS+ failures
+;;; within +LOGIN-WINDOW-SECONDS+ the address has to wait. Kept in memory: one
+;;; process, and a restart clearing it is fine.
+
+(defparameter +login-attempts+ 5)
+(defparameter +login-window-seconds+ 300)
+(defvar *login-failures* (make-hash-table :test 'equal))
+(defvar *login-failures-lock* (bordeaux-threads-2:make-lock :name "koya-login-failures"))
+
+(defun login-locked-p (address)
+  "True when ADDRESS has failed too often recently."
+  (bordeaux-threads-2:with-lock-held (*login-failures-lock*)
+    (let ((entry (gethash address *login-failures*)))
+      (and entry
+           (>= (car entry) +login-attempts+)
+           (< (- (get-universal-time) (cdr entry)) +login-window-seconds+)))))
+
+(defun note-login-failure (address)
+  (bordeaux-threads-2:with-lock-held (*login-failures-lock*)
+    (let ((entry (gethash address *login-failures*))
+          (now (get-universal-time)))
+      (setf (gethash address *login-failures*)
+            (if (and entry (< (- now (cdr entry)) +login-window-seconds+))
+                (cons (1+ (car entry)) now)
+                (cons 1 now))))))
+
+(defun clear-login-failures (address)
+  (bordeaux-threads-2:with-lock-held (*login-failures-lock*)
+    (remhash address *login-failures*)))
 
 (defun session-login (secret &optional code)
   "Mark the current session as the owner when SECRET is right and, with TOTP
@@ -77,7 +111,7 @@ no cross-origin writes.")
 
 (defun require-api-key (space)
   "Signal 401/403 unless the request carries an API key valid for SPACE."
-  (let* ((key (or (header "x-koya-api-key") (header "x-microcms-api-key")))
+  (let* ((key (header "x-koya-api-key"))
          (key-space (space-for-api-key key)))
     (cond ((null key) (fail-api 401 "unauthorized" "X-KOYA-API-KEY header is required"))
           ((null key-space) (fail-api 401 "unauthorized" "Invalid API key"))

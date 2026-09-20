@@ -26,7 +26,7 @@
 
 ;;; HTTP client for a koya server. Delivery calls need *API-KEY*; admin calls
 ;;; (schema push, content management, keys) need *SECRET*. Responses are
-;;; converted to kebab-case keyword plists, arrays to lists, like microcms-lisp-sdk.
+;;; converted to kebab-case keyword plists, arrays to lists.
 
 (defvar *base-url* nil "Server URL, e.g. https://cms.example.com. Falls back to KOYA_URL.")
 (defvar *secret* nil "Owner secret for admin calls. Falls back to KOYA_SECRET.")

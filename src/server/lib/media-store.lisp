@@ -67,13 +67,19 @@ row. Signals a 4xx api-error for unsupported or oversized data."
     (fail-api 413 "too_large" (format nil "Files are limited to ~a MB" (floor +max-upload-bytes+ (* 1024 1024)))))
   (multiple-value-bind (mime width height) (sniff-image bytes)
     (unless mime (fail-api 422 "unsupported_type" "Only PNG, JPEG, GIF and WebP images are accepted"))
-    (let ((media (insert-media space :filename (safe-filename filename) :mime mime :size (length bytes)
-                                     :width width :height height :alt alt)))
-      (let ((path (media-path media)))
-        (ensure-directories-exist path)
-        (with-open-file (out path :direction :output :element-type '(unsigned-byte 8) :if-exists :supersede)
-          (write-sequence bytes out)))
-      media)))
+    ;; the file first: a failed write (disk full) must not leave a row whose URL 404s
+    (let* ((id (koya/core/ulid:make-ulid))
+           (path (merge-pathnames (format nil "~a/~a.~a" space id (image-extension mime))
+                                  (uiop:ensure-directory-pathname (media-dir)))))
+      (ensure-directories-exist path)
+      (with-open-file (out path :direction :output :element-type '(unsigned-byte 8) :if-exists :supersede)
+        (write-sequence bytes out))
+      (handler-case
+          (insert-media space :id id :filename (safe-filename filename) :mime mime :size (length bytes)
+                              :width width :height height :alt alt)
+        (error (e)
+          (ignore-errors (delete-file path))
+          (error e))))))
 
 (defun remove-media (media)
   "Delete the row and the file. A missing file is not an error."

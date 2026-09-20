@@ -66,7 +66,7 @@ that does not exist on the calendar (2026-02-30) signals, so that is caught too.
        (parses-as-time-p value)))
 
 (defun content-id-p (value)
-  "Content ids: 1-64 URL-safe characters (ULIDs, microCMS-style ids, custom ids)."
+  "Content ids: 1-64 URL-safe characters (ULIDs, or ids carried over from another system)."
   (and (stringp value) (scan "^[A-Za-z0-9_-]{1,64}\\z" value) t))
 
 (defun slug-string-p (value)

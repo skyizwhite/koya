@@ -10,6 +10,7 @@
   (:import-from #:koya-server/actions/media-picker #:media-picker)
   (:import-from #:koya-tests/server/media #:png-bytes #:*media-root* #:multipart-body)
   (:import-from #:koya-server/lib/totp #:totp #:*totp-last-counter* #:totp-enabled-p)
+  (:import-from #:koya-server/lib/auth #:clear-login-failures)
   (:import-from #:cl-ppcre #:scan-to-strings)
   (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
@@ -140,7 +141,7 @@ is a list of parts for MULTIPART-BODY."
                (let ((*cookie* nil))
                  (multiple-value-bind (status body) (request :post "/login" :form `(("secret" . ,*secret*) ("code" . ,code)))
                    (ok (= status 401))
-                   (ok (search "expired" body) "the same code cannot log in twice")))))
+                   (ok (search "one-time code" body) "the same code cannot log in twice")))))
         (setf (uiop:getenv "KOYA_TOTP_SECRET") ""))))
   (testing "cross-origin posts are rejected"
     (multiple-value-bind (status) (request :post "/logout" :headers '(("origin" . "https://evil.example")))
@@ -486,3 +487,28 @@ is a list of parts for MULTIPART-BODY."
       (ok (string= (getf headers :cache-control) "no-store") "pages are not cached")
       (ok (search "/assets/style/dist.css?v=" body) "asset URLs carry a version")
       (ok (search "/assets/icon.svg?v=" body)))))
+
+(deftest login-lockout
+  (let ((*cookie* nil))
+    (clear-login-failures "127.0.0.1")
+    (dotimes (i 5)
+      (multiple-value-bind (status) (request :post "/login" :form '(("secret" . "nope")))
+        (ok (= status 401))))
+    (multiple-value-bind (status body) (request :post "/login" :form `(("secret" . ,*secret*)))
+      (ok (= status 429) "even the right secret is refused while locked")
+      (ok (search "Too many attempts" body)))
+    (clear-login-failures "127.0.0.1")
+    (multiple-value-bind (status) (request :post "/login" :form `(("secret" . ,*secret*)))
+      (ok (= status 303) "logs in again once the lock is cleared"))))
+
+(deftest body-size-limit
+  (let ((env (list :request-method :post :script-name "" :path-info "/login" :query-string ""
+                   :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                   :request-uri "/login" :url-scheme "http" :remote-addr "127.0.0.1"
+                   :headers (alist-hash-table '(("host" . "localhost:3000")) :test 'equal)
+                   :content-type "multipart/form-data; boundary=x" :content-length (* 3000 1024 1024)
+                   :raw-body (make-in-memory-input-stream (string-to-octets "")))))
+    (destructuring-bind (status headers body) (funcall *app* env)
+      (declare (ignore headers))
+      (ok (= status 413) "a huge Content-Length is refused before the body is read")
+      (ok (search "too_large" (first body))))))

@@ -13,6 +13,7 @@
            #:update-media
            #:delete-media
            #:media-references
+           #:media-reference-counts
            #:media-id #:media-space #:media-filename #:media-mime #:media-size
            #:media-width #:media-height #:media-alt #:media-created-at))
 (in-package #:koya-server/db/media)
@@ -74,3 +75,15 @@
     (col (fetch-one "SELECT COUNT(*) AS n FROM contents WHERE space = ? AND (published LIKE ? OR draft LIKE ?)"
                     space needle needle)
          "n")))
+
+(defun media-reference-counts (space ids)
+  "Hash of id -> number of contents in SPACE mentioning it, for all IDS in one pass
+over the space's content data (a page of the library asks for 48 at once)."
+  (let ((counts (make-hash-table :test 'equal)))
+    (dolist (id ids) (setf (gethash id counts) 0))
+    (when ids
+      (dolist (row (fetch "SELECT published, draft FROM contents WHERE space = ?" space))
+        (let ((text (concatenate 'string (or (col row "published") "") (or (col row "draft") ""))))
+          (dolist (id ids)
+            (when (search id text) (incf (gethash id counts)))))))
+    counts))

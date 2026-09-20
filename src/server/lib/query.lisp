@@ -14,7 +14,7 @@
            #:+system-fields+))
 (in-package #:koya-server/lib/query)
 
-;;; Parsing of microCMS-compatible list query parameters and translation of
+;;; Parsing of the delivery API's list query parameters and translation of
 ;;; filters/orders into SQL over the JSON data column.
 
 (define-condition query-error (error)

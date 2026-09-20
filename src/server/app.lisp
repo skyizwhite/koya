@@ -21,7 +21,7 @@
   (:import-from #:koya-server/lib/env
                 #:dev-mode-p #:base-url)
   (:import-from #:koya-server/lib/media-store
-                #:*media-middleware*)
+                #:*media-middleware* #:+max-upload-bytes+)
   (:import-from #:koya-server/lib/http
                 #:make-json-app)
   (:import-from #:koya-server/lib/auth
@@ -76,6 +76,24 @@
   "Cache-Control for everything that did not set one: immutable assets, no-store otherwise.
 /media/ sets its own (see *media-middleware*).")
 
+(defparameter +max-body-bytes+ (+ +max-upload-bytes+ (* 1024 1024))
+  "Largest request body accepted: the media upload limit plus room for the other parts.")
+
+(defparameter *body-limit-middleware*
+  (lambda (app)
+    (lambda (env)
+      (let ((length (getf env :content-length)))
+        (if (and (integerp length) (> length +max-body-bytes+))
+            ;; before anything parses the body: lack reads a multipart body whole
+            (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")
+                  (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"Request body is limited to ~a MB\"}}"
+                                (floor +max-body-bytes+ (* 1024 1024)))))
+            (funcall app env)))))
+  "Rejects oversized bodies by Content-Length, outermost, so no parser allocates for them.")
+
+(defparameter +session-seconds+ (* 24 3600)
+  "How long an owner session cookie lives.")
+
 (defun session-cookie-state ()
   "The owner session cookie: HttpOnly so scripts cannot read it, SameSite=Lax so
 other sites cannot post with it, Secure when the site is served over HTTPS."
@@ -84,22 +102,26 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
   (lack/middleware/session/state/cookie:make-cookie-state
                      :httponly t
                      :samesite :lax
+                     :expires +session-seconds+
                      :secure (and (>= (length (base-url)) 8) (string-equal "https://" (base-url) :end2 8))))
 
 (defun build-app ()
   (clear-middlewares *page-app*)
   (install-middleware *page-app* (with-args *clack-error-middleware* :debug (dev-mode-p)))
+  (install-middleware *page-app* *body-limit-middleware*)
   (install-middleware *page-app* *cache-control-middleware*)
   (install-middleware *page-app* *lack-middleware-accesslog*)
-  (install-middleware *page-app* (with-args *lack-middleware-session* :state (session-cookie-state)))
-  (install-middleware *page-app* *trim-trailing-slash*)
+  ;; media and the delivery API need no session; keeping them outside the session
+  ;; middleware also keeps the in-memory store from growing with every image fetch
+  (install-middleware *page-app* *media-middleware*)
   (install-middleware *page-app* (with-args *lack-middleware-mount* "/api" *api-app*))
+  ;; :keep-empty nil: a request that never touches its session leaves nothing behind
+  (install-middleware *page-app* (with-args *lack-middleware-session* :state (session-cookie-state) :keep-empty nil))
+  (install-middleware *page-app* *trim-trailing-slash*)
   (install-middleware *page-app* (with-args *lack-middleware-mount* "/admin/api"
                                             (lack:builder *admin-auth-middleware* *admin-api-app*)))
   (install-middleware *page-app* *actions-middleware*)
   (static-path *page-app* "/assets/" "assets/")
-  ;; uploaded images, public like the delivery API's content
-  (install-middleware *page-app* *media-middleware*)
   (configure *page-app*))
 
 (defparameter *app* (build-app))

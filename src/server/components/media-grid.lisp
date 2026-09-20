@@ -36,8 +36,10 @@
         :data-preview-name (media-filename media)
         :data-preview-meta (format nil "~a · ~a" (dimensions media) (human-size (media-size media)))))
 
-(defcomp ~media-card (&key media space)
-  "Library card: thumbnail, facts, alt form and delete form."
+(defcomp ~media-card (&key media space references)
+  "Library card: thumbnail, facts, alt form and delete form. REFERENCES is how many
+contents mention this file (shown in the delete confirmation)."
+  (declare (ignore space))
   (let ((id (media-id media))
         (preview (preview-attributes media)))
     (hsx
@@ -64,11 +66,10 @@
          (form :method "post"
            (input :type "hidden" :name "action" :value "delete")
            (input :type "hidden" :name "id" :value id)
+           ;; the confirmation text is data, not inline script: koya-editor.js asks
            (button :type "submit" :class "btn btn-danger"
-                   :onclick (format nil "return confirm('Delete ~a?~a')"
-                                    (remove #\' (media-filename media))
-                                    (let ((n (koya-server/db/media:media-references space id)))
-                                      (if (plusp n) (format nil " It is used by ~a content~:p." n) "")))
+                   :data-confirm (format nil "Delete ~a?~a" (media-filename media)
+                                         (if (plusp (or references 0)) (format nil " It is used by ~a content~:p." references) ""))
              "Delete")))))))
 
 (defcomp ~pick-card (&key media)
@@ -87,13 +88,16 @@
 (defcomp ~media-grid (&key items space (mode :library))
   (if (null items)
       (hsx (~empty-state "No media yet. Upload an image above."))
-      (hsx (ul :class (if (eq mode :picker)
-                          "grid grid-cols-3 gap-3 sm:grid-cols-4"
-                          "grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4")
-             (loop :for media :in items :collect
-               (if (eq mode :picker)
-                   (hsx (~pick-card :media media))
-                   (hsx (~media-card :media media :space space))))))))
+      (let ((references (and (eq mode :library)
+                             (koya-server/db/media:media-reference-counts space (mapcar #'media-id items)))))
+        (hsx (ul :class (if (eq mode :picker)
+                            "grid grid-cols-3 gap-3 sm:grid-cols-4"
+                            "grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4")
+               (loop :for media :in items :collect
+                 (if (eq mode :picker)
+                     (hsx (~pick-card :media media))
+                     (hsx (~media-card :media media :space space
+                                       :references (gethash (media-id media) references 0))))))))))
 
 (defcomp ~media-preview-dialog ()
   "One dialog per page; [data-preview-src] buttons fill and open it (koya-editor.js)."

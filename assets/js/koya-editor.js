@@ -221,3 +221,13 @@ document.addEventListener("DOMContentLoaded", () => {
     new QRCode(el, { text: el.dataset.qr, width: 192, height: 192, correctLevel: QRCode.CorrectLevel.M });
   });
 });
+
+// Buttons with data-confirm ask before their form submits. The text lives in an
+// attribute rather than an inline handler, so any file name is safe in it.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-confirm]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      if (!window.confirm(button.dataset.confirm)) event.preventDefault();
+    });
+  });
+});

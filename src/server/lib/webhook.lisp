@@ -13,7 +13,7 @@
            #:*webhook-async*))
 (in-package #:koya-server/lib/webhook)
 
-;;; Content change notifications, microCMS-shaped so existing receivers keep working:
+;;; Content change notifications:
 ;;; {"service": SPACE, "api": MODEL, "id": ID, "type": "new"|"edit"|"delete"|"draft",
 ;;;  "contents": {"old": {...}|null, "new": {...}|null}}
 ;;; Each change has an EVENT (:publish :unpublish :delete :draft); a webhook is
