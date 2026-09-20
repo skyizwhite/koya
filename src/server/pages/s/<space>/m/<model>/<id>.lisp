@@ -134,6 +134,10 @@
              (data (form->data model params)))
         (handler-case
             (cond
+              ((and (null content) (member action '("delete" "unpublish") :test #'string=))
+               ;; posted against /new: there is nothing to act on
+               (set-response-status 404)
+               (hsx (~layout :space space-name (h1 :class "text-xl font-bold" "Content not found"))))
               ((string= action "delete")
                (destroy space model (content-id content))
                (set-flash "Content deleted.")

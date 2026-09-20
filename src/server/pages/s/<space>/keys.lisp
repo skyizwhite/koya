@@ -5,15 +5,15 @@
   (:import-from #:koya-server/db/api-keys #:create-api-key #:list-api-keys #:delete-api-key)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:with-owner-post #:set-title #:param #:short-time #:~layout #:~flash #:~empty-state #:space-url)
+                #:with-owner #:with-owner-post #:set-title #:param #:short-time #:set-flash #:redirect-to
+                #:~layout #:~empty-state #:space-url)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/keys)
 
-(defcomp ~keys-page (&key space new-key message)
+(defcomp ~keys-page (&key space new-key)
   (hsx
    (~layout :space space :crumbs (list (cons "API keys" nil))
      (h1 :class "mb-6 text-2xl font-bold" "API keys")
-     (~flash :message message)
      (when new-key
        (hsx (div :class "mb-6 rounded-md border border-ok/40 bg-ok/5 px-4 py-3 text-sm"
               (p :class "font-medium text-ok" "New key created. Copy it now; it will not be shown again.")
@@ -69,12 +69,14 @@
             ((equal action "create")
              (set-title (format nil "API keys · ~a · koya" space))
              (hsx (~keys-page :space space :new-key (create-api-key space :label (or (param params "label") "")))))
+            ;; delete and rotate redirect so a reload cannot repeat them; create
+            ;; renders directly because the plaintext key is shown only once
             ((equal action "delete")
              (delete-api-key space (or (param params "id") ""))
-             (set-title (format nil "API keys · ~a · koya" space))
-             (hsx (~keys-page :space space :message "Key deleted.")))
+             (set-flash "Key deleted.")
+             (redirect-to (format nil "~a/keys" (space-url space))))
             ((equal action "rotate-webhook-secret")
              (rotate-webhook-secret space)
-             (set-title (format nil "API keys · ~a · koya" space))
-             (hsx (~keys-page :space space :message "Webhook secret rotated.")))
+             (set-flash "Webhook secret rotated.")
+             (redirect-to (format nil "~a/keys" (space-url space))))
             (t (set-response-status 400) (hsx (~layout :space space (p "Unknown action"))))))))
