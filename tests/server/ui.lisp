@@ -151,7 +151,7 @@
           (request :post "/s/website/m/blog/new"
                    :form '(("action" . "save") ("f-title" . "Hello World") ("f-body" . "# Hi")
                            ("f-featured" . "on") ("f-category" . "tech") ("f-labels" . "a") ("f-labels" . "b")
-                           ("f-count" . "3") ("f-when" . "2026-09-20T10:00")
+                           ("f-count" . "2.5") ("f-when" . "2026-09-20T10:00")
                            ("f-related" . "x1") ("f-related" . "x2")))
         (declare (ignore body))
         (ok (= status 303))
@@ -165,7 +165,7 @@
           (ok (string= (jget draft "slug") "hello-world") "slug generated from title")
           (ok (eq (jget draft "featured") t))
           (ok (equalp (jget draft "labels") #("a" "b")))
-          (ok (= (jget draft "count") 3))
+          (ok (= (jget draft "count") 2.5))
           (ok (string= (jget draft "when") "2026-09-20T10:00:00Z"))
           (ok (equalp (jget draft "related") #("x1" "x2")) "a multiple select repeats the name"))))
     (testing "editor shows the draft and the flash exactly once"
@@ -175,6 +175,7 @@
         (ok (search "value=\"hello-world\"" body))
         (ok (search "checked" body))
         (ok (search "value=\"2026-09-20T10:00\"" body))
+        (ok (search "value=\"2.5\"" body) "floats render without an exponent marker")
         (ok (search "<select id=\"f-related\" name=\"f-related\" multiple" body)
             "reference is a multiple select")
         (ok (search "value=\"x1\" selected" body) "selected ids not in the target model are kept")
@@ -197,6 +198,7 @@
         (ok (search "2026-09-20 10:00 UTC" body) "datetime preview")
         (ok (search ">Yes<" body) "boolean preview")
         (ok (search ">a, b<" body) "multi select preview")
+        (ok (search ">2.5<" body) "number preview")
         (ok (search ">draft<" body))
         (ok (search "data-href=\"/s/website/m/blog/" body) "rows link to the editor")
         (ok (search "Hello World, x2" body) "a reference previews as the target's label, unknown ids stay ids")

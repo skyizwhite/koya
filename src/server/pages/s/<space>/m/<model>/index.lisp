@@ -9,6 +9,7 @@
   (:import-from #:koya-server/db/contents
                 #:list-contents #:find-object-content #:content-id #:content-status #:content-data)
   (:import-from #:koya-server/lib/query #:parse-query #:make-query)
+  (:import-from #:koya-server/lib/forms #:number->string)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:redirect-to #:short-time #:content-label
@@ -58,6 +59,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
     (:richtext (strip-html value))
     (:datetime (short-time value))
     (:boolean (if value "Yes" "No"))
+    (:number (if (realp value) (number->string value) (princ-to-string value)))
     (:reference (collapse-whitespace (princ-to-string (reference-label field value ref-labels))))
     (t (collapse-whitespace (princ-to-string value)))))
 

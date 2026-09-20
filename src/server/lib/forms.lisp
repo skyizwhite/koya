@@ -12,6 +12,7 @@
            #:form-value
            #:slugify
            #:value->string
+           #:number->string
            #:normalize-richtext))
 (in-package #:koya-server/lib/forms)
 
@@ -90,9 +91,16 @@ except booleans which are always present (unchecked = false)."
            (when raw (setf (gethash (field-name field) data) raw))))))
     data))
 
+(defun number->string (n)
+  "3 -> \"3\", 1.5d0 -> \"1.5\": no exponent marker, so <input type=number> accepts it."
+  (if (floatp n)
+      (let ((*read-default-float-format* (type-of n))) (princ-to-string n))
+      (princ-to-string n)))
+
 (defun value->string (field value)
   "Render a stored VALUE of FIELD as the string shown in its input."
   (cond ((or (null value) (eq value json-null)) "")
+        ((realp value) (number->string value))
         ((and (vectorp value) (not (stringp value)))
          (format nil "~{~a~^, ~}" (coerce value 'list)))
         ((eq (field-type field) :datetime)
