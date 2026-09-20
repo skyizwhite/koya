@@ -50,25 +50,26 @@
        (div :class "truncate font-medium" :title (media-filename media) (media-filename media))
        (div :class "text-xs text-muted"
          (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media)) (short-time (media-created-at media))))
-       (div :class "flex gap-2"
-         (button :type "button" :class "btn"
-                 :data-preview-src (getf preview :data-preview-src) :data-preview-alt (getf preview :data-preview-alt)
-                 :data-preview-name (getf preview :data-preview-name) :data-preview-meta (getf preview :data-preview-meta)
-           "Preview"))
        (form :method "post" :class "flex gap-2"
          (input :type "hidden" :name "action" :value "alt")
          (input :type "hidden" :name "id" :value id)
          (input :type "text" :name "alt" :value (media-alt media) :placeholder "alt text" :class "input" :aria-label "alt text")
          (button :type "submit" :class "btn" "Save"))
-       (form :method "post" :class "text-right"
-         (input :type "hidden" :name "action" :value "delete")
-         (input :type "hidden" :name "id" :value id)
-         (button :type "submit" :class "btn btn-danger"
-                 :onclick (format nil "return confirm('Delete ~a?~a')"
-                                  (remove #\' (media-filename media))
-                                  (let ((n (koya-server/db/media:media-references space id)))
-                                    (if (plusp n) (format nil " It is used by ~a content~:p." n) "")))
-           "Delete"))))))
+       ;; Preview and Delete share a row; Delete is its own form
+       (div :class "flex items-center justify-between gap-2"
+         (button :type "button" :class "btn"
+                 :data-preview-src (getf preview :data-preview-src) :data-preview-alt (getf preview :data-preview-alt)
+                 :data-preview-name (getf preview :data-preview-name) :data-preview-meta (getf preview :data-preview-meta)
+           "Preview")
+         (form :method "post"
+           (input :type "hidden" :name "action" :value "delete")
+           (input :type "hidden" :name "id" :value id)
+           (button :type "submit" :class "btn btn-danger"
+                   :onclick (format nil "return confirm('Delete ~a?~a')"
+                                    (remove #\' (media-filename media))
+                                    (let ((n (koya-server/db/media:media-references space id)))
+                                      (if (plusp n) (format nil " It is used by ~a content~:p." n) "")))
+             "Delete")))))))
 
 (defcomp ~pick-card (&key media)
   "Picker card: one button carrying everything the page needs to use the file."
