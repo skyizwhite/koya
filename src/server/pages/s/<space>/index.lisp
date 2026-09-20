@@ -5,7 +5,7 @@
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/contents #:count-contents)
   (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/lib/page #:with-owner #:set-title #:~layout #:~empty-state #:model-url #:space-url)
+  (:import-from #:koya-server/lib/page #:with-owner #:set-title #:~layout #:~empty-state #:~model-icon #:model-url #:space-url)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/index)
 
@@ -28,11 +28,14 @@
                     (hsx (ul :class "divide-y divide-line rounded-md border border-line bg-panel"
                            (loop :for model :in (space-models space) :collect
                              (hsx (li (a :href (model-url name (model-name model))
-                                         :class "flex items-center justify-between px-4 py-3 hover:bg-base"
-                                        (span :class "font-medium" (model-name model))
-                                        (span :class "text-sm text-muted"
-                                          (format nil "~(~a~) · ~a content~:p" (model-kind model)
-                                                  (count-contents name (model-name model)))))))))))
+                                         :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
+                                        (span :class "flex items-center gap-3 font-medium"
+                                          (~model-icon :kind (model-kind model) :class "h-4 w-4 text-muted")
+                                          (model-name model))
+                                        (if (eq (model-kind model) :list)
+                                            (hsx (span :class "text-sm text-muted"
+                                                   (format nil "~a content~:p" (count-contents name (model-name model)))))
+                                            (hsx (<>))))))))))
                 (when (space-webhooks space)
                   (hsx (section :class "mt-8"
                          (h2 :class "mb-2 text-sm font-semibold text-muted" "Webhooks")

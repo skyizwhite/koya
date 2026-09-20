@@ -36,6 +36,7 @@
            #:~flash
            #:~errors
            #:~empty-state
+           #:~model-icon
            #:space-url
            #:model-url
            #:content-url))
@@ -165,6 +166,18 @@ Requests without either header are accepted (non-browser clients)."
                      ((string= status "published+draft") "bg-warn/10 text-warn")
                      (t "bg-line text-muted"))))
     (hsx (span :class (clsx "badge" class) status))))
+
+(defcomp ~model-icon (&key kind (class "h-4 w-4"))
+  "Inline icon for a model KIND: stacked rows for :list, a single card for :object."
+  (hsx
+   (svg :|viewBox| "0 0 16 16" :fill "none" :stroke "currentColor" :stroke-width "1.5"
+        :stroke-linecap "round" :stroke-linejoin "round" :aria-hidden "true"
+        :class (clsx "shrink-0" class)
+     (if (eq kind :object)
+         (hsx (<> (rect :x "2" :y "2.5" :width "12" :height "11" :rx "1.5")
+                  (path :d "M5 6h6M5 9h4")))
+         ;; three bulleted rows
+         (hsx (path :d "M2 3.5h.5M5.5 3.5H14M2 8h.5M5.5 8H14M2 12.5h.5M5.5 12.5H14"))))))
 
 (defcomp ~empty-state (&key children)
   (hsx (div :class "rounded-md border border-dashed border-line px-6 py-10 text-center text-sm text-muted" children)))

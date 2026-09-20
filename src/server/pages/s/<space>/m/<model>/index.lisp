@@ -92,13 +92,15 @@
                                  (thead (tr :class "text-left text-muted"
                                           (loop :for field :in fields :collect
                                             (hsx (th :class "py-2 pr-4 font-medium" (field-name field))))
-                                          (th :class "py-2 font-medium" "Status")))
+                                          (th :class "py-2 font-medium" "Status")
+                                          (th)))
                                  (tbody :class "divide-y divide-line"
                                    (loop :for content :in contents :collect
                                      ;; the whole row opens the editor (see koya-editor.js)
-                                     (hsx (tr :class "cursor-pointer hover:bg-panel"
+                                     (hsx (tr :class "group cursor-pointer transition hover:bg-accent/5"
                                               :data-href (content-url space model-name (content-id content))
                                               :tabindex "0" :role "link"
                                             (loop :for field :in fields :collect
                                               (hsx (~preview-cell :field field :content content)))
-                                            (td :class "py-2" (~status-badge :status (content-status content))))))))))))))))))))
+                                            (td :class "py-2" (~status-badge :status (content-status content)))
+                                            (td :class "py-2 pl-4 text-right text-muted group-hover:text-accent" "›"))))))))))))))))))
