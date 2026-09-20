@@ -6,6 +6,9 @@
   (:import-from #:koya-server/db/schema-store #:save-schema)
   (:import-from #:koya-server/db/contents #:list-contents #:content-status #:content-published #:content-draft #:content-id)
   (:import-from #:koya-server/db/api-keys #:list-api-keys)
+  (:import-from #:koya-server/db/media #:list-media #:media-id)
+  (:import-from #:koya-server/actions/media-picker #:media-picker)
+  (:import-from #:koya-tests/server/media #:png-bytes #:*media-root* #:multipart-body)
   (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
   (:import-from #:koya-server/lib/forms #:slugify #:normalize-richtext)
@@ -30,12 +33,14 @@
                                  (make-field :labels :select :options '("a" "b") :many t)
                                  (make-field :count :number)
                                  (make-field :when :datetime)
+                                 (make-field :cover :media)
                                  (make-field :related :reference :model "blog" :many t))
               :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
               :public-url "https://site.test/blog/{CONTENT_ID}"))
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
+  (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (connect-db ":memory:")
@@ -45,8 +50,9 @@
 
 (teardown (disconnect-db))
 
-(defun request (method path &key form headers query)
-  "Returns (values status body-string headers-plist)."
+(defun request (method path &key form multipart headers query)
+  "Returns (values status body-string headers-plist). FORM is urlencoded; MULTIPART
+is a list of parts for MULTIPART-BODY."
   (let* ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
                     :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                     :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
@@ -59,6 +65,11 @@
         (setf (getf env :content-type) "application/x-www-form-urlencoded"
               (getf env :content-length) (length octets)
               (getf env :raw-body) (make-in-memory-input-stream octets))))
+    (when multipart
+      (multiple-value-bind (octets content-type) (multipart-body multipart)
+        (setf (getf env :content-type) content-type
+              (getf env :content-length) (length octets)
+              (getf env :raw-body) (make-in-memory-input-stream octets))))
     (destructuring-bind (status response-headers body) (funcall *app* env)
       (let ((set-cookie (getf response-headers :set-cookie)))
         (when set-cookie
@@ -67,6 +78,11 @@
       (values status (apply #'concatenate 'string (if (listp body) body (list body))) response-headers))))
 
 (defun location (headers) (getf headers :location))
+
+(defun request-url (method url &rest args)
+  "REQUEST with a URL that may carry a query string, e.g. an action endpoint."
+  (let ((q (position #\? url)))
+    (apply #'request method (subseq url 0 q) :query (and q (subseq url (1+ q))) args)))
 
 (deftest health
   (let ((*cookie* nil))
@@ -300,3 +316,67 @@
   (ok (string= (slugify "Hello, World!") "hello-world"))
   (ok (string= (slugify "  Common  Lisp 2026 ") "common-lisp-2026"))
   (ok (string= (slugify "日本語") "") "non-ascii yields empty; validation then reports it"))
+
+(deftest media-library
+  (let ((origin '(("origin" . "http://localhost:3000"))))
+    (multiple-value-bind (status body) (request :get "/s/website/media")
+      (ok (= status 200))
+      (ok (search "No media yet" body)))
+    (testing "upload from the library page"
+      (multiple-value-bind (status body headers)
+          (request :post "/s/website/media" :headers origin
+                   :multipart (list (list "action" "upload") (list "alt" "Cover")
+                                    (list "file" "cover.png" "image/png" (png-bytes 4 4))
+                                    (list "file" "second.png" "image/png" (png-bytes 8 8))))
+        (declare (ignore body))
+        (ok (= status 303))
+        (ok (string= (location headers) "/s/website/media")))
+      (multiple-value-bind (status body) (request :get "/s/website/media")
+        (ok (= status 200))
+        (ok (search "Uploaded 2 files." body))
+        (ok (search "cover.png" body))
+        (ok (search "4×4" body))
+        (ok (search "/media/website/" body)))
+      (multiple-value-bind (status body) (request :get "/s/website/media" :query "q=second")
+        (ok (= status 200))
+        (ok (search "second.png" body))
+        (ok (not (search "cover.png" body)) "search narrows the grid"))
+      (multiple-value-bind (status body)
+          (request :post "/s/website/media" :headers origin
+                   :multipart (list (list "action" "upload") (list "file" "notes.txt" "text/plain" (babel:string-to-octets "hi"))))
+        (declare (ignore body))
+        (ok (= status 303)))
+      (multiple-value-bind (status body) (request :get "/s/website/media")
+        (ok (= status 200))
+        (ok (search "Only PNG, JPEG, GIF and WebP" body) "rejection shows as a flash")))
+    (testing "editor offers the picker for a :media field"
+      (multiple-value-bind (status body) (request :get "/s/website/m/blog/new")
+        (ok (= status 200))
+        (ok (search "data-media-pick-for=\"f-cover\"" body))
+        (ok (search "<dialog id=\"media-picker\"" body))
+        (ok (search (media-picker :space "website") body) "dialog knows the picker URL")))
+    (testing "picker fragment"
+      (multiple-value-bind (status body) (request-url :get (media-picker :space "website"))
+        (ok (= status 200))
+        (ok (search "data-pick-id=" body))
+        (ok (search "data-pick-url=\"/media/website/" body))
+        (ok (not (search "<html" body)) "a fragment, not a page"))
+      (let ((*cookie* nil))
+        (multiple-value-bind (status) (request-url :get (media-picker :space "website"))
+          (ok (= status 403) "the picker needs the owner session"))))
+    (testing "alt and delete"
+      (let ((id (media-id (first (list-media "website" :search "cover")))))
+        (multiple-value-bind (status body headers)
+            (request :post "/s/website/media" :form `(("action" . "alt") ("id" . ,id) ("alt" . "New alt")) :headers origin)
+          (declare (ignore body))
+          (ok (= status 303))
+          (ok (string= (location headers) "/s/website/media")))
+        (multiple-value-bind (status body) (request :get "/s/website/media")
+          (ok (= status 200))
+          (ok (search "value=\"New alt\"" body)))
+        (multiple-value-bind (status body headers)
+            (request :post "/s/website/media" :form `(("action" . "delete") ("id" . ,id)) :headers origin)
+          (declare (ignore body))
+          (ok (= status 303))
+          (ok (string= (location headers) "/s/website/media")))
+        (ok (null (list-media "website" :search "cover")))))))

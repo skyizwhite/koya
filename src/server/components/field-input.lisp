@@ -6,6 +6,10 @@
                 #:json-null)
   (:import-from #:koya-server/lib/forms
                 #:field-param-name #:value->string)
+  (:import-from #:koya-server/db/media
+                #:media-filename #:media-alt)
+  (:import-from #:koya-server/lib/media-store
+                #:media-url)
   (:export #:~field-input))
 (in-package #:koya-server/components/field-input)
 
@@ -44,7 +48,26 @@
        (p :class "text-xs text-muted"
          (format nil "~a content~:p of ~a" (length choices) (field-option field :model)))))))
 
-(defcomp ~field-input (&key field value error references)
+(defcomp ~media-control (&key name value media)
+  "A hidden input holding the media id, a preview, and buttons wired up by
+koya-editor.js to the page's media picker dialog."
+  (hsx
+   (div :class "flex items-start gap-4" :data-media-field name
+     (input :type "hidden" :id name :name name :value (or value ""))
+     (img :src (if media (media-url media :absolute nil) "")
+          :alt (if media (media-alt media) "")
+          :class (clsx "h-24 w-24 rounded-md border border-line bg-panel object-contain" (unless media "hidden"))
+          :data-media-preview t)
+     (div :class "space-y-2 text-sm"
+       (div :class "text-muted" :data-media-name t
+         (cond (media (media-filename media))
+               ((and value (plusp (length value))) (format nil "~a (missing)" value))
+               (t "No image")))
+       (div :class "flex gap-2"
+         (button :type "button" :class "btn" :data-media-pick-for name "Choose…")
+         (button :type "button" :class "btn" :data-media-clear-for name "Clear"))))))
+
+(defcomp ~field-input (&key field value error references media)
   (let* ((name (field-param-name field))
          (id name)
          (type (field-type field))
@@ -91,9 +114,7 @@
          (:reference
           (hsx (~reference-select :field field :value value :references references)))
          (:media
-          (hsx (<> (input :type "text" :id id :name name :value string :class "input font-mono text-xs"
-                          :placeholder (if (field-many-p field) "id, id, ..." "id"))
-                   (p :class "text-xs text-muted" "media id"))))
+          (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media)))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))
        (if error
            (hsx (p :class "text-xs text-danger" error))

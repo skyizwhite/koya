@@ -22,7 +22,9 @@
               (~layout :space name
                 (div :class "mb-6 flex items-center justify-between"
                   (h1 :class "text-2xl font-bold" name)
-                  (a :href (format nil "~a/keys" (space-url name)) :class "btn" "API keys"))
+                  (div :class "flex gap-2"
+                    (a :href (format nil "~a/media" (space-url name)) :class "btn" "Media")
+                    (a :href (format nil "~a/keys" (space-url name)) :class "btn" "API keys")))
                 (if (null (space-models space))
                     (hsx (~empty-state "This space has no models."))
                     (hsx (ul :class "divide-y divide-line rounded-md border border-line bg-panel"

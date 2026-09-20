@@ -12,7 +12,7 @@
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
-  (:import-from #:koya-tests/server/media #:png-bytes #:*media-root*))
+  (:import-from #:koya-tests/server/media #:png-bytes #:*media-root* #:multipart-body))
 (in-package #:koya-tests/server/http)
 
 (defparameter *secret* "test-secret")
@@ -68,27 +68,6 @@
 (defun admin (method path &key body query)
   (request method path :query query :body body
                        :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*)))))
-
-(defun multipart-body (parts)
-  "PARTS: (name value) for text fields or (name filename content-type octets) for files.
-Returns (values octets content-type)."
-  (let* ((boundary "----koyatest")
-         (crlf (string-to-octets (format nil "~c~c" #\Return #\Linefeed)))
-         (chunks '()))
-    (flet ((text (s) (push (string-to-octets s :encoding :utf-8) chunks))
-           (raw (o) (push o chunks)))
-      (dolist (part parts)
-        (text (format nil "--~a" boundary)) (raw crlf)
-        (if (= (length part) 2)
-            (progn (text (format nil "Content-Disposition: form-data; name=\"~a\"" (first part))) (raw crlf) (raw crlf)
-                   (text (second part)) (raw crlf))
-            (destructuring-bind (name filename content-type octets) part
-              (text (format nil "Content-Disposition: form-data; name=\"~a\"; filename=\"~a\"" name filename)) (raw crlf)
-              (text (format nil "Content-Type: ~a" content-type)) (raw crlf) (raw crlf)
-              (raw octets) (raw crlf))))
-      (text (format nil "--~a--" boundary)) (raw crlf))
-    (values (apply #'concatenate '(vector (unsigned-byte 8)) (nreverse chunks))
-            (format nil "multipart/form-data; boundary=~a" boundary))))
 
 (defun admin-upload (path parts)
   "POST a multipart body as the owner. Returns (values status json)."

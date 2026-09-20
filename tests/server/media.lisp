@@ -13,7 +13,8 @@
   (:import-from #:koya-server/lib/http #:api-error #:api-error-status)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema)
   (:import-from #:koya/core/json #:jget #:parse-json)
-  (:export #:png-bytes #:*media-root*))
+  (:import-from #:babel #:string-to-octets)
+  (:export #:png-bytes #:*media-root* #:multipart-body))
 (in-package #:koya-tests/server/media)
 
 (defvar *media-root*
@@ -27,6 +28,27 @@
   (flet ((be32 (n) (list (ldb (byte 8 24) n) (ldb (byte 8 16) n) (ldb (byte 8 8) n) (ldb (byte 8 0) n))))
     (apply #'bytes (append '(#x89 #x50 #x4E #x47 #x0D #x0A #x1A #x0A) (be32 13) '(#x49 #x48 #x44 #x52)
                            (be32 width) (be32 height) '(8 6 0 0 0)))))
+
+(defun multipart-body (parts)
+  "PARTS: (name value) for text fields or (name filename content-type octets) for files.
+Returns (values octets content-type)."
+  (let* ((boundary "----koyatest")
+         (crlf (string-to-octets (format nil "~c~c" #\Return #\Linefeed)))
+         (chunks '()))
+    (flet ((text (s) (push (string-to-octets s :encoding :utf-8) chunks))
+           (raw (o) (push o chunks)))
+      (dolist (part parts)
+        (text (format nil "--~a" boundary)) (raw crlf)
+        (if (= (length part) 2)
+            (progn (text (format nil "Content-Disposition: form-data; name=\"~a\"" (first part))) (raw crlf) (raw crlf)
+                   (text (second part)) (raw crlf))
+            (destructuring-bind (name filename content-type octets) part
+              (text (format nil "Content-Disposition: form-data; name=\"~a\"; filename=\"~a\"" name filename)) (raw crlf)
+              (text (format nil "Content-Type: ~a" content-type)) (raw crlf) (raw crlf)
+              (raw octets) (raw crlf))))
+      (text (format nil "--~a--" boundary)) (raw crlf))
+    (values (apply #'concatenate '(vector (unsigned-byte 8)) (nreverse chunks))
+            (format nil "multipart/form-data; boundary=~a" boundary))))
 
 (setup
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))

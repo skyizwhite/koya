@@ -17,10 +17,17 @@
                 #:with-owner #:with-owner-post #:set-title #:redirect-to #:param #:set-flash #:expand-url-template
                 #:short-time #:content-label #:~layout #:~status-badge #:~errors #:content-url #:model-url)
   (:import-from #:koya-server/components/field-input #:~field-input)
+  (:import-from #:koya-server/actions/media-picker #:~media-picker-dialog)
+  (:import-from #:koya-server/db/media #:find-media)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>)
 
 (defun new-p (id) (string= id "new"))
+
+(defun media-for (space field value)
+  "The media struct behind a :media field's id, or NIL."
+  (and (eq (field-type field) :media) (stringp value) (plusp (length value))
+       (find-media (space-name space) value)))
 
 (defun reference-options (space field)
   "Selectable contents of FIELD's target model as (id . label), sorted by label."
@@ -91,7 +98,10 @@
            (hsx (~field-input :field field
                               :value (and data (gethash (field-name field) data))
                               :references (reference-options space field)
+                              :media (media-for space field (and data (gethash (field-name field) data)))
                               :error (field-error errors (field-name field))))))
+       ;; one picker per page, shared by :media fields and Quill's image button
+       (~media-picker-dialog :space space-name)
        (if content
            (hsx (div :class "mt-12 flex items-center justify-between border-t border-line pt-6 text-sm text-muted"
                   (span (if object-p "Delete this content and start over." "Delete this content permanently."))

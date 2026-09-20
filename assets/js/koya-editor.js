@@ -26,13 +26,19 @@ document.addEventListener("DOMContentLoaded", () => {
       theme: "snow",
       placeholder: "Write here...",
       modules: {
-        toolbar: [
-          [{ header: [2, 3, 4, false] }],
-          ["bold", "italic", "underline", "strike", "code"],
-          ["link", "blockquote", "code-block", "image"],
-          [{ list: "ordered" }, { list: "bullet" }],
-          ["clean"],
-        ],
+        toolbar: {
+          container: [
+            [{ header: [2, 3, 4, false] }],
+            ["bold", "italic", "underline", "strike", "code"],
+            ["link", "blockquote", "code-block", "image"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            ["clean"],
+          ],
+          handlers: {
+            // the image button opens the media picker instead of asking for a URL
+            image: () => window.koyaMediaPicker && window.koyaMediaPicker.open({ kind: "quill", quill }),
+          },
+        },
       },
     });
     if (input.value) quill.clipboard.dangerouslyPasteHTML(protect(input.value));
@@ -107,5 +113,75 @@ document.addEventListener("DOMContentLoaded", () => {
     select.hidden = true;
     select.after(wrap);
     render();
+  });
+});
+
+// Media picker: one <dialog id="media-picker"> per editor page. Its body is
+// fetched with HTMX from data-picker-url when opened. A click on a card
+// ([data-pick-id]) hands the file to whoever opened the picker: a :media field
+// (hidden input + preview) or a Quill editor (inserts an <img>).
+document.addEventListener("DOMContentLoaded", () => {
+  const dialog = document.getElementById("media-picker");
+  if (!dialog) return;
+  let target = null;
+
+  const picker = {
+    open(t) {
+      target = t;
+      const body = dialog.querySelector("#media-picker-body");
+      if (body && window.htmx) htmx.ajax("GET", dialog.dataset.pickerUrl, { target: body, swap: "outerHTML" });
+      dialog.showModal();
+    },
+    close() {
+      target = null;
+      dialog.close();
+    },
+  };
+  window.koyaMediaPicker = picker;
+
+  const setField = (name, item) => {
+    const wrap = document.querySelector(`[data-media-field="${name}"]`);
+    if (!wrap) return;
+    const input = wrap.querySelector("input[type=hidden]");
+    const img = wrap.querySelector("[data-media-preview]");
+    const label = wrap.querySelector("[data-media-name]");
+    input.value = item ? item.id : "";
+    if (item) {
+      img.src = item.url;
+      img.alt = item.alt;
+      img.classList.remove("hidden");
+      label.textContent = item.name;
+    } else {
+      img.removeAttribute("src");
+      img.classList.add("hidden");
+      label.textContent = "No image";
+    }
+  };
+
+  document.querySelectorAll("[data-media-pick-for]").forEach((button) => {
+    button.addEventListener("click", () => picker.open({ kind: "field", name: button.dataset.mediaPickFor }));
+  });
+  document.querySelectorAll("[data-media-clear-for]").forEach((button) => {
+    button.addEventListener("click", () => setField(button.dataset.mediaClearFor, null));
+  });
+  dialog.querySelector("[data-picker-close]").addEventListener("click", picker.close);
+  dialog.addEventListener("click", (event) => {
+    // a click on the backdrop lands on the dialog element itself
+    if (event.target === dialog) picker.close();
+  });
+
+  dialog.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-pick-id]");
+    if (!card || !target) return;
+    const item = { id: card.dataset.pickId, url: card.dataset.pickUrl, alt: card.dataset.pickAlt, name: card.dataset.pickName };
+    if (target.kind === "field") {
+      setField(target.name, item);
+    } else if (target.kind === "quill") {
+      const quill = target.quill;
+      const range = quill.getSelection(true);
+      quill.insertEmbed(range.index, "image", item.url, "user");
+      quill.setSelection(range.index + 1);
+    }
+    picker.close();
   });
 });

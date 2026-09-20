@@ -43,6 +43,14 @@ select {
   @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium;
 }
 
+/* Media picker dialog */
+dialog#media-picker[open] {
+  @apply mx-auto;
+}
+dialog#media-picker::backdrop {
+  background: rgb(31 29 26 / 0.4);
+}
+
 /* Quill */
 .quill-editor {
   @apply rounded-b-md border border-line bg-panel;
