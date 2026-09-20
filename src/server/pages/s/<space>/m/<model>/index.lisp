@@ -13,34 +13,44 @@
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:redirect-to #:short-time #:content-label
-                #:~layout #:~status-badge #:~empty-state #:content-url #:model-url)
+                #:~layout #:~status-badge #:~empty-state #:~icon #:content-url #:model-url)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
 
-(defparameter +preview-length+ 60
-  "Longest field preview shown in the list, in characters.")
+(defparameter +preview-length+ 120
+  "Longest field preview carried into the list, in characters.
+A cell is two lines tall and ellipsises whatever does not fit, so this is only a
+guard against putting a whole richtext body in the HTML: it sits above what the
+widest column can show, which leaves the visible cut to the browser.")
 
 (defparameter +column-widths+
-  '((:text      . "min-w-40 max-w-72")
-    (:textarea  . "min-w-48 max-w-80")
-    (:richtext  . "min-w-48 max-w-80")
-    (:number    . "min-w-24 max-w-32")
-    (:boolean   . "min-w-20 max-w-24")
-    (:date      . "min-w-28 max-w-32")
-    (:datetime  . "min-w-36 max-w-44")
-    (:select    . "min-w-32 max-w-48")
-    (:media     . "min-w-32 max-w-48")
-    (:reference . "min-w-40 max-w-64")
-    (:slug      . "min-w-40 max-w-64"))
+  '((:text      . "min-w-32 max-w-56")
+    (:textarea  . "min-w-36 max-w-64")
+    (:richtext  . "min-w-36 max-w-64")
+    (:number    . "min-w-16 max-w-24")
+    (:boolean   . "min-w-16 max-w-20")
+    (:date      . "min-w-24 max-w-28")
+    (:datetime  . "min-w-32 max-w-40")
+    (:select    . "min-w-24 max-w-36")
+    (:media     . "min-w-24 max-w-36")
+    (:reference . "min-w-32 max-w-48")
+    (:slug      . "min-w-32 max-w-48"))
   "Bounds for a list column, per field type, as classes on the cell's inner box.
 The minimum keeps a column readable and lets a wide model outgrow the page
 rather than squeezing every column thin; the maximum stops one long text field
-from taking the whole width. Between the two the preview wraps.")
+from taking the whole width. Between the two the preview sizes to its content.
+They are deliberately tight: a preview gets two lines, so a narrow column still
+shows a useful amount of text and more of the model fits on screen.")
 
 (defun column-width (field)
-  "Classes for the box a preview is drawn in: the bounds for FIELD's type, and
-wrapping that breaks a long unbroken run rather than letting it escape the box."
-  (clsx "break-words" (or (cdr (assoc (field-type field) +column-widths+)) "min-w-32 max-w-64")))
+  "Width bounds for FIELD's column, as classes on the cell's inner box."
+  (or (cdr (assoc (field-type field) +column-widths+)) "min-w-24 max-w-48"))
+
+(defparameter +row-height+ "h-14"
+  "Two text-sm lines plus the cells' padding: the height of every row.
+A preview is clamped to two lines, so no row outgrows it, and the height is set
+on the row rather than the cell so that the cells' own middle alignment centres
+a shorter preview — and the status badge and the chevron with it.")
 
 (defun reference-labels (space model)
   "Field name -> hash of referenced id -> label, for every reference field of MODEL.
@@ -104,7 +114,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
 (defcomp ~preview-cell (&key field content ref-labels)
   (let ((preview (field-preview field (content-data content :draft t) ref-labels)))
     (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
-           (div :class (column-width field) (or preview "—"))))))
+           (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—"))))))
 
 (defun @get (params)
   (with-owner
@@ -131,25 +141,26 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                     (div :class "mb-6 flex items-center justify-between"
                       (h1 :class "text-2xl font-bold" model-name
                         (span :class "ml-3 text-base font-normal text-muted" (format nil "~a content~:p" total)))
-                      (a :href (content-url space model-name "new") :class "btn btn-primary" "New content"))
+                      (a :href (content-url space model-name "new") :class "btn btn-primary"
+                         (~icon :name :plus) "New content"))
                     (if (null contents)
                         (hsx (~empty-state "No contents yet."))
-                        (hsx (div :class "overflow-x-auto"
+                        (hsx (div :class "overflow-x-auto rounded-md border border-line bg-panel"
                                (table :class "w-full text-sm"
-                                 (thead (tr :class "text-left text-muted"
+                                 (thead (tr :class "border-b border-line text-left text-muted"
+                                          (th :class "py-2 pl-4 pr-4 font-medium whitespace-nowrap" "status")
                                           (loop :for field :in fields :collect
                                             (hsx (th :class "py-2 pr-4 font-medium"
-                                                   (div :class (column-width field) (field-name field)))))
-                                          (th :class "py-2 whitespace-nowrap font-medium" "Status")
+                                                   (div :class (clsx "truncate" (column-width field)) (field-name field)))))
                                           (th)))
                                  (tbody :class "divide-y divide-line"
                                    (loop :for content :in contents :collect
                                      ;; the whole row opens the editor (see koya-editor.js)
-                                     (hsx (tr :class "group cursor-pointer transition hover:bg-accent/5"
+                                     (hsx (tr :class (clsx "group cursor-pointer transition hover:bg-base" +row-height+)
                                               :data-href (content-url space model-name (content-id content))
                                               :tabindex "0" :role "link"
+                                            (td :class "py-2 pl-4 pr-4 whitespace-nowrap"
+                                              (~status-badge :status (content-status content)))
                                             (loop :for field :in fields :collect
                                               (hsx (~preview-cell :field field :content content :ref-labels ref-labels)))
-                                            (td :class "py-2 whitespace-nowrap"
-                                              (~status-badge :status (content-status content)))
-                                            (td :class "py-2 pl-4 text-right text-muted group-hover:text-accent" "›"))))))))))))))))))
+                                            (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent" "›"))))))))))))))))))

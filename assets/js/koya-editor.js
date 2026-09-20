@@ -194,7 +194,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const image = dialog.querySelector("[data-preview-image]");
   const title = dialog.querySelector("[data-preview-title]");
   const caption = dialog.querySelector("[data-preview-caption]");
-  const open = dialog.querySelector("[data-preview-open]");
+  const ids = dialog.querySelectorAll("[data-preview-id]");
+  const alt = dialog.querySelector("[data-preview-alt-input]");
+  const remove = dialog.querySelector("[data-preview-delete]");
 
   document.querySelectorAll("[data-preview-src]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -202,7 +204,10 @@ document.addEventListener("DOMContentLoaded", () => {
       image.alt = button.dataset.previewAlt || "";
       title.textContent = button.dataset.previewName || "";
       caption.textContent = button.dataset.previewMeta || "";
-      open.href = button.dataset.previewSrc;
+      // the dialog's alt and delete forms act on whichever file was opened
+      ids.forEach((input) => { input.value = button.dataset.previewId || ""; });
+      if (alt) alt.value = button.dataset.previewAlt || "";
+      if (remove) remove.dataset.confirm = button.dataset.previewConfirm || "";
       dialog.showModal();
     });
   });
@@ -211,6 +216,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (event.target === dialog) dialog.close();
   });
   dialog.addEventListener("close", () => image.removeAttribute("src"));
+});
+
+// A file input behind a button-styled label has nothing to submit it, so its
+// form goes as soon as files are chosen (the picker does the same over HTMX).
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-submit-on-change]").forEach((input) => {
+    input.addEventListener("change", () => {
+      if (input.files.length && input.form) input.form.requestSubmit();
+    });
+  });
 });
 
 // Settings: draw a QR code for every [data-qr] element (the otpauth URI when

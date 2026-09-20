@@ -7,7 +7,8 @@
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/contents #:count-contents)
   (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/lib/page #:with-owner #:set-title #:~layout #:~empty-state #:~model-icon #:model-url #:space-url)
+  (:import-from #:koya-server/lib/page
+                #:with-owner #:set-title #:~layout #:~empty-state #:~icon #:~model-icon #:model-url #:space-url)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/index)
 
@@ -25,11 +26,11 @@
                 (div :class "mb-6 flex items-center justify-between"
                   (h1 :class "text-2xl font-bold" name)
                   (div :class "flex gap-2"
-                    (a :href (format nil "~a/media" (space-url name)) :class "btn" "Media")
-                    (a :href (format nil "~a/keys" (space-url name)) :class "btn" "API keys")))
+                    (a :href (format nil "~a/media" (space-url name)) :class "btn" (~icon :name :media) "Media")
+                    (a :href (format nil "~a/keys" (space-url name)) :class "btn" (~icon :name :key) "API keys")))
                 (if (null (space-models space))
                     (hsx (~empty-state "This space has no models."))
-                    (hsx (ul :class "divide-y divide-line rounded-md border border-line bg-panel"
+                    (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                            (loop :for model :in (space-models space) :collect
                              (hsx (li (a :href (model-url name (model-name model))
                                          :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
@@ -46,11 +47,15 @@
                   (when hooks
                     (hsx (section :class "mt-8"
                            (h2 :class "mb-2 text-sm font-semibold text-muted" "Webhooks")
-                           (ul :class "space-y-1 text-sm"
+                           (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                              (loop :for (model . hook) :in hooks :collect
-                               (hsx (li :class "flex flex-wrap items-center gap-2"
-                                      (span :class "font-medium" (webhook-label hook))
-                                      (span :class "text-muted" (if model (format nil "~a only" model) "all models"))
-                                      (code :class "text-xs" (webhook-url hook))
-                                      (span :class "text-xs text-muted"
-                                        (format nil "~{~(~a~)~^, ~}" (webhook-events hook))))))))))))))))))
+                               (hsx (li :class "flex items-center justify-between gap-3 px-4 py-3"
+                                      (div :class "min-w-0"
+                                        (div :class "font-medium" (webhook-label hook))
+                                        (code :class "block truncate text-xs text-muted" (webhook-url hook)))
+                                      ;; two lines again, mirroring the label and its URL
+                                      (div :class "shrink-0 text-right"
+                                        (div :class "text-sm text-muted"
+                                          (if model (format nil "~a only" model) "all models"))
+                                        (div :class "text-xs text-muted"
+                                          (format nil "~{~(~a~)~^, ~}" (webhook-events hook)))))))))))))))))))

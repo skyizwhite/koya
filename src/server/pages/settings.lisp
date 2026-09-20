@@ -6,7 +6,7 @@
                 #:totp-enabled-p #:totp-env-secret #:totp-secret #:totp-code-valid-p
                 #:generate-totp-secret #:otpauth-uri #:enable-totp #:disable-totp)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to #:~layout)
+                #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to #:~layout #:~icon)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/settings)
 
@@ -43,7 +43,7 @@
                (form :method "post" :class "space-y-3"
                  (input :type "hidden" :name "action" :value "disable")
                  (~code-input :label "Enter a current code to turn it off")
-                 (button :type "submit" :class "btn btn-danger" "Disable two-factor login")))))
+                 (button :type "submit" :class "btn btn-danger" (~icon :name :close) "Disable two-factor login")))))
        (pending
         (hsx (<>
                (p :class "mb-4 text-sm" "Scan the QR code with your authenticator app, or enter the secret by hand, then type the code it shows to finish.")
@@ -58,14 +58,14 @@
                  (input :type "hidden" :name "action" :value "enable")
                  (~code-input :label "Code shown by the app")
                  (div :class "flex gap-2"
-                   (button :type "submit" :class "btn btn-primary" "Enable two-factor login")
-                   (button :type "submit" :name "action" :value "cancel" :class "btn" "Cancel"))))))
+                   (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Enable two-factor login")
+                   (button :type "submit" :name "action" :value "cancel" :class "btn" (~icon :name :close) "Cancel"))))))
        (t
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-line text-muted" "Disabled"))
                (form :method "post"
                  (input :type "hidden" :name "action" :value "begin")
-                 (button :type "submit" :class "btn btn-primary" "Set up two-factor login")))))))))
+                 (button :type "submit" :class "btn btn-primary" (~icon :name :shield) "Set up two-factor login")))))))))
 
 (defcomp ~settings-page (&key pending error)
   (hsx (~layout :crumbs (list (cons "Settings" nil))

@@ -20,14 +20,27 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+/* Preflight leaves a button with the arrow the browser gives it; anything
+   clickable in the admin UI should say so under the pointer. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 .btn {
-  @apply inline-flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm font-medium text-fg hover:bg-base disabled:opacity-50;
+  @apply inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm font-medium text-fg hover:bg-base disabled:cursor-default disabled:opacity-50;
 }
 .btn-primary {
   @apply border-accent bg-accent text-accent-fg hover:bg-accent/90;
 }
 .btn-danger {
   @apply border-danger text-danger hover:bg-danger/10;
+}
+/* Where a label would not fit: the icon alone, in a square. Needs an aria-label. */
+.btn-icon {
+  @apply px-2;
 }
 .input {
   @apply w-full rounded-md border border-line bg-panel px-3 py-2 text-sm text-fg focus:border-accent focus:outline-none;
@@ -47,8 +60,9 @@ select {
 dialog.koya-dialog {
   @apply w-full rounded-md border border-line bg-base p-0 text-fg shadow;
 }
+/* Preflight zeroes the margin a modal dialog centres itself with. */
 dialog.koya-dialog[open] {
-  @apply mx-auto;
+  @apply m-auto;
 }
 dialog.koya-dialog::backdrop {
   background: rgb(31 29 26 / 0.4);

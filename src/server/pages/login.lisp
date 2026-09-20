@@ -5,7 +5,7 @@
   (:import-from #:lack/request #:request-remote-addr)
   (:import-from #:koya-server/lib/totp #:totp-enabled-p)
   (:import-from #:koya-server/lib/assets #:asset-url)
-  (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:same-origin-p)
+  (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:same-origin-p #:~icon)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/login)
 
@@ -25,7 +25,7 @@
                 (input :type "text" :id "code" :name "code" :inputmode "numeric" :autocomplete "one-time-code"
                        :pattern "[0-9 ]*" :required t :class "input mt-1.5"))))
        (when error (hsx (p :class "text-sm text-danger" error)))
-       (button :type "submit" :class "btn btn-primary w-full justify-center" "Log in")))))
+       (button :type "submit" :class "btn btn-primary w-full justify-center" (~icon :name :login) "Log in")))))
 
 (defun @get (params)
   (declare (ignore params))

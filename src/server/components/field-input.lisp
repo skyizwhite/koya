@@ -10,6 +10,8 @@
                 #:media-filename #:media-alt)
   (:import-from #:koya-server/lib/media-store
                 #:media-url)
+  (:import-from #:koya-server/lib/page
+                #:~icon)
   (:export #:~field-input))
 (in-package #:koya-server/components/field-input)
 
@@ -64,8 +66,8 @@ koya-editor.js to the page's media picker dialog."
                ((and value (plusp (length value))) (format nil "~a (missing)" value))
                (t "No image")))
        (div :class "flex gap-2"
-         (button :type "button" :class "btn" :data-media-pick-for name "Choose…")
-         (button :type "button" :class "btn" :data-media-clear-for name "Clear"))))))
+         (button :type "button" :class "btn" :data-media-pick-for name (~icon :name :media) "Choose…")
+         (button :type "button" :class "btn" :data-media-clear-for name (~icon :name :close) "Clear"))))))
 
 (defcomp ~field-input (&key field value error references media)
   (let* ((name (field-param-name field))

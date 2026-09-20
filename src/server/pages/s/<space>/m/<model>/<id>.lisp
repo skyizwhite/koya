@@ -15,7 +15,7 @@
   (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:redirect-to #:param #:set-flash #:expand-url-template
-                #:short-time #:content-label #:~layout #:~status-badge #:~errors #:content-url #:model-url)
+                #:short-time #:content-label #:~layout #:~status-badge #:~errors #:~icon #:content-url #:model-url)
   (:import-from #:koya-server/components/field-input #:~field-input)
   (:import-from #:koya-server/actions/media-picker #:~media-picker-dialog)
   (:import-from #:koya-server/db/media #:find-media)
@@ -44,11 +44,12 @@
     (and e (getf e :message))))
 
 (defcomp ~external-link (&key href children)
-  (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" children " ↗")))
+  (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" children (~icon :name :external))))
 
-(defcomp ~action-button (&key value (class "btn") onclick children)
+(defcomp ~action-button (&key value (class "btn") onclick icon children)
   "A submit button for the editor form, usable outside the form element."
   (hsx (button :type "submit" :form "editor-form" :name "action" :value value :class class :onclick onclick
+         (if icon (hsx (~icon :name icon)) (hsx (<>)))
          children)))
 
 (defcomp ~meta (&key content)
@@ -76,25 +77,28 @@
                           (list (cons model-name (model-url space-name model-name))
                                 (cons (if content id "new") nil)))
        ;; Sticky action bar: title and metadata on the left, links and actions on the right.
-       (div :class "sticky top-0 z-10 -mx-4 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
-         (div :class "flex flex-wrap items-start justify-between gap-4"
-           (div
-             (h1 :class "text-2xl font-bold" model-name
-               (if object-p
-                   (hsx (<>))
-                   (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
-             (if content (hsx (~meta :content content)) (hsx (<>))))
+       ;; -mt-3 takes back the bar's own top padding so the title starts where every
+       ;; other page's title does, under the layout's padding alone.
+       (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
+         (h1 :class "text-2xl font-bold" model-name
+           (if object-p
+               (hsx (<>))
+               (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
+         (if content (hsx (~meta :content content)) (hsx (<>)))
+         ;; under the title, the full width: where the content can be seen on the
+         ;; left, what can be done to it on the right
+         (div :class "mt-3 flex flex-wrap items-center justify-between gap-2"
            (div :class "flex flex-wrap items-center gap-2"
              (if preview-url (hsx (~external-link :href preview-url "Preview draft")) (hsx (<>)))
-             (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>)))
-             (if (or preview-url public-url) (hsx (span :class "mx-1 h-6 w-px bg-line")) (hsx (<>)))
+             (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>))))
+           (div :class "flex flex-wrap items-center gap-2"
              (if (and published draft)
-                 (hsx (~action-button :value "discard" :onclick "return confirm('Discard the draft and go back to the published version?')"
+                 (hsx (~action-button :value "discard" :icon :discard :class "btn btn-danger"
+                                      :onclick "return confirm('Discard the draft and go back to the published version?')"
                                       "Discard draft"))
                  (hsx (<>)))
-             (if published (hsx (~action-button :value "unpublish" "Unpublish")) (hsx (<>)))
-             (~action-button :value "save" "Save draft")
-             (~action-button :value "publish" :class "btn btn-primary" "Publish"))))
+             (~action-button :value "save" :icon :save "Save draft")
+             (~action-button :value "publish" :icon :publish :class "btn btn-primary" "Publish"))))
        (~errors :errors errors)
        (form :id "editor-form" :method "post" :action (content-url space-name model-name id)
              :class "space-y-6" :data-editor-form t
@@ -106,11 +110,19 @@
                               :error (field-error errors (field-name field))))))
        ;; one picker per page, shared by :media fields and Quill's image button
        (~media-picker-dialog :space space-name)
+       ;; the two ways to take content off the site, kept away from the daily ones
        (if content
-           (hsx (div :class "mt-12 flex items-center justify-between border-t border-line pt-6 text-sm text-muted"
-                  (span (if object-p "Delete this content and start over." "Delete this content permanently."))
-                  (~action-button :value "delete" :class "btn btn-danger"
-                                  :onclick "return confirm('Delete this content?')" "Delete")))
+           (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
+                  (div
+                    (p :class "font-medium text-danger" "Danger zone")
+                    (p :class "text-muted"
+                      (if object-p
+                          "Unpublishing takes the content off the site; deleting empties it and starts over."
+                          "Unpublishing takes the content off the site; deleting removes it for good.")))
+                  (div :class "flex flex-wrap items-center gap-2"
+                    (if published (hsx (~action-button :value "unpublish" :icon :unpublish "Unpublish")) (hsx (<>)))
+                    (~action-button :value "delete" :icon :delete :class "btn btn-danger"
+                                    :onclick "return confirm('Delete this content?')" "Delete"))))
            (hsx (<>)))))))
 
 (defun load-editor (params)

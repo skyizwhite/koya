@@ -6,7 +6,7 @@
   (:import-from #:koya-server/db/media #:list-media)
   (:import-from #:koya-server/lib/media-store #:store-upload)
   (:import-from #:koya-server/lib/http #:uploaded-files #:api-error #:api-error-message)
-  (:import-from #:koya-server/lib/page #:owner-p #:same-origin-p #:param)
+  (:import-from #:koya-server/lib/page #:owner-p #:same-origin-p #:param #:~icon)
   (:import-from #:koya-server/components/media-grid #:~media-grid)
   (:export #:media-picker
            #:media-picker-upload
@@ -28,7 +28,7 @@
      (form :hx-post (media-picker-upload :space space) :hx-target "#media-picker-body" :hx-swap "outerHTML"
            :hx-encoding "multipart/form-data" :hx-trigger "change from:find input[type=file]"
            :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
-       (label :class "btn" "Upload…"
+       (label :class "btn" (~icon :name :upload) "Upload…"
          (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
        (span :class "text-muted" "PNG, JPEG, GIF or WebP. Uploaded files are added to the library.")
        (when error (hsx (span :class "text-danger" error))))
@@ -67,6 +67,6 @@
    (dialog :id "media-picker" :data-picker-url (media-picker :space space) :class "koya-dialog max-w-3xl"
      (div :class "flex items-center justify-between border-b border-line px-4 py-3"
        (h2 :class "font-semibold" "Media")
-       (button :type "button" :class "btn" :data-dialog-close t "Close"))
+       (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close" (~icon :name :close)))
      (div :class "max-h-[70vh] overflow-y-auto p-4"
        (div :id "media-picker-body" :class "text-sm text-muted" "Loading…")))))

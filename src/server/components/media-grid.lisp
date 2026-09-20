@@ -6,7 +6,7 @@
   (:import-from #:koya-server/lib/media-store
                 #:media-url)
   (:import-from #:koya-server/lib/page
-                #:short-time #:~empty-state)
+                #:short-time #:~empty-state #:~icon)
   (:export #:~media-grid
            #:~media-card
            #:~media-preview-dialog
@@ -29,48 +29,40 @@
   (hsx (img :src (media-url media :absolute nil) :alt (media-alt media) :loading "lazy"
             :class "aspect-square w-full rounded-md border border-line bg-panel object-contain")))
 
-(defun preview-attributes (media)
-  "Attributes koya-editor.js reads to fill the preview dialog."
-  (list :data-preview-src (media-url media :absolute nil)
-        :data-preview-alt (media-alt media)
-        :data-preview-name (media-filename media)
-        :data-preview-meta (format nil "~a · ~a" (dimensions media) (human-size (media-size media)))))
+(defun delete-confirmation (media references)
+  "What the owner is asked before a file goes, REFERENCES contents using it."
+  (format nil "Delete ~a?~a" (media-filename media)
+          (if (plusp (or references 0)) (format nil " It is used by ~a content~:p." references) "")))
 
 (defcomp ~media-card (&key media space references)
-  "Library card: thumbnail, facts, alt form and delete form. REFERENCES is how many
-contents mention this file (shown in the delete confirmation)."
+  "Library card: the thumbnail opens the preview dialog, which carries everything
+that can be done to the file; only Delete is on the card, over its corner.
+REFERENCES is how many contents mention the file (shown in the confirmation)."
   (declare (ignore space))
-  (let ((id (media-id media))
-        (preview (preview-attributes media)))
+  (let ((id (media-id media)))
     (hsx
-     (li :class "space-y-2 text-sm"
+     (li :class "relative space-y-2 text-sm"
+       ;; the whole thumbnail is the preview button, so the card needs no other
        (button :type "button" :class "block w-full cursor-zoom-in"
-               :data-preview-src (getf preview :data-preview-src) :data-preview-alt (getf preview :data-preview-alt)
-               :data-preview-name (getf preview :data-preview-name) :data-preview-meta (getf preview :data-preview-meta)
+               :data-preview-src (media-url media :absolute nil)
+               :data-preview-alt (media-alt media)
+               :data-preview-name (media-filename media)
+               :data-preview-meta (format nil "~a · ~a" (dimensions media) (human-size (media-size media)))
+               :data-preview-id id
+               :data-preview-confirm (delete-confirmation media references)
                :aria-label (format nil "Preview ~a" (media-filename media))
          (~thumb :media media))
        (div :class "truncate font-medium" :title (media-filename media) (media-filename media))
        (div :class "text-xs text-muted"
          (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media)) (short-time (media-created-at media))))
-       (form :method "post" :class "flex gap-2"
-         (input :type "hidden" :name "action" :value "alt")
+       (form :method "post" :class "absolute right-2 top-2"
+         (input :type "hidden" :name "action" :value "delete")
          (input :type "hidden" :name "id" :value id)
-         (input :type "text" :name "alt" :value (media-alt media) :placeholder "alt text" :class "input" :aria-label "alt text")
-         (button :type "submit" :class "btn" "Save"))
-       ;; Preview and Delete share a row; Delete is its own form
-       (div :class "flex items-center justify-between gap-2"
-         (button :type "button" :class "btn"
-                 :data-preview-src (getf preview :data-preview-src) :data-preview-alt (getf preview :data-preview-alt)
-                 :data-preview-name (getf preview :data-preview-name) :data-preview-meta (getf preview :data-preview-meta)
-           "Preview")
-         (form :method "post"
-           (input :type "hidden" :name "action" :value "delete")
-           (input :type "hidden" :name "id" :value id)
-           ;; the confirmation text is data, not inline script: koya-editor.js asks
-           (button :type "submit" :class "btn btn-danger"
-                   :data-confirm (format nil "Delete ~a?~a" (media-filename media)
-                                         (if (plusp (or references 0)) (format nil " It is used by ~a content~:p." references) ""))
-             "Delete")))))))
+         ;; the confirmation text is data, not inline script: koya-editor.js asks
+         (button :type "submit" :class "btn btn-danger btn-icon"
+                 :data-confirm (delete-confirmation media references)
+                 :aria-label (format nil "Delete ~a" (media-filename media))
+           (~icon :name :delete)))))))
 
 (defcomp ~pick-card (&key media)
   "Picker card: one button carrying everything the page needs to use the file."
@@ -100,15 +92,30 @@ contents mention this file (shown in the delete confirmation)."
                                        :references (gethash (media-id media) references 0))))))))))
 
 (defcomp ~media-preview-dialog ()
-  "One dialog per page; [data-preview-src] buttons fill and open it (koya-editor.js)."
+  "One dialog per page; [data-preview-src] buttons fill and open it (koya-editor.js).
+The file's alt text and its Delete live here rather than on every card. Both
+forms post to the page the dialog is on, which is the media library."
   (hsx
-   (dialog :id "media-preview" :class "koya-dialog max-w-5xl"
+   (dialog :id "media-preview" :class "koya-dialog max-w-3xl"
      (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
        (div :class "min-w-0"
          (div :class "truncate font-semibold" :data-preview-title t "")
          (div :class "text-xs text-muted" :data-preview-caption t ""))
-       (div :class "flex shrink-0 gap-2"
-         (a :href "#" :target "_blank" :rel "noopener" :class "btn" :data-preview-open t "Open ↗")
-         (button :type "button" :class "btn" :data-dialog-close t "Close")))
-     (div :class "flex max-h-[80vh] items-center justify-center bg-fg/5 p-4"
-       (img :src "" :alt "" :class "max-h-[75vh] max-w-full object-contain" :data-preview-image t)))))
+       (div :class "flex shrink-0 items-center gap-2"
+         (form :method "post"
+           (input :type "hidden" :name "action" :value "delete")
+           (input :type "hidden" :name "id" :value "" :data-preview-id t)
+           ;; the confirmation starts generic and is replaced with the open file's
+           ;; own, which also makes the button one koya-editor.js binds at load
+           (button :type "submit" :class "btn btn-danger btn-icon" :data-preview-delete t
+                   :data-confirm "Delete this file?" :aria-label "Delete"
+             (~icon :name :delete)))
+         (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close" (~icon :name :close))))
+     (div :class "flex max-h-[65vh] items-center justify-center bg-fg/5 p-4"
+       (img :src "" :alt "" :class "max-h-[60vh] max-w-full object-contain" :data-preview-image t))
+     (form :method "post" :class "flex items-center gap-2 border-t border-line px-4 py-3"
+       (input :type "hidden" :name "action" :value "alt")
+       (input :type "hidden" :name "id" :value "" :data-preview-id t)
+       (input :type "text" :name "alt" :value "" :placeholder "alt text" :class "input" :aria-label "alt text"
+              :data-preview-alt-input t)
+       (button :type "submit" :class "btn btn-icon" :aria-label "Save alt text" (~icon :name :check))))))

@@ -7,7 +7,7 @@
   (:import-from #:koya-server/lib/http #:path-param #:uploaded-files #:api-error #:api-error-message)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to
-                #:~layout #:space-url)
+                #:~layout #:~icon #:space-url)
   (:import-from #:koya-server/components/media-grid #:~media-grid #:~media-preview-dialog)
   (:export #:@get #:@post #:media-page-url))
 (in-package #:koya-server/pages/s/<space>/media)
@@ -38,27 +38,27 @@
            (span :class "ml-3 text-base font-normal text-muted" (format nil "~a file~:p" total)))
          (form :method "get" :class "flex gap-2"
            (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input")
-           (button :type "submit" :class "btn" "Search")))
-       (form :method "post" :enctype "multipart/form-data" :class "mb-8 flex flex-wrap items-end gap-3 rounded-md border border-line bg-panel p-4"
+           (button :type "submit" :class "btn btn-icon" :aria-label "Search" (~icon :name :search))))
+       ;; the picker's upload row (see actions/media-picker): the button opens the
+       ;; file picker and the files go up as soon as they are chosen. alt text is
+       ;; written afterwards, in the preview dialog.
+       (form :method "post" :enctype "multipart/form-data"
+             :class "mb-8 flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
          (input :type "hidden" :name "action" :value "upload")
-         (div :class "flex-1"
-           (label :for "file" :class "label" "Images (PNG, JPEG, GIF, WebP; several at once)")
-           (input :type "file" :id "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t
-                  :required t :class "mt-1.5 block text-sm"))
-         (div
-           (label :for "alt" :class "label" "alt text")
-           (input :type "text" :id "alt" :name "alt" :class "input mt-1.5" :placeholder "optional"))
-         (button :type "submit" :class "btn btn-primary" "Upload"))
+         (label :class "btn" (~icon :name :upload) "Upload"
+           (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp"
+                  :multiple t :class "hidden" :data-submit-on-change t))
+         (span :class "text-muted" "PNG, JPEG, GIF or WebP, several at once."))
        (~media-grid :items items :space space)
        (~media-preview-dialog)
        (when (> pages 1)
          (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
                 (if (> page 1)
-                    (hsx (a :href (page-link (1- page) search) :class "btn" "Previous"))
+                    (hsx (a :href (page-link (1- page) search) :class "btn" (~icon :name :prev) "Previous"))
                     (hsx (<>)))
                 (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
                 (if (< page pages)
-                    (hsx (a :href (page-link (1+ page) search) :class "btn" "Next"))
+                    (hsx (a :href (page-link (1+ page) search) :class "btn" "Next" (~icon :name :next)))
                     (hsx (<>))))))))))
 
 (defun @get (params)
