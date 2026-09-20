@@ -92,12 +92,13 @@
   (error 'schema-error :message (apply #'format nil fmt args)))
 
 (defun slug-name-p (string)
-  "Space and model names: lowercase, digits and hyphens, used in URLs."
-  (and (stringp string) (scan "^[a-z][a-z0-9-]*$" string) t))
+  "Space and model names: lowercase, digits and hyphens, used in URLs.
+Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline."
+  (and (stringp string) (scan "^[a-z][a-z0-9-]*\\z" string) t))
 
 (defun field-name-p (string)
   "Field names: camelCase identifiers, used as JSON keys."
-  (and (stringp string) (scan "^[a-z][a-zA-Z0-9]*$" string) t))
+  (and (stringp string) (scan "^[a-z][a-zA-Z0-9]*\\z" string) t))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Structures

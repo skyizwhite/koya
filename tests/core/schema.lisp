@@ -35,7 +35,9 @@
     (ok (signals (make-field :x :select) 'schema-error) "select needs options")
     (ok (signals (make-field :x :reference) 'schema-error) "reference needs model")
     (ok (signals (make-field :x :slug) 'schema-error) "slug needs from")
-    (ok (signals (make-field "Bad Name" :text) 'schema-error)))
+    (ok (signals (make-field "Bad Name" :text) 'schema-error))
+    (ok (signals (make-field (format nil "title~%") :text) 'schema-error) "no trailing newline")
+    (ok (signals (make-model (format nil "blog~%") :list nil) 'schema-error) "no trailing newline"))
   (testing "model and space names must be slugs"
     (ok (signals (make-model "Blog Post" :list nil) 'schema-error))
     (ok (signals (make-model "blog" :weird nil) 'schema-error))

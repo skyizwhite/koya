@@ -42,7 +42,7 @@
 
 (defun date-string-p (value)
   (and (stringp value)
-       (scan "^\\d{4}-\\d{2}-\\d{2}$" value)
+       (scan "^\\d{4}-\\d{2}-\\d{2}\\z" value)
        (parse-timestring value :fail-on-error nil)
        t))
 
@@ -53,10 +53,10 @@
 
 (defun content-id-p (value)
   "Content ids: 1-64 URL-safe characters (ULIDs, microCMS-style ids, custom ids)."
-  (and (stringp value) (scan "^[A-Za-z0-9_-]{1,64}$" value) t))
+  (and (stringp value) (scan "^[A-Za-z0-9_-]{1,64}\\z" value) t))
 
 (defun slug-string-p (value)
-  (and (stringp value) (scan "^[a-z0-9]+(?:-[a-z0-9]+)*$" value) t))
+  (and (stringp value) (scan "^[a-z0-9]+(?:-[a-z0-9]+)*\\z" value) t))
 
 (defun check-string (field value &key (code "type") (what "a string"))
   (cond ((not (stringp value))
