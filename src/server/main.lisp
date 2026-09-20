@@ -6,10 +6,13 @@
   (:import-from #:koya-server/lib/env #:db-path #:server-port)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
+  (:import-from #:koya-server/lib/totp #:generate-totp-secret #:otpauth-uri #:totp)
   (:export #:start
            #:stop
            #:reload
-           #:main))
+           #:main
+           #:totp-setup
+           #:totp-code))
 (in-package #:koya-server)
 
 (defvar *server* nil)
@@ -41,3 +44,15 @@
   "Entry point for a deployed process: Woo on all interfaces, blocking forever."
   (start :server :woo :address "0.0.0.0")
   (loop (sleep 3600)))
+
+(defun totp-setup (&key (account "owner"))
+  "Generate a secret for two-factor login and print what to do with it: put the
+Base32 value in KOYA_TOTP_SECRET and add the otpauth URI to an authenticator app
+(paste it, or turn it into a QR code). Returns the secret."
+  (let ((secret (generate-totp-secret)))
+    (format t "~&KOYA_TOTP_SECRET=~a~%~a~%" secret (otpauth-uri secret :account account))
+    secret))
+
+(defun totp-code (&optional (secret (koya-server/lib/totp:totp-secret)))
+  "The one-time code valid right now, for checking a setup from the REPL."
+  (totp secret))

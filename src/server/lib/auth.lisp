@@ -10,6 +10,8 @@
                 #:constant-time-equal)
   (:import-from #:babel
                 #:string-to-octets)
+  (:import-from #:koya-server/lib/totp
+                #:totp-enabled-p #:totp-code-valid-p)
   (:export #:secure-string=
            #:owner-env-p
            #:*admin-auth-middleware*
@@ -36,11 +38,15 @@
 (defun session-owner-p (&optional (session (ningle:context :session)))
   (and session (gethash "owner" session) t))
 
-(defun session-login (secret)
-  "Mark the current session as the owner when SECRET is right. Returns T on success."
-  (when (secure-string= secret (koya-secret))
-    (setf (gethash "owner" (ningle:context :session)) t)
-    t))
+(defun session-login (secret &optional code)
+  "Mark the current session as the owner when SECRET is right and, with TOTP
+enabled, CODE is the current one-time code. Returns T on success, :code when only
+the code is wrong or missing, NIL otherwise. The secret is checked first so a
+wrong secret never learns whether a code would have been accepted."
+  (cond ((not (secure-string= secret (koya-secret))) nil)
+        ((and (totp-enabled-p) (not (totp-code-valid-p code))) :code)
+        (t (setf (gethash "owner" (ningle:context :session)) t)
+           t)))
 
 (defun session-logout ()
   (remhash "owner" (ningle:context :session)))

@@ -198,6 +198,11 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - 管理画面・管理 API: 単一オーナーシークレット(環境変数 `KOYA_SECRET`)。
   UI はログインフォーム → セッション Cookie、管理 API(deploy 等)は `Authorization: Bearer`。
   比較は定数時間で行う。
+- **二段階認証(TOTP)**: `KOYA_TOTP_SECRET`(Base32)を設定するとログインフォームにワンタイムコード欄が出る。
+  RFC 6238(SHA-1、30 秒、6 桁、前後 1 ステップ許容)。使ったステップはプロセス内で記憶し、同じコードで二度は入れない。
+  シークレットが違えばコードの正否は判定しない(コードを消費しない)。対象はブラウザのログインのみで、
+  管理 API の Bearer は機械向けなので変えない。鍵の生成は REPL の `(koya-server:totp-setup)` が
+  `KOYA_TOTP_SECRET` の値と otpauth URI を出す。認証アプリには URI を貼るか QR にして登録する。
 - 配信 API: space ごとの API キー(`X-KOYA-API-KEY`)。**本体側で生成し、管理 UI に表示**する。
   利用側は `.env` に置いてクライアントへ渡す。利用側コードにシークレットを置かない。
   キーは高エントロピーの乱数なので SHA-256 ハッシュで保存する(bcrypt は使わない)。
@@ -330,7 +335,7 @@ website から流用するパターン:
   番号付き Lisp 関数のリストで up のみ持つ。down は持たない。
 - バックアップは Coolify のボリュームバックアップに任せる。
   `POST /admin/api/backup`(`VACUUM INTO`)は後続フェーズ。
-- 環境変数: `KOYA_SECRET`、`KOYA_DB_PATH`、`KOYA_MEDIA_DIR`、`KOYA_BASE_URL`、`KOYA_PORT`、`KOYA_ENV`。
+- 環境変数: `KOYA_SECRET`、`KOYA_TOTP_SECRET`(任意)、`KOYA_DB_PATH`、`KOYA_MEDIA_DIR`、`KOYA_BASE_URL`、`KOYA_PORT`、`KOYA_ENV`。
 - `GET /health`(認証なし、DB 疎通を含む)をヘルスチェックに使う。
 
 ## 13. マイルストーン
@@ -424,3 +429,4 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 | 2026-09-20 | 管理 API の書き込みも Origin 検証。Cookie は HttpOnly / SameSite=Lax / https なら Secure | SameSite の既定値だけに頼らない |
 | 2026-09-20 | メディアは koya 自身が `/media/` で配信。形式は先頭バイトで判定し PNG / JPEG / GIF / WebP のみ、SVG は不可 | 外部ストレージなしで完結させる。Content-Type 詐称と SVG 経由のスクリプトを避ける |
 | 2026-09-20 | `:media` は配信 API で常にオブジェクト展開(`include` 不要) | 画像は URL が無いと使えず、展開が入れ子になることもない |
+| 2026-09-20 | 二段階認証は TOTP、鍵は環境変数 `KOYA_TOTP_SECRET`(未設定なら無効) | 単一オーナーなので設定は env で足りる。DB や登録画面を持ち込まない |

@@ -2,6 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/lib/auth #:session-login)
+  (:import-from #:koya-server/lib/totp #:totp-enabled-p)
   (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:same-origin-p)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/login)
@@ -14,6 +15,11 @@
        (div
          (label :for "secret" :class "label" "Owner secret")
          (input :type "password" :id "secret" :name "secret" :required t :autofocus t :class "input mt-1.5"))
+       (when (totp-enabled-p)
+         (hsx (div
+                (label :for "code" :class "label" "One-time code")
+                (input :type "text" :id "code" :name "code" :inputmode "numeric" :autocomplete "one-time-code"
+                       :pattern "[0-9 ]*" :required t :class "input mt-1.5"))))
        (when error (hsx (p :class "text-sm text-danger" error)))
        (button :type "submit" :class "btn btn-primary w-full justify-center" "Log in")))))
 
@@ -29,8 +35,8 @@
   (cond ((not (same-origin-p))
          (set-response-status 403)
          (hsx (~login-form :error "Cross-origin request rejected")))
-        ((session-login (or (param params "secret") ""))
-         (redirect-to "/"))
         (t
-         (set-response-status 401)
-         (hsx (~login-form :error "Wrong secret")))))
+         (let ((result (session-login (or (param params "secret") "") (param params "code"))))
+           (cond ((eq result t) (redirect-to "/"))
+                 (t (set-response-status 401)
+                    (hsx (~login-form :error (if (eq result :code) "Wrong or expired one-time code" "Wrong secret")))))))))
