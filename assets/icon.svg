@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- koya: a small hut. Accent #b5541c on a warm base, rounded tile. -->
+  <rect width="32" height="32" rx="7" fill="#b5541c"/>
+  <!-- roof -->
+  <path d="M16 6 L27 16 H5 Z" fill="#fbfaf7"/>
+  <!-- walls -->
+  <rect x="8" y="16" width="16" height="10" fill="#fbfaf7"/>
+  <!-- door -->
+  <rect x="13.5" y="19" width="5" height="7" rx="1" fill="#b5541c"/>
+  <!-- chimney -->
+  <rect x="20" y="8" width="3" height="5" fill="#fbfaf7"/>
+</svg>

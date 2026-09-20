@@ -10,6 +10,7 @@
        (meta :charset "utf-8")
        (meta :name "viewport" :content "width=device-width, initial-scale=1")
        (title (or title "koya"))
+       (link :rel "icon" :type "image/svg+xml" :href "/assets/icon.svg")
        (link :rel "stylesheet" :href "/assets/style/quill.snow.css")
        (link :rel "stylesheet" :href "/assets/style/dist.css")
        (script :src "/assets/js/htmx.min.js" :defer t)

@@ -10,7 +10,9 @@
 (defcomp ~login-form (&key error)
   (hsx
    (main :class "mx-auto max-w-sm px-4 py-24"
-     (h1 :class "mb-6 text-2xl font-bold tracking-tight" "koya")
+     (h1 :class "mb-6 flex items-center gap-3 text-2xl font-bold tracking-tight"
+       (img :src "/assets/icon.svg" :alt "" :width "32" :height "32" :class "h-8 w-8 rounded-md")
+       "koya")
      (form :method "post" :action "/login" :class "space-y-4"
        (div
          (label :for "secret" :class "label" "Owner secret")

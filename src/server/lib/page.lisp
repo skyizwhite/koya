@@ -135,7 +135,9 @@ See ORIGIN-ALLOWED-P."
      (header :class "border-b border-line bg-panel"
        (div :class "mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3"
          (nav :class "flex items-center gap-2 text-sm"
-           (a :href "/" :class "font-bold tracking-tight text-fg" "koya")
+           (a :href "/" :class "inline-flex items-center gap-2 font-bold tracking-tight text-fg"
+              (img :src "/assets/icon.svg" :alt "" :width "20" :height "20" :class "h-5 w-5 rounded")
+              "koya")
            (when space
              (hsx (<> (span :class "text-muted" "/")
                       (a :href (space-url space) :class "text-fg hover:underline" space))))
