@@ -23,5 +23,8 @@
   (format-iso (now)))
 
 (defun parse-iso (string)
-  "Parse an ISO 8601 string into a local-time timestamp, or NIL when invalid."
-  (and (stringp string) (parse-timestring string :fail-on-error nil)))
+  "Parse an ISO 8601 string into a local-time timestamp, or NIL when invalid
+(including calendar-invalid dates, which local-time signals on)."
+  (and (stringp string)
+       (handler-case (parse-timestring string :fail-on-error nil)
+         (error () nil))))

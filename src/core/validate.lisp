@@ -40,16 +40,22 @@
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
 
+(defun parses-as-time-p (string)
+  "True when local-time accepts STRING. :fail-on-error only covers syntax; a date
+that does not exist on the calendar (2026-02-30) signals, so that is caught too."
+  (handler-case (and (parse-timestring string :fail-on-error nil) t)
+    (error () nil)))
+
 (defun date-string-p (value)
   (and (stringp value)
        (scan "^\\d{4}-\\d{2}-\\d{2}\\z" value)
-       (parse-timestring value :fail-on-error nil)
-       t))
+       (parses-as-time-p value)))
 
 (defun datetime-string-p (value)
+  "ISO 8601 date and time with an explicit zone: 2026-09-20T10:00:00.000Z or ...+09:00."
   (and (stringp value)
-       (parse-timestring value :fail-on-error nil)
-       t))
+       (scan "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:\\d{2})\\z" value)
+       (parses-as-time-p value)))
 
 (defun content-id-p (value)
   "Content ids: 1-64 URL-safe characters (ULIDs, microCMS-style ids, custom ids)."
