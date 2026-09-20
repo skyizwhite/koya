@@ -8,10 +8,8 @@
                 #:regex-replace-all)
   (:import-from #:koya-server/lib/auth
                 #:session-owner-p)
-  (:import-from #:koya-server/lib/env
-                #:base-url)
-  (:import-from #:quri
-                #:uri #:uri-host #:uri-port)
+  (:import-from #:koya-server/lib/http
+                #:origin-allowed-p)
   (:import-from #:koya/core/schema
                 #:model-fields #:field-name #:field-type)
   (:import-from #:koya/core/json
@@ -90,19 +88,11 @@
                           (regex-replace-all "\\{CONTENT_ID\\}" template (or id ""))
                           (or draft-key ""))))
 
-(defun header-host (name)
-  (let ((v (first (get-request-header name))))
-    (and v (let ((u (ignore-errors (uri (string-trim " " v)))))
-             (and u (uri-host u) (format nil "~a~@[:~a~]" (uri-host u) (uri-port u)))))))
-
 (defun same-origin-p ()
   "True when the request's Origin (or Referer) matches the Host header or KOYA_BASE_URL.
-Requests without either header are accepted (non-browser clients)."
-  (let ((origin (or (header-host "origin") (header-host "referer"))))
-    (or (null origin)
-        (let ((host (string-trim " " (or (first (get-request-header "host")) "")))
-              (base (ignore-errors (let ((u (uri (base-url)))) (format nil "~a~@[:~a~]" (uri-host u) (uri-port u))))))
-          (or (string-equal origin host) (and base (string-equal origin base)))))))
+See ORIGIN-ALLOWED-P."
+  (flet ((h (name) (first (get-request-header name))))
+    (origin-allowed-p (h "origin") (h "referer") (h "host"))))
 
 (defmacro with-owner (&body body)
   "Run BODY for the logged-in owner, otherwise redirect to the login page."

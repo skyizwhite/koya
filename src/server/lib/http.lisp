@@ -17,7 +17,9 @@
   (:import-from #:koya-server/lib/query
                 #:query-error #:query-error-message)
   (:import-from #:koya-server/lib/env
-                #:dev-mode-p)
+                #:dev-mode-p #:base-url)
+  (:import-from #:quri
+                #:uri #:uri-scheme #:uri-host #:uri-port)
   (:import-from #:babel
                 #:octets-to-string)
   (:export #:json-app
@@ -30,6 +32,7 @@
            #:query-param
            #:body-field
            #:header
+           #:origin-allowed-p
            #:error-object
            #:json-response
            #:ok-status))
@@ -118,3 +121,39 @@ vectors, strings...) and whose errors become JSON error responses."))
 (defun header (name)
   (let ((values (get-request-header name)))
     (and values (string-trim " " (first values)))))
+
+;;; --- Same-origin check (CSRF) --------------------------------------------------
+
+(defun origin-key (url)
+  "host or host:port of URL, lowercased, with the scheme's default port dropped.
+NIL when URL has no host, which includes the literal \"null\" browsers send from
+sandboxed or opaque origins."
+  (let ((u (ignore-errors (uri (string-trim " " url)))))
+    (and u (uri-host u)
+         (let* ((scheme (string-downcase (or (uri-scheme u) "")))
+                (port (uri-port u))
+                (default (cond ((string= scheme "https") 443) ((string= scheme "http") 80))))
+           (string-downcase
+            (if (or (null port) (eql port default))
+                (uri-host u)
+                (format nil "~a:~a" (uri-host u) port)))))))
+
+(defun host-key (host)
+  "The Host header in the same shape as ORIGIN-KEY: default ports are dropped."
+  (let ((host (string-downcase (string-trim " " (or host "")))))
+    (dolist (suffix '(":80" ":443") host)
+      (let ((n (- (length host) (length suffix))))
+        (when (and (plusp n) (string= host suffix :start1 n))
+          (return (subseq host 0 n)))))))
+
+(defun origin-allowed-p (origin referer host &optional (base (base-url)))
+  "CSRF check for state-changing requests. The Origin header (or Referer when
+Origin is absent) must name the Host or KOYA_BASE_URL. A request with neither
+header is accepted: non-browser clients. A present but unusable Origin such as
+\"null\" is rejected."
+  (let ((source (or origin referer)))
+    (or (null source)
+        (let ((key (origin-key source)))
+          (and key
+               (or (string= key (host-key host))
+                   (let ((base-key (origin-key base))) (and base-key (string= key base-key)))))))))

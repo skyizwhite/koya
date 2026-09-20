@@ -95,7 +95,9 @@
     (multiple-value-bind (status) (request :post "/logout" :headers '(("origin" . "https://evil.example")))
       (ok (= status 403)))
     (multiple-value-bind (status) (request :post "/s/website/keys" :form '(("action" . "create")) :headers '(("origin" . "https://evil.example")))
-      (ok (= status 403))))
+      (ok (= status 403)))
+    (multiple-value-bind (status) (request :post "/logout" :headers '(("origin" . "null")))
+      (ok (= status 403) "an opaque origin is not 'no origin'")))
   (testing "same-origin post is fine"
     (multiple-value-bind (status body) (request :post "/s/website/keys" :form '(("action" . "create") ("label" . "ui"))
                                                 :headers '(("origin" . "http://localhost:3000")))

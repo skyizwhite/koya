@@ -7,6 +7,7 @@
   (:import-from #:koya-server/db/api-keys #:create-api-key)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema #:schema->jobject)
+  (:import-from #:koya-server/lib/http #:origin-allowed-p)
   (:import-from #:koya/core/json #:parse-json #:to-json #:jobject #:jget #:json-null)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
@@ -67,6 +68,21 @@
   (request :get path :query query :headers (and key `(("x-koya-api-key" . ,key)))))
 
 (defun webhook-types () (mapcar (lambda (w) (jget (second w) "type")) (reverse *webhooks*)))
+
+(deftest origin-check
+  (flet ((allowed (origin referer host) (origin-allowed-p origin referer host "https://cms.example.com")))
+    (ok (allowed nil nil "cms.example.com") "no Origin or Referer: non-browser client")
+    (ok (allowed "https://cms.example.com" nil "cms.example.com"))
+    (ok (allowed "https://cms.example.com:443" nil "cms.example.com") "default port is dropped")
+    (ok (allowed "https://cms.example.com" nil "cms.example.com:443"))
+    (ok (allowed "http://localhost:3000" nil "localhost:3000"))
+    (ok (allowed "https://cms.example.com" nil "10.0.0.5:3000") "KOYA_BASE_URL behind a proxy")
+    (ok (allowed nil "https://cms.example.com/s/website/keys" "cms.example.com") "Referer fallback")
+    (ng (allowed "https://evil.example" nil "cms.example.com"))
+    (ng (allowed "http://cms.example.com:3000" nil "cms.example.com") "other port is another origin")
+    (ng (allowed "null" nil "cms.example.com") "Origin: null is rejected")
+    (ng (allowed "garbage" nil "cms.example.com"))
+    (ng (allowed "https://evil.example" "https://cms.example.com/" "cms.example.com") "Origin wins over Referer")))
 
 (deftest admin-auth
   (multiple-value-bind (status json) (request :get "/admin/api/me")
