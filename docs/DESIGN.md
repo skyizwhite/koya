@@ -401,6 +401,21 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 
 - revisions、`backup`、Slynk 接続手順、非 Lisp クライアント(TypeScript)の着手。
 
+### 次にやること(2026-09-20 時点)
+
+koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ済み。microCMS からのインポートを残して移行はほぼ完了。
+
+- **ドキュメント整備**(最優先): `docs/SCHEMA.md`(スキーマ JSON の仕様、`koyaSchema: 1`)と
+  `docs/openapi.yaml`(配信 API / 管理 API)。DESIGN.md は経緯込みの設計書なので、利用者向けの
+  リファレンスを別に書く。README のスクリーンショットは入れた。
+- 運用: `/data` ボリュームのバックアップ確認(Coolify のボリュームバックアップ、または `VACUUM INTO` の
+  `POST /admin/api/backup`)。microCMS 解約後に website の `MICROCMS_*` と `scripts/import-from-microcms.py` を削除。
+- 管理 UI: `:datetime` 入力のタイムゾーン変換 JS。一覧のページング(現在は 100 件固定)。
+- セキュリティ: webhook 単位の秘密(`:secret`)を受け口が増えたときに。管理 API 用に `KOYA_SECRET` と
+  別のトークンを切れるようにする(現状は Bearer にオーナーシークレットをそのまま使い、二段階認証の対象外)。
+- 配信: webhook は通知ごとにスレッドを起こすので、大量インポート時はキューにまとめる。
+- 依存: hsx の `&` エスケープ修正は koya で取り込み済み。website は `qlot update koya` で koya の変更を追従。
+
 ## 14. 決定ログ
 
 | 日付 | 決定 | 理由 |
