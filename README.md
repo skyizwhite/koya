@@ -60,6 +60,7 @@ Then, from the REPL:
 ```lisp
 (koya:configure :api-key "koya_...")
 (koya:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :fields "id,title,publishedAt"))
+(koya:get-list 'blog :query '(:include "tags"))   ; embed referenced contents (ids by default)
 (koya:get-item 'blog "01J...")
 (koya:get-object 'about)
 ```
@@ -67,7 +68,7 @@ Then, from the REPL:
 The delivery API is a microCMS-compatible subset:
 
 ```
-GET /api/v1/{space}/{model}?limit=&offset=&orders=&fields=&filters=&depth=&draftKey=
+GET /api/v1/{space}/{model}?limit=&offset=&orders=&fields=&filters=&include=&draftKey=
 GET /api/v1/{space}/{model}/{id}
 X-KOYA-API-KEY: koya_...   (X-MICROCMS-API-KEY is accepted too)
 ```

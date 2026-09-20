@@ -103,7 +103,7 @@ koya/
 | `:date` / `:datetime` | ISO 8601 文字列(UTC) | `:required` |
 | `:select` | 文字列(`:many` で配列) | `:options ("a" "b")` `:many` |
 | `:media` | media id。API では URL 付きオブジェクトに展開 | `:required` |
-| `:reference` | content id(`:many` で配列)。`depth` で展開 | `:model` `:many` |
+| `:reference` | content id(`:many` で配列)。`include` で展開 | `:model` `:many` |
 | `:slug` | 文字列。`:from` のフィールドから自動生成 | `:from title` `:unique` |
 
 - リレーション(`:reference`)は同一 space 内のモデルのみ。
@@ -154,7 +154,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 
 - **REST のみ**。GraphQL は当面やらない。
 - **配信 API**: `GET /api/v1/{space}/{model}`、`GET /api/v1/{space}/{model}/{id}`。
-  microCMS 互換のサブセット: `limit` `offset` `orders` `fields` `filters` `depth` `draftKey`。
+  microCMS 互換のサブセット: `limit` `offset` `orders` `fields` `filters` `draftKey`。
+  参照は常に id で返し、`include=tags,author.avatar` のように名指ししたフィールドだけ埋め込む(`depth` は持たない)。
   レスポンスは `{contents, totalCount, offset, limit}`。object 型は単一オブジェクトを返す。
   `filters` は `[equals]` `[not_equals]` `[contains]` `[exists]` `[not_exists]`
   `[less_than]` `[greater_than]` と `[and]` `[or]` の主要なもののみ。
@@ -323,7 +324,7 @@ website から流用するパターン:
 
 ### M2: 残りのフィールド型とメディア
 
-- `:number` `:date` `:select` `:reference`(`depth`)`:slug` `:media`、画像アップロード、
+- `:number` `:date` `:select` `:reference`(`include`)`:slug` `:media`、画像アップロード、
   `filters` の残りの演算子、`docs/SCHEMA.md` と `docs/openapi.yaml` の整備。
 
 ### M3: 運用・拡張
@@ -369,3 +370,4 @@ website から流用するパターン:
 | 2026-09-20 | website の移行は `koya-migration` ブランチで実施(ローカル koya で全ページ表示を確認) | M1 完了条件 |
 | 2026-09-20 | richtext は Quill で編集する HTML 文字列に変更(Markdown / 3bmd 廃止) | 管理 UI の使い勝手。microCMS の HTML をそのまま移行できる |
 | 2026-09-20 | モデルに `:preview-url` / `:public-url` テンプレート、draft key は保存ごとに再生成、flash はセッション一度きり | 管理 UI 改善の要望 |
+| 2026-09-20 | 参照の展開は `depth` ではなく `include`(フィールド名指し、`a.b` で入れ子)。デフォルトは id のみ | 必要な参照だけ取る。深さ指定は不要な展開を招く |

@@ -4,6 +4,8 @@
                 #:model-fields #:field-name #:field-type #:field-option #:field-many-p #:space-model)
   (:import-from #:koya/core/json
                 #:jobject #:json-array-p #:json-null)
+  (:import-from #:koya-server/lib/query
+                #:query-error)
   (:import-from #:koya-server/db/contents
                 #:content-id #:content-status #:content-published #:content-draft #:content-draft-key
                 #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
@@ -19,26 +21,37 @@
     (when object (maphash (lambda (k v) (setf (gethash k out) v)) object))
     out))
 
-(defun expand-reference (space target-model-name value depth)
-  "Replace a referenced id with the published content object, or NIL when missing."
+(defun expand-reference (space target-model-name value include)
+  "The published content object for a referenced id, or NIL when it is missing or
+unpublished. INCLUDE applies to the embedded object's own references."
   (let* ((target (space-model space target-model-name))
          (content (and target (stringp value) (find-content (koya/core/schema:space-name space) target-model-name value))))
     (and content (content-published content)
-         (content->jobject content target space :depth (1- depth)))))
+         (content->jobject content target space :include include))))
 
-(defun decorate (object model space depth)
-  "Expand references in OBJECT (destructively). Richtext is HTML and passes through as is."
+(defun check-include (include model)
+  "Every top-level INCLUDE name must be a reference field of MODEL."
+  (dolist (path include)
+    (let ((field (find (first path) (model-fields model) :key #'field-name :test #'string=)))
+      (unless (and field (eq (field-type field) :reference))
+        (error 'query-error :message (format nil "include: ~s is not a reference field" (first path)))))))
+
+(defun embed-references (object model space include)
+  "Destructively replace the ids of the reference fields named in INCLUDE with the
+referenced objects. A path a.b embeds a, and b inside each embedded a."
+  (check-include include model)
   (dolist (field (model-fields model))
-    (multiple-value-bind (value found) (gethash (field-name field) object)
-      (when (and found value (not (eq value json-null)))
-        (case (field-type field)
-          (:reference
-           (when (and space (plusp depth))
-             (let ((target (field-option field :model)))
-               (setf (gethash (field-name field) object)
-                     (if (field-many-p field)
-                         (coerce (remove nil (map 'list (lambda (v) (expand-reference space target v depth)) value)) 'vector)
-                         (expand-reference space target value depth))))))))))
+    (let* ((name (field-name field))
+           (nested (loop :for path :in include
+                         :when (string= (first path) name) :collect (rest path)))
+           (value (gethash name object)))
+      (when (and nested value (not (eq value json-null)))
+        (let ((target (field-option field :model))
+              (nested (remove nil nested)))
+          (setf (gethash name object)
+                (if (field-many-p field)
+                    (coerce (remove nil (map 'list (lambda (v) (expand-reference space target v nested)) value)) 'vector)
+                    (or (expand-reference space target value nested) json-null)))))))
   object)
 
 (defun select-fields (object fields)
@@ -58,16 +71,18 @@
         (gethash "revisedAt" object) (or (content-revised-at content) json-null))
   object)
 
-(defun content->jobject (content model space &key draft fields (depth 1))
-  "Delivery API shape: the data merged with system fields. DRAFT serves the draft data."
+(defun content->jobject (content model space &key draft fields include)
+  "Delivery API shape: the data merged with system fields. DRAFT serves the draft data.
+References stay ids unless named in INCLUDE (see EMBED-REFERENCES)."
   (let ((object (copy-object (content-data content :draft draft))))
     (system-fields content object)
-    (decorate object model space depth)
+    (when include (embed-references object model space include))
     (select-fields object fields)))
 
 (defun admin-content->jobject (content model)
   "Admin API shape: status, both data versions and metadata."
-  (flet ((data (object) (and object (decorate (copy-object object) model nil 0))))
+  (declare (ignore model))
+  (flet ((data (object) (and object (copy-object object))))
     (jobject "id" (content-id content)
              "status" (content-status content)
              "published" (or (data (content-published content)) json-null)

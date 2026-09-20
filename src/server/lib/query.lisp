@@ -8,7 +8,7 @@
            #:query-error-message
            #:parse-query
            #:make-query
-           #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-depth
+           #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
            #:build-where
            #:build-order-by
            #:+system-fields+))
@@ -26,7 +26,6 @@
 
 (defparameter +default-limit+ 10)
 (defparameter +max-limit+ 100)
-(defparameter +max-depth+ 3)
 
 (defstruct query
   (limit +default-limit+)
@@ -34,7 +33,7 @@
   orders    ; list of (name . :asc/:desc)
   filters   ; list of groups, each group a list of (name op value); groups are OR'ed, terms AND'ed
   fields    ; list of field names or NIL for all
-  (depth 1))
+  include)  ; list of reference paths to embed, each a list of field names (a.b -> ("a" "b"))
 
 (defun param (params name)
   (let ((v (cdr (assoc name params :test #'string=))))
@@ -50,6 +49,10 @@
 
 (defun split-csv (string)
   (remove "" (mapcar (lambda (s) (string-trim " " s)) (split "," string)) :test #'string=))
+
+(defun parse-include (string)
+  "include=tags,author.avatar -> ((\"tags\") (\"author\" \"avatar\"))"
+  (mapcar (lambda (path) (remove "" (split "\\." path) :test #'string=)) (split-csv string)))
 
 (defun parse-orders (string)
   (mapcar (lambda (item)
@@ -89,7 +92,7 @@
               :orders (let ((o (param params "orders"))) (and o (parse-orders o)))
               :filters (let ((f (param params "filters"))) (and f (parse-filters f)))
               :fields (let ((f (param params "fields"))) (and f (split-csv f)))
-              :depth (parse-integer-param params "depth" 1 :min 0 :max +max-depth+)))
+              :include (let ((i (param params "include"))) (and i (parse-include i)))))
 
 ;;; --- SQL generation ---------------------------------------------------------
 

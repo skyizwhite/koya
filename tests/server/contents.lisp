@@ -12,7 +12,7 @@
   (:import-from #:koya-server/db/api-keys
                 #:create-api-key #:list-api-keys #:delete-api-key #:space-for-api-key)
   (:import-from #:koya-server/lib/query
-                #:parse-query #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-depth
+                #:parse-query #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
                 #:query-error)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema)
   (:import-from #:koya/core/json #:parse-json #:jget))
@@ -137,12 +137,12 @@
   (let ((query (q)))
     (ok (= (query-limit query) 10))
     (ok (= (query-offset query) 0))
-    (ok (= (query-depth query) 1))
+    (ok (null (query-include query)) "references stay ids by default")
     (ok (null (query-fields query))))
-  (let ((query (q "limit" "500" "fields" "id,title" "depth" "2" "filters" "a[equals]1[and]b[exists][or]c[equals]2")))
+  (let ((query (q "limit" "500" "fields" "id,title" "include" "tags,author.avatar" "filters" "a[equals]1[and]b[exists][or]c[equals]2")))
     (ok (= (query-limit query) 100) "capped")
     (ok (equal (query-fields query) '("id" "title")))
-    (ok (= (query-depth query) 2))
+    (ok (equal (query-include query) '(("tags") ("author" "avatar"))))
     (ok (equal (query-filters query) '((("a" "equals" "1") ("b" "exists" "")) (("c" "equals" "2")))))))
 
 (deftest api-keys

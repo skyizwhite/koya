@@ -98,7 +98,7 @@
 
 (defun published-view (space model content)
   (and (content-published content)
-       (content->jobject content model space :depth 0)))
+       (content->jobject content model space)))
 
 (defun notify (space model-name id type &key old new)
   (notify-webhooks space model-name id type

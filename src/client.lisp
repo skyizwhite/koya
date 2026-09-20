@@ -58,7 +58,10 @@
 (defun query-alist (query)
   "Kebab plist -> camelCase alist of strings for the query string."
   (loop :for (k v) :on query :by #'cddr
-        :when v :collect (cons (camel-key k) (if (stringp v) v (princ-to-string v)))))
+        :when v :collect (cons (camel-key k)
+                               (cond ((stringp v) v)
+                                     ((listp v) (format nil "~{~a~^,~}" v))
+                                     (t (princ-to-string v))))))
 
 (defun build-url (path query)
   (let ((uri (quri:uri (format nil "~a~a" (base-url) path))))
@@ -137,7 +140,9 @@ after interactive confirmation when CONFIRM is true. Returns the applied changes
   (format nil "/api/v1/~a/~(~a~)~@[/~a~]" (space-name space) model id))
 
 (defun get-list (model &key space query)
-  "List published contents of MODEL. QUERY is a kebab plist (:limit :offset :orders :fields :filters :depth)."
+  "List published contents of MODEL. QUERY is a kebab plist (:limit :offset :orders
+:fields :filters :include). References are ids unless :include names them, e.g.
+:include \"tags\" or :include '(\"tags\" \"author.avatar\")."
   (jvalue->lisp (request :get (delivery-path space model) :query query :auth :api-key)))
 
 (defun get-item (model id &key space query)

@@ -4,7 +4,7 @@
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-server/lib/http #:path-param #:query-param #:fail-api)
   (:import-from #:koya-server/lib/auth #:require-api-key)
-  (:import-from #:koya-server/lib/query #:parse-query #:query-limit #:query-offset #:query-fields #:query-depth)
+  (:import-from #:koya-server/lib/query #:parse-query #:query-limit #:query-offset #:query-fields #:query-include)
   (:import-from #:koya-server/lib/content-service #:resolve-model)
   (:import-from #:koya-server/lib/presenter #:content->jobject)
   (:import-from #:koya-server/db/contents
@@ -26,11 +26,11 @@
               (unless (and content (or draft (content-published content)))
                 (fail-api 404 "not_found" "Content does not exist"))
               (content->jobject content model space :draft draft
-                                :fields (query-fields query) :depth (query-depth query)))
+                                :fields (query-fields query) :include (query-include query)))
             (multiple-value-bind (contents total) (list-contents space-name model-name model query)
               (jobject "contents" (map 'vector (lambda (c) (content->jobject c model space
                                                                              :fields (query-fields query)
-                                                                             :depth (query-depth query)))
+                                                                             :include (query-include query)))
                                        contents)
                        "totalCount" total
                        "offset" (query-offset query)
