@@ -112,14 +112,21 @@ live inside the JSON data column."
         (unless (model-field model name) (bad "unknown field ~s" name))
         (format nil "json_extract(~a, '$.~a')" column name))))
 
+(defun parse-number-strictly (string)
+  "STRING as a real number, or NIL. The reader runs with *read-eval* off and standard
+syntax, and the whole string must be one number: filter values come from the network."
+  (handler-case
+      (with-standard-io-syntax
+        (let ((*read-eval* nil) (*read-default-float-format* 'double-float))
+          (multiple-value-bind (n end) (read-from-string string)
+            (and (realp n) (= end (length string)) n))))
+    (error () nil)))
+
 (defun coerce-value (name model value)
   (let ((field (model-field model name)))
     (cond ((null field) value)
           ((eq (field-type field) :number)
-           (handler-case (let ((*read-default-float-format* 'double-float))
-                           (let ((n (read-from-string value)))
-                             (if (realp n) n (bad "~a expects a number" name))))
-             (error () (bad "~a expects a number" name))))
+           (or (parse-number-strictly value) (bad "~a expects a number" name)))
           ((eq (field-type field) :boolean)
            (cond ((string= value "true") 1) ((string= value "false") 0) (t (bad "~a expects true or false" name))))
           (t value))))

@@ -37,6 +37,8 @@
 
 (defhook :before (koya-server/db/connection:exec "DELETE FROM contents"))
 
+(defvar *read-eval-probe* nil "Set by a hostile filter value if the reader ever evaluates it.")
+
 (defun data (json) (parse-json json))
 (defun q (&rest kv) (parse-query (loop :for (k v) :on kv :by #'cddr :collect (cons k v))))
 (defun titles (contents) (mapcar (lambda (c) (jget (content-published c) "title")) contents))
@@ -129,6 +131,14 @@
       (ok (equal (titles (list-contents "website" "blog" model (q "filters" "title[not_equals]Beta"))) '("Gamma" "Alpha"))))
     (testing "bad queries are rejected"
       (ok (signals (list-contents "website" "blog" model (q "filters" "nope[equals]1")) 'query-error))
+      (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]abc")) 'query-error))
+      (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]1 2")) 'query-error) "trailing garbage")
+      (let ((*read-eval-probe* nil))
+        (ok (signals (list-contents "website" "blog" model
+                                    (q "filters" "count[equals]#.(setf koya-tests/server/contents::*read-eval-probe* t)"))
+                     'query-error)
+            "reader macros in a number filter are rejected")
+        (ok (null *read-eval-probe*) "and never evaluated"))
       (ok (signals (list-contents "website" "blog" model (q "filters" "title[weird]1")) 'query-error))
       (ok (signals (list-contents "website" "blog" model (q "orders" "nope")) 'query-error))
       (ok (signals (q "limit" "abc") 'query-error)))))
