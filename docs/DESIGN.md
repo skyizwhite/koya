@@ -344,22 +344,23 @@ website から流用するパターン:
   `:media` の API 展開(`{url, width, height, alt}`)、`:datetime` 入力のタイムゾーン変換 JS、
   `docs/SCHEMA.md` と `docs/openapi.yaml` の整備。
 
-### 既知の課題(2026-09-20 のコードレビューで確認、未修正)
+### 2026-09-20 のコードレビューと対応
 
-修正済み: 配信 API の数値 `filters` が `*read-eval*` 有効のまま `read-from-string` していた(任意コード実行)。
+core / server / UI・client を通しでレビューし、確認できた問題は当日中に修正した(1件ずつコミット)。
 
-- 整合性: 一意制約チェックと INSERT、object 型の「1件だけ」の判定と INSERT がトランザクション外で、並行要求で重複しうる。
-- 認証: セッション Cookie に HttpOnly / Secure が無い。管理 JSON API は Origin 検証をせず SameSite=Lax 頼み。
-  `Origin: null` はパース不能のため「Origin 無し」扱いで通る。
-- 同一オリジン判定が quri の既定ポート補完(`:443`)で Host と食い違う。`KOYA_BASE_URL` が正しく設定されていれば一致する。
-- バリデーション: `$` アンカーが末尾改行を許す(名前・id に `\n` が入る)。暦として無効な日付(`2026-02-30`)が 500。
-  `false` / `[]` が任意の型のフィールドで空扱いになり保存される。`:pattern` など option 値の型を検査せず、
-  壊れた正規表現で全保存が失敗する。`jobject->schema` の型不一致が `schema-error` にならない。
-- 数値: `1.5` が `1.5d0` として表示され `<input type="number">` に載らず、再保存で消える。
-- hsx: 属性値のエスケープが `"` のみで、`&` を含む値が編集のたびに変化する(hsx 側の修正)。
-- client: `lisp->jvalue` が NIL を `[]` にする(`false` / `null` を送れない)。
-- 管理 UI: `/new` への delete / unpublish が 500。keys ページの delete / rotate が POST 後リダイレクトしない。
-- diff: option の差分比較が `equalp` で大文字小文字の違いを検出しない。`:many` / `:required` の変更が破壊的扱いでない。
+- 配信 API の数値 `filters` が `*read-eval*` 有効のまま `read-from-string` していた(任意コード実行)→ 標準構文・`*read-eval*` 無効・値全体が1つの数値であることを要求。
+- 一意制約チェック / object 型の1件判定と INSERT がトランザクション外 → create / update-draft / publish を `with-db-transaction` で包む(接続ロックも保持)。
+- セッション Cookie に HttpOnly / SameSite が無かった → HttpOnly、SameSite=Lax、`KOYA_BASE_URL` が https なら Secure。
+- 管理 JSON API が Origin を見ていなかった → 書き込みメソッドはフォームと同じ同一オリジン判定を通す(Origin 無しの非ブラウザは通る)。
+- 同一オリジン判定: quri の既定ポート補完で Host と食い違う、`Origin: null` が「無し」扱い → 既定ポートを落として比較、パース不能な Origin は不一致。
+- `$` アンカーが末尾改行を許す → `\z`。暦上無効な日付で 500 → 型エラー。datetime は時刻とゾーン(`Z` / オフセット)必須に。
+- `false` / `[]` が全型で空扱い → boolean 以外の `false`、単一値フィールドの `[]` は型エラー。
+- option 値の型未検査(壊れた正規表現で以後の保存が全滅)→ `make-field` で型検査と正規表現のコンパイル。`jobject->schema` は型・kind・option 名を許可リストから探し(intern しない)、形の不一致は `schema-error`。
+- diff が `equalp` で大小文字の変更を見逃す → `equal`。required / unique / integer の追加、単一↔複数、max-length 短縮、pattern 変更、min / max の狭まり、select option の削除は破壊的変更として `:force` を要求。
+- `1.5` が `1.5d0` と表示され再保存で消える → 数値は指数表記なしで出力。
+- client の `lisp->jvalue` が NIL を `[]` にしていた → NIL は `null`、空配列は `#()`。
+- 管理 UI: `/new` への delete / unpublish が 500 → 404。keys ページの delete / rotate → flash 付きリダイレクト(create は平文キーを一度だけ見せるため直接描画のまま)。
+- hsx: 属性値のエスケープが `"` のみ → `&` `<` `>` も(skyizwhite/hsx 側で修正。koya は push 後に `qlot update hsx` で取り込む)。
 
 ### M3: 運用・拡張
 
@@ -407,3 +408,6 @@ website から流用するパターン:
 | 2026-09-20 | 参照の展開は `depth` ではなく `include`(フィールド名指し、`a.b` で入れ子)。デフォルトは id のみ | 必要な参照だけ取る。深さ指定は不要な展開を招く |
 | 2026-09-20 | 管理 UI の一覧は全フィールドのプレビュー + status、行全体がリンク。reference は select(複数はチップ + ドロップダウン)、見た目はブラウザ標準 | 一覧で内容を判断できるように。参照 id の手入力をやめる |
 | 2026-09-20 | 運用ツール(website の schema 同期など)は just コマンドではなく REPL から呼ぶ Lisp 関数として提供する | REPL 駐在で開発するため |
+| 2026-09-20 | JSON の `false` / `[]` は「値」。空扱いは `null`・空白文字列・`:many` の `[]` のみ | jzon が false を NIL にするため、型の取り違えを保存しない |
+| 2026-09-20 | 制約を強める field option 変更(required 追加、単一↔複数、pattern 変更など)は破壊的変更 | 既存コンテンツを不正にしうる変更は `:force` で自覚的に |
+| 2026-09-20 | 管理 API の書き込みも Origin 検証。Cookie は HttpOnly / SameSite=Lax / https なら Secure | SameSite の既定値だけに頼らない |
