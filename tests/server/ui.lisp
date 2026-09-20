@@ -186,7 +186,8 @@
         (ng (search "Draft saved" body) "flash is gone on the next request")))
     (testing "list shows field previews and status, newest first"
       (request :post "/s/website/m/blog/new"
-               :form '(("action" . "save") ("f-title" . "Second post") ("f-body" . "<p>Rich <b>text</b> &amp; more</p>")))
+               :form `(("action" . "save") ("f-title" . "Second post") ("f-body" . "<p>Rich <b>text</b> &amp; more</p>")
+                       ("f-related" . ,id) ("f-related" . "x2")))
       (multiple-value-bind (status body) (request :get "/s/website/m/blog")
         (ok (= status 200))
         (ok (search "Hello World" body))
@@ -198,6 +199,7 @@
         (ok (search ">a, b<" body) "multi select preview")
         (ok (search ">draft<" body))
         (ok (search "data-href=\"/s/website/m/blog/" body) "rows link to the editor")
+        (ok (search "Hello World, x2" body) "a reference previews as the target's label, unknown ids stay ids")
         (ok (not (search "<a href=\"/s/website/m/blog/0" body)) "no title link")
         (ok (not (search "Created at" body)))
         (ok (not (search "Updated at" body))))
