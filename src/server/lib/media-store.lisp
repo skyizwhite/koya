@@ -3,7 +3,7 @@
   (:import-from #:koya-server/lib/env
                 #:media-dir #:base-url)
   (:import-from #:koya-server/lib/image
-                #:sniff-image #:image-extension)
+                #:sniff-image #:image-extension #:+image-types+)
   (:import-from #:koya-server/lib/http
                 #:fail-api)
   (:import-from #:koya-server/db/media
@@ -12,7 +12,10 @@
                 #:media-width #:media-height #:media-alt #:media-created-at)
   (:import-from #:koya/core/json
                 #:jobject #:json-null)
-  (:export #:store-upload
+  (:import-from #:cl-ppcre
+                #:scan-to-strings)
+  (:export #:*media-middleware*
+           #:store-upload
            #:remove-media
            #:media-path
            #:media-url
@@ -77,3 +80,29 @@ row. Signals a 4xx api-error for unsupported or oversized data."
   (delete-media (media-space media) (media-id media))
   (let ((path (media-path media)))
     (when (probe-file path) (delete-file path))))
+
+;;; --- Serving ------------------------------------------------------------------
+
+(defparameter +media-path-pattern+ "^([a-z][a-z0-9-]*)/([0-9A-Z]{26})\\.(png|jpg|gif|webp)\\z"
+  "space/id.ext under /media/: only shapes STORE-UPLOAD produces, so no traversal.")
+
+(defun media-file-response (rest)
+  "Lack response for /media/REST, or NIL when REST is not a media path or the file is absent."
+  (multiple-value-bind (match groups) (scan-to-strings +media-path-pattern+ rest)
+    (when match
+      (let* ((mime (car (find (aref groups 2) +image-types+ :key #'cdr :test #'string=)))
+             (path (merge-pathnames (format nil "~a/~a.~a" (aref groups 0) (aref groups 1) (aref groups 2))
+                                    (uiop:ensure-directory-pathname (media-dir)))))
+        (when (probe-file path)
+          ;; ids are never reused, so a URL always names the same bytes
+          (list 200 (list :content-type mime :cache-control "public, max-age=31536000, immutable") path))))))
+
+(defparameter *media-middleware*
+  (lambda (app)
+    (lambda (env)
+      (let ((path (getf env :path-info)))
+        (if (and (> (length path) 7) (string= "/media/" path :end2 7))
+            (or (media-file-response (subseq path 7))
+                (list 404 (list :content-type "text/plain") (list "Not Found")))
+            (funcall app env)))))
+  "Serves uploaded files from KOYA_MEDIA_DIR (read per request) under /media/.")

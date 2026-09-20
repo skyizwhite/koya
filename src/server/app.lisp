@@ -20,6 +20,8 @@
                 #:*clack-error-middleware*)
   (:import-from #:koya-server/lib/env
                 #:dev-mode-p #:base-url)
+  (:import-from #:koya-server/lib/media-store
+                #:*media-middleware*)
   (:import-from #:koya-server/lib/http
                 #:make-json-app)
   (:import-from #:koya-server/lib/auth
@@ -75,6 +77,8 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
                                             (lack:builder *admin-auth-middleware* *admin-api-app*)))
   (install-middleware *page-app* *actions-middleware*)
   (static-path *page-app* "/assets/" "assets/")
+  ;; uploaded images, public like the delivery API's content
+  (install-middleware *page-app* *media-middleware*)
   (configure *page-app*))
 
 (defparameter *app* (build-app))

@@ -22,6 +22,8 @@
                 #:uri #:uri-scheme #:uri-host #:uri-port)
   (:import-from #:babel
                 #:octets-to-string)
+  (:import-from #:alexandria
+                #:read-stream-content-into-byte-vector)
   (:export #:json-app
            #:make-json-app
            #:api-error
@@ -31,6 +33,8 @@
            #:path-param
            #:query-param
            #:body-field
+           #:form-field
+           #:uploaded-files
            #:header
            #:origin-allowed-p
            #:error-object
@@ -117,6 +121,19 @@ vectors, strings...) and whose errors become JSON error responses."))
 (defun body-field (body name &optional default)
   (multiple-value-bind (v found) (gethash name body)
     (if found v default)))
+
+(defun form-field (params name)
+  "A plain (non-file) form field, or NIL when absent or blank."
+  (let ((v (cdr (assoc name params :test #'equal))))
+    (and (stringp v) (plusp (length (string-trim " " v))) (string-trim " " v))))
+
+(defun uploaded-files (params name)
+  "Files posted under NAME as a list of (octets filename content-type). A multipart
+file part arrives from lack as (stream filename content-type); one name may repeat."
+  (loop :for (k . v) :in params
+        :when (and (equal k name) (consp v) (streamp (first v)))
+          :collect (destructuring-bind (stream &optional filename content-type) v
+                     (list (read-stream-content-into-byte-vector stream) filename content-type))))
 
 (defun header (name)
   (let ((values (get-request-header name)))

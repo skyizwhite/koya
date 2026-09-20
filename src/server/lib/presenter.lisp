@@ -6,6 +6,10 @@
                 #:jobject #:json-array-p #:json-null)
   (:import-from #:koya-server/lib/query
                 #:query-error)
+  (:import-from #:koya-server/db/media
+                #:find-media)
+  (:import-from #:koya-server/lib/media-store
+                #:media->jobject)
   (:import-from #:koya-server/db/contents
                 #:content-id #:content-status #:content-published #:content-draft #:content-draft-key
                 #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
@@ -54,6 +58,17 @@ referenced objects. A path a.b embeds a, and b inside each embedded a."
                     (or (expand-reference space target value nested) json-null)))))))
   object)
 
+(defun expand-media (object model space)
+  "Destructively replace :media ids with {id, url, width, height, alt, ...}; an id
+that no longer exists becomes null. Always applied: the object is small and
+consumers need the URL."
+  (dolist (field (model-fields model) object)
+    (when (eq (field-type field) :media)
+      (let ((value (gethash (field-name field) object)))
+        (when (and value (not (eq value json-null)))
+          (let ((media (and (stringp value) (find-media (koya/core/schema:space-name space) value))))
+            (setf (gethash (field-name field) object) (if media (media->jobject media) json-null))))))))
+
 (defun select-fields (object fields)
   (if (null fields)
       object
@@ -77,6 +92,7 @@ References stay ids unless named in INCLUDE (see EMBED-REFERENCES)."
   (let ((object (copy-object (content-data content :draft draft))))
     (system-fields content object)
     (when include (embed-references object model space include))
+    (expand-media object model space)
     (select-fields object fields)))
 
 (defun admin-content->jobject (content model)
