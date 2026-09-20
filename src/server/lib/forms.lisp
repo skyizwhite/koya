@@ -5,7 +5,9 @@
   (:import-from #:koya/core/json
                 #:json-null)
   (:import-from #:cl-ppcre
-                #:regex-replace-all #:split #:scan)
+                #:regex-replace-all #:split #:scan #:quote-meta-chars)
+  (:import-from #:koya-server/lib/env
+                #:base-url)
   (:export #:form->data
            #:field-param-name
            #:form-values
@@ -52,7 +54,10 @@
 blank line and every block element ends with a newline, so the stored source
 stays readable and diffs cleanly."
   (let* ((html (regex-replace-all "<p>\\s*</p>" html "<p><br></p>"))
-         (html (regex-replace-all +block-close-pattern+ html (format nil "\\1~%"))))
+         (html (regex-replace-all +block-close-pattern+ html (format nil "\\1~%")))
+         ;; our own media is stored by path; the delivery API makes it absolute again
+         (html (regex-replace-all (format nil "(src|href)=\"~a/media/" (quote-meta-chars (string-right-trim "/" (base-url))))
+                                  html "\\1=\"/media/")))
     (string-trim '(#\Newline #\Return #\Space) html)))
 
 (defun form->data (model params)

@@ -10,6 +10,10 @@
                 #:find-media)
   (:import-from #:koya-server/lib/media-store
                 #:media->jobject)
+  (:import-from #:koya-server/lib/env
+                #:base-url)
+  (:import-from #:cl-ppcre
+                #:regex-replace-all)
   (:import-from #:koya-server/db/contents
                 #:content-id #:content-status #:content-published #:content-draft #:content-draft-key
                 #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
@@ -58,6 +62,17 @@ referenced objects. A path a.b embeds a, and b inside each embedded a."
                     (or (expand-reference space target value nested) json-null)))))))
   object)
 
+(defun absolutize-richtext (object model)
+  "Destructively prefix /media/ paths inside richtext fields with KOYA_BASE_URL:
+the HTML is rendered by other sites, where a relative path would point at them."
+  (let ((base (string-right-trim "/" (base-url))))
+    (dolist (field (model-fields model) object)
+      (when (eq (field-type field) :richtext)
+        (let ((value (gethash (field-name field) object)))
+          (when (stringp value)
+            (setf (gethash (field-name field) object)
+                  (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))))))
+
 (defun expand-media (object model space)
   "Destructively replace :media ids with {id, url, width, height, alt, ...}; an id
 that no longer exists becomes null. Always applied: the object is small and
@@ -93,6 +108,7 @@ References stay ids unless named in INCLUDE (see EMBED-REFERENCES)."
     (system-fields content object)
     (when include (embed-references object model space include))
     (expand-media object model space)
+    (absolutize-richtext object model)
     (select-fields object fields)))
 
 (defun admin-content->jobject (content model)

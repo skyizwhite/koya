@@ -31,6 +31,7 @@
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
+  (setf (uiop:getenv "KOYA_BASE_URL") "http://localhost:3000")
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
   (connect-db ":memory:")
   (migrate)
@@ -384,6 +385,19 @@
               (ok (eq (jget json "cover") koya/core/json:json-null)))
             (multiple-value-bind (status) (request :get (format nil "/media/website/~a.png" id))
               (ok (= status 404) "file gone"))))))
+    (testing "richtext media paths are absolute in the delivery API"
+      (multiple-value-bind (status json)
+          (admin :post "/admin/api/contents/website/blog"
+                 :body (jobject "data" (jobject "title" "Inline image"
+                                                "body" "<p><img src=\"/media/website/01ARZ3NDEKTSV4RRFFQ69G5FAV.png\"></p>")
+                                "publish" t))
+        (ok (= status 201))
+        (multiple-value-bind (status json) (delivery (format nil "/api/v1/website/blog/~a" (jget json "id")))
+          (ok (= status 200))
+          (ok (search "src=\"http://localhost:3000/media/website/01ARZ3NDEKTSV4RRFFQ69G5FAV.png\"" (jget json "body"))))
+        (multiple-value-bind (status json) (admin :get (format nil "/admin/api/contents/website/blog/~a" (jget json "id")))
+          (ok (= status 200))
+          (ok (search "src=\"/media/website/" (jget json "published" "body")) "stored and admin-visible as a path"))))
     (testing "rejections"
       (multiple-value-bind (status json)
           (admin-upload "/admin/api/media/website" (list (list "file" "notes.txt" "text/plain" (string-to-octets "hello"))))

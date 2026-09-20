@@ -40,6 +40,7 @@
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
+  (setf (uiop:getenv "KOYA_BASE_URL") "http://localhost:3000")
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
@@ -310,7 +311,10 @@ is a list of parts for MULTIPART-BODY."
 <p>c<br>d</p>"))
   (ok (string= (normalize-richtext "<p>x</p>
 ") "<p>x</p>") "already formatted input is left alone apart from trailing whitespace")
-  (ok (string= (normalize-richtext "<p>a&nbsp;b</p>") "<p>a&nbsp;b</p>") "entities are not touched server-side"))
+  (ok (string= (normalize-richtext "<p>a&nbsp;b</p>") "<p>a&nbsp;b</p>") "entities are not touched server-side")
+  (ok (string= (normalize-richtext "<p><img src=\"http://localhost:3000/media/website/X.png\"></p>")
+               "<p><img src=\"/media/website/X.png\"></p>")
+      "the editor's absolute media URLs are stored as paths"))
 
 (deftest slugify-test
   (ok (string= (slugify "Hello, World!") "hello-world"))
