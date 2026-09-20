@@ -20,6 +20,27 @@
 (defparameter +preview-length+ 60
   "Longest field preview shown in the list, in characters.")
 
+(defparameter +column-widths+
+  '((:text      . "min-w-40 max-w-72")
+    (:textarea  . "min-w-48 max-w-80")
+    (:richtext  . "min-w-48 max-w-80")
+    (:number    . "min-w-24 max-w-32")
+    (:boolean   . "min-w-20 max-w-24")
+    (:date      . "min-w-28 max-w-32")
+    (:datetime  . "min-w-36 max-w-44")
+    (:select    . "min-w-32 max-w-48")
+    (:media     . "min-w-32 max-w-48")
+    (:reference . "min-w-40 max-w-64")
+    (:slug      . "min-w-40 max-w-64"))
+  "Bounds for a list column, per field type, as classes on the cell's inner box.
+The minimum keeps a column readable and lets a wide model outgrow the page
+rather than squeezing every column thin; the maximum stops one long text field
+from taking the whole width. Between the two the preview wraps.")
+
+(defun column-width (field)
+  "Classes for the box a preview is drawn in: the bounds for FIELD's type, and
+wrapping that breaks a long unbroken run rather than letting it escape the box."
+  (clsx "break-words" (or (cdr (assoc (field-type field) +column-widths+)) "min-w-32 max-w-64")))
 
 (defun reference-labels (space model)
   "Field name -> hash of referenced id -> label, for every reference field of MODEL.
@@ -82,7 +103,8 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
 
 (defcomp ~preview-cell (&key field content ref-labels)
   (let ((preview (field-preview field (content-data content :draft t) ref-labels)))
-    (hsx (td :class (clsx "whitespace-nowrap py-2 pr-4" (if preview "" "text-muted")) (or preview "—")))))
+    (hsx (td :class (clsx "border-b border-line py-2 pr-4 align-top" (if preview "" "text-muted"))
+           (div :class (column-width field) (or preview "—"))))))
 
 (defun @get (params)
   (with-owner
@@ -113,14 +135,15 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                     (if (null contents)
                         (hsx (~empty-state "No contents yet."))
                         (hsx (div :class "overflow-x-auto"
-                               (table :class "w-full text-sm"
+                               (table :class "w-full border-separate border-spacing-0 text-sm"
                                  (thead (tr :class "text-left text-muted"
                                           (loop :for field :in fields :collect
-                                            (hsx (th :class "whitespace-nowrap py-2 pr-4 font-medium" (field-name field))))
+                                            (hsx (th :class "py-2 pr-4 font-medium"
+                                                   (div :class (column-width field) (field-name field)))))
                                           ;; pinned so they stay visible when the row scrolls sideways
                                           (th :class "sticky right-6 bg-base py-2 font-medium" "Status")
                                           (th :class "sticky right-0 w-6 bg-base")))
-                                 (tbody :class "divide-y divide-line"
+                                 (tbody :class "[&>tr:last-child>td]:border-0"
                                    (loop :for content :in contents :collect
                                      ;; the whole row opens the editor (see koya-editor.js)
                                      (hsx (tr :class "group cursor-pointer transition hover:bg-accent/5"
@@ -128,6 +151,6 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                                               :tabindex "0" :role "link"
                                             (loop :for field :in fields :collect
                                               (hsx (~preview-cell :field field :content content :ref-labels ref-labels)))
-                                            (td :class "sticky right-6 bg-base py-2 group-hover:bg-[#f8f2ec]"
+                                            (td :class "sticky right-6 border-b border-line bg-base py-2 align-top group-hover:bg-[#f8f2ec]"
                                               (~status-badge :status (content-status content)))
-                                            (td :class "sticky right-0 w-6 bg-base py-2 text-right text-muted group-hover:bg-[#f8f2ec] group-hover:text-accent" "›"))))))))))))))))))
+                                            (td :class "sticky right-0 w-6 border-b border-line bg-base py-2 text-right align-top text-muted group-hover:bg-[#f8f2ec] group-hover:text-accent" "›"))))))))))))))))))
