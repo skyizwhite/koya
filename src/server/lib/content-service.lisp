@@ -8,6 +8,8 @@
                 #:parse-iso)
   (:import-from #:koya/core/json
                 #:json-null)
+  (:import-from #:koya-server/db/connection
+                #:with-db-transaction)
   (:import-from #:koya-server/db/schema-store
                 #:find-space #:space-webhook-secret)
   (:import-from #:koya-server/db/contents
@@ -35,6 +37,11 @@
 
 ;;; Content operations shared by the admin API and the admin UI: model lookup,
 ;;; validation (including uniqueness), persistence and webhook notification.
+;;;
+;;; Each write runs inside WITH-DB-TRANSACTION, which also holds the connection
+;;; lock, so the "is this value taken?" and "does the object already exist?"
+;;; checks and the insert that follows them cannot interleave with another
+;;; request. Webhooks fire inside that scope too; they are asynchronous.
 
 (defun resolve-model (space-name model-name)
   "Return (values space model) or signal 404."
@@ -117,22 +124,23 @@ and only PUBLISHED-AT applies."
          (updated-at (check-timestamp "updatedAt" updated-at))
          (published-at (check-published-at published-at))
          (revised-at (check-timestamp "revisedAt" revised-at)))
-    (check-content space-name model data)
-    (flet ((insert ()
-             (let ((content (apply #'create-content space-name model-name data
-                                   :publish publish
-                                   :created-at created-at :updated-at updated-at
-                                   :published-at published-at :revised-at revised-at
-                                   (and (check-new-id id) (list :id id)))))
-               (when publish
-                 (notify space model-name (content-id content) "new" :new (published-view space model content)))
-               content)))
-      (if (eq (model-kind model) :object)
-          (let ((existing (find-object-content space-name model-name)))
-            (cond ((null existing) (insert))
-                  (publish (publish space model (content-id existing) data :published-at published-at))
-                  (t (update-draft space model (content-id existing) data :replace t))))
-          (insert)))))
+    (with-db-transaction
+      (check-content space-name model data)
+      (flet ((insert ()
+               (let ((content (apply #'create-content space-name model-name data
+                                     :publish publish
+                                     :created-at created-at :updated-at updated-at
+                                     :published-at published-at :revised-at revised-at
+                                     (and (check-new-id id) (list :id id)))))
+                 (when publish
+                   (notify space model-name (content-id content) "new" :new (published-view space model content)))
+                 content)))
+        (if (eq (model-kind model) :object)
+            (let ((existing (find-object-content space-name model-name)))
+              (cond ((null existing) (insert))
+                    (publish (publish space model (content-id existing) data :published-at published-at))
+                    (t (update-draft space model (content-id existing) data :replace t))))
+            (insert))))))
 
 (defun update-draft (space model id patch &key replace)
   "Save a draft: PATCH is merged onto the current draft (or published data) unless REPLACE."
@@ -140,8 +148,9 @@ and only PUBLISHED-AT applies."
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
          (data (if replace patch (merge-data (content-data content :draft t) patch))))
-    (check-content space-name model data :exclude-id id)
-    (save-draft id data)))
+    (with-db-transaction
+      (check-content space-name model data :exclude-id id)
+      (save-draft id data))))
 
 (defun publish (space model id &optional data &key published-at)
   "Publish DATA, or the current draft. PUBLISHED-AT (ISO 8601) overrides the publish date. Fires webhooks."
@@ -152,10 +161,11 @@ and only PUBLISHED-AT applies."
          (published-at (check-published-at published-at))
          (old (published-view space model content))
          (type (if (content-published-at content) "edit" "new")))
-    (check-content space-name model data :exclude-id id)
-    (let ((published (publish-content id data :published-at published-at)))
-      (notify space model-name id type :old old :new (published-view space model published))
-      published)))
+    (with-db-transaction
+      (check-content space-name model data :exclude-id id)
+      (let ((published (publish-content id data :published-at published-at)))
+        (notify space model-name id type :old old :new (published-view space model published))
+        published))))
 
 (defun unpublish (space model id)
   (let* ((space-name (space-name space))
