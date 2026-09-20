@@ -19,8 +19,25 @@
 
 (defparameter *destructive-ops* '(:remove-space :remove-model :remove-field :change-kind :change-field-type))
 
+(defun options-tightened-p (from to)
+  "True when field options TO can reject content that FROM accepted: a constraint
+was added or narrowed, or the single/many shape changed."
+  (flet ((f (k) (getf from k)) (n (k) (getf to k)))
+    (or (and (not (f :required)) (n :required))
+        (and (not (f :unique)) (n :unique))
+        (and (not (f :integer)) (n :integer))
+        (not (eq (and (f :many) t) (and (n :many) t)))
+        (and (n :max-length) (or (null (f :max-length)) (< (n :max-length) (f :max-length))))
+        (and (n :pattern) (not (equal (n :pattern) (f :pattern))))
+        (and (n :min) (or (null (f :min)) (> (n :min) (f :min))))
+        (and (n :max) (or (null (f :max)) (< (n :max) (f :max))))
+        (and (f :options) (set-difference (f :options) (n :options) :test #'equal) t))))
+
 (defun destructive-change-p (change)
-  (and (member (getf change :op) *destructive-ops*) t))
+  (let ((op (getf change :op)))
+    (or (and (member op *destructive-ops*) t)
+        (and (eq op :change-field-options)
+             (options-tightened-p (getf change :from) (getf change :to))))))
 
 (defun destructive-changes-p (changes)
   (some #'destructive-change-p changes))
@@ -41,9 +58,10 @@
     changes))
 
 (defun plist-equal (a b)
+  "EQUAL, not EQUALP: a case-only change to a pattern or an option is a change."
   (and (= (length a) (length b))
        (loop :for (k v) :on a :by #'cddr
-             :always (equalp v (getf b k '%missing)))))
+             :always (equal v (getf b k '%missing)))))
 
 (defun diff-fields (space model old new)
   (diff-named
@@ -109,7 +127,8 @@
             (case op
               ((:change-kind :change-field-type)
                (format nil "~(~a~) -> ~(~a~)" (getf change :from) (getf change :to)))
-              ((:change-field-options :change-model-options) "options changed")
+              (:change-field-options (if (destructive-change-p change) "options tightened" "options changed"))
+              (:change-model-options "options changed")
               (:change-webhooks "webhooks changed")
               (t nil)))))
 

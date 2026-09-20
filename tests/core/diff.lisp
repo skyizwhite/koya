@@ -44,6 +44,33 @@
     (ng (destructive-changes-p changes))
     (ok (search "options changed" (format-change (first changes))))))
 
+(deftest field-options
+  (flet ((blog (&rest title-options)
+           (make-schema (list (make-space "website"
+                                          :models (list (make-model "blog" :list
+                                                                    (list (apply #'make-field :title :text title-options))))))))
+         (only (changes) (progn (ok (= (length changes) 1)) (first changes))))
+    (testing "case-only changes are seen"
+      (let ((change (only (diff-schemas (blog :pattern "^[A-Z]") (blog :pattern "^[a-z]")))))
+        (ok (eq (getf change :op) :change-field-options))
+        (ok (destructive-changes-p (list change)) "a different pattern can reject existing content")))
+    (testing "loosening is not destructive"
+      (ng (destructive-changes-p (diff-schemas (blog :max-length 50) (blog :max-length 100))))
+      (ng (destructive-changes-p (diff-schemas (blog :required t) (blog)))))
+    (testing "tightening is destructive"
+      (ok (destructive-changes-p (diff-schemas (blog) (blog :required t))))
+      (ok (destructive-changes-p (diff-schemas (blog :max-length 100) (blog :max-length 50))))
+      (ok (destructive-changes-p (diff-schemas (blog) (blog :unique t))))
+      (ok (search "options tightened" (format-change (only (diff-schemas (blog) (blog :required t)))))))
+    (testing "changing single/many and dropping select options is destructive"
+      (flet ((sel (&rest options)
+               (make-schema (list (make-space "website"
+                                              :models (list (make-model "blog" :list
+                                                                        (list (apply #'make-field :cat :select options)))))))))
+        (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b") :many t) (sel :options '("a" "b")))))
+        (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b")) (sel :options '("a")))))
+        (ng (destructive-changes-p (diff-schemas (sel :options '("a")) (sel :options '("a" "b")))))))))
+
 (deftest from-nothing
   (let ((changes (diff-schemas nil (schema-a))))
     (ok (equal (ops changes) '(:add-space :add-model :add-field :add-field :add-model :add-field)))
