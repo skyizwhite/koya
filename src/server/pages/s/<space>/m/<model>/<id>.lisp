@@ -2,11 +2,12 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-fields #:field-name #:space-name #:model-name
-                #:model-preview-url #:model-public-url)
+                #:model-kind #:model-fields #:field-name #:field-type #:field-option #:space-name #:space-model
+                #:model-name #:model-preview-url #:model-public-url)
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
+  (:import-from #:koya-server/lib/query #:make-query)
   (:import-from #:koya-server/db/contents
-                #:find-content #:content-id #:content-status #:content-published #:content-draft
+                #:list-contents #:find-content #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data)
   (:import-from #:koya-server/lib/content-service
                 #:resolve-model #:create #:update-draft #:publish #:unpublish #:destroy)
@@ -14,12 +15,22 @@
   (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:redirect-to #:param #:set-flash #:expand-url-template
-                #:short-time #:~layout #:~status-badge #:~errors #:content-url #:model-url)
+                #:short-time #:content-label #:~layout #:~status-badge #:~errors #:content-url #:model-url)
   (:import-from #:koya-server/components/field-input #:~field-input)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>)
 
 (defun new-p (id) (string= id "new"))
+
+(defun reference-options (space field)
+  "Selectable contents of FIELD's target model as (id . label), sorted by label."
+  (when (eq (field-type field) :reference)
+    (let ((target (space-model space (field-option field :model))))
+      (when target
+        (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target)))
+                      (list-contents (space-name space) (model-name target) target
+                                     (make-query :limit 1000) :status :all))
+              #'string-lessp :key #'cdr)))))
 
 (defun field-error (errors name)
   (let ((e (find name errors :key (lambda (e) (getf e :field)) :test #'string=)))
@@ -79,6 +90,7 @@
          (loop :for field :in (model-fields model) :collect
            (hsx (~field-input :field field
                               :value (and data (gethash (field-name field) data))
+                              :references (reference-options space field)
                               :error (field-error errors (field-name field))))))
        (if content
            (hsx (div :class "mt-12 flex items-center justify-between border-t border-line pt-6 text-sm text-muted"

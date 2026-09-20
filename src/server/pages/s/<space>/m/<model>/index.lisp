@@ -57,16 +57,9 @@
           ((and (stringp value) (zerop (length value))) nil)
           (t (truncate-text (scalar-preview field value))))))
 
-(defcomp ~preview-cell (&key field content primary space model-name)
-  (let* ((preview (field-preview field (content-data content :draft t)))
-         (text (or preview (if primary (content-id content) "—")))
-         (class (if preview "" "text-muted")))
-    (if primary
-        (hsx (td :class "py-2 pr-4"
-               (a :href (content-url space model-name (content-id content))
-                  :class (clsx "font-medium hover:underline" class)
-                  text)))
-        (hsx (td :class (clsx "py-2 pr-4" class) text)))))
+(defcomp ~preview-cell (&key field content)
+  (let ((preview (field-preview field (content-data content :draft t))))
+    (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted")) (or preview "—")))))
 
 (defun @get (params)
   (with-owner
@@ -102,8 +95,10 @@
                                           (th :class "py-2 font-medium" "Status")))
                                  (tbody :class "divide-y divide-line"
                                    (loop :for content :in contents :collect
-                                     (hsx (tr
-                                            (loop :for field :in fields :for i :from 0 :collect
-                                              (hsx (~preview-cell :field field :content content :primary (zerop i)
-                                                                  :space space :model-name model-name)))
+                                     ;; the whole row opens the editor (see koya-editor.js)
+                                     (hsx (tr :class "cursor-pointer hover:bg-panel"
+                                              :data-href (content-url space model-name (content-id content))
+                                              :tabindex "0" :role "link"
+                                            (loop :for field :in fields :collect
+                                              (hsx (~preview-cell :field field :content content)))
                                             (td :class "py-2" (~status-badge :status (content-status content))))))))))))))))))))

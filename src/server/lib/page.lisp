@@ -12,6 +12,12 @@
                 #:base-url)
   (:import-from #:quri
                 #:uri #:uri-host #:uri-port)
+  (:import-from #:koya/core/schema
+                #:model-fields #:field-name #:field-type)
+  (:import-from #:koya/core/json
+                #:json-null)
+  (:import-from #:koya-server/db/contents
+                #:content-id #:content-data)
   (:export #:with-owner
            #:with-owner-post
            #:owner-p
@@ -24,6 +30,7 @@
            #:take-flash
            #:expand-url-template
            #:short-time
+           #:content-label
            #:~layout
            #:~status-badge
            #:~flash
@@ -63,6 +70,17 @@
   (if (and (stringp iso) (>= (length iso) 16))
       (format nil "~a ~a UTC" (subseq iso 0 10) (subseq iso 11 16))
       (or iso "")))
+
+(defun content-label (content model)
+  "Human label for CONTENT: its first non-empty text or slug field, else its id."
+  (let ((data (content-data content :draft t)))
+    (or (and data
+             (loop :for field :in (model-fields model)
+                   :when (member (field-type field) '(:text :slug))
+                     :do (let ((value (gethash (field-name field) data)))
+                           (when (and (stringp value) (plusp (length value)))
+                             (return value)))))
+        (content-id content))))
 
 (defun expand-url-template (template &key id draft-key)
   "Fill {CONTENT_ID} and {DRAFT_KEY} in a model's preview/public URL template."

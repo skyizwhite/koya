@@ -72,9 +72,11 @@ except booleans which are always present (unchecked = false)."
                  (when values (setf (gethash (field-name field) data) (coerce values 'vector))))
                (when raw (setf (gethash (field-name field) data) raw))))
           ((:reference :media)
-           (when raw
-             (setf (gethash (field-name field) data)
-                   (if (field-many-p field) (coerce (split-ids raw) 'vector) raw))))
+           (if (field-many-p field)
+               ;; a multiple select repeats the name; a text input separates ids with commas
+               (let ((ids (loop :for v :in (form-values params name) :append (split-ids v))))
+                 (when ids (setf (gethash (field-name field) data) (coerce ids 'vector))))
+               (when raw (setf (gethash (field-name field) data) raw))))
           (:datetime
            (when raw
              ;; datetime-local gives 2026-09-20T10:00; treat it as UTC.

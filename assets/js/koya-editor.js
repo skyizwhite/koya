@@ -47,3 +47,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
+// List rows: a [data-href] row opens its editor on click or Enter, unless the
+// click landed on a real link or button inside it.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-href]").forEach((row) => {
+    const open = () => { window.location.href = row.dataset.href; };
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("a, button, input, select")) return;
+      open();
+    });
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && event.target === row) open();
+    });
+  });
+});

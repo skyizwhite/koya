@@ -13,7 +13,39 @@
 
 (defun present-p (value) (and value (not (eq value json-null))))
 
-(defcomp ~field-input (&key field value error)
+(defun selected-p (value option)
+  (if (present-p value)
+      (if (and (vectorp value) (not (stringp value)))
+          (and (find option value :test #'equal) t)
+          (equal option value))
+      nil))
+
+(defun reference-choices (value references)
+  "REFERENCES as (id . label), plus any selected id it lacks so nothing is dropped silently."
+  (let ((selected (cond ((not (present-p value)) '())
+                        ((and (vectorp value) (not (stringp value))) (coerce value 'list))
+                        (t (list value)))))
+    (append references
+            (loop :for id :in selected
+                  :unless (assoc id references :test #'equal)
+                    :collect (cons id (format nil "~a (missing)" id))))))
+
+(defcomp ~reference-select (&key field value references)
+  (let* ((name (field-param-name field))
+         (choices (reference-choices value references))
+         (many (field-many-p field)))
+    (hsx
+     (<>
+       (select :id name :name name :class "input" :multiple many
+               :size (and many (min 8 (max 3 (length choices))))
+         (if many (hsx (<>)) (hsx (option :value "" "—")))
+         (loop :for (id . label) :in choices :collect
+           (hsx (option :value id :selected (selected-p value id) label))))
+       (p :class "text-xs text-muted"
+         (format nil "~a content~:p of ~a~:[~; (hold Ctrl or ⌘ to select several)~]"
+                 (length choices) (field-option field :model) many))))))
+
+(defcomp ~field-input (&key field value error references)
   (let* ((name (field-param-name field))
          (id name)
          (type (field-type field))
@@ -57,13 +89,12 @@
                      (option :value "" "—")
                      (loop :for option :in (field-option field :options) :collect
                        (hsx (option :value option :selected (equal option value) option)))))))
-         ((:reference :media)
+         (:reference
+          (hsx (~reference-select :field field :value value :references references)))
+         (:media
           (hsx (<> (input :type "text" :id id :name name :value string :class "input font-mono text-xs"
                           :placeholder (if (field-many-p field) "id, id, ..." "id"))
-                   (p :class "text-xs text-muted"
-                     (if (eq type :reference)
-                         (format nil "ids of ~a contents" (field-option field :model))
-                         "media id")))))
+                   (p :class "text-xs text-muted" "media id"))))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))
        (if error
            (hsx (p :class "text-xs text-danger" error))

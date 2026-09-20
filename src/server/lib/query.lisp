@@ -7,6 +7,7 @@
   (:export #:query-error
            #:query-error-message
            #:parse-query
+           #:make-query
            #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-depth
            #:build-where
            #:build-order-by
