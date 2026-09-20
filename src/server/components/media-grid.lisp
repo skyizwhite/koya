@@ -35,27 +35,27 @@
           (if (plusp (or references 0)) (format nil " It is used by ~a content~:p." references) "")))
 
 (defcomp ~media-card (&key media space references)
-  "Library card: the thumbnail opens the preview dialog, which carries everything
-that can be done to the file; only Delete is on the card, over its corner.
-REFERENCES is how many contents mention the file (shown in the confirmation)."
+  "Library card: the picture and nothing else. Its name and facts are in the
+preview dialog the thumbnail opens, along with everything that can be done to
+the file; only Delete is on the card, over its corner. REFERENCES is how many
+contents mention the file (shown in the confirmation)."
   (declare (ignore space))
   (let ((id (media-id media)))
     (hsx
-     (li :class "relative space-y-2 text-sm"
+     (li :class "relative"
        ;; the whole thumbnail is the preview button, so the card needs no other
        (button :type "button" :class "block w-full cursor-zoom-in"
                :data-preview-src (media-url media :absolute nil)
                :data-preview-alt (media-alt media)
                :data-preview-name (media-filename media)
-               :data-preview-meta (format nil "~a · ~a" (dimensions media) (human-size (media-size media)))
+               :data-preview-meta (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media))
+                                          (short-time (media-created-at media)))
                :data-preview-id id
                :data-preview-confirm (delete-confirmation media references)
+               :title (media-filename media)
                :aria-label (format nil "Preview ~a" (media-filename media))
          (~thumb :media media))
-       (div :class "truncate font-medium" :title (media-filename media) (media-filename media))
-       (div :class "text-xs text-muted"
-         (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media)) (short-time (media-created-at media))))
-       (form :method "post" :class "absolute right-2 top-2"
+       (form :method "post" :class "absolute right-1 top-1"
          (input :type "hidden" :name "action" :value "delete")
          (input :type "hidden" :name "id" :value id)
          ;; the confirmation text is data, not inline script: koya-editor.js asks
@@ -84,7 +84,8 @@ REFERENCES is how many contents mention the file (shown in the confirmation)."
                              (koya-server/db/media:media-reference-counts space (mapcar #'media-id items)))))
         (hsx (ul :class (if (eq mode :picker)
                             "grid grid-cols-3 gap-3 sm:grid-cols-4"
-                            "grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4")
+                            ;; pictures only, so they can be small and many
+                            "grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6")
                (loop :for media :in items :collect
                  (if (eq mode :picker)
                      (hsx (~pick-card :media media))
