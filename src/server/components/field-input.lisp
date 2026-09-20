@@ -36,14 +36,12 @@
          (many (field-many-p field)))
     (hsx
      (<>
-       (select :id name :name name :class "input" :multiple many
-               :size (and many (min 8 (max 3 (length choices))))
+       (select :id name :name name :multiple many
          (if many (hsx (<>)) (hsx (option :value "" "—")))
          (loop :for (id . label) :in choices :collect
            (hsx (option :value id :selected (selected-p value id) label))))
        (p :class "text-xs text-muted"
-         (format nil "~a content~:p of ~a~:[~; (hold Ctrl or ⌘ to select several)~]"
-                 (length choices) (field-option field :model) many))))))
+         (format nil "~a content~:p of ~a" (length choices) (field-option field :model)))))))
 
 (defcomp ~field-input (&key field value error references)
   (let* ((name (field-param-name field))
@@ -85,7 +83,7 @@
                               (input :type "checkbox" :name name :value option
                                      :checked (and (present-p value) (find option value :test #'equal) t))
                               option)))))
-              (hsx (select :id id :name name :class "input"
+              (hsx (select :id id :name name
                      (option :value "" "—")
                      (loop :for option :in (field-option field :options) :collect
                        (hsx (option :value option :selected (equal option value) option)))))))

@@ -175,7 +175,7 @@
         (ok (search "value=\"hello-world\"" body))
         (ok (search "checked" body))
         (ok (search "value=\"2026-09-20T10:00\"" body))
-        (ok (search "<select id=\"f-related\" name=\"f-related\" class=\"input\" multiple" body)
+        (ok (search "<select id=\"f-related\" name=\"f-related\" multiple" body)
             "reference is a multiple select")
         (ok (search "value=\"x1\" selected" body) "selected ids not in the target model are kept")
         (ok (search (format nil "value=\"~a\"" id) body) "existing contents are offered")

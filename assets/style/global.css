@@ -31,6 +31,10 @@ body {
 .input {
   @apply w-full rounded-md border border-line bg-panel px-3 py-2 text-sm text-fg focus:border-accent focus:outline-none;
 }
+/* Form selects keep the browser's own look; preflight would strip their border and background. */
+select {
+  all: revert;
+}
 .label {
   @apply block text-sm font-medium text-fg;
 }
