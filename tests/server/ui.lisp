@@ -18,6 +18,7 @@
 
 (defparameter *secret* "ui-secret")
 (defvar *cookie* nil)
+(defvar *set-cookie* nil "The last Set-Cookie header seen, flags included.")
 
 (defun blog-model ()
   (make-model "blog" :list (list (make-field :title :text :required t)
@@ -60,7 +61,8 @@
     (destructuring-bind (status response-headers body) (funcall *app* env)
       (let ((set-cookie (getf response-headers :set-cookie)))
         (when set-cookie
-          (setf *cookie* (subseq set-cookie 0 (position #\; set-cookie)))))
+          (setf *set-cookie* set-cookie
+                *cookie* (subseq set-cookie 0 (position #\; set-cookie)))))
       (values status (apply #'concatenate 'string (if (listp body) body (list body))) response-headers))))
 
 (defun location (headers) (getf headers :location))
@@ -87,7 +89,9 @@
     (declare (ignore body))
     (ok (= status 303))
     (ok (string= (location headers) "/"))
-    (ok *cookie* "session cookie set"))
+    (ok *cookie* "session cookie set")
+    (ok (search "HttpOnly" *set-cookie*) "cookie is HttpOnly")
+    (ok (search "SameSite=Lax" *set-cookie*) "cookie is SameSite=Lax"))
   (multiple-value-bind (status body) (request :get "/")
     (ok (= status 200))
     (ok (search "website" body) "space listed"))

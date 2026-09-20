@@ -19,7 +19,7 @@
   (:import-from #:clack-errors
                 #:*clack-error-middleware*)
   (:import-from #:koya-server/lib/env
-                #:dev-mode-p)
+                #:dev-mode-p #:base-url)
   (:import-from #:koya-server/lib/http
                 #:make-json-app)
   (:import-from #:koya-server/lib/auth
@@ -54,11 +54,21 @@
   (set-response-header :content-type "text/html; charset=utf-8")
   (call-next-method app (and result (hsx:render-to-string (hsx:hsx result)))))
 
+(defun session-cookie-state ()
+  "The owner session cookie: HttpOnly so scripts cannot read it, SameSite=Lax so
+other sites cannot post with it, Secure when the site is served over HTTPS."
+  ;; the state package has no ASDF system of its own, so it is named in full;
+  ;; lack-middleware-session (imported above) loads it
+  (lack/middleware/session/state/cookie:make-cookie-state
+                     :httponly t
+                     :samesite :lax
+                     :secure (and (>= (length (base-url)) 8) (string-equal "https://" (base-url) :end2 8))))
+
 (defun build-app ()
   (clear-middlewares *page-app*)
   (install-middleware *page-app* (with-args *clack-error-middleware* :debug (dev-mode-p)))
   (install-middleware *page-app* *lack-middleware-accesslog*)
-  (install-middleware *page-app* *lack-middleware-session*)
+  (install-middleware *page-app* (with-args *lack-middleware-session* :state (session-cookie-state)))
   (install-middleware *page-app* *trim-trailing-slash*)
   (install-middleware *page-app* (with-args *lack-middleware-mount* "/api" *api-app*))
   (install-middleware *page-app* (with-args *lack-middleware-mount* "/admin/api"
