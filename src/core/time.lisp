@@ -2,10 +2,12 @@
   (:use #:cl)
   (:import-from #:local-time
                 #:now
+                #:timestamp+
                 #:format-timestring
                 #:parse-timestring
                 #:+utc-zone+)
   (:export #:now-iso
+           #:iso-from-now
            #:format-iso
            #:parse-iso))
 (in-package #:koya/core/time)
@@ -21,6 +23,11 @@
 
 (defun now-iso ()
   (format-iso (now)))
+
+(defun iso-from-now (seconds)
+  "The moment SECONDS from now. Comparable to NOW-ISO as a string: both are UTC
+and fixed width."
+  (format-iso (timestamp+ (now) seconds :sec)))
 
 (defun parse-iso (string)
   "Parse an ISO 8601 string into a local-time timestamp, or NIL when invalid

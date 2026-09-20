@@ -26,6 +26,8 @@
                 #:make-json-app)
   (:import-from #:koya-server/lib/auth
                 #:*admin-auth-middleware*)
+  (:import-from #:koya-server/db/sessions
+                #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/document
                 #:~document)
   (:export #:*app*
@@ -91,9 +93,6 @@
             (funcall app env)))))
   "Rejects oversized bodies by Content-Length, outermost, so no parser allocates for them.")
 
-(defparameter +session-seconds+ (* 24 3600)
-  "How long an owner session cookie lives.")
-
 (defun session-cookie-state ()
   "The owner session cookie: HttpOnly so scripts cannot read it, SameSite=Lax so
 other sites cannot post with it, Secure when the site is served over HTTPS."
@@ -115,8 +114,12 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
   ;; middleware also keeps the in-memory store from growing with every image fetch
   (install-middleware *page-app* *media-middleware*)
   (install-middleware *page-app* (with-args *lack-middleware-mount* "/api" *api-app*))
+  ;; the store is the database, not the process, so a restart keeps the owner logged in
   ;; :keep-empty nil: a request that never touches its session leaves nothing behind
-  (install-middleware *page-app* (with-args *lack-middleware-session* :state (session-cookie-state) :keep-empty nil))
+  (install-middleware *page-app* (with-args *lack-middleware-session*
+                                            :store (make-session-store)
+                                            :state (session-cookie-state)
+                                            :keep-empty nil))
   (install-middleware *page-app* *trim-trailing-slash*)
   (install-middleware *page-app* (with-args *lack-middleware-mount* "/admin/api"
                                             (lack:builder *admin-auth-middleware* *admin-api-app*)))

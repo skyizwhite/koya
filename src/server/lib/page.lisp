@@ -15,7 +15,7 @@
   (:import-from #:koya/core/schema
                 #:model-fields #:field-name #:field-type)
   (:import-from #:koya/core/json
-                #:json-null)
+                #:json-null #:json-array)
   (:import-from #:koya-server/db/contents
                 #:content-id #:content-data)
   (:export #:with-owner
@@ -52,19 +52,21 @@
 (defun redirect-to (path &optional (status 303))
   (redirect path status))
 
-;;; One-shot messages carried in the session across a redirect.
+;;; One-shot messages carried in the session across a redirect. A session is
+;;; stored as JSON (see db/sessions), so the message travels as a pair of
+;;; strings rather than as a list holding a keyword.
 
 (defun set-flash (message &optional (kind :ok))
   (let ((session (context :session)))
-    (when session (setf (gethash "flash" session) (list message kind)))))
+    (when session (setf (gethash "flash" session) (json-array message (string-downcase kind))))))
 
 (defun take-flash ()
   "Return (values message kind) once, then forget it."
   (let* ((session (context :session))
          (flash (and session (gethash "flash" session))))
-    (when flash
+    (when (and flash (= (length flash) 2))
       (remhash "flash" session)
-      (values (first flash) (second flash)))))
+      (values (aref flash 0) (if (equal (aref flash 1) "error") :error :ok)))))
 
 (defun short-time (iso)
   "2026-09-20T05:04:03.123Z -> 2026-09-20 05:04 UTC"

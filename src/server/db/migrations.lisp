@@ -63,7 +63,12 @@
      "CREATE TABLE settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
-        updated_at TEXT NOT NULL)")))
+        updated_at TEXT NOT NULL)")
+    (3
+     "CREATE TABLE sessions (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        expires_at TEXT NOT NULL)")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

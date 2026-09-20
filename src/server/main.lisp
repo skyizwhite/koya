@@ -6,6 +6,7 @@
   (:import-from #:koya-server/lib/env #:db-path #:server-port #:dev-mode-p)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
+  (:import-from #:koya-server/db/sessions #:purge-expired-sessions)
   (:import-from #:koya-server/lib/totp #:generate-totp-secret #:otpauth-uri #:totp)
   (:import-from #:koya-server/lib/assets #:refresh-asset-version)
   (:export #:start
@@ -26,6 +27,7 @@
   (connect-db db)
   (let ((applied (migrate)))
     (when applied (format t "~&[koya] applied migrations ~{~a~^, ~}~%" applied)))
+  (purge-expired-sessions)
   ;; :debug only in dev: with it on, an unhandled error invokes the debugger, which
   ;; in a --non-interactive image means the process exits. Off, clack answers 500.
   (setf *server* (clack:clackup *app* :server server :address address :port port :debug (dev-mode-p)))

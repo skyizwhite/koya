@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/server/db
   (:use #:cl #:rove)
   (:import-from #:koya-server/db/connection
-                #:connect-db #:disconnect-db #:fetch #:fetch-one #:col)
+                #:connect-db #:disconnect-db #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/db/migrations
                 #:migrate #:current-version)
   (:import-from #:koya-server/db/schema-store
@@ -10,6 +10,10 @@
                 #:make-field #:make-model #:make-space #:make-schema
                 #:schema-spaces #:space-name #:space-webhooks #:space-models #:model-name #:model-field
                 #:schema->jobject)
+  (:import-from #:koya-server/db/sessions
+                #:make-session-store #:purge-expired-sessions)
+  (:import-from #:lack/middleware/session/store
+                #:fetch-session #:store-session #:remove-session)
   (:import-from #:koya/core/json
                 #:to-json))
 (in-package #:koya-tests/server/db)
@@ -35,7 +39,7 @@
                      (make-space "shop"))))
 
 (deftest migrations
-  (ok (= (current-version) 2))
+  (ok (= (current-version) 3))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -63,3 +67,23 @@
     (save-schema (make-schema nil))
     (ok (null (schema-spaces (load-schema))))
     (ok (null (fetch "SELECT * FROM models")))))
+
+(deftest sessions-outlive-the-store
+  (let ((session (make-hash-table :test 'equal)))
+    (setf (gethash "owner" session) t)
+    (store-session (make-session-store) "sid-1" session))
+  ;; a fresh store is what a restarted process has: the session comes from the row
+  (let ((loaded (fetch-session (make-session-store) "sid-1")))
+    (ok (hash-table-p loaded))
+    (ok (gethash "owner" loaded) "the owner flag survives"))
+  (testing "a session that has run out is refused and purged"
+    (exec "UPDATE sessions SET expires_at = ? WHERE id = ?" "2000-01-01T00:00:00.000Z" "sid-1")
+    (ng (fetch-session (make-session-store) "sid-1"))
+    (purge-expired-sessions)
+    (ng (fetch-one "SELECT id FROM sessions WHERE id = ?" "sid-1")))
+  (testing "logging out drops the row"
+    (let ((session (make-hash-table :test 'equal)))
+      (setf (gethash "owner" session) t)
+      (store-session (make-session-store) "sid-2" session))
+    (remove-session (make-session-store) "sid-2")
+    (ng (fetch-session (make-session-store) "sid-2"))))

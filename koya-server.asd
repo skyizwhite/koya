@@ -1,5 +1,6 @@
 (register-system-packages "cl-dbi" '(:dbi))
 (register-system-packages "bordeaux-threads" '(:bordeaux-threads-2 :bt2))
+(register-system-packages "lack-middleware-session" '(:lack/middleware/session/store))
 
 (defsystem "koya-server"
   :version "0.1.0"

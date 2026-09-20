@@ -143,6 +143,7 @@ koya/
 schema_version (version PK, applied_at)
 spaces         (name PK, webhooks JSON, created_at)
 settings       (key PK, value, updated_at)      ; インスタンス設定(二段階認証の鍵など)
+sessions       (id PK, data JSON, expires_at)   ; 管理画面のログインセッション
 models         (space, name, kind, definition JSON, PK(space, name))
 contents       (id ULID PK, space, model, status, published JSON, draft JSON,
                 created_at, updated_at, published_at, revised_at)
@@ -203,6 +204,9 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - 管理画面・管理 API: 単一オーナーシークレット(環境変数 `KOYA_SECRET`)。
   UI はログインフォーム → セッション Cookie、管理 API(deploy 等)は `Authorization: Bearer`。
   比較は定数時間で行う。
+- **セッションはプロセスではなく DB(`sessions` テーブル)に持つ**。再起動・再デプロイでログアウトしない。
+  寿命は Cookie も行も 24 時間で、使うたびに延びる(行の書き込みは半分を過ぎてから)。値は JSON で保存する
+  ため、セッションに入れてよいのは文字列・数値・真偽値とその配列だけ(flash もこの形)。
 - **二段階認証(TOTP)**: 初期状態は無効。管理画面の `/settings` で「Set up」すると鍵を生成して QR コード
   (otpauth URI)とシークレットを表示し、認証アプリのコードを入力して初めて有効になる(鍵は `settings` テーブル)。
   無効化にもコードが要る。`KOYA_TOTP_SECRET`(Base32)を環境変数で与えるとそれが優先され、画面からは変更不可。
@@ -470,4 +474,5 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-20 | 二段階認証は TOTP。管理画面の設定ページで有効化し鍵は `settings` テーブルへ。`KOYA_TOTP_SECRET` は上書き用 | REPL より画面の方が親切。初期無効で、アプリのコード確認を経て有効化 |
 | 2026-09-20 | webhook は label / url / events を持ち、space(全モデル)とモデルの両方に定義できる。秘密は space 単位のまま | microCMS の API 単位・イベント設定を code で取り込む。下書きイベントでプレビュービルド等を回せる |
 | 2026-09-20 | `defmodel` の `:kind` は必須(`:list` / `:object`)。省略はマクロ展開時にエラー | 既定値があると list か object か読み手に分からない |
+| 2026-09-20 | セッションはメモリストアをやめ SQLite の `sessions` テーブルに置く(24 時間、使うたび延長、起動時に期限切れを掃除) | 再起動・再デプロイのたびにログアウトしていたため |
 | 2026-09-20 | 配信 API の互換ヘッダ `X-MICROCMS-API-KEY` を廃止。デプロイ前レビューで本文サイズ上限・ログインロック・セッション失効・空セッション非保存を追加 | 他社名を残さない。本番公開前に DoS とブルートフォースの入口を塞ぐ |
