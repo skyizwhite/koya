@@ -144,8 +144,10 @@ See ORIGIN-ALLOWED-P."
                       (if href
                           (hsx (a :href href :class "text-fg hover:underline" label))
                           (hsx (span :class "text-muted" label)))))))
-         (form :method "post" :action "/logout"
-           (button :type "submit" :class "btn" "Log out"))))
+         (div :class "flex items-center gap-2"
+           (a :href "/settings" :class "btn" "Settings")
+           (form :method "post" :action "/logout"
+             (button :type "submit" :class "btn" "Log out")))))
      (main :class "mx-auto max-w-5xl px-4 py-8"
        (multiple-value-bind (message kind) (take-flash)
          (~flash :message message :kind kind))

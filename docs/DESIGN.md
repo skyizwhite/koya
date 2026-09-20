@@ -142,6 +142,7 @@ koya/
 ```
 schema_version (version PK, applied_at)
 spaces         (name PK, webhooks JSON, created_at)
+settings       (key PK, value, updated_at)      ; インスタンス設定(二段階認証の鍵など)
 models         (space, name, kind, definition JSON, PK(space, name))
 contents       (id ULID PK, space, model, status, published JSON, draft JSON,
                 created_at, updated_at, published_at, revised_at)
@@ -201,11 +202,12 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - 管理画面・管理 API: 単一オーナーシークレット(環境変数 `KOYA_SECRET`)。
   UI はログインフォーム → セッション Cookie、管理 API(deploy 等)は `Authorization: Bearer`。
   比較は定数時間で行う。
-- **二段階認証(TOTP)**: `KOYA_TOTP_SECRET`(Base32)を設定するとログインフォームにワンタイムコード欄が出る。
+- **二段階認証(TOTP)**: 初期状態は無効。管理画面の `/settings` で「Set up」すると鍵を生成して QR コード
+  (otpauth URI)とシークレットを表示し、認証アプリのコードを入力して初めて有効になる(鍵は `settings` テーブル)。
+  無効化にもコードが要る。`KOYA_TOTP_SECRET`(Base32)を環境変数で与えるとそれが優先され、画面からは変更不可。
   RFC 6238(SHA-1、30 秒、6 桁、前後 1 ステップ許容)。使ったステップはプロセス内で記憶し、同じコードで二度は入れない。
   シークレットが違えばコードの正否は判定しない(コードを消費しない)。対象はブラウザのログインのみで、
-  管理 API の Bearer は機械向けなので変えない。鍵の生成は REPL の `(koya-server:totp-setup)` が
-  `KOYA_TOTP_SECRET` の値と otpauth URI を出す。認証アプリには URI を貼るか QR にして登録する。
+  管理 API の Bearer は機械向けなので変えない。QR は同梱の qrcode.js(davidshimjs、MIT)でブラウザ側で描く。
 - 配信 API: space ごとの API キー(`X-KOYA-API-KEY`)。**本体側で生成し、管理 UI に表示**する。
   利用側は `.env` に置いてクライアントへ渡す。利用側コードにシークレットを置かない。
   キーは高エントロピーの乱数なので SHA-256 ハッシュで保存する(bcrypt は使わない)。
@@ -436,5 +438,5 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 | 2026-09-20 | 管理 API の書き込みも Origin 検証。Cookie は HttpOnly / SameSite=Lax / https なら Secure | SameSite の既定値だけに頼らない |
 | 2026-09-20 | メディアは koya 自身が `/media/` で配信。形式は先頭バイトで判定し PNG / JPEG / GIF / WebP のみ、SVG は不可 | 外部ストレージなしで完結させる。Content-Type 詐称と SVG 経由のスクリプトを避ける |
 | 2026-09-20 | `:media` は配信 API で常にオブジェクト展開(`include` 不要) | 画像は URL が無いと使えず、展開が入れ子になることもない |
-| 2026-09-20 | 二段階認証は TOTP、鍵は環境変数 `KOYA_TOTP_SECRET`(未設定なら無効) | 単一オーナーなので設定は env で足りる。DB や登録画面を持ち込まない |
+| 2026-09-20 | 二段階認証は TOTP。管理画面の設定ページで有効化し鍵は `settings` テーブルへ。`KOYA_TOTP_SECRET` は上書き用 | REPL より画面の方が親切。初期無効で、アプリのコード確認を経て有効化 |
 | 2026-09-20 | webhook は label / url / events を持ち、space(全モデル)とモデルの両方に定義できる。秘密は space 単位のまま | microCMS の API 単位・イベント設定を code で取り込む。下書きイベントでプレビュービルド等を回せる |

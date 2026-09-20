@@ -35,7 +35,7 @@
                      (make-space "shop"))))
 
 (deftest migrations
-  (ok (= (current-version) 1))
+  (ok (= (current-version) 2))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 

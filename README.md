@@ -105,8 +105,4 @@ Environment variables: `KOYA_SECRET` (required), `KOYA_TOTP_SECRET` (optional se
 
 ### Two-factor login
 
-```lisp
-(koya-server:totp-setup)   ; prints KOYA_TOTP_SECRET=... and an otpauth:// URI for your authenticator app
-```
-
-Set the variable and restart; the login form then asks for the one-time code as well as the secret.
+Open **Settings** in the admin UI and set it up: scan the QR code with an authenticator app and confirm with a code. From then on the login form asks for the code as well as the secret. To configure it outside the database instead, `(koya-server:totp-setup)` prints a `KOYA_TOTP_SECRET` value; when that variable is set it takes precedence.

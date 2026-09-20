@@ -212,3 +212,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   dialog.addEventListener("close", () => image.removeAttribute("src"));
 });
+
+// Settings: draw a QR code for every [data-qr] element (the otpauth URI when
+// setting up two-factor login). qrcode.min.js is davidshimjs/qrcodejs (MIT).
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof QRCode === "undefined") return;
+  document.querySelectorAll("[data-qr]").forEach((el) => {
+    new QRCode(el, { text: el.dataset.qr, width: 192, height: 192, correctLevel: QRCode.CorrectLevel.M });
+  });
+});

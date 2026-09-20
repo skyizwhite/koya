@@ -4,8 +4,13 @@
                 #:make-hmac #:update-hmac #:hmac-digest #:random-data)
   (:import-from #:koya-server/lib/env
                 #:env)
+  (:import-from #:koya-server/db/settings
+                #:get-setting #:set-setting #:delete-setting)
   (:export #:totp-enabled-p
            #:totp-secret
+           #:totp-env-secret
+           #:enable-totp
+           #:disable-totp
            #:base32-decode
            #:base32-encode
            #:hotp
@@ -17,15 +22,35 @@
 (in-package #:koya-server/lib/totp)
 
 ;;; Time-based one-time passwords (RFC 6238 over RFC 4226): HMAC-SHA1, 30 second
-;;; steps, six digits. The shared secret is KOYA_TOTP_SECRET (Base32); when it is
-;;; not set the second factor is off and the owner secret alone logs in.
+;;; steps, six digits. The owner turns the second factor on from the admin UI's
+;;; settings page, which stores the Base32 secret in the settings table. The
+;;; KOYA_TOTP_SECRET environment variable overrides that (for configuration kept
+;;; outside the database); with neither, the owner secret alone logs in.
+
+(defvar *totp-last-counter* -1
+  "Highest time step that has already logged someone in; a code is single-use.")
 
 (defparameter +alphabet+ "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 (defparameter +step-seconds+ 30)
 (defparameter +digits+ 6)
 
-(defun totp-secret () (let ((s (env "KOYA_TOTP_SECRET"))) (and s (plusp (length s)) s)))
+(defun totp-env-secret ()
+  (let ((s (env "KOYA_TOTP_SECRET"))) (and s (plusp (length s)) s)))
+
+(defun totp-secret ()
+  (or (totp-env-secret) (get-setting "totp_secret")))
+
 (defun totp-enabled-p () (and (totp-secret) t))
+
+(defun enable-totp (secret)
+  "Store SECRET as the second factor. Forget any step used with the previous one."
+  (set-setting "totp_secret" secret)
+  (setf *totp-last-counter* -1)
+  secret)
+
+(defun disable-totp ()
+  (delete-setting "totp_secret")
+  (setf *totp-last-counter* -1))
 
 (defun base32-decode (string)
   "Octets of a Base32 STRING (RFC 4648, case-insensitive, padding and spaces ignored)."
@@ -73,9 +98,6 @@
 (defun totp (secret &key (time (unix-now)))
   "The current code for SECRET (a Base32 string)."
   (hotp (base32-decode secret) (floor time +step-seconds+)))
-
-(defvar *totp-last-counter* -1
-  "Highest time step that has already logged someone in; a code is single-use.")
 
 (defun totp-code-valid-p (code &key (secret (totp-secret)) (time (unix-now)) (window 1))
   "True when CODE matches the current step or one within WINDOW steps either way,

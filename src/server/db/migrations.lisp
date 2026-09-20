@@ -58,7 +58,12 @@
         width INTEGER,
         height INTEGER,
         alt TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL)")))
+        created_at TEXT NOT NULL)")
+    (2
+     "CREATE TABLE settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL)")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

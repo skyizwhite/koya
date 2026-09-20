@@ -46,9 +46,9 @@
   (loop (sleep 3600)))
 
 (defun totp-setup (&key (account "owner"))
-  "Generate a secret for two-factor login and print what to do with it: put the
-Base32 value in KOYA_TOTP_SECRET and add the otpauth URI to an authenticator app
-(paste it, or turn it into a QR code). Returns the secret."
+  "For configuring two-factor login through the environment instead of the admin
+UI's settings page: generate a secret and print the KOYA_TOTP_SECRET line and
+the otpauth URI for an authenticator app. Returns the secret."
   (let ((secret (generate-totp-secret)))
     (format t "~&KOYA_TOTP_SECRET=~a~%~a~%" secret (otpauth-uri secret :account account))
     secret))
