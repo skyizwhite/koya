@@ -36,6 +36,7 @@ In your own project (which depends on `koya`):
                           :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
   (title    :text :required t)
   (slug     :slug :from title :unique t)
+  (cover    :media)
   (content  :richtext)
   (tags     :reference :model tag :many t))
 
@@ -72,6 +73,18 @@ GET /api/v1/{space}/{model}?limit=&offset=&orders=&fields=&filters=&include=&dra
 GET /api/v1/{space}/{model}/{id}
 X-KOYA-API-KEY: koya_...   (X-MICROCMS-API-KEY is accepted too)
 ```
+
+## Media
+
+Images (PNG, JPEG, GIF, WebP) live in a per-space library under `KOYA_MEDIA_DIR` and are served by koya at `/media/{space}/{id}.{ext}`. Upload from the admin UI (`/s/{space}/media`, or the picker in the editor and in Quill's image button), or from Lisp:
+
+```lisp
+(koya:upload-media #p"cover.png" :alt "Cover")   ; => (:id "..." :url "https://cms.example.com/media/website/....png" ...)
+(koya:list-media :search "cover")
+(koya:delete-media "01J...")
+```
+
+A `:media` field stores the id and the delivery API returns `{id, url, width, height, alt, ...}`.
 
 ## Tests
 

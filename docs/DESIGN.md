@@ -246,10 +246,21 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   - 一覧はページング・ファイル名検索つき。
 - メディア管理画面の機能: アップロード(複数可)、一覧(サムネイル、ファイル名、サイズ、寸法、登録日)、
   詳細(URL コピー、alt テキスト編集)、削除(コンテンツから参照中なら警告)。
-- 本体のローカルディスク(Docker ボリューム)に保存し、`/media/{space}/{id}.{ext}` で配信する。
+- 本体のローカルディスク(`KOYA_MEDIA_DIR`、Docker ではボリューム)に `{space}/{id}.{ext}` で保存し、
+  本体自身が `/media/{space}/{id}.{ext}` で配信する(認証なし。id は使い回さないので `immutable` キャッシュ)。
+  配信ミドルウェアは `space/ULID.ext` の形しか受け付けない。
+- 受け付ける形式は PNG / JPEG / GIF / WebP。先頭バイトで判定し、寸法もヘッダから読む(クライアントの
+  Content-Type は見ない。SVG はスクリプトを含めるため対象外)。上限 20 MB。
 - リサイズ・変換・外部ストレージ(S3 等)は持たない。必要になったら CDN 側(Cloudflare Images 等)か後続フェーズで。
-- フィールド型 `:media` は media の id を参照し、API では `{url, width, height, alt}` のオブジェクトに展開する。
-- 管理 API: `GET/POST /admin/api/{space}/media`、`GET/PATCH/DELETE /admin/api/{space}/media/{id}`。
+- フィールド型 `:media` は media の id を保存し、配信 API では常に
+  `{id, url, filename, mime, size, width, height, alt, createdAt}` に展開する(削除済みなら `null`)。管理 API は id のまま。
+- 管理 API: `GET/POST /admin/api/media/{space}`(`q=` 検索、`limit` / `offset`。POST は multipart の `file`(複数可)と `alt`)、
+  `GET/PATCH/DELETE /admin/api/media/{space}/{id}`(GET は参照数 `references` 付き、PATCH は `{"alt"}`)。
+- 管理 UI: `/s/{space}/media` がライブラリ画面。編集画面は `<dialog>` を1つ持ち、中身を ningle-actions の
+  エンドポイント(`media-picker` / `media-picker-upload`、オーナーセッション必須)から HTMX で取り込む。
+  `:media` フィールドの「Choose…」と Quill の画像ボタンが同じピッカーを開き、選択で id をセット、または `<img>` を挿入する。
+- richtext 内の画像は `<img src="/media/...">` の URL として本文に埋め込まれる(参照数の集計はこの URL も数える)。
+- client: `upload-media` `list-media` `get-media` `update-media` `delete-media`。
 
 ## 9. 下書き・公開・バージョニング
 
@@ -339,10 +350,10 @@ website から流用するパターン:
 ### M2: 残りのフィールド型とメディア
 
 - 済: `:number` `:date` `:select` `:slug` の型と入力、`:reference`(select 入力、`include` 展開、
-  一覧でのラベル表示)、`filters` の残りの演算子、作成時のシステム日時の指定(移行用)。
-- 残: メディアライブラリ(アップロード、`/media/...` 配信、管理 API、管理画面、編集画面のモーダル)、
-  `:media` の API 展開(`{url, width, height, alt}`)、`:datetime` 入力のタイムゾーン変換 JS、
-  `docs/SCHEMA.md` と `docs/openapi.yaml` の整備。
+  一覧でのラベル表示)、`filters` の残りの演算子、作成時のシステム日時の指定(移行用)、
+  メディアライブラリ(8 章: アップロード、`/media/...` 配信、管理 API、管理画面、編集画面のピッカー、
+  Quill の画像挿入、`:media` の API 展開、client)。
+- 残: `:datetime` 入力のタイムゾーン変換 JS、`docs/SCHEMA.md` と `docs/openapi.yaml` の整備。
 
 ### 2026-09-20 のコードレビューと対応
 
@@ -411,3 +422,5 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 | 2026-09-20 | JSON の `false` / `[]` は「値」。空扱いは `null`・空白文字列・`:many` の `[]` のみ | jzon が false を NIL にするため、型の取り違えを保存しない |
 | 2026-09-20 | 制約を強める field option 変更(required 追加、単一↔複数、pattern 変更など)は破壊的変更 | 既存コンテンツを不正にしうる変更は `:force` で自覚的に |
 | 2026-09-20 | 管理 API の書き込みも Origin 検証。Cookie は HttpOnly / SameSite=Lax / https なら Secure | SameSite の既定値だけに頼らない |
+| 2026-09-20 | メディアは koya 自身が `/media/` で配信。形式は先頭バイトで判定し PNG / JPEG / GIF / WebP のみ、SVG は不可 | 外部ストレージなしで完結させる。Content-Type 詐称と SVG 経由のスクリプトを避ける |
+| 2026-09-20 | `:media` は配信 API で常にオブジェクト展開(`include` 不要) | 画像は URL が無いと使えず、展開が入れ子になることもない |
