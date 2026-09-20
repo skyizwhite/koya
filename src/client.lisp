@@ -20,7 +20,8 @@
            #:get-list #:get-item #:get-object
            #:list-contents #:get-content #:create-content #:update-content
            #:publish-content #:unpublish-content #:delete-content #:draft-key
-           #:create-api-key #:list-api-keys #:delete-api-key #:webhook-secret))
+           #:create-api-key #:list-api-keys #:delete-api-key #:webhook-secret
+           #:list-media #:get-media #:upload-media #:update-media #:delete-media))
 (in-package #:koya/client)
 
 ;;; HTTP client for a koya server. Delivery calls need *API-KEY*; admin calls
@@ -68,8 +69,9 @@
     (when query (setf (quri:uri-query-params uri) (query-alist query)))
     (render-uri uri)))
 
-(defun request (method path &key query body auth)
-  "Perform a request. AUTH is :owner or :api-key. Returns the parsed JSON value."
+(defun request (method path &key query body form auth)
+  "Perform a request. AUTH is :owner or :api-key. BODY is sent as JSON; FORM, an
+alist whose values may be pathnames, as multipart/form-data. Returns the parsed JSON value."
   (let ((headers (list (cons "Accept" "application/json"))))
     (ecase auth
       (:owner (push (cons "Authorization" (format nil "Bearer ~a" (secret))) headers))
@@ -79,7 +81,7 @@
     (handler-case
         (multiple-value-bind (response-body status)
             (dexador:request (build-url path query) :method method :headers headers
-                             :content (and body (to-json body)) :force-string t)
+                             :content (cond (body (to-json body)) (form form) (t nil)) :force-string t)
           (declare (ignore status))
           (if (and (stringp response-body) (plusp (length response-body)))
               (parse-json response-body)
@@ -215,3 +217,32 @@ can be given explicitly, e.g. when importing from another CMS."
 
 (defun delete-api-key (id &key space)
   (jvalue->lisp (request :delete (format nil "/admin/api/keys/~a/~a" (space-name space) id) :auth :owner)))
+
+;;; --- Admin API: media -------------------------------------------------------
+
+(defun media-path (space &optional id)
+  (format nil "/admin/api/media/~a~@[/~a~]" (space-name space) id))
+
+(defun list-media (&key space search (limit 60) (offset 0))
+  "Media of SPACE, newest first: (:media (...) :total-count n :offset :limit). SEARCH matches file names."
+  (jvalue->lisp (request :get (media-path space) :query (list :q search :limit limit :offset offset) :auth :owner)))
+
+(defun get-media (id &key space)
+  "One media as a plist, including :references (contents that mention it)."
+  (jvalue->lisp (request :get (media-path space id) :auth :owner)))
+
+(defun upload-media (file &key space (alt ""))
+  "Upload FILE (a pathname or namestring of a PNG, JPEG, GIF or WebP image) to SPACE's
+library. Returns the new media as a plist, :url included."
+  (first (getf (jvalue->lisp (request :post (media-path space)
+                                      :form (list (cons "alt" alt) (cons "file" (pathname file)))
+                                      :auth :owner))
+               :media)))
+
+(defun update-media (id &key space alt)
+  "Change the alt text of media ID."
+  (jvalue->lisp (request :patch (media-path space id) :body (jobject "alt" (or alt "")) :auth :owner)))
+
+(defun delete-media (id &key space)
+  "Delete media ID and its file."
+  (jvalue->lisp (request :delete (media-path space id) :auth :owner)))

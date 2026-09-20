@@ -10,7 +10,9 @@
                 #:pull #:get-list #:get-item #:get-object
                 #:list-contents #:get-content #:create-content #:update-content
                 #:publish-content #:unpublish-content #:delete-content #:draft-key
-                #:list-api-keys #:delete-api-key #:webhook-secret))
+                #:list-api-keys #:delete-api-key #:webhook-secret
+                #:list-media #:get-media #:upload-media #:update-media #:delete-media)
+  (:import-from #:koya-tests/server/media #:png-bytes #:*media-root*))
 (in-package #:koya-tests/client)
 
 (defparameter *port* 3987)
@@ -18,6 +20,7 @@
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
+  (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (start :server :woo :port *port* :db ":memory:")
@@ -27,7 +30,8 @@
   (defmodel (website blog) ()
     (title :text :required t)
     (body :richtext)
-    (tags :reference :model tag :many t))
+    (tags :reference :model tag :many t)
+    (cover :media))
   (defmodel (website tag) ()
     (name :text :required t))
   (defmodel (website about) (:kind :object)
@@ -39,9 +43,9 @@
 
 (deftest deploy-plan-pull
   (let ((changes (koya/client:plan :stream (make-broadcast-stream))))
-    (ok (= (length changes) 9) "everything is new"))
+    (ok (= (length changes) 10) "everything is new"))
   (let ((applied (koya/client:deploy :stream (make-broadcast-stream))))
-    (ok (= (length applied) 9)))
+    (ok (= (length applied) 10)))
   (ok (null (koya/client:plan :stream (make-broadcast-stream))) "nothing left to change")
   (let ((remote (pull)))
     (ok (equal (mapcar #'model-name (space-models (first (schema-spaces remote)))) '("blog" "tag" "about"))))
@@ -54,7 +58,7 @@
     (ok (koya/client:deploy :force t :stream (make-broadcast-stream)))
     (ok (= (length (space-models (first (schema-spaces (pull))))) 1))
     ;; restore
-    (defmodel (website blog) () (title :text :required t) (body :richtext) (tags :reference :model tag :many t))
+    (defmodel (website blog) () (title :text :required t) (body :richtext) (tags :reference :model tag :many t) (cover :media))
     (defmodel (website tag) () (name :text :required t))
     (defmodel (website about) (:kind :object) (body :richtext))
     (koya/client:deploy :force t :stream (make-broadcast-stream))))
@@ -123,6 +127,25 @@
           "a malformed timestamp is rejected"))
     (testing "webhook secret"
       (ok (= (length (webhook-secret)) 48)))
+    (testing "media"
+      (let ((file (merge-pathnames "client-upload.png" *media-root*)))
+        (ensure-directories-exist file)
+        (with-open-file (out file :direction :output :element-type '(unsigned-byte 8) :if-exists :supersede)
+          (write-sequence (png-bytes 6 4) out))
+        (let ((media (upload-media file :alt "Uploaded")))
+          (ok (string= (getf media :filename) "client-upload.png"))
+          (ok (= (getf media :width) 6))
+          (ok (search "/media/website/" (getf media :url)))
+          (ok (= (getf (list-media) :total-count) 1))
+          (ok (= (getf (get-media (getf media :id)) :references) 0))
+          (ok (string= (getf (update-media (getf media :id) :alt "Changed") :alt) "Changed"))
+          (let ((post (create-content 'blog (list :title "Covered" :cover (getf media :id)) :publish t)))
+            (ok (string= (getf (getf (get-item 'blog (getf post :id)) :cover) :alt) "Changed")
+                "delivery expands :media into a plist")
+            (ok (= (getf (get-media (getf media :id)) :references) 1))
+            (delete-content 'blog (getf post :id)))
+          (ok (getf (delete-media (getf media :id)) :deleted))
+          (ok (= (getf (list-media) :total-count) 0)))))
     (testing "api keys"
       (ok (= (length (list-api-keys)) 1))
       (multiple-value-bind (key id) (koya/client:create-api-key :label "extra")
