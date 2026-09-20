@@ -12,6 +12,7 @@
                "koya-tests/config"
                "koya-tests/server/db"
                "koya-tests/server/contents"
+               "koya-tests/server/media"
                "koya-tests/server/http"
                "koya-tests/server/ui"
                "koya-tests/client")
