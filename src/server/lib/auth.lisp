@@ -3,7 +3,7 @@
   (:import-from #:koya-server/lib/env
                 #:koya-secret)
   (:import-from #:koya-server/lib/http
-                #:fail-api #:header #:json-response #:error-object)
+                #:fail-api #:header #:json-response #:error-object #:origin-allowed-p)
   (:import-from #:koya-server/db/api-keys
                 #:space-for-api-key)
   (:import-from #:ironclad
@@ -51,13 +51,23 @@
         (let ((token (bearer-token env)))
           (and token (secure-string= token (koya-secret)))))))
 
+(defun cross-origin-write-p (env)
+  "A state-changing request whose Origin/Referer does not match this server. The
+session cookie would otherwise let a page on another site drive the admin API."
+  (let ((headers (getf env :headers)))
+    (and (member (getf env :request-method) '(:post :put :patch :delete))
+         (not (origin-allowed-p (gethash "origin" headers) (gethash "referer" headers) (gethash "host" headers))))))
+
 (defparameter *admin-auth-middleware*
   (lambda (app)
     (lambda (env)
-      (if (owner-env-p env)
-          (funcall app env)
-          (json-response 401 (error-object "unauthorized" "Owner authentication required")))))
-  "Lack middleware guarding the admin API.")
+      (cond ((not (owner-env-p env))
+             (json-response 401 (error-object "unauthorized" "Owner authentication required")))
+            ((cross-origin-write-p env)
+             (json-response 403 (error-object "forbidden" "Cross-origin request rejected")))
+            (t (funcall app env)))))
+  "Lack middleware guarding the admin API: owner session or Bearer secret, and
+no cross-origin writes.")
 
 (defun require-api-key (space)
   "Signal 401/403 unless the request carries an API key valid for SPACE."

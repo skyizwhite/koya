@@ -92,7 +92,22 @@
     (ok (= status 401)))
   (multiple-value-bind (status json) (admin :get "/admin/api/me")
     (ok (= status 200))
-    (ok (eq (jget json "owner") t))))
+    (ok (eq (jget json "owner") t)))
+  (testing "writes need a matching origin when a browser sends one"
+    (multiple-value-bind (status json)
+        (request :post "/admin/api/schema/plan" :body (jobject "koyaSchema" 1)
+                 :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*)) ("origin" . "https://evil.example")))
+      (ok (= status 403))
+      (ok (string= (jget json "error" "code") "forbidden")))
+    (multiple-value-bind (status)
+        (request :post "/admin/api/schema/plan" :body (jobject "koyaSchema" 1 "spaces" #())
+                 :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*)) ("origin" . "http://localhost:3000")
+                            ("host" . "localhost:3000")))
+      (ok (= status 200)))
+    (multiple-value-bind (status)
+        (request :get "/admin/api/me"
+                 :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*)) ("origin" . "https://evil.example")))
+      (ok (= status 200) "reads are not gated"))))
 
 (deftest schema-endpoints
   (multiple-value-bind (status json) (admin :get "/admin/api/schema")
