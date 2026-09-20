@@ -28,5 +28,8 @@
 (defun koya-secret () (required-env "KOYA_SECRET"))
 (defun db-path () (env "KOYA_DB_PATH" "./data/koya.db"))
 (defun media-dir () (env "KOYA_MEDIA_DIR" "./data/media"))
-(defun base-url () (env "KOYA_BASE_URL" "http://localhost:3000"))
 (defun server-port () (parse-integer (env "KOYA_PORT" "3000")))
+(defun base-url ()
+  "The public URL of this server: absolute media URLs and the same-origin check
+use it. Defaults to localhost on the port actually served."
+  (env "KOYA_BASE_URL" (format nil "http://localhost:~a" (server-port))))

@@ -37,8 +37,8 @@
        (div :class "truncate font-medium" :title (media-filename media) (media-filename media))
        (div :class "text-xs text-muted"
          (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media)) (short-time (media-created-at media))))
-       (input :type "text" :readonly t :value (media-url media) :class "input select-all font-mono text-xs"
-              :aria-label "URL")
+       (div :class "flex gap-2"
+         (a :href (media-url media :absolute nil) :target "_blank" :rel "noopener" :class "btn" "Preview ↗"))
        (form :method "post" :class "flex gap-2"
          (input :type "hidden" :name "action" :value "alt")
          (input :type "hidden" :name "id" :value id)
