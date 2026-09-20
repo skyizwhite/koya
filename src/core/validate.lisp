@@ -37,6 +37,14 @@
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
       (and (json-array-p value) (zerop (length value)))))
 
+(defun blank-for-field-p (field value)
+  "Blank means 'no value given': null, a whitespace-only string, and an empty array
+on a :many field. JSON false (NIL) is a value, so a text field set to false is a
+type error rather than an omission; the same goes for [] on a single-value field."
+  (or (json-null-p value)
+      (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
+      (and (field-many-p field) (json-array-p value) (zerop (length value)))))
+
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
 
@@ -133,7 +141,10 @@ Returns a list of error plists; empty means valid."
     (dolist (field (model-fields model))
       (multiple-value-bind (value found) (gethash (field-name field) data)
         (cond ((and (not found) partial) nil)
-              ((blank-value-p value)
+              ((not found)
+               (when (and (field-required-p field) (not (eq (field-type field) :boolean)))
+                 (push (err field "required" "is required") errors)))
+              ((blank-for-field-p field value)
                (when (and (field-required-p field) (not (eq (field-type field) :boolean)))
                  (push (err field "required" "is required") errors)))
               (t (setf errors (append (reverse (check-value field value)) errors))))))

@@ -45,6 +45,16 @@
                        (validate-content *model* (parse-json "{\"title\": null}") :partial t))
                '("required")))))
 
+(deftest false-and-empty-array-are-values
+  (ok (equal (codes "{\"title\": false, \"eventAt\": \"2026-09-20T00:00:00Z\", \"count\": false}")
+             '(("title" . "type") ("count" . "type")))
+      "false is only a boolean")
+  (ok (equal (codes "{\"title\": [], \"eventAt\": \"2026-09-20T00:00:00Z\"}")
+             '(("title" . "type")))
+      "[] on a single-value field")
+  (ok (null (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"labels\": [], \"tags\": []}"))
+      "[] on a many field is blank"))
+
 (deftest type-errors
   (ok (equal (codes "{\"title\": 1, \"eventAt\": \"nope\"}")
              '(("title" . "type") ("eventAt" . "type"))))
