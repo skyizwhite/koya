@@ -103,7 +103,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
 
 (defcomp ~preview-cell (&key field content ref-labels)
   (let ((preview (field-preview field (content-data content :draft t) ref-labels)))
-    (hsx (td :class (clsx "py-2 pr-4 align-top" (if preview "" "text-muted"))
+    (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
            (div :class (column-width field) (or preview "—"))))))
 
 (defun @get (params)
@@ -150,6 +150,6 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                                               :tabindex "0" :role "link"
                                             (loop :for field :in fields :collect
                                               (hsx (~preview-cell :field field :content content :ref-labels ref-labels)))
-                                            (td :class "py-2 whitespace-nowrap align-top"
+                                            (td :class "py-2 whitespace-nowrap"
                                               (~status-badge :status (content-status content)))
-                                            (td :class "py-2 pl-4 text-right align-top text-muted group-hover:text-accent" "›"))))))))))))))))))
+                                            (td :class "py-2 pl-4 text-right text-muted group-hover:text-accent" "›"))))))))))))))))))
