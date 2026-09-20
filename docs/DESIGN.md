@@ -360,7 +360,7 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 - `1.5` が `1.5d0` と表示され再保存で消える → 数値は指数表記なしで出力。
 - client の `lisp->jvalue` が NIL を `[]` にしていた → NIL は `null`、空配列は `#()`。
 - 管理 UI: `/new` への delete / unpublish が 500 → 404。keys ページの delete / rotate → flash 付きリダイレクト(create は平文キーを一度だけ見せるため直接描画のまま)。
-- hsx: 属性値のエスケープが `"` のみ → `&` `<` `>` も(skyizwhite/hsx 側で修正。koya は push 後に `qlot update hsx` で取り込む)。
+- hsx: 属性値のエスケープが `"` のみ → `&` も(`<` `>` は引用符内で合法なので Alpine.js の式の読みやすさを優先して据え置き。skyizwhite/hsx 側で修正。koya は push 後に `qlot update hsx` で取り込む)。
 
 ### M3: 運用・拡張
 
