@@ -336,6 +336,8 @@ is a list of parts for MULTIPART-BODY."
         (ok (search "Uploaded 2 files." body))
         (ok (search "cover.png" body))
         (ok (search "4×4" body))
+        (ok (search "<dialog id=\"media-preview\"" body) "preview modal is on the page")
+        (ok (search "data-preview-src=\"/media/website/" body) "cards open it")
         (ok (search "/media/website/" body)))
       (multiple-value-bind (status body) (request :get "/s/website/media" :query "q=second")
         (ok (= status 200))

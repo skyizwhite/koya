@@ -164,7 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-media-clear-for]").forEach((button) => {
     button.addEventListener("click", () => setField(button.dataset.mediaClearFor, null));
   });
-  dialog.querySelector("[data-picker-close]").addEventListener("click", picker.close);
+  dialog.querySelector("[data-dialog-close]").addEventListener("click", picker.close);
   dialog.addEventListener("click", (event) => {
     // a click on the backdrop lands on the dialog element itself
     if (event.target === dialog) picker.close();
@@ -184,4 +184,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     picker.close();
   });
+});
+
+// Image preview: [data-preview-src] buttons (the library thumbnails and their
+// Preview buttons) show the image large in <dialog id="media-preview">.
+document.addEventListener("DOMContentLoaded", () => {
+  const dialog = document.getElementById("media-preview");
+  if (!dialog) return;
+  const image = dialog.querySelector("[data-preview-image]");
+  const title = dialog.querySelector("[data-preview-title]");
+  const caption = dialog.querySelector("[data-preview-caption]");
+  const open = dialog.querySelector("[data-preview-open]");
+
+  document.querySelectorAll("[data-preview-src]").forEach((button) => {
+    button.addEventListener("click", () => {
+      image.src = button.dataset.previewSrc;
+      image.alt = button.dataset.previewAlt || "";
+      title.textContent = button.dataset.previewName || "";
+      caption.textContent = button.dataset.previewMeta || "";
+      open.href = button.dataset.previewSrc;
+      dialog.showModal();
+    });
+  });
+  dialog.querySelector("[data-dialog-close]").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+  dialog.addEventListener("close", () => image.removeAttribute("src"));
 });

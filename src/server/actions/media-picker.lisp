@@ -64,10 +64,9 @@
 (defcomp ~media-picker-dialog (&key space)
   "The (initially empty) dialog. koya-editor.js loads the body from data-picker-url on open."
   (hsx
-   (dialog :id "media-picker" :data-picker-url (media-picker :space space)
-           :class "w-full max-w-3xl rounded-md border border-line bg-base p-0 text-fg shadow backdrop:bg-fg/40"
+   (dialog :id "media-picker" :data-picker-url (media-picker :space space) :class "koya-dialog max-w-3xl"
      (div :class "flex items-center justify-between border-b border-line px-4 py-3"
        (h2 :class "font-semibold" "Media")
-       (button :type "button" :class "btn" :data-picker-close t "Close"))
+       (button :type "button" :class "btn" :data-dialog-close t "Close"))
      (div :class "max-h-[70vh] overflow-y-auto p-4"
        (div :id "media-picker-body" :class "text-sm text-muted" "Loading…")))))

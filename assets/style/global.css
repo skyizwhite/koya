@@ -43,11 +43,14 @@ select {
   @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium;
 }
 
-/* Media picker dialog */
-dialog#media-picker[open] {
+/* Dialogs (media picker, image preview) */
+dialog.koya-dialog {
+  @apply w-full rounded-md border border-line bg-base p-0 text-fg shadow;
+}
+dialog.koya-dialog[open] {
   @apply mx-auto;
 }
-dialog#media-picker::backdrop {
+dialog.koya-dialog::backdrop {
   background: rgb(31 29 26 / 0.4);
 }
 

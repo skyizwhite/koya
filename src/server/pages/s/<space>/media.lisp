@@ -8,7 +8,7 @@
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to
                 #:~layout #:space-url)
-  (:import-from #:koya-server/components/media-grid #:~media-grid)
+  (:import-from #:koya-server/components/media-grid #:~media-grid #:~media-preview-dialog)
   (:export #:@get #:@post #:media-page-url))
 (in-package #:koya-server/pages/s/<space>/media)
 
@@ -47,6 +47,7 @@
            (input :type "text" :id "alt" :name "alt" :class "input mt-1.5" :placeholder "optional"))
          (button :type "submit" :class "btn btn-primary" "Upload"))
        (~media-grid :items items :space space)
+       (~media-preview-dialog)
        (when (> pages 1)
          (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
                 (if (> page 1)

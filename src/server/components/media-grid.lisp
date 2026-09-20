@@ -9,6 +9,7 @@
                 #:short-time #:~empty-state)
   (:export #:~media-grid
            #:~media-card
+           #:~media-preview-dialog
            #:human-size))
 (in-package #:koya-server/components/media-grid)
 
@@ -28,17 +29,32 @@
   (hsx (img :src (media-url media :absolute nil) :alt (media-alt media) :loading "lazy"
             :class "aspect-square w-full rounded-md border border-line bg-panel object-contain")))
 
+(defun preview-attributes (media)
+  "Attributes koya-editor.js reads to fill the preview dialog."
+  (list :data-preview-src (media-url media :absolute nil)
+        :data-preview-alt (media-alt media)
+        :data-preview-name (media-filename media)
+        :data-preview-meta (format nil "~a · ~a" (dimensions media) (human-size (media-size media)))))
+
 (defcomp ~media-card (&key media space)
   "Library card: thumbnail, facts, alt form and delete form."
-  (let ((id (media-id media)))
+  (let ((id (media-id media))
+        (preview (preview-attributes media)))
     (hsx
      (li :class "space-y-2 text-sm"
-       (~thumb :media media)
+       (button :type "button" :class "block w-full cursor-zoom-in"
+               :data-preview-src (getf preview :data-preview-src) :data-preview-alt (getf preview :data-preview-alt)
+               :data-preview-name (getf preview :data-preview-name) :data-preview-meta (getf preview :data-preview-meta)
+               :aria-label (format nil "Preview ~a" (media-filename media))
+         (~thumb :media media))
        (div :class "truncate font-medium" :title (media-filename media) (media-filename media))
        (div :class "text-xs text-muted"
          (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media)) (short-time (media-created-at media))))
        (div :class "flex gap-2"
-         (a :href (media-url media :absolute nil) :target "_blank" :rel "noopener" :class "btn" "Preview ↗"))
+         (button :type "button" :class "btn"
+                 :data-preview-src (getf preview :data-preview-src) :data-preview-alt (getf preview :data-preview-alt)
+                 :data-preview-name (getf preview :data-preview-name) :data-preview-meta (getf preview :data-preview-meta)
+           "Preview"))
        (form :method "post" :class "flex gap-2"
          (input :type "hidden" :name "action" :value "alt")
          (input :type "hidden" :name "id" :value id)
@@ -77,3 +93,17 @@
                (if (eq mode :picker)
                    (hsx (~pick-card :media media))
                    (hsx (~media-card :media media :space space))))))))
+
+(defcomp ~media-preview-dialog ()
+  "One dialog per page; [data-preview-src] buttons fill and open it (koya-editor.js)."
+  (hsx
+   (dialog :id "media-preview" :class "koya-dialog max-w-5xl"
+     (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
+       (div :class "min-w-0"
+         (div :class "truncate font-semibold" :data-preview-title t "")
+         (div :class "text-xs text-muted" :data-preview-caption t ""))
+       (div :class "flex shrink-0 gap-2"
+         (a :href "#" :target "_blank" :rel "noopener" :class "btn" :data-preview-open t "Open ↗")
+         (button :type "button" :class "btn" :data-dialog-close t "Close")))
+     (div :class "flex max-h-[80vh] items-center justify-center bg-fg/5 p-4"
+       (img :src "" :alt "" :class "max-h-[75vh] max-w-full object-contain" :data-preview-image t)))))
