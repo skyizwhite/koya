@@ -177,6 +177,23 @@
       (multiple-value-bind (status body) (request :get (format nil "/s/website/m/blog/~a" id))
         (ok (= status 200))
         (ng (search "Draft saved" body) "flash is gone on the next request")))
+    (testing "list shows field previews and status, newest first"
+      (request :post "/s/website/m/blog/new"
+               :form '(("action" . "save") ("f-title" . "Second post") ("f-body" . "<p>Rich <b>text</b> &amp; more</p>")))
+      (multiple-value-bind (status body) (request :get "/s/website/m/blog")
+        (ok (= status 200))
+        (ok (search "Hello World" body))
+        (ok (< (search "Second post" body) (search "Hello World" body)) "newest created first")
+        (ok (search "Rich text &amp; more" body) "rich text is previewed as plain text")
+        (ok (not (search "<b>text</b>" body)))
+        (ok (search "2026-09-20 10:00 UTC" body) "datetime preview")
+        (ok (search ">Yes<" body) "boolean preview")
+        (ok (search ">a, b<" body) "multi select preview")
+        (ok (search ">draft<" body))
+        (ok (not (search "Created at" body)))
+        (ok (not (search "Updated at" body))))
+      (let ((second (first (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))
+        (request :post (format nil "/s/website/m/blog/~a" (content-id second)) :form '(("action" . "delete")))))
     (testing "publish, unpublish, delete"
       (multiple-value-bind (status body headers)
           (request :post (format nil "/s/website/m/blog/~a" id)
