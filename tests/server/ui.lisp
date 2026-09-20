@@ -512,3 +512,16 @@ is a list of parts for MULTIPART-BODY."
       (declare (ignore headers))
       (ok (= status 413) "a huge Content-Length is refused before the body is read")
       (ok (search "too_large" (first body))))))
+
+(deftest list-status-is-pinned
+  (multiple-value-bind (status body headers)
+      (request :post "/s/website/m/blog/new" :form '(("action" . "save") ("f-title" . "Columns") ("f-body" . "<p>x</p>"))
+               :headers '(("origin" . "http://localhost:3000")))
+    (declare (ignore body))
+    (ok (= status 303))
+    (let ((path (subseq (location headers) 0 (position #\? (location headers)))))
+      (multiple-value-bind (status body) (request :get "/s/website/m/blog")
+        (ok (= status 200))
+        (ok (search ">related<" body) "every field keeps its column")
+        (ok (search "sticky right-6" body) "Status column is pinned"))
+      (request :post path :form '(("action" . "delete")) :headers '(("origin" . "http://localhost:3000"))))))

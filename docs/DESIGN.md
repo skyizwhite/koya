@@ -235,7 +235,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   `/s/{space}/m/{model}`(コンテンツ一覧。object 型は単一コンテンツの編集画面へリダイレクト)、
   `/s/{space}/m/{model}/{id}`(編集。`{id}` = `new` で新規)。**メディアライブラリ**(8 章)は M2。
 - コンテンツ一覧は作成日時の新しい順。列はモデルの全フィールドのプレビュー(richtext はタグ除去、
-  参照は参照先のラベル、60 文字で省略)と status で、created / updated は出さない。行全体が編集画面へのリンク。
+  参照は参照先のラベル、60 文字で省略)と status で、created / updated は出さない。フィールドが多ければ横スクロール。
+  status と行末の矢印は右端に固定(sticky)され、横スクロールしても見える。行全体が編集画面へのリンク。
 - フォームは通常の POST(`action` = save / publish / unpublish / delete)で送る。
 - 管理側の POST は `Origin` / `Referer` が `Host` または `KOYA_BASE_URL` と一致することを要求する(CSRF 対策)。
 - `:datetime` の入力は `datetime-local` で、値は UTC として扱う(タイムゾーン変換は M2 で JS を足す)。

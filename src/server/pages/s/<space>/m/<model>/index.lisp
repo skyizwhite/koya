@@ -20,6 +20,7 @@
 (defparameter +preview-length+ 60
   "Longest field preview shown in the list, in characters.")
 
+
 (defun reference-labels (space model)
   "Field name -> hash of referenced id -> label, for every reference field of MODEL.
 Components render lazily, so this is passed explicitly rather than bound dynamically."
@@ -116,8 +117,9 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                                  (thead (tr :class "text-left text-muted"
                                           (loop :for field :in fields :collect
                                             (hsx (th :class "py-2 pr-4 font-medium" (field-name field))))
-                                          (th :class "py-2 font-medium" "Status")
-                                          (th)))
+                                          ;; pinned so they stay visible when the row scrolls sideways
+                                          (th :class "sticky right-6 bg-base py-2 font-medium" "Status")
+                                          (th :class "sticky right-0 w-6 bg-base")))
                                  (tbody :class "divide-y divide-line"
                                    (loop :for content :in contents :collect
                                      ;; the whole row opens the editor (see koya-editor.js)
@@ -126,5 +128,6 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                                               :tabindex "0" :role "link"
                                             (loop :for field :in fields :collect
                                               (hsx (~preview-cell :field field :content content :ref-labels ref-labels)))
-                                            (td :class "py-2" (~status-badge :status (content-status content)))
-                                            (td :class "py-2 pl-4 text-right text-muted group-hover:text-accent" "›"))))))))))))))))))
+                                            (td :class "sticky right-6 bg-base py-2 group-hover:bg-[#f8f2ec]"
+                                              (~status-badge :status (content-status content)))
+                                            (td :class "sticky right-0 w-6 bg-base py-2 text-right text-muted group-hover:bg-[#f8f2ec] group-hover:text-accent" "›"))))))))))))))))))
