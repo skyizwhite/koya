@@ -62,3 +62,50 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
+// Many-reference fields: the <select multiple> keeps the submitted values but is
+// hidden; the user sees the chosen contents as chips and adds more from an
+// ordinary dropdown.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("select[multiple][data-picker]").forEach((select) => {
+    const wrap = document.createElement("div");
+    wrap.className = "flex flex-wrap items-center gap-2";
+    const chips = document.createElement("div");
+    chips.className = "flex flex-wrap items-center gap-2";
+    const picker = document.createElement("select");
+    picker.setAttribute("aria-label", "Add");
+    wrap.append(chips, picker);
+
+    const render = () => {
+      chips.replaceChildren();
+      picker.replaceChildren(new Option("Add…", ""));
+      Array.from(select.options).forEach((option) => {
+        if (option.selected) {
+          const chip = document.createElement("span");
+          chip.className = "badge inline-flex items-center gap-1 bg-line text-fg";
+          chip.append(option.text);
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "text-muted hover:text-danger";
+          remove.setAttribute("aria-label", `Remove ${option.text}`);
+          remove.textContent = "×";
+          remove.addEventListener("click", () => { option.selected = false; render(); });
+          chip.append(remove);
+          chips.append(chip);
+        } else {
+          picker.append(new Option(option.text, option.value));
+        }
+      });
+      picker.value = "";
+    };
+    picker.addEventListener("change", () => {
+      const option = Array.from(select.options).find((o) => o.value === picker.value);
+      if (option) option.selected = true;
+      render();
+    });
+
+    select.hidden = true;
+    select.after(wrap);
+    render();
+  });
+});

@@ -36,7 +36,8 @@
          (many (field-many-p field)))
     (hsx
      (<>
-       (select :id name :name name :multiple many
+       ;; a many-reference is enhanced into chips + a dropdown by koya-editor.js
+       (select :id name :name name :multiple many :data-picker many
          (if many (hsx (<>)) (hsx (option :value "" "—")))
          (loop :for (id . label) :in choices :collect
            (hsx (option :value id :selected (selected-p value id) label))))

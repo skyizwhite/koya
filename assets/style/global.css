@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @source "../../src/server";
+@source "../js";
 
 @theme {
   --color-base: #fbfaf7;
