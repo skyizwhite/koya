@@ -82,7 +82,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
 
 (defcomp ~preview-cell (&key field content ref-labels)
   (let ((preview (field-preview field (content-data content :draft t) ref-labels)))
-    (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted")) (or preview "—")))))
+    (hsx (td :class (clsx "whitespace-nowrap py-2 pr-4" (if preview "" "text-muted")) (or preview "—")))))
 
 (defun @get (params)
   (with-owner
@@ -116,7 +116,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                                (table :class "w-full text-sm"
                                  (thead (tr :class "text-left text-muted"
                                           (loop :for field :in fields :collect
-                                            (hsx (th :class "py-2 pr-4 font-medium" (field-name field))))
+                                            (hsx (th :class "whitespace-nowrap py-2 pr-4 font-medium" (field-name field))))
                                           ;; pinned so they stay visible when the row scrolls sideways
                                           (th :class "sticky right-6 bg-base py-2 font-medium" "Status")
                                           (th :class "sticky right-0 w-6 bg-base")))
