@@ -211,6 +211,17 @@
       (multiple-value-bind (status body) (request :get (format nil "/s/website/m/blog/~a" id))
         (ok (= status 200))
         (ng (search "Draft saved" body) "flash is gone on the next request")))
+    (testing "text with a literal entity survives the editor"
+      (multiple-value-bind (status body headers)
+          (request :post "/s/website/m/blog/new"
+                   :form '(("action" . "save") ("f-title" . "AT&amp;T <b>") ("f-body" . "<p>x</p>")))
+        (declare (ignore body))
+        (ok (= status 303))
+        (let ((path (subseq (location headers) 0 (position #\? (location headers)))))
+          (multiple-value-bind (status body) (request :get path)
+            (ok (= status 200))
+            (ok (search "value=\"AT&amp;amp;T <b>\"" body) "the attribute encodes & so the browser shows AT&amp;T"))
+          (request :post path :form '(("action" . "delete"))))))
     (testing "list shows field previews and status, newest first"
       (request :post "/s/website/m/blog/new"
                :form `(("action" . "save") ("f-title" . "Second post") ("f-body" . "<p>Rich <b>text</b> &amp; more</p>")
