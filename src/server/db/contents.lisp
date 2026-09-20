@@ -67,16 +67,20 @@
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ? AND space = ? AND model = ?" id space model)))
     (and row (row->content row))))
 
-(defun create-content (space model data &key publish (id (make-ulid)) published-at)
-  "Insert DATA as a new content. With PUBLISH it is published immediately (at
-PUBLISHED-AT when given, for imports), otherwise saved as a draft."
+(defun create-content (space model data &key publish (id (make-ulid))
+                                             created-at updated-at published-at revised-at)
+  "Insert DATA as a new content. With PUBLISH it is published immediately,
+otherwise saved as a draft. The system timestamps default to now; imports may
+supply any of CREATED-AT, UPDATED-AT, PUBLISHED-AT and REVISED-AT (ISO 8601).
+PUBLISHED-AT and REVISED-AT are only stored when publishing."
   (let ((now (now-iso)))
     (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           id space model (if publish "published" "draft")
           (and publish (to-json data)) (and (not publish) (to-json data))
           (and (not publish) (new-draft-key))
-          now now (and publish (or published-at now)) (and publish now))
+          (or created-at now) (or updated-at now)
+          (and publish (or published-at now)) (and publish (or revised-at now)))
     (get-content id)))
 
 (defun save-draft (id data)

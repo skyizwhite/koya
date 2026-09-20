@@ -81,11 +81,14 @@
     (maphash (lambda (k v) (if (eq v json-null) (remhash k out) (setf (gethash k out) v))) patch)
     out))
 
-(defun check-published-at (value)
-  "VALUE is an ISO 8601 string or NIL. Signals 400 otherwise."
+(defun check-timestamp (name value)
+  "VALUE is an ISO 8601 string or NIL. Signals 400 naming the wire field NAME otherwise."
   (cond ((null value) nil)
         ((parse-iso value) value)
-        (t (fail-api 400 "bad_request" "\"publishedAt\" must be an ISO 8601 datetime"))))
+        (t (fail-api 400 "bad_request" (format nil "\"~a\" must be an ISO 8601 datetime" name)))))
+
+(defun check-published-at (value)
+  (check-timestamp "publishedAt" value))
 
 (defun check-new-id (id)
   (cond ((null id) nil)
@@ -103,16 +106,23 @@
                    :old old
                    :new new))
 
-(defun create (space model data &key publish id published-at)
-  "Create a content. ID and PUBLISHED-AT (ISO 8601) may be given explicitly, e.g.
-when importing. For object-kind models the single existing content is updated instead."
+(defun create (space model data &key publish id created-at updated-at published-at revised-at)
+  "Create a content. ID and the system timestamps CREATED-AT, UPDATED-AT,
+PUBLISHED-AT and REVISED-AT (ISO 8601) may be given explicitly, e.g. when
+importing. For object-kind models the single existing content is updated instead,
+and only PUBLISHED-AT applies."
   (let* ((space-name (space-name space))
          (model-name (koya/core/schema:model-name model))
-         (published-at (check-published-at published-at)))
+         (created-at (check-timestamp "createdAt" created-at))
+         (updated-at (check-timestamp "updatedAt" updated-at))
+         (published-at (check-published-at published-at))
+         (revised-at (check-timestamp "revisedAt" revised-at)))
     (check-content space-name model data)
     (flet ((insert ()
              (let ((content (apply #'create-content space-name model-name data
-                                   :publish publish :published-at published-at
+                                   :publish publish
+                                   :created-at created-at :updated-at updated-at
+                                   :published-at published-at :revised-at revised-at
                                    (and (check-new-id id) (list :id id)))))
                (when publish
                  (notify space model-name (content-id content) "new" :new (published-view space model content)))

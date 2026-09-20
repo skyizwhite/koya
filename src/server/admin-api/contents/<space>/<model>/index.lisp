@@ -20,12 +20,17 @@
                  "totalCount" total "offset" (query-offset query) "limit" (query-limit query))))))
 
 (defun @post (params)
-  "Create a content from {\"data\": {...}, \"publish\": bool, \"id\"?: string, \"publishedAt\"?: iso}."
+  "Create a content from {\"data\": {...}, \"publish\": bool, \"id\"?: string,
+\"createdAt\"?, \"updatedAt\"?, \"publishedAt\"?, \"revisedAt\"?: iso}."
   (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
     (let* ((body (read-json-body))
            (data (body-field body "data")))
       (unless (hash-table-p data) (fail-api 400 "bad_request" "\"data\" must be an object"))
       (let ((content (create space model data :publish (eq (body-field body "publish") t)
-                             :id (body-field body "id") :published-at (body-field body "publishedAt"))))
+                             :id (body-field body "id")
+                             :created-at (body-field body "createdAt")
+                             :updated-at (body-field body "updatedAt")
+                             :published-at (body-field body "publishedAt")
+                             :revised-at (body-field body "revisedAt"))))
         (ok-status 201)
         (admin-content->jobject content model)))))

@@ -160,12 +160,16 @@ after interactive confirmation when CONFIRM is true. Returns the applied changes
 (defun get-content (model id &key space)
   (jvalue->lisp (request :get (admin-path space model id) :auth :owner)))
 
-(defun create-content (model data &key space publish id published-at)
-  "Create a content. DATA is a kebab plist of field values. ID and PUBLISHED-AT
-(ISO 8601 string) can be given explicitly, e.g. when importing from another CMS."
+(defun create-content (model data &key space publish id created-at updated-at published-at revised-at)
+  "Create a content. DATA is a kebab plist of field values. ID and the system
+timestamps CREATED-AT, UPDATED-AT, PUBLISHED-AT and REVISED-AT (ISO 8601 strings)
+can be given explicitly, e.g. when importing from another CMS."
   (let ((body (jobject "data" (lisp->jvalue data) "publish" (and publish t))))
     (when id (setf (gethash "id" body) id))
-    (when published-at (setf (gethash "publishedAt" body) published-at))
+    (loop :for (key value) :on (list "createdAt" created-at "updatedAt" updated-at
+                                     "publishedAt" published-at "revisedAt" revised-at)
+          :by #'cddr
+          :when value :do (setf (gethash key body) value))
     (jvalue->lisp (request :post (admin-path space model) :body body :auth :owner))))
 
 (defun update-content (model id data &key space)

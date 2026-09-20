@@ -365,6 +365,7 @@ website から流用するパターン:
 | 2026-09-20 | 配信 API は `X-MICROCMS-API-KEY` も受理 | 既存 SDK からの移行を容易にする |
 | 2026-09-20 | Webhook は space ごとの秘密を `X-KOYA-WEBHOOK-KEY` で送る(管理 UI で表示・ローテート) | 受け側が呼び出し元を検証できるようにする |
 | 2026-09-20 | 作成・公開時に `id` と `publishedAt` を明示指定できる。参照 id は URL セーフ文字列なら可 | microCMS からの移行で URL と公開日を維持する |
+| 2026-09-20 | 作成時は `createdAt` `updatedAt` `revisedAt` も明示指定できる | microCMS の 4 つのシステム日時をそのまま持ち込む。未指定は現在時刻 |
 | 2026-09-20 | website の移行は `koya-migration` ブランチで実施(ローカル koya で全ページ表示を確認) | M1 完了条件 |
 | 2026-09-20 | richtext は Quill で編集する HTML 文字列に変更(Markdown / 3bmd 廃止) | 管理 UI の使い勝手。microCMS の HTML をそのまま移行できる |
 | 2026-09-20 | モデルに `:preview-url` / `:public-url` テンプレート、draft key は保存ごとに再生成、flash はセッション一度きり | 管理 UI 改善の要望 |

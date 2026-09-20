@@ -106,11 +106,20 @@
       (ok (string= (getf (unpublish-content 'blog (getf post :id)) :status) "draft"))
       (ok (getf (delete-content 'blog (getf post :id)) :deleted))
       (ok (= (getf (list-contents 'blog) :total-count) 0)))
-    (testing "import with explicit id and date"
-      (let ((imported (create-content 'tag '(:name "imported") :publish t :id "abc123" :published-at "2025-01-02T03:04:05.000Z")))
+    (testing "import with explicit id and dates"
+      (let ((imported (create-content 'tag '(:name "imported") :publish t :id "abc123"
+                                      :created-at "2024-12-31T00:00:00.000Z"
+                                      :updated-at "2025-01-03T00:00:00.000Z"
+                                      :published-at "2025-01-02T03:04:05.000Z"
+                                      :revised-at "2025-01-02T04:00:00.000Z")))
         (ok (string= (getf imported :id) "abc123"))
+        (ok (string= (getf imported :created-at) "2024-12-31T00:00:00.000Z"))
+        (ok (string= (getf imported :updated-at) "2025-01-03T00:00:00.000Z"))
         (ok (string= (getf imported :published-at) "2025-01-02T03:04:05.000Z"))
-        (ok (string= (getf (get-item 'tag "abc123") :name) "imported"))))
+        (ok (string= (getf imported :revised-at) "2025-01-02T04:00:00.000Z"))
+        (ok (string= (getf (get-item 'tag "abc123") :name) "imported")))
+      (ok (signals (create-content 'tag '(:name "bad date") :created-at "yesterday") 'koya-error)
+          "a malformed timestamp is rejected"))
     (testing "webhook secret"
       (ok (= (length (webhook-secret)) 48)))
     (testing "api keys"
