@@ -3,7 +3,7 @@
 (register-system-packages "lack-middleware-session" '(:lack/middleware/session/store))
 
 (defsystem "koya-server"
-  :version "0.1.0"
+  :version "0.1.1"
   :description "koya - a small headless CMS in Common Lisp (server)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
   :license "MIT"
