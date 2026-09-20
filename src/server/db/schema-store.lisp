@@ -4,6 +4,7 @@
                 #:exec #:fetch #:col #:with-db-transaction)
   (:import-from #:koya/core/schema
                 #:make-schema #:make-space #:schema-spaces #:space-name #:space-webhooks #:space-models
+                #:webhook->jobject
                 #:model-name #:model-kind #:model->jobject #:jobject->model #:check-schema)
   (:import-from #:koya/core/json
                 #:parse-json #:to-json)
@@ -61,7 +62,7 @@
 (defun save-space (space position now)
   (exec "INSERT INTO spaces (name, webhooks, webhook_secret, position, created_at) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(name) DO UPDATE SET webhooks = excluded.webhooks, position = excluded.position"
-        (space-name space) (to-json (coerce (space-webhooks space) 'vector)) (new-secret) position now)
+        (space-name space) (to-json (map 'vector #'webhook->jobject (space-webhooks space))) (new-secret) position now)
   (let ((keep (mapcar #'model-name (space-models space))))
     (dolist (row (fetch "SELECT name FROM models WHERE space = ?" (space-name space)))
       (unless (member (col row "name") keep :test #'string=)

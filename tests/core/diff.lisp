@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/core/diff
   (:use #:cl #:rove)
   (:import-from #:koya/core/schema
-                #:make-field #:make-model #:make-space #:make-schema)
+                #:make-field #:make-model #:make-space #:make-schema #:make-webhook)
   (:import-from #:koya/core/diff
                 #:diff-schemas
                 #:destructive-changes-p
@@ -70,6 +70,17 @@
         (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b") :many t) (sel :options '("a" "b")))))
         (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b")) (sel :options '("a")))))
         (ng (destructive-changes-p (diff-schemas (sel :options '("a")) (sel :options '("a" "b")))))))))
+
+(deftest model-webhooks
+  (flet ((blog (&rest hooks)
+           (make-schema (list (make-space "website"
+                                          :models (list (make-model "blog" :list (list (make-field :title :text))
+                                                                    :webhooks hooks)))))))
+    (let ((changes (diff-schemas (blog) (blog (make-webhook "preview" "https://p" :events '(:draft))))))
+      (ok (equal (ops changes) '(:change-model-webhooks)))
+      (ng (destructive-changes-p changes))
+      (ok (search "webhooks changed" (format-change (first changes)))))
+    (ok (null (diff-schemas (blog (make-webhook "https://a" "https://a")) (blog "https://a"))) "same hook, different spelling: no change")))
 
 (deftest from-nothing
   (let ((changes (diff-schemas nil (schema-a))))

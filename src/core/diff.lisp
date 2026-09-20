@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya/core/schema
                 #:schema-spaces #:space-name #:space-webhooks #:space-models
-                #:model-name #:model-kind #:model-fields #:model-options
+                #:model-name #:model-kind #:model-fields #:model-options #:model-webhooks
                 #:field-name #:field-type #:field-options)
   (:import-from #:koya/core/json
                 #:jobject)
@@ -90,6 +90,9 @@ was added or narrowed, or the single/many shape changed."
              (unless (plist-equal (model-options o) (model-options n))
                (list (list :op :change-model-options :space space :model (model-name n)
                            :from (model-options o) :to (model-options n))))
+             (unless (equal (model-webhooks o) (model-webhooks n))
+               (list (list :op :change-model-webhooks :space space :model (model-name n)
+                           :from (model-webhooks o) :to (model-webhooks n))))
              (diff-fields space (model-name n) (model-fields o) (model-fields n))))))
 
 (defun diff-spaces (old new)
@@ -129,7 +132,7 @@ was added or narrowed, or the single/many shape changed."
                (format nil "~(~a~) -> ~(~a~)" (getf change :from) (getf change :to)))
               (:change-field-options (if (destructive-change-p change) "options tightened" "options changed"))
               (:change-model-options "options changed")
-              (:change-webhooks "webhooks changed")
+              ((:change-webhooks :change-model-webhooks) "webhooks changed")
               (t nil)))))
 
 (defun change->jobject (change)

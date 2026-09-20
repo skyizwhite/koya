@@ -107,8 +107,12 @@
   (and (content-published content)
        (content->jobject content model space)))
 
-(defun notify (space model-name id type &key old new)
-  (notify-webhooks space model-name id type
+(defun draft-view (space model content)
+  "The draft (or, without one, published) data as the delivery API would show it."
+  (content->jobject content model space :draft t))
+
+(defun notify (space model id type event &key old new)
+  (notify-webhooks space model id type event
                    :secret (space-webhook-secret (space-name space))
                    :old old
                    :new new))
@@ -132,8 +136,9 @@ and only PUBLISHED-AT applies."
                                      :created-at created-at :updated-at updated-at
                                      :published-at published-at :revised-at revised-at
                                      (and (check-new-id id) (list :id id)))))
-                 (when publish
-                   (notify space model-name (content-id content) "new" :new (published-view space model content)))
+                 (if publish
+                     (notify space model (content-id content) "new" :publish :new (published-view space model content))
+                     (notify space model (content-id content) "draft" :draft :new (draft-view space model content)))
                  content)))
         (if (eq (model-kind model) :object)
             (let ((existing (find-object-content space-name model-name)))
@@ -150,7 +155,9 @@ and only PUBLISHED-AT applies."
          (data (if replace patch (merge-data (content-data content :draft t) patch))))
     (with-db-transaction
       (check-content space-name model data :exclude-id id)
-      (save-draft id data))))
+      (let ((saved (save-draft id data)))
+        (notify space model id "draft" :draft :old (published-view space model saved) :new (draft-view space model saved))
+        saved))))
 
 (defun publish (space model id &optional data &key published-at)
   "Publish DATA, or the current draft. PUBLISHED-AT (ISO 8601) overrides the publish date. Fires webhooks."
@@ -164,7 +171,7 @@ and only PUBLISHED-AT applies."
     (with-db-transaction
       (check-content space-name model data :exclude-id id)
       (let ((published (publish-content id data :published-at published-at)))
-        (notify space model-name id type :old old :new (published-view space model published))
+        (notify space model id type :publish :old old :new (published-view space model published))
         published))))
 
 (defun unpublish (space model id)
@@ -173,7 +180,7 @@ and only PUBLISHED-AT applies."
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
     (let ((result (unpublish-content id)))
-      (when old (notify space model-name id "edit" :old old))
+      (when old (notify space model id "edit" :unpublish :old old))
       result)))
 
 (defun destroy (space model id)
@@ -182,5 +189,5 @@ and only PUBLISHED-AT applies."
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
     (delete-content id)
-    (when old (notify space model-name id "delete" :old old))
+    (when old (notify space model id "delete" :delete :old old))
     t))

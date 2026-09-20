@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/config
   (:use #:cl #:rove)
   (:import-from #:koya/config
-                #:defspace #:defmodel #:current-schema #:clear-schema #:find-space #:find-model)
+                #:defspace #:defmodel #:webhook #:current-schema #:clear-schema #:find-space #:find-model)
   (:import-from #:koya/core/schema
                 #:schema-space #:space-models #:space-webhooks #:space-model
                 #:model-field #:model-kind #:field-option #:field-type #:schema-error
@@ -27,7 +27,9 @@
   (let* ((schema (current-schema))
          (space (schema-space schema "website"))
          (blog (space-model space "blog")))
-    (ok (equal (space-webhooks space) '("https://example.com/hook")))
+    (ok (equal (space-webhooks space) '((:label "https://example.com/hook" :url "https://example.com/hook"
+                                         :events (:publish :unpublish :delete))))
+        "a bare URL becomes a webhook with default events")
     (ok (equal (mapcar #'koya/core/schema:model-name (space-models space)) '("blog" "tag" "about")))
     (ok (eq (model-kind (space-model space "tag")) :list) "kind defaults to :list")
     (ok (eq (model-kind (space-model space "about")) :object))
@@ -47,7 +49,23 @@
   (ok (model-field (find-model 'website 'blog) 'body))
   (defspace website :webhooks '("https://x"))
   (ok (= (length (space-models (find-space 'website))) 1) "redefining a space keeps its models")
-  (ok (equal (space-webhooks (find-space 'website)) '("https://x"))))
+  (ok (equal (mapcar #'koya/core/schema:webhook-url (space-webhooks (find-space 'website))) '("https://x"))))
+
+(deftest webhooks-dsl
+  (clear-schema)
+  (defspace website :webhooks (list (webhook "revalidate" "https://site/revalidate")))
+  (defmodel (website blog) (:webhooks (list (webhook "preview" "https://preview/hook" :events '(:draft))
+                                             (webhook "index" "https://search/hook" :events '("publish" :delete))))
+    (title :text))
+  (let* ((space (schema-space (current-schema) "website"))
+         (blog (space-model space "blog")))
+    (ok (equal (space-webhooks space) '((:label "revalidate" :url "https://site/revalidate" :events (:publish :unpublish :delete)))))
+    (ok (equal (mapcar #'koya/core/schema:webhook-label (koya/core/schema:model-webhooks blog)) '("preview" "index")))
+    (ok (equal (koya/core/schema:webhook-events (second (koya/core/schema:model-webhooks blog))) '(:publish :delete))
+        "events accept strings and keep canonical order"))
+  (ok (signals (eval '(defmodel (website blog) (:webhooks (list (webhook "x" "https://x" :events '(:nope)))) (title :text)))
+               'koya/core/schema:schema-error)
+      "unknown events are rejected"))
 
 (deftest errors
   (ok (signals (eval '(defmodel (nowhere blog) () (title :text))) 'error) "space must exist")

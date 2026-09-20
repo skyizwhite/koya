@@ -81,9 +81,12 @@ koya/
 
 ```lisp
 (defspace website
-  :webhooks '("https://skyizwhite.dev/api/revalidate"))   ; 評価される(関数呼び出しも可)
+  ;; 評価される。全モデルに適用。URL 文字列だけでも可(label = URL、既定イベント)
+  :webhooks (list (webhook "revalidate" "https://skyizwhite.dev/api/revalidate")))
 
-(defmodel (website blog) (:kind :list)
+(defmodel (website blog) (:kind :list
+                          ;; このモデルだけに追加される webhook
+                          :webhooks (list (webhook "preview-build" "https://preview.example/hook" :events '(:draft))))
   (title        :text     :required t)
   (description  :text)
   (content      :richtext)
@@ -272,9 +275,13 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - `contents.published` と `contents.draft` の2カラム。status は `draft` / `published` / `published+draft`。
 - `draftKey` でドラフトをプレビュー取得(microCMS 互換)。下書き保存のたびに draft key を再生成し、
   公開すると消す(古いプレビュー URL は無効になる)。
-- 公開・更新・削除時に space の webhook を呼ぶ(website の revalidate が受け口)。
-  ペイロードは microCMS 互換に近い形(`service`、`api`、`id`、`type`、`contents.old/new`)。
-  space ごとに生成される秘密を `X-KOYA-WEBHOOK-KEY` ヘッダで送り、受け側で照合する。下書き保存では呼ばない。
+- **webhook** は `(webhook label url :events (...))` で定義する。space の webhook は全モデルに適用され、
+  モデルは `:webhooks` で自分用を追加する(microCMS の「API ごとに複数」に相当。設定は code)。
+  イベントは `:publish`(新規公開・再公開)`:unpublish` `:delete` `:draft`(下書き保存)の部分集合で、
+  省略時は `:draft` 以外。ペイロードは microCMS 互換に近い形(`service`、`api`、`id`、
+  `type` = `new` / `edit` / `delete` / `draft`、`contents.old/new`)。`draft` の `new` は下書きデータ。
+  space ごとに生成される秘密を `X-KOYA-WEBHOOK-KEY` ヘッダで送り、受け側で照合する(秘密は webhook 単位ではなく space 単位)。
+  URL 文字列だけを並べた旧形式も受け付ける(label = URL、既定イベント)。plan には label 単位で差分が出る。
 - 履歴(revisions)は初期スコープ外。
 
 ## 10. 技術スタック
@@ -430,3 +437,4 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 | 2026-09-20 | メディアは koya 自身が `/media/` で配信。形式は先頭バイトで判定し PNG / JPEG / GIF / WebP のみ、SVG は不可 | 外部ストレージなしで完結させる。Content-Type 詐称と SVG 経由のスクリプトを避ける |
 | 2026-09-20 | `:media` は配信 API で常にオブジェクト展開(`include` 不要) | 画像は URL が無いと使えず、展開が入れ子になることもない |
 | 2026-09-20 | 二段階認証は TOTP、鍵は環境変数 `KOYA_TOTP_SECRET`(未設定なら無効) | 単一オーナーなので設定は env で足りる。DB や登録画面を持ち込まない |
+| 2026-09-20 | webhook は label / url / events を持ち、space(全モデル)とモデルの両方に定義できる。秘密は space 単位のまま | microCMS の API 単位・イベント設定を code で取り込む。下書きイベントでプレビュービルド等を回せる |

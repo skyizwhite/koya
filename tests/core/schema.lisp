@@ -4,7 +4,7 @@
                 #:make-field #:make-model #:make-space #:make-schema
                 #:field-name #:field-type #:field-option
                 #:model-field #:model-kind #:space-model #:schema-space #:space-webhooks
-                #:model-preview-url #:model-public-url
+                #:model-preview-url #:model-public-url #:model-webhooks #:make-webhook
                 #:schema-error #:schema-errors #:check-schema
                 #:schema->jobject #:jobject->schema)
   (:import-from #:koya/core/json
@@ -46,6 +46,20 @@
     (ok (equal (field-option (make-field :x :select :options '(news tech)) :options) '("news" "tech"))
         "symbol options are downcased like model names")
     (ok (signals (make-space "s" :webhooks "https://x") 'schema-error) "webhooks must be a list")
+    (ok (signals (make-webhook "" "https://x") 'schema-error) "label needed")
+    (ok (signals (make-webhook "x" "") 'schema-error) "url needed")
+    (ok (signals (make-webhook "x" "https://x" :events '(:publish :bogus)) 'schema-error) "unknown event")
+    (ok (signals (make-space "s" :webhooks (list (make-webhook "a" "https://x") (make-webhook "a" "https://y"))) 'schema-error)
+        "labels are unique within a space")
+    (ok (equal (make-webhook "x" "https://x" :events '(:draft "publish" :publish)) '(:label "x" :url "https://x" :events (:publish :draft)))
+        "events are deduplicated and ordered")
+    (let ((legacy (jobject->schema (parse-json "{\"koyaSchema\": 1, \"spaces\": [{\"name\": \"s\", \"webhooks\": [\"https://old\", {\"label\": \"new\", \"url\": \"https://new\", \"events\": [\"draft\"]}], \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"webhooks\": [{\"label\": \"mh\", \"url\": \"https://m\"}]}]}]}"))))
+      (ok (equal (space-webhooks (schema-space legacy "s"))
+                 '((:label "https://old" :url "https://old" :events (:publish :unpublish :delete))
+                   (:label "new" :url "https://new" :events (:draft))))
+          "bare URL strings from older schemas still load")
+      (ok (equal (model-webhooks (space-model (schema-space legacy "s") "m"))
+                 '((:label "mh" :url "https://m" :events (:publish :unpublish :delete))))))
     (ok (signals (make-model (format nil "blog~%") :list nil) 'schema-error) "no trailing newline"))
   (testing "model and space names must be slugs"
     (ok (signals (make-model "Blog Post" :list nil) 'schema-error))
@@ -84,7 +98,9 @@
     (ok (search "\"maxLength\":100" json))
     (ok (search "\"eventAt\"" json))
     (ok (search "\"kind\":\"object\"" json))
-    (ok (equal (space-webhooks (schema-space back :website)) '("https://example.com/hook")))
+    (ok (equal (space-webhooks (schema-space back :website))
+               '((:label "https://example.com/hook" :url "https://example.com/hook" :events (:publish :unpublish :delete)))))
+    (ok (search "\"webhooks\":[{\"label\":\"https://example.com/hook\"" json) "webhooks are objects on the wire")
     (let ((blog (space-model (schema-space back :website) :blog)))
       (ok (= (field-option (model-field blog :title) :max-length) 100))
       (ok (field-option (model-field blog :tags) :many))

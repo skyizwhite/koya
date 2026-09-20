@@ -1,7 +1,9 @@
 (defpackage #:koya-server/pages/s/<space>/index
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya/core/schema #:space-models #:model-name #:model-kind #:space-webhooks)
+  (:import-from #:koya/core/schema
+                #:space-models #:model-name #:model-kind #:model-webhooks #:space-webhooks
+                #:webhook-label #:webhook-url #:webhook-events)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/contents #:count-contents)
   (:import-from #:koya-server/lib/http #:path-param)
@@ -38,8 +40,17 @@
                                             (hsx (span :class "text-sm text-muted"
                                                    (format nil "~a content~:p" (count-contents name (model-name model)))))
                                             (hsx (<>))))))))))
-                (when (space-webhooks space)
-                  (hsx (section :class "mt-8"
-                         (h2 :class "mb-2 text-sm font-semibold text-muted" "Webhooks")
-                         (ul :class "text-sm"
-                           (loop :for url :in (space-webhooks space) :collect (hsx (li (code url)))))))))))))))
+                (let ((hooks (append (mapcar (lambda (h) (cons nil h)) (space-webhooks space))
+                                     (loop :for model :in (space-models space)
+                                           :append (mapcar (lambda (h) (cons (model-name model) h)) (model-webhooks model))))))
+                  (when hooks
+                    (hsx (section :class "mt-8"
+                           (h2 :class "mb-2 text-sm font-semibold text-muted" "Webhooks")
+                           (ul :class "space-y-1 text-sm"
+                             (loop :for (model . hook) :in hooks :collect
+                               (hsx (li :class "flex flex-wrap items-center gap-2"
+                                      (span :class "font-medium" (webhook-label hook))
+                                      (span :class "text-muted" (if model (format nil "~a only" model) "all models"))
+                                      (code :class "text-xs" (webhook-url hook))
+                                      (span :class "text-xs text-muted"
+                                        (format nil "~{~(~a~)~^, ~}" (webhook-events hook))))))))))))))))))

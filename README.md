@@ -29,11 +29,14 @@ In your own project (which depends on `koya`):
 
 ```lisp
 (defspace website
-  :webhooks '("https://example.com/api/revalidate"))
+  ;; fires for every model; events default to publish, unpublish and delete
+  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
 
 (defmodel (website blog) (:kind :list
                           :public-url "https://example.com/blog/{CONTENT_ID}"
-                          :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
+                          :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
+                          ;; this model only, on draft saves as well
+                          :webhooks (list (webhook "preview-build" "https://preview.example/hook" :events '(:draft))))
   (title    :text :required t)
   (slug     :slug :from title :unique t)
   (cover    :media)

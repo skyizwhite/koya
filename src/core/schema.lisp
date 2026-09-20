@@ -30,6 +30,13 @@
            #:model-fields
            #:model-field
            #:model-options
+           #:model-webhooks
+           #:+webhook-events+
+           #:make-webhook
+           #:webhook-label
+           #:webhook-url
+           #:webhook-events
+           #:webhook->jobject
            #:model-preview-url
            #:model-public-url
            #:space-def
@@ -171,13 +178,61 @@ checked here so that validation never trips over a wrong type or a broken regex.
 (defun field-required-p (field) (and (field-option field :required) t))
 (defun field-many-p (field) (and (field-option field :many) t))
 
-(defstruct (model (:constructor %make-model))
-  name     ; slug string
-  kind     ; :list or :object
-  fields   ; list of FIELD
-  options) ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY})
+;;; ---------------------------------------------------------------------------
+;;; Webhooks: plists (:label L :url U :events (...)) so EQUAL compares them.
+;;; A space's webhooks apply to every model; a model adds its own.
 
-(defun make-model (name kind fields &key preview-url public-url)
+(defparameter +webhook-events+ '(:publish :unpublish :delete :draft))
+(defparameter +default-webhook-events+ '(:publish :unpublish :delete)
+  "Events a webhook gets when none are named: everything that changes published content.")
+
+(defun webhook-label (webhook) (getf webhook :label))
+(defun webhook-url (webhook) (getf webhook :url))
+(defun webhook-events (webhook) (getf webhook :events))
+
+(defun normalize-events (events label)
+  "EVENTS as keywords from +WEBHOOK-EVENTS+, in canonical order, no duplicates."
+  (let ((keys (mapcar (lambda (e)
+                        (or (find-keyword (if (symbolp e) (string-downcase (symbol-name e)) e) +webhook-events+)
+                            (fail "webhook ~s: unknown event ~s (use ~{~(~a~)~^, ~})" label e +webhook-events+)))
+                      (if (json-array-p events) (coerce events 'list) events))))
+    (remove-if-not (lambda (e) (member e keys)) +webhook-events+)))
+
+(defun make-webhook (label url &key (events +default-webhook-events+))
+  "A webhook: LABEL names it in plans and logs, URL receives the POST, EVENTS is a
+subset of +WEBHOOK-EVENTS+ (:publish :unpublish :delete :draft), default all but :draft."
+  (unless (and (stringp label) (plusp (length label))) (fail "webhook label must be a non-empty string, got ~s" label))
+  (unless (and (stringp url) (plusp (length url))) (fail "webhook ~s: url must be a non-empty string, got ~s" label url))
+  (let ((events (normalize-events (or events +default-webhook-events+) label)))
+    (when (null events) (fail "webhook ~s: at least one event is needed" label))
+    (list :label label :url url :events events)))
+
+(defun normalize-webhook (entry)
+  "ENTRY may be a bare URL string (label = url, default events), a webhook plist,
+or a wire-format object."
+  (cond ((stringp entry) (make-webhook entry entry))
+        ((and (consp entry) (keywordp (first entry)))
+         (make-webhook (getf entry :label) (getf entry :url) :events (getf entry :events)))
+        ((hash-table-p entry) (jobject->webhook entry))
+        (t (fail "a webhook must be a URL string or (webhook label url ...), got ~s" entry))))
+
+(defun normalize-webhooks (webhooks where)
+  (unless (or (listp webhooks) (json-array-p webhooks))
+    (fail "~a: :webhooks must be a list, got ~s" where webhooks))
+  (let ((hooks (map 'list #'normalize-webhook webhooks)))
+    (let ((labels (mapcar #'webhook-label hooks)))
+      (when (/= (length labels) (length (remove-duplicates labels :test #'string=)))
+        (fail "~a: webhook labels must be unique" where)))
+    hooks))
+
+(defstruct (model (:constructor %make-model))
+  name      ; slug string
+  kind      ; :list or :object
+  fields    ; list of FIELD
+  options   ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY})
+  webhooks) ; list of webhook plists, in addition to the space's
+
+(defun make-model (name kind fields &key preview-url public-url webhooks)
   (let ((name (string-downcase (string name))))
     (dolist (url (list preview-url public-url))
       (unless (or (null url) (stringp url))
@@ -191,7 +246,8 @@ checked here so that validation never trips over a wrong type or a broken regex.
         (fail "model ~s has duplicate field names" name)))
     (%make-model :name name :kind kind :fields fields
                  :options (append (and preview-url (list :preview-url preview-url))
-                                  (and public-url (list :public-url public-url))))))
+                                  (and public-url (list :public-url public-url)))
+                 :webhooks (normalize-webhooks webhooks (format nil "model ~s" name)))))
 
 (defun model-preview-url (model) (getf (model-options model) :preview-url))
 (defun model-public-url (model) (getf (model-options model) :public-url))
@@ -209,12 +265,12 @@ checked here so that validation never trips over a wrong type or a broken regex.
   (let ((name (string-downcase (string name))))
     (unless (slug-name-p name)
       (fail "space name ~s must be lowercase letters, digits and hyphens" name))
-    (unless (and (listp webhooks) (every #'stringp webhooks))
-      (fail "space ~s: :webhooks must be a list of URL strings" name))
     (let ((names (mapcar #'model-name models)))
       (when (/= (length names) (length (remove-duplicates names :test #'string=)))
         (fail "space ~s has duplicate model names" name)))
-    (%make-space :name name :webhooks webhooks :models models)))
+    (%make-space :name name
+                 :webhooks (normalize-webhooks webhooks (format nil "space ~s" name))
+                 :models models)))
 
 (defun space-model (space name)
   (find (string-downcase (string name)) (space-models space) :key #'model-name :test #'string=))
@@ -285,17 +341,29 @@ checked here so that validation never trips over a wrong type or a broken regex.
             :do (setf (gethash (camel-key k) obj) (option->jvalue k v))))
     obj))
 
+(defun webhook->jobject (webhook)
+  (jobject "label" (webhook-label webhook)
+           "url" (webhook-url webhook)
+           "events" (map 'vector (lambda (e) (string-downcase (symbol-name e))) (webhook-events webhook))))
+
+(defun jobject->webhook (obj)
+  (unless (hash-table-p obj) (fail "each webhook must be an object or a URL string"))
+  (let ((label (jget obj "label")) (url (jget obj "url")) (events (jget obj "events")))
+    (unless (or (null events) (json-array-p events)) (fail "webhook ~s: events must be an array" label))
+    (make-webhook (or label url) url :events (and events (coerce events 'list)))))
+
 (defun model->jobject (model)
   (let ((obj (jobject "name" (model-name model)
                       "kind" (string-downcase (symbol-name (model-kind model)))
                       "fields" (map 'vector #'field->jobject (model-fields model)))))
     (when (model-preview-url model) (setf (gethash "previewUrl" obj) (model-preview-url model)))
     (when (model-public-url model) (setf (gethash "publicUrl" obj) (model-public-url model)))
+    (when (model-webhooks model) (setf (gethash "webhooks" obj) (map 'vector #'webhook->jobject (model-webhooks model))))
     obj))
 
 (defun space->jobject (space)
   (jobject "name" (space-name space)
-           "webhooks" (coerce (space-webhooks space) 'vector)
+           "webhooks" (map 'vector #'webhook->jobject (space-webhooks space))
            "models" (map 'vector #'model->jobject (space-models space))))
 
 (defun schema->jobject (schema)
@@ -339,10 +407,13 @@ never interned: an unknown name stays a string."
     (unless (stringp name) (fail "model without a name"))
     (unless kind (fail "model ~s: kind must be \"list\" or \"object\"" name))
     (unless (or (null fields) (json-array-p fields)) (fail "model ~s: fields must be an array" name))
-    (make-model name kind
-                (map 'list #'jobject->field (or fields #()))
-                :preview-url (jget obj "previewUrl")
-                :public-url (jget obj "publicUrl"))))
+    (let ((webhooks (jget obj "webhooks")))
+      (unless (or (null webhooks) (json-array-p webhooks)) (fail "model ~s: webhooks must be an array" name))
+      (make-model name kind
+                  (map 'list #'jobject->field (or fields #()))
+                  :preview-url (jget obj "previewUrl")
+                  :public-url (jget obj "publicUrl")
+                  :webhooks (coerce (or webhooks #()) 'list)))))
 
 (defun jobject->space (obj)
   (unless (hash-table-p obj) (fail "each space must be an object"))

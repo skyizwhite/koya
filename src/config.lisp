@@ -3,6 +3,7 @@
   (:import-from #:koya/core/schema
                 #:make-field
                 #:make-model
+                #:make-webhook
                 #:make-space
                 #:make-schema
                 #:check-schema
@@ -12,6 +13,7 @@
                 #:model-name)
   (:export #:defspace
            #:defmodel
+           #:webhook
            #:current-schema
            #:clear-schema
            #:find-space
@@ -22,7 +24,7 @@
 ;;; collected into an in-memory registry; CURRENT-SCHEMA turns it into a
 ;;; validated schema that DEPLOY sends to the server.
 ;;;
-;;;   (defspace website :webhooks '("https://example.com/api/revalidate"))
+;;;   (defspace website :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
 ;;;
 ;;;   (defmodel (website blog) (:kind :list)
 ;;;     (title        :text :required t)
@@ -69,11 +71,17 @@
           (make-space key :webhooks (space-webhooks space) :models new-models))
     model))
 
+(defun webhook (label url &key events)
+  "A webhook for :webhooks of defspace or defmodel. EVENTS is a list from
+(:publish :unpublish :delete :draft); the default is every event except :draft."
+  (make-webhook label url :events events))
+
 (defmacro defspace (name &key webhooks)
-  "Define (or redefine) a space. WEBHOOKS is evaluated and should yield a list of URLs."
+  "Define (or redefine) a space. WEBHOOKS is evaluated: a list of (webhook ...) or
+bare URL strings, which every model of the space fires."
   `(register-space ',name :webhooks ,webhooks))
 
-(defmacro defmodel ((space name) (&key (kind :list) preview-url public-url) &body fields)
+(defmacro defmodel ((space name) (&key (kind :list) preview-url public-url webhooks) &body fields)
   "Define (or redefine) model NAME in SPACE. Each field is (NAME TYPE . OPTIONS)
 and is taken literally, e.g. (tags :reference :model tag :many t).
 PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI
@@ -86,7 +94,8 @@ where {CONTENT_ID} and {DRAFT_KEY} are substituted, e.g.
                                                                    ,@(loop :for (k v) :on options :by #'cddr
                                                                            :append (list k `',v)))))
                                :preview-url ,preview-url
-                               :public-url ,public-url)))
+                               :public-url ,public-url
+                               :webhooks ,webhooks)))
 
 (defun current-schema ()
   "Return the validated schema built from all definitions so far."
