@@ -7,6 +7,24 @@ A small, self-hosted headless CMS written in Common Lisp, for one owner and any 
 
 The schema is code in the site's repository; the server stores a copy and builds its editing forms from it. Design notes and the decision log live in [docs/DESIGN.md](docs/DESIGN.md).
 
+## Admin UI
+
+A space lists its models with their kind and content count, plus the webhooks that fire for them.
+
+![A space: its models and webhooks](docs/img/space.png)
+
+A list model shows a preview of every field and the status of each content; the whole row opens the editor.
+
+![Contents of a list model](docs/img/model.png)
+
+The editor is generated from the model: text and textarea inputs, Quill for rich text, selects for references, a picker for media, with publish, unpublish and draft actions in a sticky bar.
+
+![Editing a content](docs/img/editor.png)
+
+Each space has a media library; images are uploaded here or straight from the editor and served by koya.
+
+![The media library](docs/img/media.png)
+
 ## Quick start (development)
 
 ```sh
