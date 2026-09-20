@@ -9,7 +9,7 @@
                 #:jkeys
                 #:json-array-p)
   (:import-from #:cl-ppcre
-                #:scan)
+                #:scan #:create-scanner)
   (:export #:+schema-version+
            #:+system-fields+
            #:*field-types*
@@ -110,11 +110,38 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
 
 (defun normalize-option (key value)
   "Options that name other things accept symbols and are stored as strings."
-  (case key
-    (:model (string-downcase (string value)))
-    (:from (camel-key value))
-    (:options (mapcar #'string (coerce value 'list)))
-    (t value)))
+  (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
+    (case key
+      (:model (name-string value))
+      (:from (if (symbolp value) (camel-key value) value))
+      (:options (if (or (listp value) (json-array-p value))
+                    (map 'list #'name-string value)
+                    value))
+      (t value))))
+
+(defun check-option-value (field-name key value)
+  "Option values come from Lisp code or from JSON sent to the server; both are
+checked here so that validation never trips over a wrong type or a broken regex."
+  (flet ((bad (what) (fail "field ~s: option ~s must be ~a, got ~s" field-name key what value)))
+    (case key
+      ((:required :unique :integer :many :default)
+       (unless (member value '(t nil)) (bad "true or false")))
+      (:max-length
+       (unless (and (integerp value) (plusp value)) (bad "a positive integer")))
+      ((:min :max)
+       (unless (realp value) (bad "a number")))
+      (:pattern
+       (unless (stringp value) (bad "a string"))
+       (handler-case (create-scanner value)
+         (error () (fail "field ~s: :pattern ~s is not a valid regular expression" field-name value))))
+      (:options
+       (unless (and (consp value) (every #'stringp value)) (bad "a non-empty list of strings"))
+       (when (/= (length value) (length (remove-duplicates value :test #'string=)))
+         (bad "a list without duplicates")))
+      (:model
+       (unless (slug-name-p value) (bad "a model name")))
+      (:from
+       (unless (field-name-p value) (bad "a field name"))))))
 
 (defun make-field (name type &rest options)
   (let ((name (if (stringp name) name (camel-key name)))
@@ -126,9 +153,10 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
       (fail "field name ~s is reserved for a system field" name))
     (unless (field-type-p type)
       (fail "unknown field type ~s for field ~s" type name))
-    (loop :for (k nil) :on options :by #'cddr
+    (loop :for (k v) :on options :by #'cddr
           :unless (member k (field-type-options type))
-            :do (fail "option ~s is not allowed on ~a field ~s" k type name))
+            :do (fail "option ~s is not allowed on ~a field ~s" k type name)
+          :do (check-option-value name k v))
     (when (and (eq type :select) (null (getf options :options)))
       (fail "select field ~s needs :options" name))
     (when (and (eq type :reference) (null (getf options :model)))
@@ -181,6 +209,8 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
   (let ((name (string-downcase (string name))))
     (unless (slug-name-p name)
       (fail "space name ~s must be lowercase letters, digits and hyphens" name))
+    (unless (and (listp webhooks) (every #'stringp webhooks))
+      (fail "space ~s: :webhooks must be a list of URL strings" name))
     (let ((names (mapcar #'model-name models)))
       (when (/= (length names) (length (remove-duplicates names :test #'string=)))
         (fail "space ~s has duplicate model names" name)))
@@ -218,11 +248,16 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
                                (space-name space) (model-name model) (field-name field) target)
                        errors))))
             (:slug
-             (let ((from (field-option field :from)))
-               (unless (model-field model from)
-                 (push (format nil "~a.~a.~a: :from refers to unknown field ~s"
-                               (space-name space) (model-name model) (field-name field) from)
-                       errors))))))))
+             (let* ((from (field-option field :from))
+                    (source (model-field model from)))
+               (cond ((null source)
+                      (push (format nil "~a.~a.~a: :from refers to unknown field ~s"
+                                    (space-name space) (model-name model) (field-name field) from)
+                            errors))
+                     ((or (eq source field) (not (member (field-type source) '(:text :textarea))))
+                      (push (format nil "~a.~a.~a: :from must name a text or textarea field other than itself"
+                                    (space-name space) (model-name model) (field-name field))
+                            errors)))))))))
     (nreverse errors)))
 
 (defun check-schema (schema)
@@ -269,36 +304,57 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
 
 (defun jvalue->option (key value)
   (case key
-    (:options (coerce value 'list))
+    (:options (if (json-array-p value) (coerce value 'list) value))
     (t value)))
 
+(defun find-keyword (string candidates)
+  "The keyword in CANDIDATES whose lowercase name is STRING, or NIL. Wire input is
+never interned: an unknown name stays a string."
+  (and (stringp string)
+       (find string candidates :key (lambda (k) (string-downcase (symbol-name k))) :test #'string=)))
+
+(defparameter *option-keys*
+  (remove-duplicates (loop :for (nil . options) :in *field-types* :append options)))
+
 (defun jobject->field (obj)
+  (unless (hash-table-p obj) (fail "each field must be an object"))
   (let* ((name (jget obj "name"))
          (type-string (jget obj "type"))
-         (type (and (stringp type-string) (intern (string-upcase type-string) :keyword)))
+         (type (find-keyword type-string (mapcar #'car *field-types*)))
          (options '()))
     (unless (stringp name) (fail "field without a name"))
-    (unless (and type (field-type-p type)) (fail "field ~s has unknown type ~s" name type-string))
+    (unless type (fail "field ~s has unknown type ~s" name type-string))
     (dolist (key (jkeys obj))
       (unless (member key '("name" "type") :test #'string=)
-        (let ((k (kebab-keyword key)))
+        (let ((k (find key *option-keys* :key #'camel-key :test #'string=)))
+          (unless k (fail "field ~s has unknown option ~s" name key))
           (setf options (append options (list k (jvalue->option k (gethash key obj))))))))
     (apply #'make-field name type options)))
 
 (defun jobject->model (obj)
-  (let ((kind (jget obj "kind"))
+  (unless (hash-table-p obj) (fail "each model must be an object"))
+  (let ((name (jget obj "name"))
+        (kind (find-keyword (jget obj "kind") '(:list :object)))
         (fields (jget obj "fields")))
-    (unless (stringp kind) (fail "model ~s without kind" (jget obj "name")))
-    (make-model (or (jget obj "name") (fail "model without a name"))
-                (intern (string-upcase kind) :keyword)
+    (unless (stringp name) (fail "model without a name"))
+    (unless kind (fail "model ~s: kind must be \"list\" or \"object\"" name))
+    (unless (or (null fields) (json-array-p fields)) (fail "model ~s: fields must be an array" name))
+    (make-model name kind
                 (map 'list #'jobject->field (or fields #()))
                 :preview-url (jget obj "previewUrl")
                 :public-url (jget obj "publicUrl"))))
 
 (defun jobject->space (obj)
-  (make-space (or (jget obj "name") (fail "space without a name"))
-              :webhooks (coerce (or (jget obj "webhooks") #()) 'list)
-              :models (map 'list #'jobject->model (or (jget obj "models") #()))))
+  (unless (hash-table-p obj) (fail "each space must be an object"))
+  (let ((name (jget obj "name"))
+        (webhooks (jget obj "webhooks"))
+        (models (jget obj "models")))
+    (unless (stringp name) (fail "space without a name"))
+    (unless (or (null webhooks) (json-array-p webhooks)) (fail "space ~s: webhooks must be an array" name))
+    (unless (or (null models) (json-array-p models)) (fail "space ~s: models must be an array" name))
+    (make-space name
+                :webhooks (coerce (or webhooks #()) 'list)
+                :models (map 'list #'jobject->model (or models #())))))
 
 (defun jobject->schema (obj)
   "Parse a wire-format schema object. Signals SCHEMA-ERROR on malformed input."

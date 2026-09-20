@@ -37,6 +37,15 @@
     (ok (signals (make-field :x :slug) 'schema-error) "slug needs from")
     (ok (signals (make-field "Bad Name" :text) 'schema-error))
     (ok (signals (make-field (format nil "title~%") :text) 'schema-error) "no trailing newline")
+    (ok (signals (make-field :x :text :pattern "(") 'schema-error) "broken regex")
+    (ok (signals (make-field :x :text :pattern 5) 'schema-error) "pattern must be a string")
+    (ok (signals (make-field :x :text :max-length "ten") 'schema-error))
+    (ok (signals (make-field :x :text :required "yes") 'schema-error))
+    (ok (signals (make-field :x :select :options "abc") 'schema-error) "options must be a list")
+    (ok (signals (make-field :x :select :options '("a" "a")) 'schema-error) "no duplicate options")
+    (ok (equal (field-option (make-field :x :select :options '(news tech)) :options) '("news" "tech"))
+        "symbol options are downcased like model names")
+    (ok (signals (make-space "s" :webhooks "https://x") 'schema-error) "webhooks must be a list")
     (ok (signals (make-model (format nil "blog~%") :list nil) 'schema-error) "no trailing newline"))
   (testing "model and space names must be slugs"
     (ok (signals (make-model "Blog Post" :list nil) 'schema-error))
@@ -91,4 +100,12 @@
   (testing "rejects bad input"
     (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 2, \"spaces\": []}")) 'schema-error))
     (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 1, \"spaces\": [{\"name\": \"s\", \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"nope\"}]}]}]}")) 'schema-error))
-    (ok (signals (jobject->schema (parse-json "[]")) 'schema-error))))
+    (ok (signals (jobject->schema (parse-json "[]")) 'schema-error))
+    (dolist (json '("{\"koyaSchema\": 1, \"spaces\": [{\"name\": 5}]}"
+                    "{\"koyaSchema\": 1, \"spaces\": [{\"name\": \"s\", \"webhooks\": \"https://x\"}]}"
+                    "{\"koyaSchema\": 1, \"spaces\": [{\"name\": \"s\", \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": 5}]}]}"
+                    "{\"koyaSchema\": 1, \"spaces\": [{\"name\": \"s\", \"models\": [{\"name\": \"m\", \"kind\": \"LIST\"}]}]}"
+                    "{\"koyaSchema\": 1, \"spaces\": [{\"name\": \"s\", \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"text\", \"pattern\": \"(\"}]}]}]}"
+                    "{\"koyaSchema\": 1, \"spaces\": [{\"name\": \"s\", \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"text\", \"bogus\": 1}]}]}]}"
+                    "{\"koyaSchema\": 1, \"spaces\": [{\"name\": \"s\", \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"select\", \"options\": \"abc\"}]}]}]}"))
+      (ok (signals (jobject->schema (parse-json json)) 'schema-error) json))))
