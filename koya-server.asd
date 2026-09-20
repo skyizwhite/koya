@@ -6,6 +6,8 @@
   :description "koya - a small headless CMS in Common Lisp (server)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
   :license "MIT"
+  :homepage "https://github.com/skyizwhite/koya"
+  :source-control (:git "https://github.com/skyizwhite/koya.git")
   :class :package-inferred-system
   :pathname "src/server"
   :depends-on ("dbd-sqlite3"
