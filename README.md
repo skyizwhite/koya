@@ -17,7 +17,7 @@ A list model shows a preview of every field and the status of each content; the 
 
 ![Contents of a list model](docs/img/model.png)
 
-The editor is generated from the model: text and textarea inputs, Quill for rich text, selects for references, a picker for media, with publish, unpublish and draft actions in a sticky bar.
+The editor is generated from the model: text and textarea inputs, Quill for rich text, selects for references, a picker for media, with publish, unpublish, save-draft and discard-draft actions in a sticky bar.
 
 ![Editing a content](docs/img/editor.png)
 

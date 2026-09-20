@@ -19,7 +19,7 @@
            #:plan #:deploy #:pull
            #:get-list #:get-item #:get-object
            #:list-contents #:get-content #:create-content #:update-content
-           #:publish-content #:unpublish-content #:delete-content #:draft-key
+           #:publish-content #:unpublish-content #:discard-draft #:delete-content #:draft-key
            #:create-api-key #:list-api-keys #:delete-api-key #:webhook-secret
            #:list-media #:get-media #:upload-media #:update-media #:delete-media))
 (in-package #:koya/client)
@@ -192,6 +192,10 @@ can be given explicitly, e.g. when importing from another CMS."
 
 (defun unpublish-content (model id &key space)
   (jvalue->lisp (request :post (admin-path space model id "unpublish") :body (jobject) :auth :owner)))
+
+(defun discard-draft (model id &key space)
+  "Drop the draft of a published content, leaving the published version."
+  (jvalue->lisp (request :post (admin-path space model id "discard-draft") :body (jobject) :auth :owner)))
 
 (defun delete-content (model id &key space)
   (jvalue->lisp (request :delete (admin-path space model id) :auth :owner)))

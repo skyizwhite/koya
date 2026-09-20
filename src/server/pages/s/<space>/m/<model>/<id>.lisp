@@ -10,7 +10,7 @@
                 #:list-contents #:find-content #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data)
   (:import-from #:koya-server/lib/content-service
-                #:resolve-model #:create #:update-draft #:publish #:unpublish #:destroy)
+                #:resolve-model #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
   (:import-from #:koya-server/lib/http #:path-param #:api-error)
   (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/page
@@ -88,6 +88,10 @@
              (if preview-url (hsx (~external-link :href preview-url "Preview draft")) (hsx (<>)))
              (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>)))
              (if (or preview-url public-url) (hsx (span :class "mx-1 h-6 w-px bg-line")) (hsx (<>)))
+             (if (and published draft)
+                 (hsx (~action-button :value "discard" :onclick "return confirm('Discard the draft and go back to the published version?')"
+                                      "Discard draft"))
+                 (hsx (<>)))
              (if published (hsx (~action-button :value "unpublish" "Unpublish")) (hsx (<>)))
              (~action-button :value "save" "Save draft")
              (~action-button :value "publish" :class "btn btn-primary" "Publish"))))
@@ -144,7 +148,7 @@
              (data (form->data model params)))
         (handler-case
             (cond
-              ((and (null content) (member action '("delete" "unpublish") :test #'string=))
+              ((and (null content) (member action '("delete" "unpublish" "discard") :test #'string=))
                ;; posted against /new: there is nothing to act on
                (set-response-status 404)
                (hsx (~layout :space space-name (h1 :class "text-xl font-bold" "Content not found"))))
@@ -155,6 +159,10 @@
               ((string= action "unpublish")
                (unpublish space model (content-id content))
                (set-flash "Unpublished.")
+               (redirect-to (content-url space-name model-name (content-id content))))
+              ((string= action "discard")
+               (discard space model (content-id content))
+               (set-flash "Draft discarded.")
                (redirect-to (content-url space-name model-name (content-id content))))
               ((string= action "publish")
                (let ((result (if content

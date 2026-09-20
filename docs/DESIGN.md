@@ -174,7 +174,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   - `/admin/api/contents/{space}/{model}`: `GET`(下書き含む一覧)`POST`(`{"data": {...}, "publish": bool}`。
     移行用に `id` と `createdAt` `updatedAt` `publishedAt` `revisedAt` を任意で指定できる)
   - `/admin/api/contents/{space}/{model}/{id}`: `GET` `PATCH`(`{"data"}` を既存データにマージして下書き保存)`DELETE`
-  - `/admin/api/contents/{space}/{model}/{id}/publish` `/unpublish` `/draft-key`(`POST`)
+  - `/admin/api/contents/{space}/{model}/{id}/publish` `/unpublish` `/discard-draft` `/draft-key`(`POST`。
+    `discard-draft` は公開済みコンテンツの下書きを捨てて `published` に戻す。未公開なら 409。webhook は送らない)
   - `/admin/api/keys/{space}`: `GET` `POST`(平文キーは作成時のみ返す)、`/admin/api/keys/{space}/{id}`: `DELETE`
   - `/admin/api/media/{space}`(M2)
 - **システムフィールド**: `id` `createdAt` `updatedAt` `publishedAt` `revisedAt` は本体が管理し、
@@ -237,7 +238,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - コンテンツ一覧は作成日時の新しい順。列はモデルの全フィールドのプレビュー(richtext はタグ除去、
   参照は参照先のラベル、60 文字で省略)と status で、created / updated は出さない。フィールドが多ければ横スクロール。
   status と行末の矢印は右端に固定(sticky)され、横スクロールしても見える。行全体が編集画面へのリンク。
-- フォームは通常の POST(`action` = save / publish / unpublish / delete)で送る。
+- フォームは通常の POST(`action` = save / publish / unpublish / discard / delete)で送る。
+  「Discard draft」は `published+draft` のときだけ出る。未公開の下書きは Delete が破棄に相当する。
 - 管理側の POST は `Origin` / `Referer` が `Host` または `KOYA_BASE_URL` と一致することを要求する(CSRF 対策)。
 - `:datetime` の入力は `datetime-local` で、値は UTC として扱う(タイムゾーン変換は M2 で JS を足す)。
 - `:slug` はフォーム・API のどちらでも、空なら `:from` のフィールドから本体側で自動生成する(ASCII のみ)。

@@ -21,6 +21,7 @@
            #:save-draft
            #:publish-content
            #:unpublish-content
+           #:discard-draft
            #:delete-content
            #:get-content
            #:find-content
@@ -108,6 +109,15 @@ PUBLISHED-AT overrides the publish date; otherwise the first publish date is kep
          (data (or (content-draft content) (content-published content))))
     (exec "UPDATE contents SET published = NULL, draft = ?, draft_key = ?, status = 'draft', updated_at = ?, published_at = NULL WHERE id = ?"
           (to-json data) (new-draft-key) (now-iso) id)
+    (get-content id)))
+
+(defun discard-draft (id)
+  "Drop the draft of a published content ID, so it shows its published data again.
+Errors when the content has no published version: there would be nothing left."
+  (let ((content (or (get-content id) (error "content ~a not found" id))))
+    (unless (content-published content) (error "content ~a is not published; delete it instead" id))
+    (exec "UPDATE contents SET draft = NULL, draft_key = NULL, status = 'published', updated_at = ? WHERE id = ?"
+          (now-iso) id)
     (get-content id)))
 
 (defun delete-content (id)

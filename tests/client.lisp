@@ -9,7 +9,7 @@
                 #:configure #:koya-error #:koya-error-status #:koya-error-code
                 #:pull #:get-list #:get-item #:get-object
                 #:list-contents #:get-content #:create-content #:update-content
-                #:publish-content #:unpublish-content #:delete-content #:draft-key
+                #:publish-content #:unpublish-content #:discard-draft #:delete-content #:draft-key
                 #:list-api-keys #:delete-api-key #:webhook-secret
                 #:list-media #:get-media #:upload-media #:update-media #:delete-media)
   (:import-from #:koya-tests/server/media #:png-bytes #:*media-root*))
@@ -107,6 +107,9 @@
       (let ((e (handler-case (create-content 'blog '(:body "no title")) (koya-error (e) e))))
         (ok (= (koya-error-status e) 422))
         (ok (string= (koya-error-code e) "validation_failed"))))
+    (testing "discard a draft"
+      (ok (string= (getf (update-content 'blog (getf post :id) '(:title "Scratch")) :status) "published+draft"))
+      (ok (string= (getf (discard-draft 'blog (getf post :id)) :status) "published")))
     (testing "unpublish and delete"
       (ok (string= (getf (unpublish-content 'blog (getf post :id)) :status) "draft"))
       (ok (getf (delete-content 'blog (getf post :id)) :deleted))

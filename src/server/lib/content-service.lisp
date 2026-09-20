@@ -13,7 +13,7 @@
   (:import-from #:koya-server/db/schema-store
                 #:find-space #:space-webhook-secret)
   (:import-from #:koya-server/db/contents
-                #:create-content #:save-draft #:publish-content #:unpublish-content #:delete-content
+                #:create-content #:save-draft #:publish-content #:unpublish-content #:delete-content #:discard-draft
                 #:find-content #:find-object-content #:unique-value-taken-p #:get-content
                 #:content-id #:content-published #:content-draft #:content-published-at #:content-data)
   (:import-from #:koya-server/lib/presenter
@@ -32,6 +32,7 @@
            #:update-draft
            #:publish
            #:unpublish
+           #:discard
            #:destroy))
 (in-package #:koya-server/lib/content-service)
 
@@ -182,6 +183,15 @@ and only PUBLISHED-AT applies."
     (let ((result (unpublish-content id)))
       (when old (notify space model id "edit" :unpublish :old old))
       result)))
+
+(defun discard (space model id)
+  "Throw away the draft of a published content. No webhook: what is published does not change."
+  (let* ((space-name (space-name space))
+         (model-name (koya/core/schema:model-name model))
+         (content (resolve-content space-name model-name id)))
+    (unless (content-published content)
+      (fail-api 409 "not_published" "Only a published content has a draft to discard; delete it instead"))
+    (discard-draft (content-id content))))
 
 (defun destroy (space model id)
   (let* ((space-name (space-name space))
