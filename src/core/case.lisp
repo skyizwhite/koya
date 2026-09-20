@@ -27,11 +27,17 @@ camelCase pass through unchanged."
   (intern (string-upcase (to-kebab-case (string key))) :keyword))
 
 (defun lisp->jvalue (value)
-  "Recursively convert a Lisp value into jzon's representation. Plists whose
-first element is a keyword become objects, other lists become arrays."
-  (cond ((and (consp value) (keywordp (first value)))
+  "Recursively convert a Lisp value into jzon's representation. NIL becomes JSON
+null (\"no value\"; the server drops null keys and treats them as blank), a plist
+whose first element is a keyword becomes an object, any other list or a vector
+becomes an array. Use #() for an empty array and T for true; JSON false has no
+Lisp spelling here, since the server treats null and false alike for booleans."
+  (cond ((null value) 'null)
+        ((and (consp value) (keywordp (first value)))
          (plist->object value))
         ((listp value)
+         (map 'vector #'lisp->jvalue value))
+        ((and (vectorp value) (not (stringp value)))
          (map 'vector #'lisp->jvalue value))
         ((hash-table-p value)
          (let ((out (make-hash-table :test 'equal)))
