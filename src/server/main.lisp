@@ -7,12 +7,14 @@
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/sessions #:purge-expired-sessions)
+  (:import-from #:koya-server/db/schema-dump #:write-snapshot)
   (:import-from #:koya-server/lib/totp #:generate-totp-secret #:otpauth-uri #:totp)
   (:import-from #:koya-server/lib/assets #:refresh-asset-version)
   (:export #:start
            #:stop
            #:reload
            #:main
+           #:write-schema-snapshot
            #:totp-setup
            #:totp-code))
 (in-package #:koya-server)
@@ -50,6 +52,11 @@
   "Entry point for a deployed process: Woo on all interfaces, blocking forever."
   (start :server :woo :address "0.0.0.0")
   (loop (sleep 3600)))
+
+(defun write-schema-snapshot ()
+  "Regenerate src/server/db/schema.sql from the migrations. Run it after adding
+one: a test fails while the snapshot is stale."
+  (write-snapshot))
 
 (defun totp-setup (&key (account "owner"))
   "For configuring two-factor login through the environment instead of the admin

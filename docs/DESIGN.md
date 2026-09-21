@@ -141,23 +141,29 @@ koya/
   mito は JSON カラム中心の設計と噛み合わないので使わない。
 - **汎用 `contents` テーブル + JSON カラム**。モデル毎のテーブルは作らない。
 
-```
-schema_version (version PK, applied_at)
-spaces         (name PK, webhooks JSON, webhook_secret, position, created_at)  ; 管理画面で作る
-settings       (key PK, value, updated_at)      ; インスタンス設定(二段階認証の鍵など)
-sessions       (id PK, data JSON, expires_at)   ; 管理画面のログインセッション
-models         (space, name, kind, definition JSON, PK(space, name))
-contents       (id ULID PK, space, model, status, published JSON, draft JSON,
-                created_at, updated_at, published_at, revised_at)
-api_keys        (id ULID PK, space, key_hash, label, created_at)  ; 配信キー
-management_keys (id ULID PK, space, key_hash, label, created_at)  ; 管理 API。表は分けたまま(14 章)
-media          (id ULID PK, space, filename, mime, size, width, height, alt, created_at)
-```
+テーブルの定義は `src/server/db/migrations.lisp`(前方向のみ、起動時に自動適用)が唯一の正。
+**現在のスキーマは [`src/server/db/schema.sql`](../src/server/db/schema.sql) を見る**
+— マイグレーションを全部当てた DB から吐いた生成物で、`(koya-server:write-schema-snapshot)`
+で更新し、古いままだとテストが落ちる。ここに一覧を手で書くと必ずずれるので書かない。役割だけ:
+
+| テーブル | 役割 |
+|---|---|
+| `schema_version` | 適用済みマイグレーションのバージョン |
+| `spaces` | space。webhook 定義と webhook 署名鍵を持つ。管理画面で作る |
+| `models` | deploy されたモデル定義(`definition` はスキーマ文書そのままの JSON) |
+| `contents` | 全モデル共通のコンテンツ。`published` / `draft` が JSON |
+| `api_keys` | 配信キー(hash 保存) |
+| `management_keys` | 管理 API キー(hash 保存)。表は分けたまま(14 章) |
+| `media` | アップロードされたファイルのメタデータ |
+| `webhook_deliveries` | webhook 送信ログ。`/s/{space}/webhooks` で見る |
+| `settings` | インスタンス設定(二段階認証の鍵など) |
+| `sessions` | 管理画面のログインセッション |
 
 - モデル定義の変更はマイグレーション不要(`models.definition` が変わるだけ)。
   バリデーションは `koya/core` が担う。フィールド削除でも `contents` の JSON は残る。
 - 絞り込みは SQLite の JSON 関数(`json_extract`)。必要なら後で式インデックスを足す。
-- ID は **ULID**。Quicklisp に無いので `koya/core/ulid` として自前実装
+- ID は **ULID**(`contents` `api_keys` `management_keys` `media` `webhook_deliveries`)。
+  Quicklisp に無いので `koya/core/ulid` として自前実装
   (48bit ミリ秒時刻 + 80bit 乱数、Crockford Base32、乱数は ironclad)。
 - 履歴が欲しくなったら `revisions` テーブルを追加する(初期は持たない)。
 
@@ -513,3 +519,4 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-22 | webhook は全て space のものにし、`defmodel` の `:webhooks` を廃止。`(webhook … :only <model>)` で絞る。`:only` はモデル名のリストも取る | 「どの webhook がどこに飛ぶか」が1箇所に並ぶ。単数しか許さないと同一 URL の hook をモデルごとに複製することになり、ラベルが一意なのでログのフィルタが汚れる |
 | 2026-09-22 | クライアントの配信キーの語彙を "api key" から "delivery key" に統一: `KOYA_DELIVERY_KEY`、`koya:*delivery-key*`、`configure :delivery-key`、`create/list/delete-delivery-key`。ワイヤの `X-KOYA-API-KEY` と DB の `api_keys` はそのまま | ドキュメントも管理画面も delivery key と呼んでいるのに、利用者が書く名前だけ api key のままだった。ヘッダは配信 API の互換性、テーブル名はマイグレーションの価値が無いので触らない |
 
+| 2026-09-22 | DB スキーマは宣言的定義 + 自動差分(Atlas 方式)にはせず、migrations を正のまま `src/server/db/schema.sql` を生成物として持つ | 現在形が1ファイルで読めるという利点は生成物で足りる。SQLite は `ALTER TABLE` が貧弱でテーブル再構築が必要な上、差分からは「列を足す」か「捨てて作り直す」かの意図が復元できない(v6 の `management_keys` がそれ)。他人の本番インスタンスで起動時に自動 DDL を当てるのも避けたい |

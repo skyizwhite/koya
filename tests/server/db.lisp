@@ -4,6 +4,8 @@
                 #:connect-db #:disconnect-db #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/db/migrations
                 #:migrate #:current-version)
+  (:import-from #:koya-server/db/schema-dump
+                #:migrated-snapshot #:read-snapshot)
   (:import-from #:koya-server/db/schema-store
                 #:load-schema #:save-schema #:find-model
                 #:list-spaces #:create-space #:delete-space #:find-space)
@@ -40,6 +42,12 @@
   (ok (= (current-version) 6))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
+
+(deftest schema-snapshot-matches-the-migrations
+  ;; the snapshot is generated, so a mismatch means it was not regenerated after
+  ;; a migration was added, never that it is the schema that is wrong
+  (ok (equal (migrated-snapshot) (read-snapshot))
+      "src/server/db/schema.sql is current; regenerate it with (koya-server:write-schema-snapshot)"))
 
 (deftest spaces-are-made-here-not-by-a-deploy
   (ok (null (load-schema "website")) "no space, no schema")
