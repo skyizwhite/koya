@@ -12,7 +12,9 @@ The schema is code in the site's repository; the server stores a copy and builds
 | | |
 |---|---|
 | [docs/ADMIN-UI.md](docs/ADMIN-UI.md) | the admin UI: logging in, writing and publishing, media, API keys, settings |
-| [docs/CLIENT.md](docs/CLIENT.md) | the `koya` library: the schema DSL, deploying it, reading and managing content, and the HTTP API underneath |
+| [docs/CLIENT.md](docs/CLIENT.md) | the `koya` library: the schema DSL, deploying it, reading and managing content |
+| [docs/SCHEMA.md](docs/SCHEMA.md) | the schema document (`koyaSchema: 1`) and the rules content values must meet |
+| [docs/openapi.yaml](docs/openapi.yaml) | the delivery and admin HTTP APIs, for clients in other languages |
 | [docs/DESIGN.md](docs/DESIGN.md) | design notes and the decision log (Japanese) |
 
 ## Admin UI
@@ -77,7 +79,7 @@ and so is everything done with them, from the REPL:
 (koya:get-object 'about)
 ```
 
-Field types, query and filter syntax, content and media management, webhooks and the raw HTTP endpoints are all in [docs/CLIENT.md](docs/CLIENT.md).
+Field types, query and filter syntax, content and media management and webhooks are in [docs/CLIENT.md](docs/CLIENT.md); the raw HTTP endpoints in [docs/openapi.yaml](docs/openapi.yaml).
 
 ## Tests
 

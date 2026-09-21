@@ -136,19 +136,18 @@ Other helpers: `(koya:current-schema)` returns the validated schema built so far
 | `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |
 | `:slug` | `:required` `:from` `:unique` `:pattern` | lowercase-hyphen string |
 
-- `:options` must be a non-empty list of distinct strings; symbols are downcased.
+- `:options` takes strings or symbols, which are downcased; `:model` and `:from`
+  take a symbol or a string too.
 - `:model` names another model **of the same space**; `:from` names a `:text` or
   `:textarea` field of the same model other than itself. Both are checked against
   the whole schema, so a typo fails before anything is sent.
-- `:pattern` is a `cl-ppcre` regular expression and is compiled as the schema is
-  built.
-- `:unique` is enforced by the server across both the draft and the published data
-  of the model.
-- A blank value is `null`, a whitespace-only string, or `[]` on a `:many` field;
-  `:required` rejects it. Booleans are exempt: unset means `false`.
-- A blank `:slug` is generated from its `:from` field when a content is saved.
 - `:default` on a `:boolean` is accepted by the schema but not applied yet: a new
   content starts with the field unset, which reads as `false`.
+
+What each type stores, what counts as blank, and how every option is enforced
+(`:unique` across drafts and published data, `:pattern` as a `cl-ppcre` regex, a
+blank `:slug` filled from `:from`, …) is specified in
+[SCHEMA.md, "Content values"](SCHEMA.md#content-values).
 
 ## Webhooks
 
@@ -194,16 +193,11 @@ nothing. With `:confirm nil` and no `:force` it gives up the same way, without
 asking, so a script never applies a destructive change by accident.
 
 Destructive means a change that can hide or invalidate content already stored:
-
-- removing a space, a model or a field;
-- changing a model's kind or a field's type;
-- tightening a field: adding `:required`, `:unique` or `:integer`, switching
-  `:many` on or off, lowering `:max-length` or `:max`, raising `:min`, changing
-  `:pattern`, or dropping a `:select` option.
-
-Nothing migrates existing content. A deploy only replaces the stored schema; rows
-that no longer fit it stay as they are, and the delivery API returns them as
-stored.
+removing a space, model or field, changing a kind or a field type, or tightening
+a field's options. The exact list, and the shape of each change, is in
+[SCHEMA.md, "Changes"](SCHEMA.md#changes). Nothing migrates existing content: a
+deploy only replaces the stored schema, and rows that no longer fit it stay as
+they are.
 
 ## Reading content
 
@@ -335,17 +329,12 @@ Anything but a 2xx signals `koya:koya-error`, with readers
 `koya-error-status`, `koya-error-code`, `koya-error-message` and
 `koya-error-details`.
 
-| Status | Code | When |
-|---|---|---|
-| 400 | `bad_request`, `bad_json`, `bad_query`, `invalid_schema` | malformed input |
-| 401 | `unauthorized` | missing or wrong secret or API key |
-| 403 | `forbidden` | an API key from another space |
-| 404 | `not_found` | unknown space, model, content or media |
-| 409 | `conflict` | a content id that already exists |
-| 409 | `destructive_changes` | a deploy that needs `:force t`; `details` lists the changes |
-| 413 | `too_large` | an upload over the limit |
-| 422 | `validation_failed` | `details` is `((:field "title" :code "required" :message "is required") …)` |
-| 500 | `internal_error` | the message is only detailed when the server runs with `KOYA_ENV=dev` |
+The status and code of every error each endpoint can return are listed in
+[openapi.yaml](openapi.yaml). Two carry `details`: `422 validation_failed`, where
+it is a list of `(:field … :code … :message …)` plists (codes in
+[SCHEMA.md](SCHEMA.md#content-values)), and `409 destructive_changes` from
+`deploy`, where it is the list of changes. A `500` only carries the underlying
+message when the server runs with `KOYA_ENV=dev`.
 
 ```lisp
 (handler-case (koya:create-content 'blog '(:title ""))
@@ -383,39 +372,9 @@ building them, and `koya:make-ulid` for generating ids.
 
 ## The HTTP API underneath
 
-Useful when writing a client in another language, or when debugging with `curl`.
-All bodies are JSON with camelCase keys; errors are
-`{"error": {"code": …, "message": …, "details": …}}`.
-
-### Delivery API — `X-KOYA-API-KEY: koya_…`
-
-| Method and path | Returns |
-|---|---|
-| `GET /api/v1/{space}/{model}?limit=&offset=&orders=&fields=&filters=&include=` | `{contents, totalCount, offset, limit}`, or the single content for an object model |
-| `GET /api/v1/{space}/{model}/{id}?fields=&include=&draftKey=` | one content |
-
-### Admin API — `Authorization: Bearer {KOYA_SECRET}`
-
-| Method and path | Purpose |
-|---|---|
-| `GET /admin/api/me` | `{owner, version}` |
-| `GET /admin/api/schema` | the stored schema |
-| `PUT /admin/api/schema?force=true` | replace it; 409 `destructive_changes` without `force` |
-| `POST /admin/api/schema/plan` | the changes a PUT would apply |
-| `GET`/`POST /admin/api/contents/{space}/{model}` | list (drafts included) / create |
-| `GET`/`PATCH`/`DELETE /admin/api/contents/{space}/{model}/{id}` | read / save a draft / delete |
-| `POST /admin/api/contents/{space}/{model}/{id}/publish` | publish; body may carry `data` and `publishedAt` |
-| `POST …/unpublish`, `…/discard-draft`, `…/draft-key` | unpublish, discard the draft, fetch the draft key |
-| `GET`/`POST /admin/api/keys/{space}` | keys and the webhook secret / create a key |
-| `DELETE /admin/api/keys/{space}/{id}` | delete a key |
-| `GET`/`POST /admin/api/media/{space}` | list / upload (`multipart/form-data`, field `file`, optional `alt`) |
-| `GET`/`PATCH`/`DELETE /admin/api/media/{space}/{id}` | read (with `references`) / set `alt` / delete |
-
-The admin API rejects a state-changing request whose `Origin` or `Referer` names
-another site, so the owner's session cookie cannot be used from one. A request
-with neither header — any non-browser client — is accepted.
-
-The schema JSON is versioned: `{"koyaSchema": 1, "spaces": [...]}`, each space
-`{name, webhooks, models}`, each model `{name, kind, fields, previewUrl?,
-publicUrl?, webhooks?}`, each field `{name, type, …options}` with camelCase option
-keys. `(koya:pull)` is the easiest way to see a real one.
+Every function above is one request to the server's JSON APIs, which are
+specified in [openapi.yaml](openapi.yaml) (endpoints, parameters, response
+shapes, error codes) and [SCHEMA.md](SCHEMA.md) (the schema document `deploy`
+sends, and the rules content values must meet). Those two are the reference for
+a client in another language, or for `curl`; `(koya:pull)` is the easiest way to
+see a real schema document.

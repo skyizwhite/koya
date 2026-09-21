@@ -413,9 +413,9 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 
 koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ済み。microCMS からのインポートを残して移行はほぼ完了。
 
-- **ドキュメント整備**(最優先): `docs/SCHEMA.md`(スキーマ JSON の仕様、`koyaSchema: 1`)と
-  `docs/openapi.yaml`(配信 API / 管理 API)。DESIGN.md は経緯込みの設計書なので、利用者向けの
-  リファレンスを別に書く。README のスクリーンショットは入れた。
+- ~~**ドキュメント整備**~~(2026-09-21 完了): 利用者向けに `docs/ADMIN-UI.md`(管理 UI)、`docs/CLIENT.md`
+  (ライブラリ)、`docs/SCHEMA.md`(スキーマ JSON の仕様、`koyaSchema: 1`)、`docs/openapi.yaml`
+  (配信 API / 管理 API)を書き、README は要約とリンクに絞った。DESIGN.md は経緯込みの設計書として残す。
 - 運用: `/data` ボリュームのバックアップ確認(Coolify のボリュームバックアップ、または `VACUUM INTO` の
   `POST /admin/api/backup`)。microCMS 解約後に website の `MICROCMS_*` と `scripts/import-from-microcms.py` を削除。
 - 管理 UI: `:datetime` 入力のタイムゾーン変換 JS。一覧のページング(現在は 100 件固定)。
