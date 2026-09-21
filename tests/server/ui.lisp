@@ -694,7 +694,9 @@ is a list of parts for MULTIPART-BODY."
                    "a model that has never fired is selectable and simply empty"))
              (multiple-value-bind (status body) (request :get "/s/website/webhooks" :query "label=nothing")
                (ok (= status 200))
-               (ok (search "Nothing matches these filters" body)))
+               (ok (search "Nothing matches these filters" body))
+               (ok (search "<option value=\"nothing\" selected" body)
+                   "a value neither the schema nor the log knows still shows as the filter, so the other select cannot drop it"))
              (testing "both together, and the selects show what is filtered"
                (multiple-value-bind (status body)
                    (request :get "/s/website/webhooks" :query "label=revalidate&model=blog")
@@ -706,4 +708,11 @@ is a list of parts for MULTIPART-BODY."
       (save-schema (make-schema (list (make-space "website"
                                                   :models (list (blog-model)
                                                                 (make-model "about" :object (list (make-field :body :richtext))))))))
-      (exec "DELETE FROM webhook_deliveries"))))
+      (exec "DELETE FROM webhook_deliveries")))
+  (testing "with the webhooks gone, nothing offers a log that can only be empty"
+    (multiple-value-bind (status body) (request :get "/s/website/m/blog")
+      (ok (= status 200))
+      (ng (search "/s/website/webhooks" body)))
+    (multiple-value-bind (status body) (request :get "/s/website/m/about/new")
+      (ok (= status 200))
+      (ng (search "/s/website/webhooks" body)))))

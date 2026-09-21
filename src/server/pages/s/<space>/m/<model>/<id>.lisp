@@ -3,6 +3,7 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya/core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:field-option #:space-name #:space-model
+                #:space-webhooks #:model-webhooks
                 #:model-name #:model-preview-url #:model-public-url)
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/lib/query #:make-query)
@@ -93,8 +94,8 @@
              (if preview-url (hsx (~external-link :href preview-url "Preview draft")) (hsx (<>)))
              (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>)))
              ;; an object model has no list page to carry this, and this editor
-             ;; is the whole of its screen
-             (if object-p
+             ;; is the whole of its screen -- but only where a hook can fire
+             (if (and object-p (or (space-webhooks space) (model-webhooks model)))
                  (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
                          (~icon :name :webhook) "Webhooks"))
                  (hsx (<>))))

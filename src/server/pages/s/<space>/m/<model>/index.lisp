@@ -3,7 +3,8 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-name #:model-fields #:field-name #:field-type #:field-option #:space-model)
+                #:model-kind #:model-name #:model-fields #:field-name #:field-type #:field-option #:space-model
+                #:space-webhooks #:model-webhooks)
   (:import-from #:koya/core/json #:json-null)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/contents
@@ -151,9 +152,12 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                       (h1 :class "text-2xl font-bold" model-name
                         (span :class "ml-3 text-base font-normal text-muted" (format nil "~a content~:p" total)))
                       (div :class "flex items-center gap-2"
-                        ;; the space's log, narrowed to what this model set off
-                        (a :href (webhook-log-url space :model model-name) :class "btn"
-                           (~icon :name :webhook) "Webhooks")
+                        ;; the space's log, narrowed to what this model set off;
+                        ;; without a hook that can fire, that log can hold nothing
+                        (if (or (space-webhooks space-object) (model-webhooks model))
+                            (hsx (a :href (webhook-log-url space :model model-name) :class "btn"
+                                    (~icon :name :webhook) "Webhooks"))
+                            (hsx (<>)))
                         (a :href (content-url space model-name "new") :class "btn btn-primary"
                            (~icon :name :plus) "New content")))
                     (if (null contents)

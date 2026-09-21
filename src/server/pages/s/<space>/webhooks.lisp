@@ -57,26 +57,30 @@
 ;;; can fire for it -- plus anything the log holds that the schema no longer
 ;;; does, so a model or hook renamed away is still reachable.
 
-(defun union-options (current logged)
-  "CURRENT in the schema's own order, then whatever else the log holds, sorted."
-  (append current
-          (sort (remove-if (lambda (value) (member value current :test #'string=)) logged)
-                #'string<)))
+(defun union-options (current logged selected)
+  "CURRENT in the schema's own order, then whatever else the log holds, sorted,
+then SELECTED if even that has not offered it. The last is what keeps the
+select showing the filter it is under: an option the browser cannot find is an
+option it silently replaces with the first one, which here reads \"All\"."
+  (let ((options (append current
+                         (sort (remove-if (lambda (value) (member value current :test #'string=)) logged)
+                               #'string<))))
+    (if (or (blank-p selected) (member selected options :test #'string=))
+        options
+        (append options (list selected)))))
 
-(defun schema-models (space)
-  (let ((space-def (find-space space)))
-    (and space-def (mapcar #'model-name (space-models space-def)))))
+(defun schema-models (space-def)
+  (and space-def (mapcar #'model-name (space-models space-def))))
 
-(defun schema-labels (space)
-  "Every webhook that can fire for SPACE: its own, and each model's."
-  (let ((space-def (find-space space)))
-    (and space-def
-         (remove-duplicates
-          (mapcar #'webhook-label
-                  (append (space-webhooks space-def)
-                          (loop :for model :in (space-models space-def)
-                                :append (model-webhooks model))))
-          :test #'string= :from-end t))))
+(defun schema-labels (space-def)
+  "Every webhook that can fire for the space: its own, and each model's."
+  (and space-def
+       (remove-duplicates
+        (mapcar #'webhook-label
+                (append (space-webhooks space-def)
+                        (loop :for model :in (space-models space-def)
+                              :append (model-webhooks model))))
+        :test #'string= :from-end t)))
 
 (defcomp ~filter-select (&key name label all options selected)
   (hsx
@@ -88,9 +92,11 @@
        (loop :for value :in options :collect
          (hsx (option :value value :selected (equal value selected) value)))))))
 
-(defcomp ~filters (&key space label model)
-  (let ((labels (union-options (schema-labels space) (delivery-labels space)))
-        (models (union-options (schema-models space) (delivery-models space))))
+(defcomp ~filters (&key space space-def label model)
+  ;; SPACE-DEF comes from @GET: FIND-SPACE reads and parses the whole instance's
+  ;; schema, so it is loaded once a request, not once a lookup
+  (let ((labels (union-options (schema-labels space-def) (delivery-labels space) label))
+        (models (union-options (schema-models space-def) (delivery-models space) model)))
     (if (and (null labels) (null models))
         (hsx (<>))
         (hsx
@@ -147,7 +153,7 @@
                   (span :class "text-danger" (delivery-error delivery)))))
        (~field :label "response" (~body-block :text (delivery-response delivery)))))))
 
-(defcomp ~log-page (&key space label model page)
+(defcomp ~log-page (&key space space-def label model page)
   (let* ((total (count-deliveries space :label label :model model))
          (pages (max 1 (ceiling total +page-size+)))
          (page (min page pages))
@@ -157,9 +163,12 @@
      (~layout :space space :crumbs (list (cons "Webhook log" nil))
        (h1 :class "mb-2 text-2xl font-bold" "Webhook log")
        (p :class "mb-4 text-sm text-muted"
-         (format nil "~a call~:p~a." total (if (filtered-p label model) " match" ""))
+         (format nil "~a call~:p~a." total
+                 (cond ((not (filtered-p label model)) "")
+                       ((= total 1) " matches")
+                       (t " match")))
          (format nil " Only the newest ~a of the space are kept." +keep-per-space+))
-       (~filters :space space :label label :model model)
+       (~filters :space space :space-def space-def :label label :model model)
        (if (null items)
            (hsx (~empty-state (if (filtered-p label model)
                                   "Nothing matches these filters."
@@ -183,13 +192,14 @@
 (defun @get (params)
   (with-owner
     (let* ((name (path-param params :space))
-           (space (and (find-space name) name)))
-      (cond ((null space)
+           (space-def (find-space name)))
+      (cond ((null space-def)
              (set-response-status 404)
              (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
             (t
-             (set-title (format nil "Webhook log · ~a · koya" space))
-             (hsx (~log-page :space space
+             (set-title (format nil "Webhook log · ~a · koya" name))
+             (hsx (~log-page :space name
+                             :space-def space-def
                              :label (param params "label")
                              :model (param params "model")
                              :page (page-number params))))))))
