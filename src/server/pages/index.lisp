@@ -15,7 +15,8 @@
 ;;; never by a schema deploy, which only ever changes the models inside one.
 ;;;
 ;;; A space has nothing but its name, and the name is an id: it is in every URL
-;;; and in the delivery API, so there is nothing here to edit.
+;;; and in the delivery API, so there is nothing here to edit -- only to make, in
+;;; the dialog behind the New space button, and to delete.
 
 (defcomp ~space-row (&key space)
   (let ((name (getf space :name)))
@@ -31,25 +32,43 @@
                  :onclick (format nil "return confirm('Delete ~a with every model, content, media file and key in it? This cannot be undone.')" name)
            (~icon :name :delete)))))))
 
+(defcomp ~new-space-dialog ()
+  "The whole of making a space is one name, so it lives in a dialog rather than
+taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
+  (hsx
+   (dialog :id "new-space" :class "koya-dialog max-w-sm"
+     (form :method "post"
+       (input :type "hidden" :name "action" :value "create")
+       (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
+         (h2 :class "font-semibold" "New space")
+         (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close"
+           (~icon :name :close)))
+       (div :class "px-4 py-4"
+         (label :for "name" :class "label" "Name")
+         (input :type "text" :id "name" :name "name" :required t :autofocus t :autocomplete "off"
+                :pattern "[a-z][a-z0-9-]*" :placeholder "website" :class "input mt-1.5")
+         (p :class "mt-2 text-xs text-muted"
+            "Lowercase letters, digits and hyphens. It is in every URL and in the delivery API, "
+            "so it cannot be changed later."))
+       (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
+         (button :type "button" :class "btn" :data-dialog-close t "Cancel")
+         (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create space"))))))
+
 (defcomp ~spaces-page (&key spaces)
   (hsx
    (~layout
-     (h1 :class "mb-6 text-2xl font-bold" "Spaces")
+     (div :class "mb-6 flex items-center justify-between gap-4"
+       (h1 :class "text-2xl font-bold" "Spaces")
+       (button :type "button" :class "btn btn-primary" :data-dialog-open "new-space"
+         (~icon :name :plus) "New space"))
      (if (null spaces)
          (hsx (~empty-state
                 (p "No spaces yet.")
-                (p :class "mt-2" "Make one below, then deploy its models with "
+                (p :class "mt-2" "Make one with " (strong "New space") ", then deploy its models with "
                    (code "(koya:deploy)") " from your project's REPL.")))
          (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                 (loop :for space :in spaces :collect (hsx (~space-row :space space))))))
-     (form :method "post" :class "mt-8 flex items-end gap-3"
-       (input :type "hidden" :name "action" :value "create")
-       (div :class "flex-1"
-         (label :for "name" :class "label" "Name")
-         (input :type "text" :id "name" :name "name" :required t :autocomplete "off"
-                :pattern "[a-z][a-z0-9-]*" :placeholder "website" :class "input mt-1.5 max-w-xs")
-         (p :class "mt-1 text-xs text-muted" "In every URL and in the delivery API. Cannot be changed later."))
-       (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create space")))))
+     (~new-space-dialog))))
 
 (defun @get (params)
   (declare (ignore params))

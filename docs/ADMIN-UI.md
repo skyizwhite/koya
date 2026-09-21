@@ -42,11 +42,11 @@ no user accounts: whoever knows the secret is the owner.
 `/` lists the spaces with the number of models in each, and is where they are
 made and deleted.
 
-- **Create space** takes a name: lowercase letters, digits and hyphens
-  (`^[a-z][a-z0-9-]*$`). The name is the space's id — it is in every admin URL
-  and in the delivery API's `/api/v1/{space}/…` — so it cannot be changed
-  afterwards. A name already taken, or one that is not a slug, is refused with
-  the reason.
+- **New space**, at the top right, opens a dialog asking for a name: lowercase
+  letters, digits and hyphens (`^[a-z][a-z0-9-]*$`). The name is the space's id —
+  it is in every admin URL and in the delivery API's `/api/v1/{space}/…` — so it
+  cannot be changed afterwards. A name already taken, or one that is not a slug,
+  is refused with the reason.
 - A new space is empty: deploy a schema to it with `(koya:deploy)` to give it
   models.
 - **Delete** asks for confirmation and then removes the space with everything in

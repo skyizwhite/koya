@@ -252,3 +252,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
+// Plain modals: [data-dialog-open="id"] opens that <dialog>, and a
+// [data-dialog-close] inside it or a click on the backdrop closes it again.
+// Dialogs whose contents are fetched or filled in (the media picker and the
+// image preview) bind their own opening above; this is for the rest.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-dialog-open]").forEach((button) => {
+    const dialog = document.getElementById(button.dataset.dialogOpen);
+    if (!dialog) return;
+    button.addEventListener("click", () => dialog.showModal());
+    dialog.querySelectorAll("[data-dialog-close]").forEach((close) => {
+      close.addEventListener("click", () => dialog.close());
+    });
+    dialog.addEventListener("click", (event) => {
+      // a click on the backdrop lands on the dialog element itself
+      if (event.target === dialog) dialog.close();
+    });
+  });
+});

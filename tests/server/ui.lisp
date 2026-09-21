@@ -217,7 +217,8 @@ is a list of parts for MULTIPART-BODY."
     (multiple-value-bind (status body) (request :get "/")
       (ok (= status 200))
       (ok (search "website" body))
-      (ok (search "Create space" body)))
+      (ok (search "data-dialog-open=\"new-space\"" body) "the form is behind a button")
+      (ok (search "<dialog id=\"new-space\"" body) "and lives in a dialog on the page"))
     (testing "a space is made here, and starts empty"
       (multiple-value-bind (status headers) (request :post "/" :form '(("action" . "create") ("name" . "shop")) :headers origin)
         (declare (ignore headers))
