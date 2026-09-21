@@ -54,6 +54,7 @@ contents mention the file (shown in the confirmation)."
                :data-preview-meta (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media))
                                           (short-time (media-created-at media)))
                :data-preview-id id
+               :data-preview-references (or references 0)
                :data-preview-confirm (delete-confirmation media references)
                :title (media-filename media)
                :aria-label (format nil "Preview ~a" (media-filename media))

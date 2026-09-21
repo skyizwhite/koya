@@ -207,7 +207,13 @@ document.addEventListener("DOMContentLoaded", () => {
       // the dialog's alt and delete forms act on whichever file was opened
       ids.forEach((input) => { input.value = button.dataset.previewId || ""; });
       if (alt) alt.value = button.dataset.previewAlt || "";
-      if (remove) remove.dataset.confirm = button.dataset.previewConfirm || "";
+      if (remove) {
+        // a file in use cannot be deleted (the server refuses too); the text says why
+        const inUse = Number(button.dataset.previewReferences || 0) > 0;
+        remove.dataset.confirm = button.dataset.previewConfirm || "";
+        remove.disabled = inUse;
+        remove.title = inUse ? button.dataset.previewConfirm || "" : "";
+      }
       dialog.showModal();
     });
   });

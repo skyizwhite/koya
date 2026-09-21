@@ -1,7 +1,6 @@
 (defpackage #:koya/config
   (:use #:cl)
   (:import-from #:koya/core/schema
-                #:schema-error
                 #:make-field
                 #:make-model
                 #:make-webhook
@@ -76,9 +75,11 @@
 (defun webhook (label url &key (events nil events-p))
   "A webhook for :webhooks of defspace or defmodel. EVENTS must be given: a non-empty
 list from (:publish :unpublish :delete :draft) saying when it fires."
-  (unless events-p
-    (error 'schema-error :message (format nil "webhook ~s: :events must be given, e.g. :events '(:publish :unpublish :delete)" label)))
-  (make-webhook label url :events events))
+  ;; passed through as given so that MAKE-WEBHOOK, the one place that checks
+  ;; webhooks, also tells a missing :events from an empty one
+  (if events-p
+      (make-webhook label url :events events)
+      (make-webhook label url)))
 
 (defmacro defspace (name &key webhooks)
   "Define (or redefine) a space. WEBHOOKS is evaluated: a list of (webhook ...) that

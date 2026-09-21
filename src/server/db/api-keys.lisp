@@ -7,7 +7,9 @@
   (:import-from #:koya/core/time
                 #:now-iso)
   (:import-from #:ironclad
-                #:random-data #:byte-array-to-hex-string #:digest-sequence #:ascii-string-to-byte-array)
+                #:random-data #:byte-array-to-hex-string #:digest-sequence)
+  (:import-from #:babel
+                #:string-to-octets)
   (:export #:create-api-key
            #:list-api-keys
            #:delete-api-key
@@ -19,7 +21,9 @@
 ;;; SHA-256 is stored. Keys are random enough that no salt or slow hash is needed.
 
 (defun hash-api-key (key)
-  (byte-array-to-hex-string (digest-sequence :sha256 (ascii-string-to-byte-array key))))
+  "SHA-256 of KEY as hex. UTF-8, not ASCII: a header with any character in it must
+fail to match, not fail to hash."
+  (byte-array-to-hex-string (digest-sequence :sha256 (string-to-octets key :encoding :utf-8))))
 
 (defun create-api-key (space &key (label ""))
   "Create a key for SPACE. Returns (values plaintext-key id)."
