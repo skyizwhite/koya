@@ -14,7 +14,7 @@
 (in-package #:koya-server/lib/webhook)
 
 ;;; Content change notifications:
-;;; {"service": SPACE, "api": MODEL, "id": ID, "event": "publish"|"unpublish"|"delete"|"draft",
+;;; {"space": SPACE, "model": MODEL, "id": ID, "event": "publish"|"unpublish"|"delete"|"draft",
 ;;;  "contents": {"old": {...}|null, "new": {...}|null}}
 ;;; Every webhook of the space, and of the model, gets every event; the receiver
 ;;; reads "event" and decides what to do (a revalidation hook ignores "draft").
@@ -47,8 +47,8 @@ asynchronous unless ASYNC is NIL."
   (let ((hooks (webhooks-for space model))
         (headers (and secret (list (cons "X-KOYA-WEBHOOK-KEY" secret)))))
     (when hooks
-      (let ((payload (to-json (jobject "service" (space-name space)
-                                       "api" (model-name model)
+      (let ((payload (to-json (jobject "space" (space-name space)
+                                       "model" (model-name model)
                                        "id" id
                                        "event" (string-downcase (symbol-name event))
                                        "contents" (jobject "old" (or old json-null) "new" (or new json-null))))))

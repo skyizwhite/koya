@@ -7,8 +7,7 @@ info:
     Two JSON APIs on one server.
 
     * The **delivery API** (`/api/v1`) reads published content with a per-space
-      API key, created on the space's *API keys* page. It is a microCMS-compatible
-      subset.
+      API key, created on the space's *API keys* page.
     * The **admin API** (`/admin/api`) manages the schema, contents, keys and media
       with a **management key** (made on the admin UI's settings page) as a
       Bearer token; the owner secret only logs into the admin UI. State-changing
@@ -363,8 +362,7 @@ paths:
         Publishes `data` when given, else the current draft, else re-publishes the
         published data. Clears the draft and its key. `publishedAt` overrides the
         publish date; otherwise the first publish date is kept and `revisedAt` set
-        to now. Fires `publish` webhooks (`type` `new` on a first publish, `edit`
-        after).
+        to now. Fires `publish` webhooks.
       security: [{ ownerSecret: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -398,7 +396,7 @@ paths:
       description: |
         Takes the content off the delivery API. Its data (the draft when there is
         one) is kept as a draft with a new draft key; `publishedAt` is cleared.
-        Fires `unpublish` webhooks (`type` `edit`).
+        Fires `unpublish` webhooks.
       security: [{ ownerSecret: [] }]
       parameters:
         - $ref: "#/components/parameters/space"

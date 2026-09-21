@@ -220,7 +220,7 @@
         (ok (string= (jget json "status") "published"))
         (ok (string= (jget json "published" "body") "# Hi")))
       (ok (equal (webhook-events) '("publish" "draft" "publish")) "tag publish, the post's draft save, the post's publish: every event reaches the hook")
-      (ok (string= (jget (second (first *webhooks*)) "api") "blog"))
+      (ok (string= (jget (second (first *webhooks*)) "model") "blog"))
       (ok (string= (jget (second (first *webhooks*)) "contents" "new" "title") "Hello"))
       (ok (string= (first (first *webhooks*)) "https://example.com/hook"))
       (ok (= (length (cdr (assoc "X-KOYA-WEBHOOK-KEY" (third (first *webhooks*)) :test #'string=))) 48)

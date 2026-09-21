@@ -164,8 +164,8 @@ so the receiver decides what to act on.
 
 ```
 {
-  "service": "website",
-  "api": "blog",
+  "space": "website",
+  "model": "blog",
   "id": "01J…",
   "event": "publish" | "unpublish" | "delete" | "draft",
   "contents": {

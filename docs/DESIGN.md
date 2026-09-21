@@ -181,8 +181,7 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   - `/admin/api/media/{space}`(M2)
 - **システムフィールド**: `id` `createdAt` `updatedAt` `publishedAt` `revisedAt` は本体が管理し、
   モデルのフィールド名として予約する(`defmodel` で宣言するとエラー)。microCMS と同じ扱い。
-- 配信 API の認証ヘッダは `X-KOYA-API-KEY`。互換のため `X-MICROCMS-API-KEY` も受け付ける
-  (microcms-lisp-sdk のベース URL を差し替えるだけで動かすため)。
+- 配信 API の認証ヘッダは `X-KOYA-API-KEY`。
 - 認証は 6 章。
 
 ### 非 Lisp クライアントへの配慮
@@ -293,7 +292,7 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   公開すると消す(古いプレビュー URL は無効になる)。
 - **webhook** は `(webhook label url)` で定義する。space の webhook は全モデルに適用され、
   モデルは `:webhooks` で自分用を追加する(microCMS の「API ごとに複数」に相当。設定は code)。
-  購読するイベントの設定は無く、**全 webhook に全イベントを送る**。ペイロード(`service`、`api`、`id`、
+  購読するイベントの設定は無く、**全 webhook に全イベントを送る**。ペイロード(`space`、`model`、`id`、
   `event` = `publish`(新規公開・再公開) / `unpublish` / `delete` / `draft`(下書き保存)、`contents.old/new`)の
   `event` を見て受け手が分岐する。`draft` の `new` は下書きデータ。
   space ごとに生成される秘密を `X-KOYA-WEBHOOK-KEY` ヘッダで送り、受け側で照合する(秘密は webhook 単位ではなく space 単位)。
@@ -428,6 +427,10 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 - 2026-09-21: webhook の `:events` は必須化したのち同日撤廃(0.3.0): 全 webhook に全イベントを送り、payload の
   `event`(publish / unpublish / delete / draft)で受け手が分岐する。microCMS 互換の `type` は廃止。`:boolean` の `:default t` を
   新規作成時に適用。参照中のメディアは削除拒否(409 `in_use`)。
+- 2026-09-21: webhook payload のキーを koya の語彙に揃えた(0.4.0): `service` → `space`、`api` → `model`。
+  microCMS の「サービス / API」に寄せた名前をやめ、スキーマと同じ space / model で呼ぶ。v0.3.0 を配信済みなので
+  受け手側(website の revalidate ハンドラ)の改修が必要。あわせて配信 API の `X-MICROCMS-API-KEY` 互換の記述と、
+  openapi に残っていた `type` `new` / `edit` の記述を削除(実装は 0.3.0 で既に落ちていた)。
 - 配信: webhook は通知ごとにスレッドを起こすので、大量インポート時はキューにまとめる。
 - 依存: hsx の `&` エスケープ修正は koya で取り込み済み。website は `qlot update koya` で koya の変更を追従。
 
