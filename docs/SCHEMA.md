@@ -23,7 +23,7 @@ naming the problem.
 
 ## Document
 
-```json
+```
 {"koyaSchema": 1, "spaces": [ …space… ]}
 ```
 
@@ -36,7 +36,7 @@ The array order is the order the admin UI shows.
 
 ## Space
 
-```json
+```
 {"name": "website", "webhooks": [ …webhook… ], "models": [ …model… ]}
 ```
 
@@ -64,7 +64,7 @@ The payload is described in [CLIENT.md](CLIENT.md#webhooks).
 
 ## Model
 
-```json
+```
 {"name": "blog", "kind": "list",
  "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
  "publicUrl": "https://example.com/blog/{CONTENT_ID}",

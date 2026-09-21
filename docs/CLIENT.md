@@ -162,7 +162,7 @@ them, and labels must be unique within each list. There is nothing to
 subscribe to: **every webhook is sent every event**, and the payload says which,
 so the receiver decides what to act on.
 
-```json
+```
 {"service": "website", "api": "blog", "id": "01J…",
  "event": "publish" | "unpublish" | "delete" | "draft",
  "contents": {"old": {…} | null, "new": {…} | null}}
