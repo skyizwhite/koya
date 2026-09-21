@@ -24,7 +24,10 @@ naming the problem.
 ## Document
 
 ```
-{"koyaSchema": 1, "spaces": [ …space… ]}
+{
+  "koyaSchema": 1,
+  "spaces": [ …space… ]
+}
 ```
 
 | Key | Type | Rules |
@@ -37,7 +40,11 @@ The array order is the order the admin UI shows.
 ## Space
 
 ```
-{"name": "website", "webhooks": [ …webhook… ], "models": [ …model… ]}
+{
+  "name": "website",
+  "webhooks": [ …webhook… ],
+  "models": [ …model… ]
+}
 ```
 
 | Key | Type | Rules |
@@ -49,7 +56,10 @@ The array order is the order the admin UI shows.
 ## Webhook
 
 ```json
-{"label": "revalidate", "url": "https://example.com/api/revalidate"}
+{
+  "label": "revalidate",
+  "url": "https://example.com/api/revalidate"
+}
 ```
 
 | Key | Type | Rules |
@@ -65,11 +75,14 @@ The payload is described in [CLIENT.md](CLIENT.md#webhooks).
 ## Model
 
 ```
-{"name": "blog", "kind": "list",
- "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
- "publicUrl": "https://example.com/blog/{CONTENT_ID}",
- "webhooks": [ … ],
- "fields": [ …field… ]}
+{
+  "name": "blog",
+  "kind": "list",
+  "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
+  "publicUrl": "https://example.com/blog/{CONTENT_ID}",
+  "webhooks": [ …webhook… ],
+  "fields": [ …field… ]
+}
 ```
 
 | Key | Type | Rules |
@@ -87,7 +100,12 @@ omitted from the output when they have no value.
 ## Field
 
 ```json
-{"name": "tags", "type": "reference", "model": "tag", "many": true}
+{
+  "name": "tags",
+  "type": "reference",
+  "model": "tag",
+  "many": true
+}
 ```
 
 | Key | Type | Rules |
@@ -162,8 +180,12 @@ Validation failures come back as `422 validation_failed` with
 between the stored schema and the one sent as a list of **changes**:
 
 ```json
-{"op": "remove_field", "path": "website.blog.summary", "destructive": true,
- "description": "! - website.blog.summary (text)"}
+{
+  "op": "remove_field",
+  "path": "website.blog.summary",
+  "destructive": true,
+  "description": "! - website.blog.summary (text)"
+}
 ```
 
 | `op` | Meaning | Destructive |
