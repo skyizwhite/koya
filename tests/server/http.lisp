@@ -132,7 +132,8 @@
     (ok (= status 401)))
   (multiple-value-bind (status json) (admin :get "/admin/api/me")
     (ok (= status 200))
-    (ok (eq (jget json "owner") t)))
+    (ok (eq (jget json "management") t) "a Bearer caller is a management key")
+    (ok (null (jget json "owner"))))
   (testing "writes need a matching origin when a browser sends one"
     (multiple-value-bind (status json)
         (request :post "/admin/api/schema/plan" :body (jobject "koyaSchema" 1)
