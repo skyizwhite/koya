@@ -217,8 +217,7 @@ stored content: rows that no longer fit stay as they are.
     {
       "name": "website",
       "webhooks": [
-        {"label": "revalidate", "url": "https://example.com/api/revalidate",
-         "events": ["publish", "unpublish", "delete"]}
+        {"label": "revalidate", "url": "https://example.com/api/revalidate"}
       ],
       "models": [
         {
@@ -227,7 +226,7 @@ stored content: rows that no longer fit stay as they are.
           "publicUrl": "https://example.com/blog/{CONTENT_ID}",
           "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
           "webhooks": [
-            {"label": "preview-build", "url": "https://preview.example/hook", "events": ["draft"]}
+            {"label": "preview-build", "url": "https://preview.example/hook"}
           ],
           "fields": [
             {"name": "title",   "type": "text", "required": true},
