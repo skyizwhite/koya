@@ -12,7 +12,7 @@
                 #:pull #:get-list #:get-item #:get-object
                 #:list-contents #:get-content #:create-content #:update-content
                 #:publish-content #:unpublish-content #:discard-draft #:delete-content #:draft-key
-                #:list-api-keys #:delete-api-key #:webhook-secret
+                #:list-delivery-keys #:delete-delivery-key #:webhook-secret
                 #:list-media #:get-media #:upload-media #:update-media #:delete-media)
   (:import-from #:koya-tests/server/media #:png-bytes #:*media-root*))
 (in-package #:koya-tests/client)
@@ -72,7 +72,7 @@
     (koya/client:deploy :force t :stream (make-broadcast-stream))))
 
 (deftest contents-and-delivery
-  (configure :api-key (create-api-key "website" :label "client"))
+  (configure :delivery-key (create-api-key "website" :label "client"))
   (let* ((tag (create-content 'tag '(:name "lisp") :publish t))
          (post (create-content 'blog (list :title "Hello" :body "# Hi" :tags (list (getf tag :id))))))
     (ok (string= (getf tag :status) "published"))
@@ -157,10 +157,10 @@
             (delete-content 'blog (getf post :id)))
           (ok (getf (delete-media (getf media :id)) :deleted))
           (ok (= (getf (list-media) :total-count) 0)))))
-    (testing "api keys"
-      (ok (= (length (list-api-keys)) 1))
-      (multiple-value-bind (key id) (koya/client:create-api-key :label "extra")
+    (testing "delivery keys"
+      (ok (= (length (list-delivery-keys)) 1))
+      (multiple-value-bind (key id) (koya/client:create-delivery-key :label "extra")
         (ok (stringp key))
-        (ok (= (length (list-api-keys)) 2))
-        (delete-api-key id)
-        (ok (= (length (list-api-keys)) 1))))))
+        (ok (= (length (list-delivery-keys)) 2))
+        (delete-delivery-key id)
+        (ok (= (length (list-delivery-keys)) 1))))))

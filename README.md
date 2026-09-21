@@ -72,7 +72,7 @@ and so is everything done with them, from the REPL:
 (koya:plan)     ; show the diff against the space on the server
 (koya:deploy)   ; apply it (asks before destructive changes)
 
-(koya:configure :api-key "koya_...")
+(koya:configure :delivery-key "koya_...")
 (koya:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :include "tags"))
 (koya:get-item 'blog "01J...")
 (koya:get-object 'about)

@@ -48,7 +48,7 @@ system; a site never loads it.
 ```lisp
 (koya:configure :base-url "https://cms.example.com"
                 :management-key "koya_mgmt_..."  ; schema, content and media calls
-                :api-key  "koya_..."   ; delivery API key: reading published content
+                :delivery-key "koya_..."  ; reading published content
                 :space    "website")   ; the space every call works in
 ```
 
@@ -59,7 +59,7 @@ call time:
 |---|---|---|
 | `koya:*base-url*` | `KOYA_URL` | everything |
 | `koya:*management-key*` | `KOYA_MANAGEMENT_KEY` | `plan`, `deploy`, `pull`, content/keys/media management |
-| `koya:*api-key*` | `KOYA_API_KEY` | `get-list`, `get-item`, `get-object` |
+| `koya:*delivery-key*` | `KOYA_DELIVERY_KEY` | `get-list`, `get-item`, `get-object` |
 | `koya:*space*` | `KOYA_SPACE` | the default for every `:space` argument |
 
 **The space is made in the admin UI first**, and both keys are then made on its
@@ -327,9 +327,9 @@ These use the management key and see drafts as well.
 ## Delivery keys and the webhook secret
 
 ```lisp
-(koya:create-api-key :label "production site")   ; => (values "koya_…" "01J…"), shown once
-(koya:list-api-keys)                             ; ((:id … :label … :created-at …) …)
-(koya:delete-api-key "01J…")
+(koya:create-delivery-key :label "production site")  ; => (values "koya_…" "01J…"), shown once
+(koya:list-delivery-keys)                            ; ((:id … :label … :created-at …) …)
+(koya:delete-delivery-key "01J…")
 (koya:webhook-secret)                            ; the X-KOYA-WEBHOOK-KEY of the space
 ```
 

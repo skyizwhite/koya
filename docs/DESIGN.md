@@ -511,4 +511,5 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-22 | management key と配信キーはテーブルを分けたまま(`scope` 列での統合はしない) | 列が同じなのは偶然。統合すると「配信キーが管理キーとして通らない」保証が `WHERE` 句1つに移り、書き忘れが致命的になる |
 | 2026-09-22 | space は名前だけを持つ(表示用ラベルは持たない)。一覧画面でできるのは作成と削除 | 名前が id で URL に出る。別名を足すほどの情報量がない |
 | 2026-09-22 | webhook は全て space のものにし、`defmodel` の `:webhooks` を廃止。`(webhook … :only <model>)` で絞る。`:only` はモデル名のリストも取る | 「どの webhook がどこに飛ぶか」が1箇所に並ぶ。単数しか許さないと同一 URL の hook をモデルごとに複製することになり、ラベルが一意なのでログのフィルタが汚れる |
+| 2026-09-22 | クライアントの配信キーの語彙を "api key" から "delivery key" に統一: `KOYA_DELIVERY_KEY`、`koya:*delivery-key*`、`configure :delivery-key`、`create/list/delete-delivery-key`。ワイヤの `X-KOYA-API-KEY` と DB の `api_keys` はそのまま | ドキュメントも管理画面も delivery key と呼んでいるのに、利用者が書く名前だけ api key のままだった。ヘッダは配信 API の互換性、テーブル名はマイグレーションの価値が無いので触らない |
 
