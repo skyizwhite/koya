@@ -81,12 +81,12 @@ koya/
 
 ```lisp
 (defspace website
-  ;; 評価される。全モデルに適用。URL 文字列だけでも可(label = URL、既定イベント)
+  ;; 評価される。全モデルに適用
   :webhooks (list (webhook "revalidate" "https://skyizwhite.dev/api/revalidate")))
 
 (defmodel (website blog) (:kind :list
                           ;; このモデルだけに追加される webhook
-                          :webhooks (list (webhook "preview-build" "https://preview.example/hook" :events '(:draft))))
+                          :webhooks (list (webhook "preview-build" "https://preview.example/hook")))
   (title        :text     :required t)
   (description  :text)
   (content      :richtext)
@@ -291,13 +291,13 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - `contents.published` と `contents.draft` の2カラム。status は `draft` / `published` / `published+draft`。
 - `draftKey` でドラフトをプレビュー取得(microCMS 互換)。下書き保存のたびに draft key を再生成し、
   公開すると消す(古いプレビュー URL は無効になる)。
-- **webhook** は `(webhook label url :events (...))` で定義する。space の webhook は全モデルに適用され、
+- **webhook** は `(webhook label url)` で定義する。space の webhook は全モデルに適用され、
   モデルは `:webhooks` で自分用を追加する(microCMS の「API ごとに複数」に相当。設定は code)。
-  イベントは `:publish`(新規公開・再公開)`:unpublish` `:delete` `:draft`(下書き保存)の部分集合で、
-  省略時は `:draft` 以外。ペイロードは microCMS 互換に近い形(`service`、`api`、`id`、
-  `type` = `new` / `edit` / `delete` / `draft`、`contents.old/new`)。`draft` の `new` は下書きデータ。
+  購読するイベントの設定は無く、**全 webhook に全イベントを送る**。ペイロード(`service`、`api`、`id`、
+  `event` = `publish`(新規公開・再公開) / `unpublish` / `delete` / `draft`(下書き保存)、`contents.old/new`)の
+  `event` を見て受け手が分岐する。`draft` の `new` は下書きデータ。
   space ごとに生成される秘密を `X-KOYA-WEBHOOK-KEY` ヘッダで送り、受け側で照合する(秘密は webhook 単位ではなく space 単位)。
-  URL 文字列だけを並べた旧形式も受け付ける(label = URL、既定イベント)。plan には label 単位で差分が出る。
+  plan には label 単位で差分が出る。
 - 履歴(revisions)は初期スコープ外。
 
 ## 10. 技術スタック
