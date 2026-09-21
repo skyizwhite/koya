@@ -16,6 +16,7 @@
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:redirect-to #:param #:set-flash #:expand-url-template
                 #:short-time #:content-label #:~layout #:~status-badge #:~errors #:~icon #:content-url #:model-url)
+  (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
   (:import-from #:koya-server/components/field-input #:~field-input)
   (:import-from #:koya-server/actions/media-picker #:~media-picker-dialog)
   (:import-from #:koya-server/db/media #:find-media)
@@ -90,7 +91,13 @@
          (div :class "mt-3 flex flex-wrap items-center justify-between gap-2"
            (div :class "flex flex-wrap items-center gap-2"
              (if preview-url (hsx (~external-link :href preview-url "Preview draft")) (hsx (<>)))
-             (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>))))
+             (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>)))
+             ;; an object model has no list page to carry this, and this editor
+             ;; is the whole of its screen
+             (if object-p
+                 (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
+                         (~icon :name :webhook) "Webhooks"))
+                 (hsx (<>))))
            (div :class "flex flex-wrap items-center gap-2"
              (if (and published draft)
                  (hsx (~action-button :value "discard" :icon :discard :class "btn btn-danger"

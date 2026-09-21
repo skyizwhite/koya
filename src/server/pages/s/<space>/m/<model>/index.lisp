@@ -14,6 +14,7 @@
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:redirect-to #:param #:short-time #:content-label
                 #:~layout #:~status-badge #:~empty-state #:~icon #:content-url #:model-url)
+  (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
 
@@ -149,8 +150,12 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                     (div :class "mb-6 flex items-center justify-between"
                       (h1 :class "text-2xl font-bold" model-name
                         (span :class "ml-3 text-base font-normal text-muted" (format nil "~a content~:p" total)))
-                      (a :href (content-url space model-name "new") :class "btn btn-primary"
-                         (~icon :name :plus) "New content"))
+                      (div :class "flex items-center gap-2"
+                        ;; the space's log, narrowed to what this model set off
+                        (a :href (webhook-log-url space :model model-name) :class "btn"
+                           (~icon :name :webhook) "Webhooks")
+                        (a :href (content-url space model-name "new") :class "btn btn-primary"
+                           (~icon :name :plus) "New content")))
                     (if (null contents)
                         (hsx (~empty-state (if (> page 1) "Nothing on this page." "No contents yet.")))
                         (hsx (div :class "overflow-x-auto rounded-md border border-line bg-panel"

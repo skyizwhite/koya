@@ -10,6 +10,8 @@
            #:list-deliveries
            #:count-deliveries
            #:find-delivery
+           #:delivery-labels
+           #:delivery-models
            #:+keep-per-space+
            #:+max-response-chars+
            #:delivery-id #:delivery-space #:delivery-label #:delivery-url #:delivery-model
@@ -66,26 +68,52 @@ instead of a line should not fill the database.")
           space space +keep-per-space+)
     id))
 
-(defun label-clause (label)
-  (if (and label (plusp (length label)))
-      (values " AND label = ?" (list label))
-      (values "" '())))
+(defun blank-p (value) (or (null value) (zerop (length value))))
 
-(defun list-deliveries (space &key label (limit 50) (offset 0))
-  "Newest first. LABEL, when given, keeps only that webhook's calls."
-  (multiple-value-bind (where params) (label-clause label)
+(defun filter-clause (label model)
+  "The WHERE fragment and parameters for whichever of LABEL and MODEL is given."
+  (let ((where "") (params '()))
+    (unless (blank-p label)
+      (setf where (concatenate 'string where " AND label = ?")
+            params (append params (list label))))
+    (unless (blank-p model)
+      (setf where (concatenate 'string where " AND model = ?")
+            params (append params (list model))))
+    (values where params)))
+
+(defun list-deliveries (space &key label model (limit 50) (offset 0))
+  "Newest first. LABEL keeps one webhook's calls; MODEL keeps the calls a change
+to that model set off, from its own webhooks and from the space's alike. Given
+together they narrow to one webhook's calls for one model."
+  (multiple-value-bind (where params) (filter-clause label model)
     (mapcar #'row->delivery
             (apply #'fetch
                    (format nil "SELECT * FROM webhook_deliveries WHERE space = ?~a ORDER BY id DESC LIMIT ? OFFSET ?" where)
                    space (append params (list limit offset))))))
 
-(defun count-deliveries (space &key label)
-  (multiple-value-bind (where params) (label-clause label)
+(defun count-deliveries (space &key label model)
+  (multiple-value-bind (where params) (filter-clause label model)
     (or (col (apply #'fetch-one
                     (format nil "SELECT COUNT(*) AS n FROM webhook_deliveries WHERE space = ?~a" where)
                     space params)
              "n")
         0)))
+
+(defun distinct-column (space column)
+  (remove "" (mapcar (lambda (row) (col row column))
+                     (fetch (format nil "SELECT DISTINCT ~a AS ~:*~a FROM webhook_deliveries WHERE space = ? ORDER BY ~:*~a" column)
+                            space))
+          :test #'string=))
+
+(defun delivery-labels (space)
+  "The webhook labels this space's log holds. Taken from the log rather than
+from the schema, so every option finds something and a hook that has since been
+renamed away is still reachable."
+  (distinct-column space "label"))
+
+(defun delivery-models (space)
+  "The models this space's log holds. From the log, for the same reason."
+  (distinct-column space "model"))
 
 (defun find-delivery (space id)
   (let ((row (fetch-one "SELECT * FROM webhook_deliveries WHERE space = ? AND id = ?" space id)))

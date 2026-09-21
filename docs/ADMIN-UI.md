@@ -54,8 +54,8 @@ label and the URL. Every webhook receives every event (publish, unpublish,
 delete, draft); the payload says which. Webhooks are part of the schema, so
 they are read-only here; change them in `defspace` / `defmodel` and deploy.
 
-Each row opens that webhook's **delivery log**, and *Delivery log* beside the
-heading opens all of them.
+Each row opens the **delivery log** filtered to that webhook; *View all →*
+beside the heading opens it unfiltered.
 
 ## The webhook delivery log
 
@@ -74,8 +74,19 @@ how long the call took, the error when there was one, and **the response body**
 as the receiver sent it — the first 4000 characters of it, which is where a
 revalidation hook's own error message usually is.
 
-`?label={label}` narrows the log to one webhook; that is the link the rows on
-the space page use.
+There is one log per space, and the narrower views are the same page filtered:
+
+| Filter | Shows | Linked from |
+|---|---|---|
+| `?label={label}` | one webhook's calls | a webhook row on the space page |
+| `?model={model}` | every call a change to that model set off, the space's webhooks included | *Webhooks* on the model's page, or in an object model's editor |
+
+Both together narrow to one webhook's calls for one model. Two selects above
+the list both show what is filtered and are how it is set, so a filter can be
+set on the page as well as arrived at by link; choosing applies it, with no
+button to press, and *Clear* drops both. They offer every model of the space
+and every webhook that can fire for it, whether or not it has fired yet, plus
+anything the log still holds that the schema no longer does.
 
 Nothing here is retried, and nothing is kept beyond the newest 200 calls of a
 space: this is a log to glance at after a publish, not an audit trail.
@@ -84,7 +95,9 @@ space: this is a log to glance at after a publish, not an audit trail.
 
 `/s/{space}/m/{model}` is a table: a status badge, then one column per field of
 the model, then a chevron. Clicking anywhere in a row (or pressing Enter on it)
-opens the editor.
+opens the editor. **Webhooks** in the header opens the space's delivery log
+filtered to this model. An object model has no such page -- its link goes
+straight to its one content -- so that button sits in its editor instead.
 
 ![Contents of a list model](img/model.png)
 
@@ -249,7 +262,7 @@ takes precedence and the settings page then only reports that it is in force.
 | `/login`, `/logout` | log in, log out |
 | `/settings` | instance settings (management keys, time zone, two-factor login) |
 | `/s/{space}` | a space: models and webhooks |
-| `/s/{space}/webhooks` | the webhook delivery log; `?label=` narrows it to one hook |
+| `/s/{space}/webhooks` | the webhook delivery log; `?label=` and `?model=` narrow it |
 | `/s/{space}/m/{model}` | contents of a model (object models redirect to their content) |
 | `/s/{space}/m/{model}/{id}` | the editor; `new` for a new content |
 | `/s/{space}/media` | media library |

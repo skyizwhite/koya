@@ -2,8 +2,11 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/db/schema-store #:find-space)
+  (:import-from #:koya/core/schema
+                #:space-models #:space-webhooks #:model-name #:model-webhooks #:webhook-label)
   (:import-from #:koya-server/db/webhook-deliveries
                 #:list-deliveries #:count-deliveries #:+keep-per-space+
+                #:delivery-labels #:delivery-models
                 #:delivery-id #:delivery-label #:delivery-url #:delivery-model #:delivery-event
                 #:delivery-content-id #:delivery-ok #:delivery-status #:delivery-response
                 #:delivery-error #:delivery-duration-ms #:delivery-created-at)
@@ -14,18 +17,24 @@
   (:export #:@get #:webhook-log-url))
 (in-package #:koya-server/pages/s/<space>/webhooks)
 
-;;; The last +KEEP-PER-SPACE+ webhook calls of a space: whether the receiver
-;;; accepted each one, and what it answered.
+;;; One log per space, holding the last +KEEP-PER-SPACE+ webhook calls it made:
+;;; whether the receiver accepted each one, and what it answered. The same page
+;;; serves every narrower view through ?label= (one webhook) and ?model= (one
+;;; model). A space's webhooks fire for every model, so a model's view holds
+;;; their calls as well as that model's own webhooks'.
 
 (defparameter +page-size+ 25)
 
-(defun webhook-log-url (space &optional label)
-  (format nil "~a/webhooks~@[?label=~a~]" (space-url space)
-          (and label (plusp (length label)) (quri:url-encode label))))
+(defun blank-p (value) (or (null value) (zerop (length value))))
 
-(defun page-link (space label page)
-  (format nil "~a/webhooks?page=~a~@[&label=~a~]" (space-url space) page
-          (and label (plusp (length label)) (quri:url-encode label))))
+(defun filtered-p (label model) (not (and (blank-p label) (blank-p model))))
+
+(defun webhook-log-url (space &key label model page)
+  "This space's log, narrowed to LABEL and/or MODEL, at PAGE."
+  (let ((query (append (unless (blank-p label) (list (format nil "label=~a" (quri:url-encode label))))
+                       (unless (blank-p model) (list (format nil "model=~a" (quri:url-encode model))))
+                       (when (and page (> page 1)) (list (format nil "page=~a" page))))))
+    (format nil "~a/webhooks~@[?~{~a~^&~}~]" (space-url space) query)))
 
 (defun page-number (params)
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
@@ -40,6 +49,61 @@
            (cond (status (format nil "~a" status))
                  (t "no response"))))))
 
+;;; The filters, as a GET form that submits on change: the two selects both show
+;;; what is filtered now and are how it is set. Submitting drops ?page= and
+;;; starts at the first again.
+;;;
+;;; The options are the schema's -- every model of the space, every webhook that
+;;; can fire for it -- plus anything the log holds that the schema no longer
+;;; does, so a model or hook renamed away is still reachable.
+
+(defun union-options (current logged)
+  "CURRENT in the schema's own order, then whatever else the log holds, sorted."
+  (append current
+          (sort (remove-if (lambda (value) (member value current :test #'string=)) logged)
+                #'string<)))
+
+(defun schema-models (space)
+  (let ((space-def (find-space space)))
+    (and space-def (mapcar #'model-name (space-models space-def)))))
+
+(defun schema-labels (space)
+  "Every webhook that can fire for SPACE: its own, and each model's."
+  (let ((space-def (find-space space)))
+    (and space-def
+         (remove-duplicates
+          (mapcar #'webhook-label
+                  (append (space-webhooks space-def)
+                          (loop :for model :in (space-models space-def)
+                                :append (model-webhooks model))))
+          :test #'string= :from-end t))))
+
+(defcomp ~filter-select (&key name label all options selected)
+  (hsx
+   (span :class "flex items-center gap-2"
+     (label :for name :class "text-sm text-muted" label)
+     ;; no Filter button: choosing is the whole gesture
+     (select :id name :name name :class "text-sm" :onchange "this.form.submit()"
+       (option :value "" :selected (blank-p selected) all)
+       (loop :for value :in options :collect
+         (hsx (option :value value :selected (equal value selected) value)))))))
+
+(defcomp ~filters (&key space label model)
+  (let ((labels (union-options (schema-labels space) (delivery-labels space)))
+        (models (union-options (schema-models space) (delivery-models space))))
+    (if (and (null labels) (null models))
+        (hsx (<>))
+        (hsx
+         (form :method "get" :action (format nil "~a/webhooks" (space-url space))
+               :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
+           (~filter-select :name "label" :label "Webhook" :all "All webhooks"
+                           :options labels :selected label)
+           (~filter-select :name "model" :label "Model" :all "All models"
+                           :options models :selected model)
+           (if (filtered-p label model)
+               (hsx (a :href (webhook-log-url space) :class "btn" (~icon :name :close) "Clear"))
+               (hsx (<>))))))))
+
 (defcomp ~field (&key label children)
   (hsx
    (div :class "flex gap-2"
@@ -47,10 +111,10 @@
      (div :class "min-w-0 flex-1 break-all" children))))
 
 (defcomp ~body-block (&key text)
-  (if (and text (plusp (length text)))
+  (if (blank-p text)
+      (hsx (span :class "text-muted" "(empty)"))
       (hsx (pre :class "mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded border border-line bg-base px-2 py-1 font-mono text-xs"
-             text))
-      (hsx (span :class "text-muted" "(empty)"))))
+             text))))
 
 (defcomp ~delivery (&key space delivery)
   (hsx
@@ -77,43 +141,42 @@
          (if (delivery-duration-ms delivery)
              (hsx (format nil "~a ms" (delivery-duration-ms delivery)))
              (hsx (span :class "text-muted" "-"))))
-       (if (plusp (length (delivery-error delivery)))
+       (if (blank-p (delivery-error delivery))
+           (hsx (<>))
            (hsx (~field :label "error"
-                  (span :class "text-danger" (delivery-error delivery))))
-           (hsx (<>)))
+                  (span :class "text-danger" (delivery-error delivery)))))
        (~field :label "response" (~body-block :text (delivery-response delivery)))))))
 
-(defcomp ~log-page (&key space label page)
-  (let* ((total (count-deliveries space :label label))
+(defcomp ~log-page (&key space label model page)
+  (let* ((total (count-deliveries space :label label :model model))
          (pages (max 1 (ceiling total +page-size+)))
          (page (min page pages))
-         (items (list-deliveries space :label label :limit +page-size+ :offset (* (1- page) +page-size+))))
+         (items (list-deliveries space :label label :model model
+                                       :limit +page-size+ :offset (* (1- page) +page-size+))))
     (hsx
      (~layout :space space :crumbs (list (cons "Webhooks" nil))
-       (div :class "mb-6 flex items-center justify-between gap-3"
-         (h1 :class "text-2xl font-bold" "Webhooks")
-         (if label
-             (hsx (a :href (format nil "~a/webhooks" (space-url space)) :class "btn"
-                     (~icon :name :close) "All webhooks"))
-             (hsx (<>))))
-       (p :class "mb-6 text-sm text-muted"
-         (if label
-             (hsx (<> "The last calls to " (code label) "."))
-             (hsx (<> "The last calls this space made.")))
-         (format nil " Only the newest ~a are kept." +keep-per-space+))
+       (h1 :class "mb-2 text-2xl font-bold" "Webhooks")
+       (p :class "mb-4 text-sm text-muted"
+         (format nil "~a call~:p~a." total (if (filtered-p label model) " match" ""))
+         (format nil " Only the newest ~a of the space are kept." +keep-per-space+))
+       (~filters :space space :label label :model model)
        (if (null items)
-           (hsx (~empty-state "Nothing has been delivered yet."))
+           (hsx (~empty-state (if (filtered-p label model)
+                                  "Nothing matches these filters."
+                                  "Nothing has been delivered yet.")))
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                   (loop :for delivery :in items :collect
                     (hsx (li (~delivery :space space :delivery delivery)))))))
        (if (> pages 1)
            (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
                   (if (> page 1)
-                      (hsx (a :href (page-link space label (1- page)) :class "btn" (~icon :name :prev) "Previous"))
+                      (hsx (a :href (webhook-log-url space :label label :model model :page (1- page))
+                              :class "btn" (~icon :name :prev) "Previous"))
                       (hsx (<>)))
                   (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
                   (if (< page pages)
-                      (hsx (a :href (page-link space label (1+ page)) :class "btn" "Next" (~icon :name :next)))
+                      (hsx (a :href (webhook-log-url space :label label :model model :page (1+ page))
+                              :class "btn" "Next" (~icon :name :next)))
                       (hsx (<>)))))
            (hsx (<>)))))))
 
@@ -126,4 +189,7 @@
              (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
             (t
              (set-title (format nil "Webhooks · ~a · koya" space))
-             (hsx (~log-page :space space :label (param params "label") :page (page-number params))))))))
+             (hsx (~log-page :space space
+                             :label (param params "label")
+                             :model (param params "model")
+                             :page (page-number params))))))))
