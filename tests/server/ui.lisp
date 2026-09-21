@@ -678,7 +678,7 @@ is a list of parts for MULTIPART-BODY."
                (ok (search "<option value=\"blog\"" body))
                (ok (search "<option value=\"about\"" body)
                    "every model of the space is offered, not only the ones that have fired")
-               (ok (search "this.form.submit()" body) "choosing filters, with no button to press")
+               (ok (search "<button type=\"submit\" class=\"btn\"" body) "with a button to apply them")
                (ng (search "Clear" body) "nothing to clear when nothing is filtered")))
            (testing "either filter narrows it"
              (multiple-value-bind (status body) (request :get "/s/website/webhooks" :query "label=revalidate")

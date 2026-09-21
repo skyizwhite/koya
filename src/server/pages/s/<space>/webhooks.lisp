@@ -49,8 +49,10 @@
            (cond (status (format nil "~a" status))
                  (t "no response"))))))
 
-;;; The filters, as a GET form that submits on change: the two selects both show
-;;; what is filtered now and are how it is set. Submitting drops ?page= and
+;;; The filters, as a plain GET form: the two selects both show what is filtered
+;;; now and are how it is set, and Filter applies them. Submitting on change
+;;; instead would cost the keyboard its choice -- arrowing a closed select fires
+;;; change on every step -- so the button stays. Submitting drops ?page= and
 ;;; starts at the first again.
 ;;;
 ;;; The options are the schema's -- every model of the space, every webhook that
@@ -86,8 +88,7 @@ option it silently replaces with the first one, which here reads \"All\"."
   (hsx
    (span :class "flex items-center gap-2"
      (label :for name :class "text-sm text-muted" label)
-     ;; no Filter button: choosing is the whole gesture
-     (select :id name :name name :class "text-sm" :onchange "this.form.submit()"
+     (select :id name :name name :class "text-sm"
        (option :value "" :selected (blank-p selected) all)
        (loop :for value :in options :collect
          (hsx (option :value value :selected (equal value selected) value)))))))
@@ -106,6 +107,7 @@ option it silently replaces with the first one, which here reads \"All\"."
                            :options labels :selected label)
            (~filter-select :name "model" :label "Model" :all "All models"
                            :options models :selected model)
+           (button :type "submit" :class "btn" (~icon :name :search) "Filter")
            (if (filtered-p label model)
                (hsx (a :href (webhook-log-url space) :class "btn" (~icon :name :close) "Clear"))
                (hsx (<>))))))))
@@ -160,8 +162,8 @@ option it silently replaces with the first one, which here reads \"All\"."
          (items (list-deliveries space :label label :model model
                                        :limit +page-size+ :offset (* (1- page) +page-size+))))
     (hsx
-     (~layout :space space :crumbs (list (cons "Webhook log" nil))
-       (h1 :class "mb-2 text-2xl font-bold" "Webhook log")
+     (~layout :space space :crumbs (list (cons "Webhooks" nil))
+       (h1 :class "mb-2 text-2xl font-bold" "Webhooks")
        (p :class "mb-4 text-sm text-muted"
          (format nil "~a call~:p~a." total
                  (cond ((not (filtered-p label model)) "")
@@ -197,7 +199,7 @@ option it silently replaces with the first one, which here reads \"All\"."
              (set-response-status 404)
              (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
             (t
-             (set-title (format nil "Webhook log · ~a · koya" name))
+             (set-title (format nil "Webhooks · ~a · koya" name))
              (hsx (~log-page :space name
                              :space-def space-def
                              :label (param params "label")
