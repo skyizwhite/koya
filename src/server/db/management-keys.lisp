@@ -13,33 +13,39 @@
   (:export #:create-management-key
            #:list-management-keys
            #:delete-management-key
-           #:management-key-p))
+           #:space-for-management-key))
 (in-package #:koya-server/db/management-keys)
 
 ;;; Management keys authenticate the admin API (schema deploys, content and media
 ;;; management from a site's REPL or its startup) in place of the owner secret,
-;;; which now only logs into the admin UI. They are instance-wide: a schema deploy
-;;; covers every space. Like delivery keys, only the SHA-256 is stored and the
-;;; plaintext is shown once, on the settings page.
+;;; which only logs into the admin UI. A key belongs to one space and reaches
+;;; nothing outside it, so a site's .env can only affect its own space. Like
+;;; delivery keys, only the SHA-256 is stored and the plaintext is shown once, on
+;;; the space's keys page.
+;;;
+;;; Delivery keys live in a table of their own (db/api-keys). The two are the same
+;;; shape today but not the same thing: one WHERE clause standing between a key
+;;; that is handed to a front end and the right to deploy a schema is not a
+;;; separation worth having.
 
-(defun create-management-key (&key (label ""))
-  "Returns (values plaintext-key id)."
+(defun create-management-key (space &key (label ""))
+  "Create a key for SPACE. Returns (values plaintext-key id)."
   (let ((key (format nil "koya_mgmt_~a" (byte-array-to-hex-string (random-data 24))))
         (id (make-ulid)))
-    (exec "INSERT INTO management_keys (id, key_hash, label, created_at) VALUES (?, ?, ?, ?)"
-          id (hash-api-key key) label (now-iso))
+    (exec "INSERT INTO management_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
+          id space (hash-api-key key) label (now-iso))
     (values key id)))
 
-(defun list-management-keys ()
-  "Plists (:id :label :created-at), oldest first."
+(defun list-management-keys (space)
+  "Plists (:id :label :created-at) of the keys of SPACE, oldest first."
   (mapcar (lambda (row) (list :id (col row "id") :label (col row "label") :created-at (col row "created_at")))
-          (fetch "SELECT id, label, created_at FROM management_keys ORDER BY created_at")))
+          (fetch "SELECT id, label, created_at FROM management_keys WHERE space = ? ORDER BY created_at" space)))
 
-(defun delete-management-key (id)
-  (exec "DELETE FROM management_keys WHERE id = ?" id))
+(defun delete-management-key (space id)
+  (exec "DELETE FROM management_keys WHERE space = ? AND id = ?" space id))
 
-(defun management-key-p (key)
-  "True when KEY is a stored management key."
+(defun space-for-management-key (key)
+  "The space KEY manages, or NIL when it is not a management key."
   (and (stringp key)
-       (fetch-one "SELECT 1 FROM management_keys WHERE key_hash = ?" (hash-api-key key))
-       t))
+       (let ((row (fetch-one "SELECT space FROM management_keys WHERE key_hash = ?" (hash-api-key key))))
+         (and row (col row "space")))))

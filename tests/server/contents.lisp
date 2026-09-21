@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
-  (:import-from #:koya-server/db/schema-store #:save-schema #:find-model)
+  (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:find-model)
   (:import-from #:koya-server/db/contents
                 #:create-content #:save-draft #:publish-content #:unpublish-content #:delete-content
                 #:get-content #:find-content #:list-contents #:ensure-draft-key #:find-object-content
@@ -14,7 +14,7 @@
   (:import-from #:koya-server/lib/query
                 #:parse-query #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
                 #:query-error)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema)
+  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:parse-json #:jget))
 (in-package #:koya-tests/server/contents)
 
@@ -29,9 +29,11 @@
 (setup
   (connect-db ":memory:")
   (migrate)
-  (save-schema (make-schema (list (make-space "website" :models (list (blog-model)
-                                                                      (make-model "tag" :list (list (make-field :name :text)))
-                                                                      (make-model "about" :object (list (make-field :body :richtext)))))))))
+  (create-space "website")
+  (save-schema "website"
+               (make-schema :models (list (blog-model)
+                                          (make-model "tag" :list (list (make-field :name :text)))
+                                          (make-model "about" :object (list (make-field :body :richtext)))))))
 
 (teardown (disconnect-db))
 

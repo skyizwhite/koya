@@ -90,7 +90,17 @@
         error TEXT NOT NULL DEFAULT '',
         duration_ms INTEGER,
         created_at TEXT NOT NULL)"
-     "CREATE INDEX webhook_deliveries_by_space ON webhook_deliveries (space, id DESC)")))
+     "CREATE INDEX webhook_deliveries_by_space ON webhook_deliveries (space, id DESC)")
+    (6
+     ;; management keys belong to one space; the old instance-wide ones cannot be
+     ;; assigned to one, so they are dropped and have to be made again
+     "DROP TABLE management_keys"
+     "CREATE TABLE management_keys (
+        id TEXT PRIMARY KEY,
+        space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,
+        key_hash TEXT NOT NULL UNIQUE,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL)")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

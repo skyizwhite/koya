@@ -2,14 +2,16 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-fields #:field-name #:field-type #:field-option #:space-name #:space-model
-                #:space-webhooks #:model-webhooks
+                #:model-kind #:model-fields #:field-name #:field-type #:field-option
+                #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url)
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/lib/query #:make-query)
   (:import-from #:koya-server/db/contents
                 #:list-contents #:find-content #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data)
+  (:import-from #:koya-server/db/schema-store
+                #:find-model #:space-webhooks)
   (:import-from #:koya-server/lib/content-service
                 #:resolve-model #:default-data #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
   (:import-from #:koya-server/lib/http #:path-param #:api-error)
@@ -29,15 +31,15 @@
 (defun media-for (space field value)
   "The media struct behind a :media field's id, or NIL."
   (and (eq (field-type field) :media) (stringp value) (plusp (length value))
-       (find-media (space-name space) value)))
+       (find-media space value)))
 
 (defun reference-options (space field)
   "Selectable contents of FIELD's target model as (id . label), sorted by label."
   (when (eq (field-type field) :reference)
-    (let ((target (space-model space (field-option field :model))))
+    (let ((target (find-model space (field-option field :model))))
       (when target
         (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target)))
-                      (list-contents (space-name space) (model-name target) target
+                      (list-contents space (model-name target) target
                                      (make-query :limit 1000) :status :all))
               #'string-lessp :key #'cdr)))))
 
@@ -62,7 +64,7 @@
      (span "updated at " (short-time (content-updated-at content))))))
 
 (defcomp ~editor (&key space model content data errors)
-  (let* ((space-name (space-name space))
+  (let* ((space-name space)
          (model-name (model-name model))
          (id (if content (content-id content) "new"))
          (object-p (eq (model-kind model) :object))
@@ -95,7 +97,7 @@
              (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>)))
              ;; an object model has no list page to carry this, and this editor
              ;; is the whole of its screen -- but only where a hook can fire
-             (if (and object-p (or (space-webhooks space) (model-webhooks model)))
+             (if (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))
                  (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
                          (~icon :name :webhook) "Webhooks"))
                  (hsx (<>))))
@@ -138,7 +140,7 @@
   (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
     (let ((id (path-param params :id)))
       (values space model (and (not (new-p id))
-                               (find-content (space-name space) (model-name model) id))))))
+                               (find-content space (model-name model) id))))))
 
 (defmacro with-editor ((space model content) params &body body)
   `(handler-case
@@ -154,16 +156,16 @@
 (defun @get (params)
   (with-owner
     (with-editor (space model content) params
-      (set-title (format nil "~a · ~a · koya" (model-name model) (space-name space)))
+      (set-title (format nil "~a · ~a · koya" (model-name model) space))
       (hsx (~editor :space space :model model :content content
                     :data (if content (content-data content :draft t) (default-data model)))))))
 
 (defun @post (params)
   (with-owner-post
     (with-editor (space model content) params
-      (set-title (format nil "~a · ~a · koya" (model-name model) (space-name space)))
+      (set-title (format nil "~a · ~a · koya" (model-name model) space))
       (let* ((action (or (param params "action") "save"))
-             (space-name (space-name space))
+             (space-name space)
              (model-name (model-name model))
              (data (form->data model params)))
         (handler-case

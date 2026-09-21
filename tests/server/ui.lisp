@@ -3,7 +3,9 @@
   (:import-from #:koya-server/app #:*app*)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db #:exec #:fetch-one #:col)
   (:import-from #:koya-server/db/migrations #:migrate)
-  (:import-from #:koya-server/db/schema-store #:save-schema)
+  (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:find-space)
+  (:import-from #:koya-server/db/api-keys #:create-api-key #:list-api-keys)
+  (:import-from #:koya-server/db/management-keys #:create-management-key #:list-management-keys)
   (:import-from #:koya-server/db/contents #:list-contents #:content-status #:content-published #:content-draft #:content-id)
   (:import-from #:koya-server/db/api-keys #:list-api-keys)
   (:import-from #:koya-server/db/media #:list-media #:media-id)
@@ -18,7 +20,7 @@
   (:import-from #:koya-server/db/webhook-deliveries #:record-delivery)
   (:import-from #:koya/core/schema #:make-webhook)
   (:import-from #:koya-server/lib/forms #:slugify #:normalize-richtext)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema)
+  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:jget)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
@@ -52,8 +54,10 @@
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (connect-db ":memory:")
   (migrate)
-  (save-schema (make-schema (list (make-space "website" :models (list (blog-model)
-                                                                      (make-model "about" :object (list (make-field :body :richtext)))))))))
+  (create-space "website")
+  (save-schema "website"
+               (make-schema :models (list (blog-model)
+                                          (make-model "about" :object (list (make-field :body :richtext)))))))
 
 (teardown (disconnect-db))
 
@@ -207,6 +211,71 @@ is a list of parts for MULTIPART-BODY."
     (ok (= status 404)))
   (multiple-value-bind (status) (request :get "/s/website/m/blog/01ARZ3NDEKTSV4RRFFQ69G5FAV")
     (ok (= status 404))))
+
+(deftest spaces-page
+  (let ((origin '(("origin" . "http://localhost:3000"))))
+    (multiple-value-bind (status body) (request :get "/")
+      (ok (= status 200))
+      (ok (search "website" body))
+      (ok (search "Create space" body)))
+    (testing "a space is made here, and starts empty"
+      (multiple-value-bind (status headers) (request :post "/" :form '(("action" . "create") ("name" . "shop")) :headers origin)
+        (declare (ignore headers))
+        (ok (= status 303)))
+      (ok (find-space "shop"))
+      (multiple-value-bind (status body) (request :get "/s/shop")
+        (ok (= status 200))
+        (ok (search "This space has no models" body))))
+    (testing "a bad or taken name is refused, and says why"
+      (request :post "/" :form '(("action" . "create") ("name" . "shop")) :headers origin)
+      (multiple-value-bind (status body) (request :get "/")
+        (declare (ignore status))
+        (ok (search "already exists" body) "the flash carries the reason"))
+      (request :post "/" :form '(("action" . "create") ("name" . "Not A Slug")) :headers origin)
+      (multiple-value-bind (status body) (request :get "/")
+        (declare (ignore status))
+        (ok (search "lowercase letters" body))))
+    (testing "deleting takes the space and its keys with it"
+      (create-api-key "shop" :label "gone")
+      (create-management-key "shop" :label "gone")
+      (multiple-value-bind (status) (request :post "/" :form '(("action" . "create") ("name" . "shop")) :headers origin)
+        (declare (ignore status)))
+      (multiple-value-bind (status) (request :post "/" :form '(("action" . "delete") ("name" . "shop")) :headers origin)
+        (ok (= status 303)))
+      (ng (find-space "shop"))
+      (ok (null (list-api-keys "shop")))
+      (ok (null (list-management-keys "shop")))
+      (multiple-value-bind (status) (request :get "/s/shop")
+        (ok (= status 404))))
+    (testing "an unknown space cannot be deleted"
+      (multiple-value-bind (status) (request :post "/" :form '(("action" . "delete") ("name" . "ghost")) :headers origin)
+        (ok (= status 404))))))
+
+(deftest keys-page
+  (let ((origin '(("origin" . "http://localhost:3000"))))
+    (multiple-value-bind (status body) (request :get "/s/website/keys")
+      (ok (= status 200))
+      (ok (search "Delivery keys" body))
+      (ok (search "Management keys" body) "both kinds of key live on the space's page")
+      (ok (search "Webhook secret" body)))
+    (testing "a management key is made here and shown once"
+      (multiple-value-bind (status body)
+          (request :post "/s/website/keys" :form '(("action" . "create-management") ("label" . "deploys")) :headers origin)
+        (ok (= status 200))
+        (ok (search "koya_mgmt_" body) "the plaintext is on the page that made it"))
+      (ok (= (length (list-management-keys "website")) 1))
+      (multiple-value-bind (status body) (request :get "/s/website/keys")
+        (declare (ignore status))
+        (ng (search "koya_mgmt_" body) "and never again"))
+      (let ((id (getf (first (list-management-keys "website")) :id)))
+        (multiple-value-bind (status) (request :post "/s/website/keys"
+                                               :form `(("action" . "delete-management") ("id" . ,id)) :headers origin)
+          (ok (= status 303)))
+        (ok (null (list-management-keys "website")))))
+    (testing "the settings page has no keys on it any more"
+      (multiple-value-bind (status body) (request :get "/settings")
+        (ok (= status 200))
+        (ng (search "Management keys" body))))))
 
 (deftest editor-flow
   (exec "DELETE FROM contents")
@@ -629,13 +698,13 @@ is a list of parts for MULTIPART-BODY."
       (request :post path :form '(("action" . "delete")) :headers '(("origin" . "http://localhost:3000"))))))
 
 (deftest webhook-log-page
-  (let ((hooked (make-schema (list (make-space "website"
-                                               :webhooks (list (make-webhook "revalidate" "https://site.test/api/revalidate"))
-                                               :models (list (blog-model)
-                                                             (make-model "about" :object (list (make-field :body :richtext)))))))))
+  (let ((hooked (make-schema :webhooks (list (make-webhook "revalidate" "https://site.test/api/revalidate")
+                                             (make-webhook "blog-build" "https://site.test/api/build" :only '(blog)))
+                             :models (list (blog-model)
+                                           (make-model "about" :object (list (make-field :body :richtext)))))))
     (unwind-protect
          (progn
-           (save-schema hooked)
+           (save-schema "website" hooked)
            (exec "DELETE FROM webhook_deliveries")
            (record-delivery "website" :label "revalidate" :url "https://site.test/api/revalidate"
                                       :model "blog" :event "publish" :content-id "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -650,7 +719,20 @@ is a list of parts for MULTIPART-BODY."
                (ok (= status 200))
                (ok (search "/s/website/webhooks?label=revalidate" body) "the row is a link to that hook's log")
                (ok (search "\"/s/website/webhooks\"" body) "and View log links to the unfiltered log")
-               (ok (search "View log" body))))
+               (ok (search "View log" body))
+               (ok (search "all models" body) "a webhook without :only says so")
+               (ok (search "blog only" body) "and one with :only names the models it covers")))
+           (testing "an object model the webhooks leave out offers no log"
+             (multiple-value-bind (status body)
+                 (let ((narrow (make-schema :webhooks (list (make-webhook "blog-build" "https://site.test/api/build"
+                                                                          :only '(blog)))
+                                            :models (list (blog-model)
+                                                          (make-model "about" :object (list (make-field :body :richtext)))))))
+               (save-schema "website" narrow)
+               (unwind-protect (request :get "/s/website/m/about/new")
+                 (save-schema "website" hooked)))
+               (ok (= status 200))
+               (ng (search "/s/website/webhooks?model=about" body))))
            (testing "a model page links to the log narrowed to that model"
              (multiple-value-bind (status body) (request :get "/s/website/m/blog")
                (ok (= status 200))
@@ -705,9 +787,9 @@ is a list of parts for MULTIPART-BODY."
                  (ok (search "<option value=\"blog\" selected" body)))))
            (multiple-value-bind (status) (request :get "/s/nope/webhooks")
              (ok (= status 404))))
-      (save-schema (make-schema (list (make-space "website"
-                                                  :models (list (blog-model)
-                                                                (make-model "about" :object (list (make-field :body :richtext))))))))
+      (save-schema "website"
+                   (make-schema :models (list (blog-model)
+                                              (make-model "about" :object (list (make-field :body :richtext))))))
       (exec "DELETE FROM webhook_deliveries")))
   (testing "with the webhooks gone, nothing offers a log that can only be empty"
     (multiple-value-bind (status body) (request :get "/s/website/m/blog")

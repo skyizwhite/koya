@@ -1,16 +1,18 @@
 openapi: 3.1.0
 info:
   title: koya
-  version: 0.2.0
+  version: 0.5.0
   summary: Delivery and admin APIs of a koya server
   description: |
     Two JSON APIs on one server.
 
     * The **delivery API** (`/api/v1`) reads published content with a per-space
-      API key, created on the space's *API keys* page.
+      API key, created on the space's *Keys* page.
     * The **admin API** (`/admin/api`) manages the schema, contents, keys and media
-      with a **management key** (made on the admin UI's settings page) as a
-      Bearer token; the owner secret only logs into the admin UI. State-changing
+      with a **management key** (made on the space's *Keys* page) as a Bearer
+      token. A key belongs to one space: every route but `/admin/api/me` names a
+      space, and a key sent to another space's route is refused with 403. The
+      owner secret only logs into the admin UI. State-changing
       requests that carry an `Origin` or `Referer` naming another site are
       rejected with 403; requests without either header (non-browser clients) are
       accepted.
@@ -133,28 +135,33 @@ paths:
                 properties:
                   owner: { type: boolean, description: "true when called with the admin UI's session" }
                   management: { type: boolean, description: "true when called with a management key" }
-                  version: { type: string, examples: ["0.2.0"] }
+                  space: { type: [string, "null"], description: "the space a management key is limited to; null for the owner" }
+                  version: { type: string, examples: ["0.5.0"] }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/api/schema:
+  /admin/api/schema/{space}:
+    parameters:
+      - $ref: "#/components/parameters/space"
     get:
       tags: [schema]
-      summary: The stored schema
+      summary: The space's stored schema
       security: [{ ownerSecret: [] }]
       responses:
         "200":
-          description: The schema document (see SCHEMA.md); empty `spaces` before any deploy
+          description: The schema document (see SCHEMA.md); empty `models` before any deploy
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Schema" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
     put:
       tags: [schema]
-      summary: Replace the stored schema
+      summary: Replace the space's schema
       description: |
-        Validates the document, diffs it against the stored schema and, unless a
-        destructive change is present without `force=true`, stores it. Existing
-        content is never modified.
+        Validates the document, diffs it against the space's stored schema and,
+        unless a destructive change is present without `force=true`, stores it.
+        Existing content is never modified. The space must already exist — it is
+        made in the admin UI — and a deploy to an unknown name is a 404.
       security: [{ ownerSecret: [] }]
       parameters:
         - name: force
@@ -181,6 +188,7 @@ paths:
         "400": { $ref: "#/components/responses/InvalidSchema" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "409":
           description: Destructive changes without `force=true`; `details` lists every change
           content:
@@ -189,11 +197,13 @@ paths:
               example:
                 error:
                   code: destructive_changes
-                  message: Schema push contains destructive changes; retry with force=true
+                  message: Schema deploy contains destructive changes; retry with force=true
                   details:
-                    - { op: remove_field, path: website.blog.summary, destructive: true, description: "! - website.blog.summary (text)" }
+                    - { op: remove_field, path: blog.summary, destructive: true, description: "! - blog.summary (text)" }
 
-  /admin/api/schema/plan:
+  /admin/api/schema/{space}/plan:
+    parameters:
+      - $ref: "#/components/parameters/space"
     post:
       tags: [schema]
       summary: The changes a PUT of this schema would apply
@@ -218,6 +228,7 @@ paths:
         "400": { $ref: "#/components/responses/InvalidSchema" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /admin/api/contents/{space}/{model}:
     parameters:
@@ -730,7 +741,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     Forbidden:
-      description: "`forbidden`: the API key belongs to another space"
+      description: "`forbidden`: the delivery or management key belongs to another space"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -787,65 +798,62 @@ components:
 
     Schema:
       type: object
-      description: The schema document; SCHEMA.md is normative.
+      description: One space's schema document; SCHEMA.md is normative. The space is named by the URL, not by the document.
       required: [koyaSchema]
       properties:
         koyaSchema: { type: integer, const: 1 }
-        spaces:
+        webhooks:
+          type: array
+          items: { $ref: "#/components/schemas/Webhook" }
+        models:
           type: array
           items:
             type: object
-            required: [name]
+            required: [name, kind]
             properties:
               name: { type: string }
-              webhooks:
-                type: array
-                items: { $ref: "#/components/schemas/Webhook" }
-              models:
+              kind: { type: string, enum: [list, object] }
+              previewUrl: { type: string }
+              publicUrl: { type: string }
+              fields:
                 type: array
                 items:
                   type: object
-                  required: [name, kind]
+                  required: [name, type]
                   properties:
                     name: { type: string }
-                    kind: { type: string, enum: [list, object] }
-                    previewUrl: { type: string }
-                    publicUrl: { type: string }
-                    webhooks:
-                      type: array
-                      items: { $ref: "#/components/schemas/Webhook" }
-                    fields:
-                      type: array
-                      items:
-                        type: object
-                        required: [name, type]
-                        properties:
-                          name: { type: string }
-                          type:
-                            type: string
-                            enum: [text, textarea, richtext, number, boolean, date, datetime, select, media, reference, slug]
-                        additionalProperties:
-                          description: The options allowed for `type`, camelCase
+                    type:
+                      type: string
+                      enum: [text, textarea, richtext, number, boolean, date, datetime, select, media, reference, slug]
+                  additionalProperties:
+                    description: The options allowed for `type`, camelCase
 
     Webhook:
       type: object
-      description: Sent every event; the payload's `event` says which. An `events` key from older schemas is ignored.
+      description: |
+        Belongs to the space and fires for every model unless `only` narrows it.
+        Sent every event; the payload's `event` says which. An `events` key from
+        older schemas is ignored.
       required: [url]
       properties:
         label: { type: string, description: Defaults to `url` }
         url: { type: string }
+        only:
+          type: array
+          description: Model names this webhook is narrowed to; absent means every model.
+          items: { type: string }
 
     Change:
       type: object
       properties:
         op:
           type: string
-          enum: [add_space, remove_space, change_webhooks, add_model, remove_model, change_kind,
-                 change_model_options, change_model_webhooks, add_field, remove_field,
+          enum: [change_webhooks, add_model, remove_model, change_kind,
+                 change_model_options, add_field, remove_field,
                  change_field_type, change_field_options]
-        path: { type: string, examples: ["website.blog.title"] }
+        path: { type: string, examples: ["blog.title"] }
         destructive: { type: boolean }
-        description: { type: string, examples: ["+ website.blog.title (text)"] }
+        description: { type: string, examples: ["+ blog.title (text)"] }
 
     ContentData:
       type: object

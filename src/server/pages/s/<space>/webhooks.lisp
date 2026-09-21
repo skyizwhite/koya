@@ -1,9 +1,9 @@
 (defpackage #:koya-server/pages/s/<space>/webhooks
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya-server/db/schema-store #:find-space)
+  (:import-from #:koya-server/db/schema-store #:load-schema)
   (:import-from #:koya/core/schema
-                #:space-models #:space-webhooks #:model-name #:model-webhooks #:webhook-label)
+                #:schema-models #:schema-webhooks #:model-name #:webhook-label)
   (:import-from #:koya-server/db/webhook-deliveries
                 #:list-deliveries #:count-deliveries #:+keep-per-space+
                 #:delivery-labels #:delivery-models
@@ -71,18 +71,14 @@ option it silently replaces with the first one, which here reads \"All\"."
         options
         (append options (list selected)))))
 
-(defun schema-models (space-def)
-  (and space-def (mapcar #'model-name (space-models space-def))))
+(defun model-names (schema)
+  (and schema (mapcar #'model-name (schema-models schema))))
 
-(defun schema-labels (space-def)
-  "Every webhook that can fire for the space: its own, and each model's."
-  (and space-def
-       (remove-duplicates
-        (mapcar #'webhook-label
-                (append (space-webhooks space-def)
-                        (loop :for model :in (space-models space-def)
-                              :append (model-webhooks model))))
-        :test #'string= :from-end t)))
+(defun webhook-labels (schema)
+  "Every webhook that can fire for the space."
+  (and schema
+       (remove-duplicates (mapcar #'webhook-label (schema-webhooks schema))
+                          :test #'string= :from-end t)))
 
 (defcomp ~filter-select (&key name label all options selected)
   (hsx
@@ -93,11 +89,11 @@ option it silently replaces with the first one, which here reads \"All\"."
        (loop :for value :in options :collect
          (hsx (option :value value :selected (equal value selected) value)))))))
 
-(defcomp ~filters (&key space space-def label model)
-  ;; SPACE-DEF comes from @GET: FIND-SPACE reads and parses the whole instance's
-  ;; schema, so it is loaded once a request, not once a lookup
-  (let ((labels (union-options (schema-labels space-def) (delivery-labels space) label))
-        (models (union-options (schema-models space-def) (delivery-models space) model)))
+(defcomp ~filters (&key space schema label model)
+  ;; SCHEMA comes from @GET: loading it reads and parses every model of the space,
+  ;; so it is loaded once a request, not once a lookup
+  (let ((labels (union-options (webhook-labels schema) (delivery-labels space) label))
+        (models (union-options (model-names schema) (delivery-models space) model)))
     (if (and (null labels) (null models))
         (hsx (<>))
         (hsx
@@ -155,7 +151,7 @@ option it silently replaces with the first one, which here reads \"All\"."
                   (span :class "text-danger" (delivery-error delivery)))))
        (~field :label "response" (~body-block :text (delivery-response delivery)))))))
 
-(defcomp ~log-page (&key space space-def label model page)
+(defcomp ~log-page (&key space schema label model page)
   (let* ((total (count-deliveries space :label label :model model))
          (pages (max 1 (ceiling total +page-size+)))
          (page (min page pages))
@@ -170,7 +166,7 @@ option it silently replaces with the first one, which here reads \"All\"."
                        ((= total 1) " matches")
                        (t " match")))
          (format nil " Only the newest ~a of the space are kept." +keep-per-space+))
-       (~filters :space space :space-def space-def :label label :model model)
+       (~filters :space space :schema schema :label label :model model)
        (if (null items)
            (hsx (~empty-state (if (filtered-p label model)
                                   "Nothing matches these filters."
@@ -194,14 +190,14 @@ option it silently replaces with the first one, which here reads \"All\"."
 (defun @get (params)
   (with-owner
     (let* ((name (path-param params :space))
-           (space-def (find-space name)))
-      (cond ((null space-def)
+           (schema (load-schema name)))
+      (cond ((null schema)
              (set-response-status 404)
              (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
             (t
              (set-title (format nil "Webhooks · ~a · koya" name))
              (hsx (~log-page :space name
-                             :space-def space-def
+                             :schema schema
                              :label (param params "label")
                              :model (param params "model")
                              :page (page-number params))))))))

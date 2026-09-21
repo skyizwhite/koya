@@ -3,8 +3,10 @@
   (:import-from #:koya/core/json
                 #:jobject #:to-json #:json-null)
   (:import-from #:koya/core/schema
-                #:space-webhooks #:space-name #:model-webhooks #:model-name
+                #:model-name #:webhook-covers-p
                 #:webhook-label #:webhook-url)
+  (:import-from #:koya-server/db/schema-store
+                #:space-webhooks)
   (:import-from #:koya-server/db/webhook-deliveries
                 #:record-delivery)
   (:import-from #:dexador)
@@ -21,8 +23,9 @@
 ;;; Content change notifications:
 ;;; {"space": SPACE, "model": MODEL, "id": ID, "event": "publish"|"unpublish"|"delete"|"draft",
 ;;;  "contents": {"old": {...}|null, "new": {...}|null}}
-;;; Every webhook of the space, and of the model, gets every event; the receiver
-;;; reads "event" and decides what to do (a revalidation hook ignores "draft").
+;;; Every webhook of the space gets every event for every model it covers; the
+;;; receiver reads "event" and decides what to do (a revalidation hook ignores
+;;; "draft"). A webhook covers every model unless its "only" narrows it.
 ;;; What each call answered is kept in db/webhook-deliveries for the admin UI.
 
 (defun default-sender (url payload headers)
@@ -42,9 +45,10 @@ answer and carries its status and body; only a transport failure has neither."
 
 (defparameter +events+ '(:publish :unpublish :delete :draft))
 
-(defun webhooks-for (space model)
-  "The webhooks of SPACE plus those of MODEL."
-  (append (space-webhooks space) (and model (model-webhooks model))))
+(defun webhooks-for (space-name model)
+  "The webhooks of the space that cover MODEL."
+  (let ((name (model-name model)))
+    (remove-if-not (lambda (hook) (webhook-covers-p hook name)) (space-webhooks space-name))))
 
 (defvar *webhook-sender* #'default-sender
   "Function (URL PAYLOAD-STRING HEADERS-ALIST) that delivers one webhook and
@@ -86,17 +90,16 @@ failed write may stop the hooks queued behind it."
                            :duration-ms (elapsed-ms start))
         (error (e) (format *error-output* "~&[koya] webhook log failed: ~a~%" e))))))
 
-(defun notify-webhooks (space model id event &key old new (async *webhook-async*) secret)
-  "Send EVENT (one of +EVENTS+) for content ID to the webhooks of SPACE (a
-space-def) and MODEL (a model struct). SECRET, when given, is sent as the
+(defun notify-webhooks (space-name model id event &key old new (async *webhook-async*) secret)
+  "Send EVENT (one of +EVENTS+) for content ID to the webhooks of the space named
+SPACE-NAME and of MODEL (a model struct). SECRET, when given, is sent as the
 X-KOYA-WEBHOOK-KEY header so receivers can authenticate the call. Delivery is
 asynchronous unless ASYNC is NIL."
   (assert (member event +events+))
-  (let ((hooks (webhooks-for space model))
+  (let ((hooks (webhooks-for space-name model))
         (headers (and secret (list (cons "X-KOYA-WEBHOOK-KEY" secret)))))
     (when hooks
-      (let* ((space-name (space-name space))
-             (model-name (model-name model))
+      (let* ((model-name (model-name model))
              (event-name (string-downcase (symbol-name event)))
              (payload (to-json (jobject "space" space-name
                                         "model" model-name

@@ -1,11 +1,13 @@
 (defpackage #:koya-server/lib/presenter
   (:use #:cl)
   (:import-from #:koya/core/schema
-                #:model-fields #:field-name #:field-type #:field-option #:field-many-p #:space-model)
+                #:model-fields #:field-name #:field-type #:field-option #:field-many-p)
   (:import-from #:koya/core/json
                 #:jobject #:json-array-p #:json-null)
   (:import-from #:koya-server/lib/query
                 #:query-error)
+  (:import-from #:koya-server/db/schema-store
+                #:find-model)
   (:import-from #:koya-server/db/media
                 #:find-media)
   (:import-from #:koya-server/lib/media-store
@@ -32,8 +34,8 @@
 (defun expand-reference (space target-model-name value include)
   "The published content object for a referenced id, or NIL when it is missing or
 unpublished. INCLUDE applies to the embedded object's own references."
-  (let* ((target (space-model space target-model-name))
-         (content (and target (stringp value) (find-content (koya/core/schema:space-name space) target-model-name value))))
+  (let* ((target (find-model space target-model-name))
+         (content (and target (stringp value) (find-content space target-model-name value))))
     (and content (content-published content)
          (content->jobject content target space :include include))))
 
@@ -81,7 +83,7 @@ consumers need the URL."
     (when (eq (field-type field) :media)
       (let ((value (gethash (field-name field) object)))
         (when (and value (not (eq value json-null)))
-          (let ((media (and (stringp value) (find-media (koya/core/schema:space-name space) value))))
+          (let ((media (and (stringp value) (find-media space value))))
             (setf (gethash (field-name field) object) (if media (media->jobject media) json-null))))))))
 
 (defun select-fields (object fields)

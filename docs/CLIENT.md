@@ -2,8 +2,8 @@
 
 `koya` is the library a site depends on. It holds three things:
 
-- a **schema DSL** — `defspace`, `defmodel`, `webhook` — that defines the space's
-  models as code in the site's own repository;
+- a **schema DSL** — `defmodel`, `defwebhooks`, `webhook` — that defines the
+  space's models as code in the site's own repository;
 - **`plan` / `deploy` / `pull`**, which compare that schema with the one the
   server stores and push it across;
 - an **HTTP client** for reading published content, managing content, keys and
@@ -47,9 +47,9 @@ system; a site never loads it.
 
 ```lisp
 (koya:configure :base-url "https://cms.example.com"
-                :management-key "koya_mgmt_..."  ; from Settings: schema, content and media calls
+                :management-key "koya_mgmt_..."  ; schema, content and media calls
                 :api-key  "koya_..."   ; delivery API key: reading published content
-                :space    "website")   ; default space for every call
+                :space    "website")   ; the space every call works in
 ```
 
 Each setting is a special variable with an environment-variable fallback, read at
@@ -62,48 +62,49 @@ call time:
 | `koya:*api-key*` | `KOYA_API_KEY` | `get-list`, `get-item`, `get-object` |
 | `koya:*space*` | `KOYA_SPACE` | the default for every `:space` argument |
 
-A management key is made on the server's **Settings** page; the owner secret
+**The space is made in the admin UI first**, and both keys are then made on its
+*Keys* page. A management key belongs to that one space and reaches nothing else,
+so a site's `.env` cannot touch another site's content; the owner secret
 (`KOYA_SECRET`) only logs into the admin UI and is not accepted here. Note that
 the server's own public URL is `KOYA_BASE_URL`; the client reads `KOYA_URL`, so
 both can sit in one `.env` without colliding. A missing setting
 signals an error naming what to set. Calls that take `:space` accept a symbol or
-a string and downcase it.
+a string and downcase it, and default to `koya:*space*`.
 
 ## Defining the schema
 
-Definitions are collected in an in-memory registry; re-evaluating a form replaces
-the previous definition of the same name, so the schema can be edited live from
-the REPL.
+A project defines the models of one space, so no definition names the space —
+`koya:*space*` says which one a deploy goes to. Definitions are collected in an
+in-memory registry; re-evaluating a form replaces the previous definition of the
+same name, so the schema can be edited live from the REPL.
 
 ```lisp
-(defspace website
-  ;; fires for every model of the space, on every event
-  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
+;; every model of the space, on every event; :only narrows one -- see Webhooks below
+(defwebhooks (webhook "revalidate" "https://example.com/api/revalidate")
+             (webhook "preview-build" "https://preview.example/hook" :only 'blog))
 
-(defmodel (website blog) (:kind :list
-                          :public-url  "https://example.com/blog/{CONTENT_ID}"
-                          :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
-                          ;; this model only, in addition to the space's
-                          :webhooks (list (webhook "preview-build" "https://preview.example/hook")))
+(defmodel blog (:kind :list
+                :public-url  "https://example.com/blog/{CONTENT_ID}"
+                :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
   (title   :text :required t)
   (slug    :slug :from title :unique t)
   (cover   :media)
   (content :richtext)
   (tags    :reference :model tag :many t))
 
-(defmodel (website tag) (:kind :list)
+(defmodel tag (:kind :list)
   (name :text :required t))
 
-(defmodel (website about) (:kind :object)
+(defmodel about (:kind :object)
   (body :richtext))
 ```
 
-- **`(defspace name &key webhooks)`** — `name` is taken literally; `:webhooks` is
-  evaluated. A space must exist before its models are defined.
-- **`(defmodel (space name) (&key kind preview-url public-url webhooks) &body fields)`** —
+- **`(defwebhooks &rest webhooks)`** — each form is evaluated and must produce a
+  `(webhook label url &key only)`. Re-evaluating replaces the whole list.
+- **`(defmodel name (&key kind preview-url public-url) &body fields)`** —
   `:kind` is required and is `:list` (many contents) or `:object` (exactly one).
-  The URL templates and `:webhooks` are evaluated; each field form
-  `(name type . options)` is taken literally.
+  The URL templates are evaluated; each field form `(name type . options)` is
+  taken literally. A model carries no webhooks: they all live in `defwebhooks`.
 - **`:preview-url` / `:public-url`** are templates for the editor's two links.
   `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
 
@@ -111,15 +112,15 @@ Naming rules, checked as the schema is built:
 
 | Name | Shape | Notes |
 |---|---|---|
-| space, model | `^[a-z][a-z0-9-]*` | they appear in URLs |
+| model | `^[a-z][a-z0-9-]*` | it appears in URLs |
 | field | `^[a-z][a-zA-Z0-9]*` | a kebab-case symbol is camelised: `(published-at :datetime)` becomes `publishedAt` |
 
 `id`, `createdAt`, `updatedAt`, `publishedAt` and `revisedAt` are system fields
 that every content already has; declaring one is an error.
 
 Other helpers: `(koya:current-schema)` returns the validated schema built so far,
-`(koya:clear-schema)` empties the registry, and `(koya:find-space name)` /
-`(koya:find-model space model)` look definitions up.
+`(koya:clear-schema)` empties the registry, and `(koya:find-model name)` looks a
+definition up.
 
 ## Field types and options
 
@@ -139,7 +140,7 @@ Other helpers: `(koya:current-schema)` returns the validated schema built so far
 
 - `:options` takes strings or symbols, which are downcased; `:model` and `:from`
   take a symbol or a string too.
-- `:model` names another model **of the same space**; `:from` names a `:text` or
+- `:model` names another model of the same space; `:from` names a `:text` or
   `:textarea` field of the same model other than itself. Both are checked against
   the whole schema, so a typo fails before anything is sent.
 - `:default t` on a `:boolean` sets the field to true on a new content that does
@@ -154,13 +155,19 @@ blank `:slug` filled from `:from`, …) is specified in
 ## Webhooks
 
 ```lisp
-(webhook label url)
+(defwebhooks
+  (webhook "revalidate" "https://example.com/api/revalidate")
+  (webhook "preview-build" "https://preview.example/hook" :only 'blog)
+  (webhook "reindex" "https://search.example/hook" :only '(blog tag)))
 ```
 
-A space's webhooks fire for every model; a model's `:webhooks` are added to
-them, and labels must be unique within each list. There is nothing to
-subscribe to: **every webhook is sent every event**, and the payload says which,
-so the receiver decides what to act on.
+Every webhook belongs to the space and fires for **every model**. `:only` narrows
+one to a model, or to a list of them; it takes symbols or strings, and each name
+must be a model of the schema, so a typo fails before anything is sent. A webhook
+without `:only` also covers models added later. Labels must be unique.
+
+There is nothing to subscribe to: **every webhook is sent every event**, and the
+payload says which, so the receiver decides what to act on.
 
 ```
 {
@@ -186,7 +193,7 @@ The bodies are the same shape the delivery API returns. Discarding a draft sends
 nothing: what is published did not change. Note that `draft` arrives on every
 save, so a hook that rebuilds or revalidates a site should return early on it.
 Every call carries the space's webhook secret in `X-KOYA-WEBHOOK-KEY` -- read it
-with `(koya:webhook-secret)` or from the space's Delivery keys page -- and
+with `(koya:webhook-secret)` or from the space's Keys page -- and
 delivery is fire-and-forget: koya does not retry. What each call answered (its
 status, its body, or the error when it never arrived) is kept for the space's
 newest 200 deliveries and shown in the admin UI at `/s/{space}/webhooks`; see
@@ -201,6 +208,11 @@ newest 200 deliveries and shown in the admin UI at `/s/{space}/webhooks`; see
 (koya:pull)                ; the schema the server currently stores, as a schema object
 ```
 
+All four work on `koya:*space*`, or on the `:space` given to them. **The space
+must already exist**: it is made in the admin UI, and a deploy to a name that has
+none is refused with `404 not_found` rather than quietly making one, so a typo in
+`KOYA_SPACE` cannot grow a second, empty space.
+
 Both `plan` and `deploy` take `:schema` (defaulting to `(current-schema)`) and
 `:stream`; `deploy` also takes `:confirm` (default `t`). When a deploy would
 change something destructive the server refuses it; `deploy` then prints the
@@ -209,8 +221,9 @@ nothing. With `:confirm nil` and no `:force` it gives up the same way, without
 asking, so a script never applies a destructive change by accident.
 
 Destructive means a change that can hide or invalidate content already stored:
-removing a space, model or field, changing a kind or a field type, or tightening
-a field's options. The exact list, and the shape of each change, is in
+removing a model or field, changing a kind or a field type, or tightening a
+field's options. Deleting the space itself is not among them — that is done in
+the admin UI, with its own confirmation. The exact list, and the shape of each change, is in
 [SCHEMA.md, "Changes"](SCHEMA.md#changes). Nothing migrates existing content: a
 deploy only replaces the stored schema, and rows that no longer fit it stay as
 they are.

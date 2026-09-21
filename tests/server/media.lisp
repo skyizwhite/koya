@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
-  (:import-from #:koya-server/db/schema-store #:save-schema)
+  (:import-from #:koya-server/db/schema-store #:save-schema #:create-space)
   (:import-from #:koya-server/db/contents #:create-content)
   (:import-from #:koya-server/lib/image #:sniff-image)
   (:import-from #:koya-server/lib/media-store
@@ -11,7 +11,7 @@
                 #:find-media #:list-media #:count-media #:update-media #:media-references
                 #:media-id #:media-filename #:media-mime #:media-width #:media-height #:media-alt)
   (:import-from #:koya-server/lib/http #:api-error #:api-error-status)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema)
+  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:jget #:parse-json)
   (:import-from #:babel #:string-to-octets)
   (:export #:png-bytes #:*media-root* #:multipart-body))
@@ -54,10 +54,11 @@ Returns (values octets content-type)."
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
   (connect-db ":memory:")
   (migrate)
-  (save-schema (make-schema (list (make-space "website"
-                                              :models (list (make-model "blog" :list (list (make-field :title :text)
-                                                                                           (make-field :cover :media)
-                                                                                           (make-field :body :richtext)))))))))
+  (create-space "website")
+  (save-schema "website"
+               (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
+                                                                         (make-field :cover :media)
+                                                                         (make-field :body :richtext)))))))
 
 (teardown
   (disconnect-db)

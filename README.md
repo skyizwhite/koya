@@ -3,7 +3,7 @@
 A small, self-hosted headless CMS written in Common Lisp, for one owner and any number of sites.
 
 - **Server** (`koya-server`): admin UI, delivery API, admin API and media library. One process, one Docker image.
-- **Library** (`koya`): a schema DSL (`defspace` / `defmodel` / `webhook`), `plan` / `deploy` / `pull` to push that schema to the server, and an HTTP client for reading and managing content.
+- **Library** (`koya`): a schema DSL (`defmodel` / `defwebhooks` / `webhook`), `plan` / `deploy` / `pull` to push that schema to the server, and an HTTP client for reading and managing content.
 
 The schema is code in the site's repository; the server stores a copy and builds its editing forms from it.
 
@@ -46,19 +46,18 @@ Or from a REPL:
 (koya-server:reload)  ; reload the code and restart
 ```
 
-Log in at `/login` with `KOYA_SECRET`. Spaces and models appear once a schema has been deployed. Two-factor login is set up in **Settings**, or outside the database with `(koya-server:totp-setup)` and `KOYA_TOTP_SECRET`.
+Log in at `/login` with `KOYA_SECRET`. Make a space on the first page and take a management key from its **Keys** page; its models appear once a schema has been deployed to it. Two-factor login is set up in **Settings**, or outside the database with `(koya-server:totp-setup)` and `KOYA_TOTP_SECRET`.
 
 ## Using koya from a site
 
-In a project that depends on `koya`, the models are Lisp:
+In a project that depends on `koya`, the models of its space are Lisp:
 
 ```lisp
-(defspace website
-  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
+(defwebhooks (webhook "revalidate" "https://example.com/api/revalidate"))
 
-(defmodel (website blog) (:kind :list
-                          :public-url "https://example.com/blog/{CONTENT_ID}"
-                          :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
+(defmodel blog (:kind :list
+                :public-url "https://example.com/blog/{CONTENT_ID}"
+                :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
   (title   :text :required t)
   (slug    :slug :from title :unique t)
   (cover   :media)
@@ -70,7 +69,7 @@ and so is everything done with them, from the REPL:
 
 ```lisp
 (koya:configure :base-url "https://cms.example.com" :management-key "koya_mgmt_..." :space "website")
-(koya:plan)     ; show the diff against the server
+(koya:plan)     ; show the diff against the space on the server
 (koya:deploy)   ; apply it (asks before destructive changes)
 
 (koya:configure :api-key "koya_...")

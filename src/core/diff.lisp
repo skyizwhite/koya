@@ -1,8 +1,8 @@
 (defpackage #:koya/core/diff
   (:use #:cl)
   (:import-from #:koya/core/schema
-                #:schema-spaces #:space-name #:space-webhooks #:space-models
-                #:model-name #:model-kind #:model-fields #:model-options #:model-webhooks
+                #:schema-webhooks #:schema-models
+                #:model-name #:model-kind #:model-fields #:model-options
                 #:field-name #:field-type #:field-options)
   (:import-from #:koya/core/json
                 #:jobject)
@@ -13,11 +13,12 @@
            #:change->jobject))
 (in-package #:koya/core/diff)
 
-;;; Structural diff between two schemas, used by plan/push. Each change is a
-;;; plist: (:op OP :space S :model M :field F :from X :to Y).
+;;; Structural diff between two schemas, used by plan/deploy. Both sides are one
+;;; space's schema, so a change is a plist (:op OP :model M :field F :from X :to Y);
+;;; the space is whichever one the deploy is addressed to.
 ;;; Destructive ops are the ones that can hide or invalidate existing content.
 
-(defparameter *destructive-ops* '(:remove-space :remove-model :remove-field :change-kind :change-field-type))
+(defparameter *destructive-ops* '(:remove-model :remove-field :change-kind :change-field-type))
 
 (defun options-tightened-p (from to)
   "True when field options TO can reject content that FROM accepted: a constraint
@@ -63,64 +64,53 @@ was added or narrowed, or the single/many shape changed."
        (loop :for (k v) :on a :by #'cddr
              :always (equal v (getf b k '%missing)))))
 
-(defun diff-fields (space model old new)
+(defun diff-fields (model old new)
   (diff-named
    old new #'field-name
-   (lambda (f) (list (list :op :add-field :space space :model model :field (field-name f) :to (field-type f))))
-   (lambda (f) (list (list :op :remove-field :space space :model model :field (field-name f) :from (field-type f))))
+   (lambda (f) (list (list :op :add-field :model model :field (field-name f) :to (field-type f))))
+   (lambda (f) (list (list :op :remove-field :model model :field (field-name f) :from (field-type f))))
    (lambda (o n)
      (cond ((not (eq (field-type o) (field-type n)))
-            (list (list :op :change-field-type :space space :model model :field (field-name n)
+            (list (list :op :change-field-type :model model :field (field-name n)
                         :from (field-type o) :to (field-type n))))
            ((not (plist-equal (field-options o) (field-options n)))
-            (list (list :op :change-field-options :space space :model model :field (field-name n)
+            (list (list :op :change-field-options :model model :field (field-name n)
                         :from (field-options o) :to (field-options n))))
            (t nil)))))
 
-(defun diff-models (space old new)
+(defun diff-models (old new)
   (diff-named
    old new #'model-name
-   (lambda (m) (cons (list :op :add-model :space space :model (model-name m) :to (model-kind m))
-                     (diff-fields space (model-name m) nil (model-fields m))))
-   (lambda (m) (list (list :op :remove-model :space space :model (model-name m))))
+   (lambda (m) (cons (list :op :add-model :model (model-name m) :to (model-kind m))
+                     (diff-fields (model-name m) nil (model-fields m))))
+   (lambda (m) (list (list :op :remove-model :model (model-name m))))
    (lambda (o n)
      (append (unless (eq (model-kind o) (model-kind n))
-               (list (list :op :change-kind :space space :model (model-name n)
+               (list (list :op :change-kind :model (model-name n)
                            :from (model-kind o) :to (model-kind n))))
              (unless (plist-equal (model-options o) (model-options n))
-               (list (list :op :change-model-options :space space :model (model-name n)
+               (list (list :op :change-model-options :model (model-name n)
                            :from (model-options o) :to (model-options n))))
-             (unless (equal (model-webhooks o) (model-webhooks n))
-               (list (list :op :change-model-webhooks :space space :model (model-name n)
-                           :from (model-webhooks o) :to (model-webhooks n))))
-             (diff-fields space (model-name n) (model-fields o) (model-fields n))))))
-
-(defun diff-spaces (old new)
-  (diff-named
-   old new #'space-name
-   (lambda (s) (cons (list :op :add-space :space (space-name s))
-                     (diff-models (space-name s) nil (space-models s))))
-   (lambda (s) (list (list :op :remove-space :space (space-name s))))
-   (lambda (o n)
-     (append (unless (equal (space-webhooks o) (space-webhooks n))
-               (list (list :op :change-webhooks :space (space-name n)
-                           :from (space-webhooks o) :to (space-webhooks n))))
-             (diff-models (space-name n) (space-models o) (space-models n))))))
+             (diff-fields (model-name n) (model-fields o) (model-fields n))))))
 
 (defun diff-schemas (old new)
-  "List the changes needed to turn schema OLD into schema NEW."
-  (diff-spaces (and old (schema-spaces old)) (schema-spaces new)))
+  "List the changes needed to turn schema OLD into schema NEW. Both are the schema
+of one space; OLD may be NIL, which is the same as an empty space."
+  (append (unless (equal (and old (schema-webhooks old)) (schema-webhooks new))
+            (list (list :op :change-webhooks
+                        :from (and old (schema-webhooks old)) :to (schema-webhooks new))))
+          (diff-models (and old (schema-models old)) (schema-models new))))
 
 (defun path (change)
-  (format nil "~a~@[.~a~]~@[.~a~]" (getf change :space) (getf change :model) (getf change :field)))
+  (format nil "~@[~a~]~@[.~a~]" (or (getf change :model) "webhooks") (getf change :field)))
 
 (defun format-change (change)
   (let ((op (getf change :op)))
     (format nil "~:[ ~;!~] ~a ~a~@[ (~(~a~))~]~@[ ~a~]"
             (destructive-change-p change)
             (case op
-              ((:add-space :add-model :add-field) "+")
-              ((:remove-space :remove-model :remove-field) "-")
+              ((:add-model :add-field) "+")
+              ((:remove-model :remove-field) "-")
               (t "~"))
             (path change)
             (case op
@@ -132,7 +122,7 @@ was added or narrowed, or the single/many shape changed."
                (format nil "~(~a~) -> ~(~a~)" (getf change :from) (getf change :to)))
               (:change-field-options (if (destructive-change-p change) "options tightened" "options changed"))
               (:change-model-options "options changed")
-              ((:change-webhooks :change-model-webhooks) "webhooks changed")
+              (:change-webhooks "changed")
               (t nil)))))
 
 (defun change->jobject (change)

@@ -5,10 +5,11 @@
   (:import-from #:koya-server/db/migrations
                 #:migrate #:current-version)
   (:import-from #:koya-server/db/schema-store
-                #:load-schema #:save-schema #:find-model)
+                #:load-schema #:save-schema #:find-model
+                #:list-spaces #:create-space #:delete-space #:find-space)
   (:import-from #:koya/core/schema
-                #:make-field #:make-model #:make-space #:make-schema #:make-webhook
-                #:schema-spaces #:space-name #:space-webhooks #:space-models #:model-name #:model-field
+                #:make-field #:make-model #:make-schema #:make-webhook
+                #:schema-webhooks #:schema-models #:model-name #:model-field
                 #:schema->jobject)
   (:import-from #:koya-server/db/sessions
                 #:make-session-store #:purge-expired-sessions)
@@ -26,46 +27,61 @@
   (disconnect-db))
 
 (defun schema-a ()
-  (make-schema (list (make-space "website"
-                                 :webhooks (list (make-webhook "hook" "https://x/hook"))
-                                 :models (list (make-model "blog" :list (list (make-field :title :text :required t)
-                                                                              (make-field :body :richtext)))
-                                               (make-model "about" :object (list (make-field :body :richtext))))))))
+  (make-schema :webhooks (list (make-webhook "hook" "https://x/hook"))
+               :models (list (make-model "blog" :list (list (make-field :title :text :required t)
+                                                            (make-field :body :richtext)))
+                             (make-model "about" :object (list (make-field :body :richtext))))))
 
 (defun schema-b ()
-  (make-schema (list (make-space "website"
-                                 :models (list (make-model "blog" :list (list (make-field :title :text)
-                                                                              (make-field :event-at :datetime)))))
-                     (make-space "shop"))))
+  (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
+                                                            (make-field :event-at :datetime))))))
 
 (deftest migrations
-  (ok (= (current-version) 5))
+  (ok (= (current-version) 6))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
+(deftest spaces-are-made-here-not-by-a-deploy
+  (ok (null (load-schema "website")) "no space, no schema")
+  (ok (string= (create-space "website") "website"))
+  (ok (create-space "shop"))
+  (ok (equal (mapcar (lambda (s) (getf s :name)) (list-spaces)) '("website" "shop"))
+      "in the order they were made")
+  (ok (= (getf (first (list-spaces)) :models) 0))
+  (testing "bad and taken names are refused"
+    (ok (signals (create-space "My Space") 'error))
+    (ok (signals (create-space "website") 'error)))
+  (testing "deleting takes the space's models with it"
+    (save-schema "shop" (schema-b))
+    (delete-space "shop")
+    (ng (find-space "shop"))
+    (ok (null (load-schema "shop")))
+    (ok (null (fetch "SELECT * FROM models WHERE space = 'shop'")))))
+
 (deftest schema-round-trip
-  (ok (null (schema-spaces (load-schema))) "empty at first")
-  (let ((changes (save-schema (schema-a))))
+  (create-space "site")
+  (ok (null (schema-models (load-schema "site"))) "empty at first")
+  (let ((changes (save-schema "site" (schema-a))))
     (ok (= (length changes) 6))
-    (ok (string= (to-json (schema->jobject (load-schema)))
+    (ok (string= (to-json (schema->jobject (load-schema "site")))
                  (to-json (schema->jobject (schema-a))))))
   (testing "find-model reads a live copy"
-    (ok (model-field (find-model "website" "blog") "title"))
-    (ng (find-model "website" "nope"))
+    (ok (model-field (find-model "site" "blog") "title"))
+    (ng (find-model "site" "nope"))
     (ng (find-model "nope" "blog")))
   (testing "saving again with no change is a no-op"
-    (ok (null (save-schema (schema-a)))))
-  (testing "removed models and added spaces are applied"
-    (save-schema (schema-b))
-    (let ((loaded (load-schema)))
-      (ok (equal (mapcar #'space-name (schema-spaces loaded)) '("website" "shop")))
-      (ok (equal (mapcar #'model-name (space-models (first (schema-spaces loaded)))) '("blog")))
-      (ok (null (space-webhooks (first (schema-spaces loaded)))))
-      (ok (model-field (find-model "website" "blog") "eventAt"))
-      (ng (model-field (find-model "website" "blog") "body"))))
-  (testing "removing a space deletes it"
-    (save-schema (make-schema nil))
-    (ok (null (schema-spaces (load-schema))))
+    (ok (null (save-schema "site" (schema-a)))))
+  (testing "removed models are applied"
+    (save-schema "site" (schema-b))
+    (let ((loaded (load-schema "site")))
+      (ok (equal (mapcar #'model-name (schema-models loaded)) '("blog")))
+      (ok (null (schema-webhooks loaded)))
+      (ok (model-field (find-model "site" "blog") "eventAt"))
+      (ng (model-field (find-model "site" "blog") "body"))))
+  (testing "an empty schema leaves the space with no models"
+    (save-schema "site" (make-schema))
+    (ok (null (schema-models (load-schema "site"))))
+    (ok (find-space "site") "the space itself stays")
     (ok (null (fetch "SELECT * FROM models")))))
 
 (deftest sessions-outlive-the-store

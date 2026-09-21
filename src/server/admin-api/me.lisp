@@ -1,16 +1,18 @@
 (defpackage #:koya-server/admin-api/me
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya/core/json #:jobject #:json-null)
   (:import-from #:lack/request #:request-env)
-  (:import-from #:koya-server/lib/auth #:session-owner-p)
+  (:import-from #:koya-server/lib/auth #:session-owner-p #:calling-space)
   (:export #:@get))
 (in-package #:koya-server/admin-api/me)
 
 (defun @get (params)
   "Who is calling: the owner through a session, or a management key (the only
-other way past the admin auth middleware), plus the server version."
+other way past the admin auth middleware) and the space it is limited to, plus
+the server version."
   (declare (ignore params))
   (let ((owner (session-owner-p (getf (request-env ningle:*request*) :lack.session))))
     (jobject "owner" (and owner t)
              "management" (not owner)
+             "space" (if owner json-null (calling-space))
              "version" (asdf:component-version (asdf:find-system :koya-server)))))

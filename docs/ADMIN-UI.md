@@ -1,13 +1,15 @@
 # The admin UI
 
 koya's admin UI is the web app the server serves at its own root: one owner, any
-number of spaces. It is where content is written, published and previewed, where
-images live, and where keys are made.
+number of spaces. It is where spaces are made, where content is written,
+published and previewed, where images live, and where keys are made.
 
-What it does **not** do is edit the schema. Spaces, models and fields come from
-the `defspace` / `defmodel` definitions in a site's own repository and reach the
-server with `(koya:deploy)` — see [CLIENT.md](CLIENT.md). The admin UI reads that
-schema and builds its lists and forms from it.
+What it does **not** do is edit the schema. Models and fields come from the
+`defmodel` definitions in a site's own repository and reach the server with
+`(koya:deploy)` — see [CLIENT.md](CLIENT.md). The admin UI reads that schema and
+builds its lists and forms from it. **Spaces are the other way round**: a space
+owns the contents, media and keys inside it, so it is made and deleted here, and
+a deploy only ever changes the models of a space that already exists.
 
 - [Logging in](#logging-in)
 - [Spaces](#spaces)
@@ -16,7 +18,7 @@ schema and builds its lists and forms from it.
 - [The editor](#the-editor)
 - [Drafts, publishing and previews](#drafts-publishing-and-previews)
 - [Media](#media)
-- [Delivery keys](#delivery-keys)
+- [Keys](#keys)
 - [Settings: time zone and two-factor login](#settings-time-zone-and-two-factor-login)
 - [Reference](#reference)
 
@@ -37,8 +39,19 @@ no user accounts: whoever knows the secret is the owner.
 
 ## Spaces
 
-`/` lists the spaces of the deployed schema with the number of models in each.
-Until a schema has been deployed the page is empty and says so.
+`/` lists the spaces with the number of models in each, and is where they are
+made and deleted.
+
+- **Create space** takes a name: lowercase letters, digits and hyphens
+  (`^[a-z][a-z0-9-]*$`). The name is the space's id — it is in every admin URL
+  and in the delivery API's `/api/v1/{space}/…` — so it cannot be changed
+  afterwards. A name already taken, or one that is not a slug, is refused with
+  the reason.
+- A new space is empty: deploy a schema to it with `(koya:deploy)` to give it
+  models.
+- **Delete** asks for confirmation and then removes the space with everything in
+  it — models, contents, media rows and files, delivery keys, management keys and
+  the webhook log. It cannot be undone.
 
 ![A space: its models and webhooks](img/space.png)
 
@@ -46,13 +59,13 @@ Until a schema has been deployed the page is empty and says so.
 
 `/s/{space}` lists the space's models — a stacked-rows icon for a `:list` model,
 braces for an `:object` model — with the number of contents in each list model,
-and links to **Media** and **Delivery keys**.
+and links to **Media** and **Keys**.
 
-Underneath, **Webhooks** shows every webhook that can fire for this space: the
-space's own (marked *all models*) and each model's (*`{model}` only*), with the
-label and the URL. Every webhook receives every event (publish, unpublish,
-delete, draft); the payload says which. Webhooks are part of the schema, so
-they are read-only here; change them in `defspace` / `defmodel` and deploy.
+Underneath, **Webhooks** shows every webhook of the space with its label, its URL
+and what it covers — *all models*, or *`blog, tag` only* for one narrowed with
+`:only`. Every webhook receives every event (publish, unpublish, delete, draft)
+for the models it covers; the payload says which. Webhooks are part of the
+schema, so they are read-only here; change them in `defwebhooks` and deploy.
 
 Each row opens the **delivery log** filtered to that webhook; *View log →*
 beside the heading opens it unfiltered.
@@ -79,13 +92,13 @@ There is one log per space, and the narrower views are the same page filtered:
 | Filter | Shows | Linked from |
 |---|---|---|
 | `?label={label}` | one webhook's calls | a webhook row on the space page |
-| `?model={model}` | every call a change to that model set off, the space's webhooks included | *Webhooks* on the model's page, or in an object model's editor |
+| `?model={model}` | every call a change to that model set off | *Webhooks* on the model's page, or in an object model's editor |
 
 Both together narrow to one webhook's calls for one model. Two selects above
 the list both show what is filtered and are how it is set, so a filter can be
 set on the page as well as arrived at by link; choosing applies it, with no
 button to press, and *Clear* drops both. They offer every model of the space
-and every webhook that can fire for it, whether or not it has fired yet, plus
+and every webhook of it, whether or not it has fired yet, plus
 anything the log still holds that the schema no longer does.
 
 Nothing here is retried, and nothing is kept beyond the newest 200 calls of a
@@ -203,37 +216,37 @@ A content is in one of three states, shown as its badge:
   **Choose…** button and from Quill's image button. The picker searches and
   uploads too, so an image can go straight from the desktop into a content.
 
-## Delivery keys
+## Keys
 
 koya has four kinds of key, each for one job:
 
 | Key | Made where | Used for |
 |---|---|---|
 | owner secret | `KOYA_SECRET` in the environment | logging into this UI |
-| management key | **Settings** | the admin API (schema deploys, content and media management from a site's code) |
-| delivery key | a space's **Delivery keys** page | reading that space through the delivery API |
+| management key | a space's **Keys** page | the admin API for that space (schema deploys, content and media management from a site's code) |
+| delivery key | the same page | reading that space through the delivery API |
 | webhook secret | one per space, on the same page | signing the webhooks koya sends |
 
-`/s/{space}/keys` manages the delivery keys sites use to read this space.
+Everything but the owner secret belongs to one space, so `/s/{space}/keys` holds
+all of it.
 
-- **Create key** takes an optional label and shows the key (`koya_…`) once. Only
-  its SHA-256 is stored, so a lost key cannot be recovered — delete it and make
-  another.
-- A key belongs to one space; it is rejected on any other.
+- **Delivery keys** are what a site sends as `X-KOYA-API-KEY` to read this
+  space's published content. Safe to put where a front end can reach it.
+- **Management keys** are what `(koya:deploy)` and the other management calls
+  send as `Authorization: Bearer …`. A key reaches this space and nothing else —
+  sent to another space's route it is refused with 403 — and it cannot log into
+  this UI, just as the owner secret cannot call the admin API.
+- **Create key** takes an optional label and shows the key (`koya_…` or
+  `koya_mgmt_…`) once. Only its SHA-256 is stored, so a lost key cannot be
+  recovered — delete it and make another. Deleting a key stops whatever used it.
 - The **Webhook secret** section shows the value koya sends as the
   `X-KOYA-WEBHOOK-KEY` header with every webhook of the space, and can rotate it.
   Verify it on the receiving end.
 
 ## Settings: time zone and two-factor login
 
-`/settings` holds the instance-wide settings.
-
-**Management keys** authenticate the admin API as `Authorization: Bearer …` —
-what `(koya:deploy)` and the other management calls of the client library send.
-**Create key** takes a label and shows the key (`koya_mgmt_…`) once; only its
-SHA-256 is stored. A management key works for every space and cannot log into
-this UI; the owner secret cannot call the admin API. Deleting a key stops
-whatever used it.
+`/settings` holds what applies to the whole server rather than to one space.
+Keys are not here: they belong to a space, and are made on its **Keys** page.
 
 **Time zone** is the zone every page shows times in — created and updated at,
 the list previews, and `:datetime` fields, which are also entered in it. Type an
@@ -258,15 +271,15 @@ takes precedence and the settings page then only reports that it is in force.
 
 | Path | Page |
 |---|---|
-| `/` | spaces |
+| `/` | spaces: the list, and where they are made and deleted |
 | `/login`, `/logout` | log in, log out |
-| `/settings` | instance settings (management keys, time zone, two-factor login) |
+| `/settings` | instance settings (time zone, two-factor login) |
 | `/s/{space}` | a space: models and webhooks |
 | `/s/{space}/webhooks` | the webhook delivery log; `?label=` and `?model=` narrow it |
 | `/s/{space}/m/{model}` | contents of a model (object models redirect to their content) |
 | `/s/{space}/m/{model}/{id}` | the editor; `new` for a new content |
 | `/s/{space}/media` | media library |
-| `/s/{space}/keys` | delivery keys and the webhook secret |
+| `/s/{space}/keys` | delivery keys, management keys and the webhook secret |
 | `/health` | unauthenticated health check (verifies the database answers) |
 
 ### Limits worth knowing
@@ -284,7 +297,8 @@ takes precedence and the settings page then only reports that it is in force.
 
 ### What the UI deliberately leaves out
 
-- Editing the schema: it belongs to the site's repository (see [CLIENT.md](CLIENT.md)).
+- Editing the schema: the models of a space belong to the site's repository (see
+  [CLIENT.md](CLIENT.md)). Making and deleting the space itself does belong here.
 - User accounts and roles: there is one owner.
 - Revision history: a content has one published version and one draft.
 

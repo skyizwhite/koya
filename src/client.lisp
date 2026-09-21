@@ -105,18 +105,22 @@ alist whose values may be pathnames, as multipart/form-data. Returns the parsed 
       (dolist (change changes)
         (format stream "~&~:[ ~;!~] ~a~%" (getf change :destructive) (getf change :description)))))
 
-(defun plan (&key (schema (current-schema)) (stream *standard-output*))
-  "Show what DEPLOY would change on the server. Returns the list of changes."
-  (let* ((response (request :post "/admin/api/schema/plan" :body (schema->jobject schema) :auth :management))
+(defun schema-path (space &optional action)
+  (format nil "/admin/api/schema/~a~@[/~a~]" (space-name space) action))
+
+(defun plan (&key space (schema (current-schema)) (stream *standard-output*))
+  "Show what DEPLOY would change in SPACE. Returns the list of changes."
+  (let* ((response (request :post (schema-path space "plan") :body (schema->jobject schema) :auth :management))
          (changes (jvalue->lisp (jget response "changes"))))
     (print-changes changes stream)
     changes))
 
-(defun deploy (&key (schema (current-schema)) force (stream *standard-output*) (confirm t))
-  "Deploy SCHEMA to the server. Destructive changes are applied only with FORCE, or
-after interactive confirmation when CONFIRM is true. Returns the applied changes."
+(defun deploy (&key space (schema (current-schema)) force (stream *standard-output*) (confirm t))
+  "Deploy SCHEMA to SPACE, which must already exist -- spaces are made in the admin
+UI. Destructive changes are applied only with FORCE, or after interactive
+confirmation when CONFIRM is true. Returns the applied changes."
   (flet ((send (force)
-           (request :put "/admin/api/schema" :query (and force '(:force "true"))
+           (request :put (schema-path space) :query (and force '(:force "true"))
                                              :body (schema->jobject schema) :auth :management)))
     (let ((response
             (handler-case (send force)
@@ -133,9 +137,9 @@ after interactive confirmation when CONFIRM is true. Returns the applied changes
         (format stream "~&Applied ~a change~:p.~%" (length applied))
         applied))))
 
-(defun pull ()
-  "Fetch the schema currently stored on the server as a schema object."
-  (jobject->schema (request :get "/admin/api/schema" :auth :management)))
+(defun pull (&key space)
+  "Fetch the schema SPACE currently has on the server as a schema object."
+  (jobject->schema (request :get (schema-path space) :auth :management)))
 
 ;;; --- Delivery API ------------------------------------------------------------
 

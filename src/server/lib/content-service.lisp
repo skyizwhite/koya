@@ -1,7 +1,7 @@
 (defpackage #:koya-server/lib/content-service
   (:use #:cl)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-fields #:field-name #:field-option #:space-model #:space-name)
+                #:model-kind #:model-fields #:field-name #:field-option)
   (:import-from #:koya/core/validate
                 #:validate-content #:validation-error #:blank-value-p #:content-id-p)
   (:import-from #:koya/core/time
@@ -11,7 +11,7 @@
   (:import-from #:koya-server/db/connection
                 #:with-db-transaction)
   (:import-from #:koya-server/db/schema-store
-                #:find-space #:space-webhook-secret)
+                #:find-space #:find-model #:space-webhook-secret)
   (:import-from #:koya-server/db/contents
                 #:create-content #:save-draft #:publish-content #:unpublish-content #:delete-content #:discard-draft
                 #:find-content #:find-object-content #:unique-value-taken-p #:get-content
@@ -46,9 +46,11 @@
 ;;; request. Webhooks fire inside that scope too; they are asynchronous.
 
 (defun resolve-model (space-name model-name)
-  "Return (values space model) or signal 404."
-  (let* ((space (or (find-space space-name) (fail-api 404 "not_found" (format nil "Space ~a does not exist" space-name))))
-         (model (or (space-model space model-name) (fail-api 404 "not_found" (format nil "Model ~a does not exist" model-name)))))
+  "Return (values space-name model) or signal 404."
+  (let* ((space (or (find-space space-name)
+                    (fail-api 404 "not_found" (format nil "Space ~a does not exist" space-name))))
+         (model (or (find-model space model-name)
+                    (fail-api 404 "not_found" (format nil "Model ~a does not exist" model-name)))))
     (values space model)))
 
 (defun resolve-content (space-name model-name id)
@@ -131,7 +133,7 @@
 
 (defun notify (space model id event &key old new)
   (notify-webhooks space model id event
-                   :secret (space-webhook-secret (space-name space))
+                   :secret (space-webhook-secret space)
                    :old old
                    :new new))
 
@@ -140,7 +142,7 @@
 PUBLISHED-AT and REVISED-AT (ISO 8601) may be given explicitly, e.g. when
 importing. For object-kind models the single existing content is updated instead,
 and only PUBLISHED-AT applies."
-  (let* ((space-name (space-name space))
+  (let* ((space-name space)
          (model-name (koya/core/schema:model-name model))
          (created-at (check-timestamp "createdAt" created-at))
          (updated-at (check-timestamp "updatedAt" updated-at))
@@ -167,7 +169,7 @@ and only PUBLISHED-AT applies."
 
 (defun update-draft (space model id patch &key replace)
   "Save a draft: PATCH is merged onto the current draft (or published data) unless REPLACE."
-  (let* ((space-name (space-name space))
+  (let* ((space-name space)
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
          (data (if replace patch (merge-data (content-data content :draft t) patch))))
@@ -179,7 +181,7 @@ and only PUBLISHED-AT applies."
 
 (defun publish (space model id &optional data &key published-at)
   "Publish DATA, or the current draft. PUBLISHED-AT (ISO 8601) overrides the publish date. Fires webhooks."
-  (let* ((space-name (space-name space))
+  (let* ((space-name space)
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
          (data (or data (content-data content :draft t)))
@@ -192,7 +194,7 @@ and only PUBLISHED-AT applies."
         published))))
 
 (defun unpublish (space model id)
-  (let* ((space-name (space-name space))
+  (let* ((space-name space)
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
@@ -202,7 +204,7 @@ and only PUBLISHED-AT applies."
 
 (defun discard (space model id)
   "Throw away the draft of a published content. No webhook: what is published does not change."
-  (let* ((space-name (space-name space))
+  (let* ((space-name space)
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id)))
     (unless (content-published content)
@@ -210,7 +212,7 @@ and only PUBLISHED-AT applies."
     (discard-draft (content-id content))))
 
 (defun destroy (space model id)
-  (let* ((space-name (space-name space))
+  (let* ((space-name space)
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))

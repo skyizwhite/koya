@@ -20,8 +20,8 @@ koya は **本体(server)** と **ライブラリ(client)** の2つで構成す�
 
 ```
 ┌─ 利用側プロジェクト(例: website)────────┐      ┌─ koya 本体(Coolify 上)──────────┐
-│  (defspace website ...)                  │      │  管理 Web アプリ(hsx + HTMX)     │
-│  (defmodel (website blog) ...)  ─ deploy ▶│─────▶│  管理 API   /admin/api/...        │
+│  (defwebhooks ...)                       │      │  管理 Web アプリ(hsx + HTMX)     │
+│  (defmodel blog ...)            ─ deploy ▶│─────▶│  管理 API   /admin/api/...        │
 │  (koya:get-list 'blog ...)      ◀ fetch ─│◀─────│  配信 API   /api/v1/{space}/...   │
 │  REPL                                    │      │  SQLite(models, contents, ...)   │
 └──────────────────────────────────────────┘      └───────────────────────────────────┘
@@ -30,12 +30,14 @@ koya は **本体(server)** と **ライブラリ(client)** の2つで構成す�
 - **本体**: 管理 Web アプリ、配信 API、管理 API、SQLite を持つ。デプロイされる唯一のプロセス。
   モデル定義は DB(`models` テーブル)に保存され、管理 UI のフォームはそれから動的に生成される。
 - **ライブラリ**(`koya` システム): 利用側プロジェクトが依存する。
-  - **config**: `defspace` / `defmodel` でスキーマを Lisp コードとして定義する。
+  - **config**: `defmodel` / `defwebhooks` で1つの space のスキーマを Lisp コードとして定義する。
+    space 自体は管理画面で作るので、コードは space 名を持たない(`koya:*space*` が宛先)。
   - **deploy**: 利用側の REPL で `(koya:deploy)` すると、定義が本体の管理 API に送られ、
     本体側のモデル定義が更新される(SQL の DDL は変わらない。4 章参照)。
   - **client**: `get-list` / `get-item` / `get-object` 等で配信 API を叩く。
     microcms-lisp-sdk の後継。モデル定義を知っているので型に応じた変換ができる。
 - スキーマの **source of truth は利用側プロジェクトのコード**(git 管理)。本体の DB はその写し。
+  ただし **space というテナントそのものは管理画面の持ち物**で、コードからは作られない(14 章 2026-09-22)。
 - 共通部分(フィールド型、バリデーション、スキーマのシリアライズ、ULID)は `koya/core` として
   両者から使う。
 
@@ -58,7 +60,7 @@ koya/
     openapi.yaml      ; 配信 API / 管理 API 仕様(未作成、M2)
   src/
     main.lisp         ; koya パッケージ(config + client の再エクスポート)
-    config.lisp       ; defspace / defmodel / current-schema
+    config.lisp       ; defmodel / defwebhooks / current-schema
     client.lisp       ; HTTP クライアント: plan / deploy / pull、get-list ...、管理 API ラッパ
     core/             ; schema, validate, diff, json, case, time, ulid
     server/
@@ -77,23 +79,21 @@ koya/
 
 - **コードファースト**。スキーマは `defmodel` マクロで Lisp コードとして定義し、git 管理する。
 - 非エンジニアによる管理 UI でのスキーマ編集はサポートしない(意図的な割り切り)。
-- モデル名は `(space model)` の組。microCMS 同様 **list 型 / object 型** を区別する。
+- 1プロジェクト = 1 space なので、モデル名は space を伴わない。microCMS 同様 **list 型 / object 型** を区別する。
 
 ```lisp
-(defspace website
-  ;; 評価される。全モデルに適用
-  :webhooks (list (webhook "revalidate" "https://skyizwhite.dev/api/revalidate")))
+;; 評価される。webhook は全て space のもので、:only で対象モデルを絞る
+(defwebhooks (webhook "revalidate" "https://skyizwhite.dev/api/revalidate")
+             (webhook "preview-build" "https://preview.example/hook" :only '(blog works)))
 
-(defmodel (website blog) (:kind :list
-                          ;; このモデルだけに追加される webhook
-                          :webhooks (list (webhook "preview-build" "https://preview.example/hook")))
+(defmodel blog (:kind :list)
   (title        :text     :required t)
   (description  :text)
   (content      :richtext)
   (tags         :reference :model tag :many t)
   (published-at :datetime))
 
-(defmodel (website about) (:kind :object)
+(defmodel about (:kind :object)
   (body :richtext))
 ```
 
@@ -126,10 +126,12 @@ koya/
   それを JSON 化して管理 API に送る。本体は `models.definition` に JSON のまま保存する。
   本体はリーダー経由の入力を一切受けない。
 - **plan → deploy**:
-  - `(koya:plan)`: 本体の現在定義と手元の定義の差分(space / model / field の追加・削除・型変更)を表示。
+  - `(koya:plan)`: 本体の現在定義と手元の定義の差分(model / field の追加・削除・型変更)を表示。
   - `(koya:deploy)`: 差分を表示し、破壊的変更(field 削除・型変更)があれば確認を求める。`:force t` で無条件適用。
   - `(koya:pull)`: 本体側の定義を取得して照合する。
-- 差分計算は本体側(`POST /admin/api/schema/plan`)で行い、クライアントは表示するだけ。
+- 差分計算は本体側(`POST /admin/api/schema/{space}/plan`)で行い、クライアントは表示するだけ。
+- deploy は **既存の space 宛てにしか通らない**(無ければ `404 not_found`)。`KOYA_SPACE` の打ち間違いで
+  空の space が増えることはない。
 - JSON 保存(4 章)のため field 削除でも `contents` のデータは消えない。
 
 ## 4. ストレージ
@@ -141,13 +143,14 @@ koya/
 
 ```
 schema_version (version PK, applied_at)
-spaces         (name PK, webhooks JSON, created_at)
+spaces         (name PK, webhooks JSON, webhook_secret, position, created_at)  ; 管理画面で作る
 settings       (key PK, value, updated_at)      ; インスタンス設定(二段階認証の鍵など)
 sessions       (id PK, data JSON, expires_at)   ; 管理画面のログインセッション
 models         (space, name, kind, definition JSON, PK(space, name))
 contents       (id ULID PK, space, model, status, published JSON, draft JSON,
                 created_at, updated_at, published_at, revised_at)
-api_keys       (id ULID PK, space, key_hash, label, created_at)
+api_keys        (id ULID PK, space, key_hash, label, created_at)  ; 配信キー
+management_keys (id ULID PK, space, key_hash, label, created_at)  ; 管理 API。表は分けたまま(14 章)
 media          (id ULID PK, space, filename, mime, size, width, height, alt, created_at)
 ```
 
@@ -169,7 +172,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   `[less_than]` `[greater_than]` と `[and]` `[or]` の主要なもののみ。
 - **管理 API**: `/admin/api/...`(実装済みのパス)。
   - `GET /admin/api/me`(疎通・認証確認)
-  - `GET /admin/api/schema`(pull)、`PUT /admin/api/schema[?force=true]`(deploy)、`POST /admin/api/schema/plan`
+  - `GET /admin/api/schema/{space}`(pull)、`PUT /admin/api/schema/{space}[?force=true]`(deploy)、
+    `POST /admin/api/schema/{space}/plan`。存在しない space は `404 not_found`(deploy では作らない)
     - deploy に破壊的変更が含まれ `force` が無い場合は `409 destructive_changes` を返し、`details` に変更一覧を載せる。
       クライアントはそれを表示して確認を取り、`force=true` で再送する(差分計算は本体側)。
   - `/admin/api/contents/{space}/{model}`: `GET`(下書き含む一覧)`POST`(`{"data": {...}, "publish": bool}`。
@@ -179,6 +183,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
     `discard-draft` は公開済みコンテンツの下書きを捨てて `published` に戻す。未公開なら 409。webhook は送らない)
   - `/admin/api/keys/{space}`: `GET` `POST`(平文キーは作成時のみ返す)、`/admin/api/keys/{space}/{id}`: `DELETE`
   - `/admin/api/media/{space}`(M2)
+  - `/admin/api/me` 以外はすべて2番目のセグメントが space。management key はその space にしか通らず、
+    他の space のパスは 403(ミドルウェアで deny by default)。
 - **システムフィールド**: `id` `createdAt` `updatedAt` `publishedAt` `revisedAt` は本体が管理し、
   モデルのフィールド名として予約する(`defmodel` で宣言するとエラー)。microCMS と同じ扱い。
 - 配信 API の認証ヘッダは `X-KOYA-API-KEY`。
@@ -200,9 +206,11 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 ## 6. 認証・認可
 
 - ユーザーアカウントは持たない。
-- 管理画面・管理 API: 単一オーナーシークレット(環境変数 `KOYA_SECRET`)。
-  UI はログインフォーム → セッション Cookie、管理 API(deploy 等)は `Authorization: Bearer`。
-  比較は定数時間で行う。
+- 管理画面: 単一オーナーシークレット(環境変数 `KOYA_SECRET`)。ログインフォーム → セッション Cookie。
+  比較は定数時間で行う。オーナーのセッションは全 space に届く。
+- 管理 API: **space ごとの management key**(`Authorization: Bearer`、管理画面の `/s/{space}/keys` で発行)。
+  `KOYA_SECRET` は管理 API には通らない(ログイン専用)。キーは自分の space のパスにしか通らず、
+  他は 403(14 章 2026-09-22)。これにより利用側の `.env` が他サイトに届かない。
 - **セッションはプロセスではなく DB(`sessions` テーブル)に持つ**。再起動・再デプロイでログアウトしない。
   寿命は Cookie も行も 24 時間で、使うたびに延びる(行の書き込みは半分を過ぎてから)。値は JSON で保存する
   ため、セッションに入れてよいのは文字列・数値・真偽値とその配列だけ(flash もこの形)。
@@ -217,8 +225,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
   キーは高エントロピーの乱数なので SHA-256 ハッシュで保存する(bcrypt は使わない)。
 - ningle-actions のエンドポイントも含め、管理側は全てセッション必須。CSRF は Origin ヘッダ検証。
 - ログインは失敗 5 回 / 5 分でそのクライアントアドレスを一時ロック(403。Woo は 429 のステータス行を持たない)。エラー文言は二要素のどちらが違うか言わない。
-  セッション Cookie は 24 時間で失効。管理 API の Bearer(`KOYA_SECRET`)は機械向けなので二段階認証の対象外
-  (シークレットの漏洩はそのまま管理権限の漏洩。運用ではシークレットを長く強くし、必要なら回転する)。
+  セッション Cookie は 24 時間で失効。管理 API の Bearer(management key)は機械向けなので二段階認証の対象外
+  (キーの漏洩はその space の管理権限の漏洩。必要なら鍵を作り直す)。
 - リクエスト本文は Content-Length で 21 MB を超えると最外側のミドルウェアが 413 を返す(multipart は lack が丸ごと
   メモリに読むため、パース前に止める)。Coolify 側の Traefik にも同程度の上限を置くとよい。
 - webhook の URL はオーナーがスキーマで書くものなので任意(内部ネットワークにも届く)。単一オーナー前提で許容。
@@ -234,8 +242,8 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - フォームは DB 上のモデル定義から動的生成(フィールド型 → 入力コンポーネントの対応表)。
 - richtext は Quill。フォーム送信時に HTML を隠しフィールドへ書き戻す(`assets/js/koya-editor.js`)。
 - 完了メッセージはセッションに載せる一度きりの flash(リダイレクト後に一度だけ表示)。
-- 画面(実装済みパス): `/login`、`/`(space 一覧)、`/s/{space}`(モデル一覧。種別アイコン、list 型は件数)、
-  `/s/{space}/keys`(API キー)、
+- 画面(実装済みパス): `/login`、`/`(space 一覧。作成と削除もここ)、`/s/{space}`(モデル一覧。種別アイコン、list 型は件数)、
+  `/s/{space}/keys`(配信キー・management key・webhook secret)、
   `/s/{space}/m/{model}`(コンテンツ一覧。object 型は単一コンテンツの編集画面へリダイレクト)、
   `/s/{space}/m/{model}/{id}`(編集。`{id}` = `new` で新規)。**メディアライブラリ**(8 章)は M2。
 - コンテンツ一覧は作成日時の新しい順。列はモデルの全フィールドのプレビュー(richtext はタグ除去、
@@ -290,13 +298,13 @@ media          (id ULID PK, space, filename, mime, size, width, height, alt, cre
 - `contents.published` と `contents.draft` の2カラム。status は `draft` / `published` / `published+draft`。
 - `draftKey` でドラフトをプレビュー取得(microCMS 互換)。下書き保存のたびに draft key を再生成し、
   公開すると消す(古いプレビュー URL は無効になる)。
-- **webhook** は `(webhook label url)` で定義する。space の webhook は全モデルに適用され、
-  モデルは `:webhooks` で自分用を追加する(microCMS の「API ごとに複数」に相当。設定は code)。
+- **webhook** は `defwebhooks` にまとめて `(webhook label url &key only)` で定義する。全て space のもので、
+  既定では全モデルに発火し、`:only`(モデル名 1 つ、またはリスト)で絞る。モデル側には webhook を持たせない。
   購読するイベントの設定は無く、**全 webhook に全イベントを送る**。ペイロード(`space`、`model`、`id`、
   `event` = `publish`(新規公開・再公開) / `unpublish` / `delete` / `draft`(下書き保存)、`contents.old/new`)の
   `event` を見て受け手が分岐する。`draft` の `new` は下書きデータ。
   space ごとに生成される秘密を `X-KOYA-WEBHOOK-KEY` ヘッダで送り、受け側で照合する(秘密は webhook 単位ではなく space 単位)。
-  plan には label 単位で差分が出る。
+  plan には space の webhook リスト単位で差分が出る(`change_webhooks`)。
 - 履歴(revisions)は初期スコープ外。
 
 ## 10. 技術スタック
@@ -375,7 +383,7 @@ website から流用するパターン:
 - 本体: マイグレーション、schema deploy/pull/plan、contents CRUD、公開/下書き、`draftKey`、
   配信 API(`limit` `offset` `orders` `fields` `filters[equals]`)、API キー、webhook、
   管理 UI(ログイン、一覧、編集、公開)。
-- client: `defspace` `defmodel` `plan` `deploy` `pull` `get-list` `get-item` `get-object`。
+- client: `defwebhooks` `defmodel` `plan` `deploy` `pull` `get-list` `get-item` `get-object`。
 - 完了条件: website の `lib/cms.lisp` を koya client に差し替え、blog / about / works が動く。
 - **完了(2026-09-20)**。website は `koya-migration` ブランチでローカル koya に対して動作確認済み。
   本番(Coolify)へのデプロイと本番へのスキーマ反映・インポートは未実施。
@@ -436,6 +444,13 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
   選択肢はスキーマのモデル / webhook に、スキーマから消えてログに残っているものを足したもの。
   導線はスペース画面の "View log →" と各 webhook 行(label 指定)、モデル一覧とオブジェクトモデルの
   エディタの Webhooks ボタン(model 指定)。webhook が 1 つも無ければボタン自体を出さない。
+- 2026-09-22: space を管理画面の資源にし、管理 API を space 単位にした(0.5.0): `/` で space の作成・削除、
+  management key は `/s/{space}/keys` で space ごとに発行、スキーマは `/admin/api/schema/{space}` で
+  1 space ずつ deploy する。スキーマ文書から `spaces` が消え、DSL は `defspace` → `defwebhooks`、
+  `defmodel` は space 名を取らなくなった。既存の management key はマイグレーション 6 で失効するので発行し直す。
+- 2026-09-22: webhook を全て `defwebhooks` に集約し、`defmodel` の `:webhooks` を廃止。代わりに
+  `(webhook label url :only '(blog tag))` で対象モデルを絞る(0.5.0)。差分の `change_model_webhooks` は消え、
+  `change_webhooks` だけになった。旧スキーマがモデルに持っていた `webhooks` キーは読み込み時に無視する。
 - 依存: hsx の `&` エスケープ修正は koya で取り込み済み。website は `qlot update koya` で koya の変更を追従。
 
 ## 14. 決定ログ
@@ -490,3 +505,10 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-20 | `defmodel` の `:kind` は必須(`:list` / `:object`)。省略はマクロ展開時にエラー | 既定値があると list か object か読み手に分からない |
 | 2026-09-20 | セッションはメモリストアをやめ SQLite の `sessions` テーブルに置く(24 時間、使うたび延長、起動時に期限切れを掃除) | 再起動・再デプロイのたびにログアウトしていたため |
 | 2026-09-20 | 配信 API の互換ヘッダ `X-MICROCMS-API-KEY` を廃止。デプロイ前レビューで本文サイズ上限・ログインロック・セッション失効・空セッション非保存を追加 | 他社名を残さない。本番公開前に DoS とブルートフォースの入口を塞ぐ |
+| 2026-09-22 | space は管理画面で作る資源にし、コードからは作られない。deploy は `/admin/api/schema/{space}` で1つの space に閉じる | space はコンテンツ・メディア・キーを抱えるテナントで、寿命がスキーマより長い。全体 PUT のままでは他サイトのリポジトリからの deploy が別 space を消しうる |
+| 2026-09-22 | スキーマ文書から `spaces` を外し、`{koyaSchema, webhooks, models}` の単一 space 形式に。DSL は `defspace` を廃して `defwebhooks`、`defmodel` は space 名を取らない | 1プロジェクト1 space が前提になり、モデル定義ごとに space 名を書く必要がなくなる。差分から `add_space` / `remove_space` も消える |
+| 2026-09-22 | management key を space 単位にし、`/admin/api/me` 以外は「パスの2番目のセグメント = キーの space」をミドルウェアで強制(deny by default) | 利用側の `.env` が他サイトに届かないようにする。配信キーと同じ粒度に揃う |
+| 2026-09-22 | management key と配信キーはテーブルを分けたまま(`scope` 列での統合はしない) | 列が同じなのは偶然。統合すると「配信キーが管理キーとして通らない」保証が `WHERE` 句1つに移り、書き忘れが致命的になる |
+| 2026-09-22 | space は名前だけを持つ(表示用ラベルは持たない)。一覧画面でできるのは作成と削除 | 名前が id で URL に出る。別名を足すほどの情報量がない |
+| 2026-09-22 | webhook は全て space のものにし、`defmodel` の `:webhooks` を廃止。`(webhook … :only <model>)` で絞る。`:only` はモデル名のリストも取る | 「どの webhook がどこに飛ぶか」が1箇所に並ぶ。単数しか許さないと同一 URL の hook をモデルごとに複製することになり、ラベルが一意なのでログのフィルタが汚れる |
+

@@ -30,23 +30,20 @@
            #:model-fields
            #:model-field
            #:model-options
-           #:model-webhooks
            #:make-webhook
            #:webhook-label
            #:webhook-url
+           #:webhook-only
+           #:webhook-covers-p
            #:webhook->jobject
+           #:jobject->webhook
            #:model-preview-url
            #:model-public-url
-           #:space-def
-           #:make-space
-           #:space-name
-           #:space-webhooks
-           #:space-models
-           #:space-model
            #:schema
            #:make-schema
-           #:schema-spaces
-           #:schema-space
+           #:schema-webhooks
+           #:schema-models
+           #:schema-model
            #:schema-error
            #:schema-error-message
            #:schema-errors
@@ -56,8 +53,6 @@
            #:field->jobject
            #:model->jobject
            #:jobject->model
-           #:space->jobject
-           #:jobject->space
            #:slug-name-p
            #:field-name-p))
 (in-package #:koya/core/schema)
@@ -177,24 +172,53 @@ checked here so that validation never trips over a wrong type or a broken regex.
 (defun field-many-p (field) (and (field-option field :many) t))
 
 ;;; ---------------------------------------------------------------------------
-;;; Webhooks: plists (:label L :url U) so EQUAL compares them. Every webhook is
-;;; sent every event -- publish, unpublish, delete and draft -- and the payload
-;;; names the event; the receiver decides what to act on (see lib/webhook).
-;;; A space's webhooks apply to every model; a model adds its own.
+;;; Webhooks: plists (:label L :url U :only (M...)) so EQUAL compares them. Every
+;;; webhook is sent every event -- publish, unpublish, delete and draft -- and the
+;;; payload names the event; the receiver decides what to act on (see lib/webhook).
+;;; They all belong to the space: :ONLY narrows one to some of its models, and a
+;;; webhook without :ONLY fires for every model.
 
 (defun webhook-label (webhook) (getf webhook :label))
 (defun webhook-url (webhook) (getf webhook :url))
+(defun webhook-only (webhook)
+  "The model names this webhook is narrowed to, or NIL for every model."
+  (getf webhook :only))
 
-(defun make-webhook (label url)
-  "A webhook: LABEL names it in plans and logs, URL receives the POST."
+(defun webhook-covers-p (webhook model-name)
+  "True when WEBHOOK fires for the model named MODEL-NAME."
+  (let ((only (webhook-only webhook)))
+    (or (null only) (and (member model-name only :test #'string=) t))))
+
+(defun normalize-only (label only)
+  "ONLY is a model name or a list of them, from the DSL (symbols allowed) or the
+wire. Returns a list of strings, or NIL for every model."
+  (let ((names (cond ((null only) '())
+                     ((or (symbolp only) (stringp only)) (list only))
+                     ((or (listp only) (json-array-p only)) (coerce only 'list))
+                     (t (fail "webhook ~s: :only must be a model name or a list of them, got ~s" label only)))))
+    (let ((names (mapcar (lambda (n)
+                           (let ((n (if (symbolp n) (string-downcase (symbol-name n)) n)))
+                             (unless (slug-name-p n)
+                               (fail "webhook ~s: :only must name models, got ~s" label n))
+                             n))
+                         names)))
+      (when (/= (length names) (length (remove-duplicates names :test #'string=)))
+        (fail "webhook ~s: :only names the same model twice" label))
+      names)))
+
+(defun make-webhook (label url &key only)
+  "A webhook: LABEL names it in plans and logs, URL receives the POST. ONLY is a
+model name, or a list of them, to narrow it to; without it the webhook fires for
+every model of the space."
   (unless (and (stringp label) (plusp (length label))) (fail "webhook label must be a non-empty string, got ~s" label))
   (unless (and (stringp url) (plusp (length url))) (fail "webhook ~s: url must be a non-empty string, got ~s" label url))
-  (list :label label :url url))
+  (let ((only (normalize-only label only)))
+    (append (list :label label :url url) (and only (list :only only)))))
 
 (defun normalize-webhook (entry)
   "ENTRY is a webhook plist from the DSL or a wire-format object."
   (cond ((and (consp entry) (keywordp (first entry)))
-         (make-webhook (getf entry :label) (getf entry :url)))
+         (make-webhook (getf entry :label) (getf entry :url) :only (getf entry :only)))
         ((hash-table-p entry) (jobject->webhook entry))
         (t (fail "a webhook must be (webhook label url), got ~s" entry))))
 
@@ -208,13 +232,12 @@ checked here so that validation never trips over a wrong type or a broken regex.
     hooks))
 
 (defstruct (model (:constructor %make-model))
-  name      ; slug string
-  kind      ; :list or :object
-  fields    ; list of FIELD
-  options   ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY})
-  webhooks) ; list of webhook plists, in addition to the space's
+  name     ; slug string
+  kind     ; :list or :object
+  fields   ; list of FIELD
+  options) ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY})
 
-(defun make-model (name kind fields &key preview-url public-url webhooks)
+(defun make-model (name kind fields &key preview-url public-url)
   (let ((name (string-downcase (string name))))
     (dolist (url (list preview-url public-url))
       (unless (or (null url) (stringp url))
@@ -228,8 +251,7 @@ checked here so that validation never trips over a wrong type or a broken regex.
         (fail "model ~s has duplicate field names" name)))
     (%make-model :name name :kind kind :fields fields
                  :options (append (and preview-url (list :preview-url preview-url))
-                                  (and public-url (list :public-url public-url)))
-                 :webhooks (normalize-webhooks webhooks (format nil "model ~s" name)))))
+                                  (and public-url (list :public-url public-url))))))
 
 (defun model-preview-url (model) (getf (model-options model) :preview-url))
 (defun model-public-url (model) (getf (model-options model) :public-url))
@@ -238,36 +260,23 @@ checked here so that validation never trips over a wrong type or a broken regex.
   (find (if (stringp name) name (camel-key name)) (model-fields model)
         :key #'field-name :test #'string=))
 
-(defstruct (space-def (:conc-name space-) (:constructor %make-space))
-  name      ; slug string
-  webhooks  ; list of URL strings
-  models)   ; list of MODEL
-
-(defun make-space (name &key webhooks models)
-  (let ((name (string-downcase (string name))))
-    (unless (slug-name-p name)
-      (fail "space name ~s must be lowercase letters, digits and hyphens" name))
-    (let ((names (mapcar #'model-name models)))
-      (when (/= (length names) (length (remove-duplicates names :test #'string=)))
-        (fail "space ~s has duplicate model names" name)))
-    (%make-space :name name
-                 :webhooks (normalize-webhooks webhooks (format nil "space ~s" name))
-                 :models models)))
-
-(defun space-model (space name)
-  (find (string-downcase (string name)) (space-models space) :key #'model-name :test #'string=))
+;;; A schema is one space's contents: the models, and the webhooks every model of
+;;; the space fires. The space itself -- its name, label and secrets -- is made
+;;; in the admin UI and is not part of the document; the name travels in the URL
+;;; a deploy is sent to.
 
 (defstruct (schema (:constructor %make-schema))
-  spaces)
+  webhooks  ; list of webhook plists, fired by every model
+  models)   ; list of MODEL
 
-(defun make-schema (&optional spaces)
-  (let ((names (mapcar #'space-name spaces)))
+(defun make-schema (&key webhooks models)
+  (let ((names (mapcar #'model-name models)))
     (when (/= (length names) (length (remove-duplicates names :test #'string=)))
-      (fail "duplicate space names")))
-  (%make-schema :spaces spaces))
+      (fail "duplicate model names")))
+  (%make-schema :webhooks (normalize-webhooks webhooks "schema") :models models))
 
-(defun schema-space (schema name)
-  (find (string-downcase (string name)) (schema-spaces schema) :key #'space-name :test #'string=))
+(defun schema-model (schema name)
+  (find (string-downcase (string name)) (schema-models schema) :key #'model-name :test #'string=))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Semantic checks that need the whole schema (cross references).
@@ -275,27 +284,31 @@ checked here so that validation never trips over a wrong type or a broken regex.
 (defun schema-errors (schema)
   "Return a list of human readable problems, empty when the schema is consistent."
   (let ((errors '()))
-    (dolist (space (schema-spaces schema))
-      (dolist (model (space-models space))
-        (dolist (field (model-fields model))
-          (case (field-type field)
-            (:reference
-             (let ((target (field-option field :model)))
-               (unless (space-model space target)
-                 (push (format nil "~a.~a.~a references unknown model ~s"
-                               (space-name space) (model-name model) (field-name field) target)
-                       errors))))
-            (:slug
-             (let* ((from (field-option field :from))
-                    (source (model-field model from)))
-               (cond ((null source)
-                      (push (format nil "~a.~a.~a: :from refers to unknown field ~s"
-                                    (space-name space) (model-name model) (field-name field) from)
-                            errors))
-                     ((or (eq source field) (not (member (field-type source) '(:text :textarea))))
-                      (push (format nil "~a.~a.~a: :from must name a text or textarea field other than itself"
-                                    (space-name space) (model-name model) (field-name field))
-                            errors)))))))))
+    (dolist (hook (schema-webhooks schema))
+      (dolist (name (webhook-only hook))
+        (unless (schema-model schema name)
+          (push (format nil "webhook ~s: :only names unknown model ~s" (webhook-label hook) name)
+                errors))))
+    (dolist (model (schema-models schema))
+      (dolist (field (model-fields model))
+        (case (field-type field)
+          (:reference
+           (let ((target (field-option field :model)))
+             (unless (schema-model schema target)
+               (push (format nil "~a.~a references unknown model ~s"
+                             (model-name model) (field-name field) target)
+                     errors))))
+          (:slug
+           (let* ((from (field-option field :from))
+                  (source (model-field model from)))
+             (cond ((null source)
+                    (push (format nil "~a.~a: :from refers to unknown field ~s"
+                                  (model-name model) (field-name field) from)
+                          errors))
+                   ((or (eq source field) (not (member (field-type source) '(:text :textarea))))
+                    (push (format nil "~a.~a: :from must name a text or textarea field other than itself"
+                                  (model-name model) (field-name field))
+                          errors))))))))
     (nreverse errors)))
 
 (defun check-schema (schema)
@@ -324,15 +337,18 @@ checked here so that validation never trips over a wrong type or a broken regex.
     obj))
 
 (defun webhook->jobject (webhook)
-  (jobject "label" (webhook-label webhook)
-           "url" (webhook-url webhook)))
+  (let ((obj (jobject "label" (webhook-label webhook)
+                      "url" (webhook-url webhook))))
+    (when (webhook-only webhook)
+      (setf (gethash "only" obj) (coerce (webhook-only webhook) 'vector)))
+    obj))
 
 (defun jobject->webhook (obj)
   "Any other key -- the \"events\" older schemas carried -- is ignored, so a
 stored schema loads and is rewritten in the current shape on the next deploy."
   (unless (hash-table-p obj) (fail "each webhook must be an object"))
   (let ((label (jget obj "label")) (url (jget obj "url")))
-    (make-webhook (or label url) url)))
+    (make-webhook (or label url) url :only (jget obj "only"))))
 
 (defun model->jobject (model)
   (let ((obj (jobject "name" (model-name model)
@@ -340,17 +356,12 @@ stored schema loads and is rewritten in the current shape on the next deploy."
                       "fields" (map 'vector #'field->jobject (model-fields model)))))
     (when (model-preview-url model) (setf (gethash "previewUrl" obj) (model-preview-url model)))
     (when (model-public-url model) (setf (gethash "publicUrl" obj) (model-public-url model)))
-    (when (model-webhooks model) (setf (gethash "webhooks" obj) (map 'vector #'webhook->jobject (model-webhooks model))))
     obj))
-
-(defun space->jobject (space)
-  (jobject "name" (space-name space)
-           "webhooks" (map 'vector #'webhook->jobject (space-webhooks space))
-           "models" (map 'vector #'model->jobject (space-models space))))
 
 (defun schema->jobject (schema)
   (jobject "koyaSchema" +schema-version+
-           "spaces" (map 'vector #'space->jobject (schema-spaces schema))))
+           "webhooks" (map 'vector #'webhook->jobject (schema-webhooks schema))
+           "models" (map 'vector #'model->jobject (schema-models schema))))
 
 (defun jvalue->option (key value)
   (case key
@@ -389,25 +400,12 @@ never interned: an unknown name stays a string."
     (unless (stringp name) (fail "model without a name"))
     (unless kind (fail "model ~s: kind must be \"list\" or \"object\"" name))
     (unless (or (null fields) (json-array-p fields)) (fail "model ~s: fields must be an array" name))
-    (let ((webhooks (jget obj "webhooks")))
-      (unless (or (null webhooks) (json-array-p webhooks)) (fail "model ~s: webhooks must be an array" name))
-      (make-model name kind
-                  (map 'list #'jobject->field (or fields #()))
-                  :preview-url (jget obj "previewUrl")
-                  :public-url (jget obj "publicUrl")
-                  :webhooks (coerce (or webhooks #()) 'list)))))
-
-(defun jobject->space (obj)
-  (unless (hash-table-p obj) (fail "each space must be an object"))
-  (let ((name (jget obj "name"))
-        (webhooks (jget obj "webhooks"))
-        (models (jget obj "models")))
-    (unless (stringp name) (fail "space without a name"))
-    (unless (or (null webhooks) (json-array-p webhooks)) (fail "space ~s: webhooks must be an array" name))
-    (unless (or (null models) (json-array-p models)) (fail "space ~s: models must be an array" name))
-    (make-space name
-                :webhooks (coerce (or webhooks #()) 'list)
-                :models (map 'list #'jobject->model (or models #())))))
+    ;; a "webhooks" key from a schema stored before they all moved to the space is
+    ;; ignored, like the "events" of an older webhook
+    (make-model name kind
+                (map 'list #'jobject->field (or fields #()))
+                :preview-url (jget obj "previewUrl")
+                :public-url (jget obj "publicUrl"))))
 
 (defun jobject->schema (obj)
   "Parse a wire-format schema object. Signals SCHEMA-ERROR on malformed input."
@@ -415,7 +413,9 @@ never interned: an unknown name stays a string."
   (let ((version (jget obj "koyaSchema")))
     (unless (eql version +schema-version+)
       (fail "unsupported koyaSchema version ~s (expected ~a)" version +schema-version+)))
-  (let ((spaces (jget obj "spaces")))
-    (unless (or (null spaces) (json-array-p spaces))
-      (fail "spaces must be an array"))
-    (check-schema (make-schema (map 'list #'jobject->space (or spaces #()))))))
+  (let ((webhooks (jget obj "webhooks"))
+        (models (jget obj "models")))
+    (unless (or (null webhooks) (json-array-p webhooks)) (fail "webhooks must be an array"))
+    (unless (or (null models) (json-array-p models)) (fail "models must be an array"))
+    (check-schema (make-schema :webhooks (coerce (or webhooks #()) 'list)
+                               :models (map 'list #'jobject->model (or models #()))))))

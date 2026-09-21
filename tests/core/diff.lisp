@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/core/diff
   (:use #:cl #:rove)
   (:import-from #:koya/core/schema
-                #:make-field #:make-model #:make-space #:make-schema #:make-webhook)
+                #:make-field #:make-model #:make-schema #:make-webhook)
   (:import-from #:koya/core/diff
                 #:diff-schemas
                 #:destructive-changes-p
@@ -12,21 +12,18 @@
 (in-package #:koya-tests/core/diff)
 
 (defun schema-a ()
-  (make-schema (list (make-space "website"
-                                 :models (list (make-model "blog" :list
-                                                           (list (make-field :title :text :required t)
-                                                                 (make-field :body :richtext)))
-                                               (make-model "about" :object (list (make-field :body :richtext))))))))
+  (make-schema :models (list (make-model "blog" :list
+                                         (list (make-field :title :text :required t)
+                                               (make-field :body :richtext)))
+                             (make-model "about" :object (list (make-field :body :richtext))))))
 
 (defun schema-b ()
-  (make-schema (list (make-space "website"
-                                 :webhooks (list (make-webhook "x" "https://x"))
-                                 :models (list (make-model "blog" :list
-                                                           (list (make-field :title :text :required t :max-length 50)
-                                                                 (make-field :body :textarea)
-                                                                 (make-field :event-at :datetime)))
-                                               (make-model "tag" :list (list (make-field :name :text)))))
-                     (make-space "other"))))
+  (make-schema :webhooks (list (make-webhook "x" "https://x"))
+               :models (list (make-model "blog" :list
+                                         (list (make-field :title :text :required t :max-length 50)
+                                               (make-field :body :textarea)
+                                               (make-field :event-at :datetime)))
+                             (make-model "tag" :list (list (make-field :name :text))))))
 
 (defun ops (changes) (mapcar (lambda (c) (getf c :op)) changes))
 
@@ -34,11 +31,10 @@
   (ok (null (diff-schemas (schema-a) (schema-a)))))
 
 (deftest model-options
-  (let* ((with-url (make-schema (list (make-space "website"
-                                                  :models (list (make-model "blog" :list (list (make-field :title :text :required t)
-                                                                                               (make-field :body :richtext))
-                                                                            :public-url "https://x/blog/{CONTENT_ID}")
-                                                                (make-model "about" :object (list (make-field :body :richtext))))))))
+  (let* ((with-url (make-schema :models (list (make-model "blog" :list (list (make-field :title :text :required t)
+                                                                             (make-field :body :richtext))
+                                                          :public-url "https://x/blog/{CONTENT_ID}")
+                                              (make-model "about" :object (list (make-field :body :richtext))))))
          (changes (diff-schemas (schema-a) with-url)))
     (ok (equal (ops changes) '(:change-model-options)))
     (ng (destructive-changes-p changes))
@@ -46,9 +42,8 @@
 
 (deftest field-options
   (flet ((blog (&rest title-options)
-           (make-schema (list (make-space "website"
-                                          :models (list (make-model "blog" :list
-                                                                    (list (apply #'make-field :title :text title-options))))))))
+           (make-schema :models (list (make-model "blog" :list
+                                                  (list (apply #'make-field :title :text title-options))))))
          (only (changes) (progn (ok (= (length changes) 1)) (first changes))))
     (testing "case-only changes are seen"
       (let ((change (only (diff-schemas (blog :pattern "^[A-Z]") (blog :pattern "^[a-z]")))))
@@ -64,27 +59,31 @@
       (ok (search "options tightened" (format-change (only (diff-schemas (blog) (blog :required t)))))))
     (testing "changing single/many and dropping select options is destructive"
       (flet ((sel (&rest options)
-               (make-schema (list (make-space "website"
-                                              :models (list (make-model "blog" :list
-                                                                        (list (apply #'make-field :cat :select options)))))))))
+               (make-schema :models (list (make-model "blog" :list
+                                                      (list (apply #'make-field :cat :select options)))))))
         (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b") :many t) (sel :options '("a" "b")))))
         (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b")) (sel :options '("a")))))
         (ng (destructive-changes-p (diff-schemas (sel :options '("a")) (sel :options '("a" "b")))))))))
 
-(deftest model-webhooks
-  (flet ((blog (&rest hooks)
-           (make-schema (list (make-space "website"
-                                          :models (list (make-model "blog" :list (list (make-field :title :text))
-                                                                    :webhooks hooks)))))))
-    (let ((changes (diff-schemas (blog) (blog (make-webhook "preview" "https://p")))))
-      (ok (equal (ops changes) '(:change-model-webhooks)))
+(deftest webhooks
+  (flet ((with-hooks (&rest hooks)
+           (make-schema :webhooks hooks :models (list (make-model "blog" :list (list (make-field :title :text)))))))
+    (let ((changes (diff-schemas (with-hooks) (with-hooks (make-webhook "preview" "https://p")))))
+      (ok (equal (ops changes) '(:change-webhooks)))
       (ng (destructive-changes-p changes))
       (ok (search "webhooks changed" (format-change (first changes)))))
-    (ok (null (diff-schemas (blog (make-webhook "a" "https://a")) (blog (make-webhook "a" "https://a")))) "same hook: no change")))
+    (ok (null (diff-schemas (with-hooks (make-webhook "a" "https://a"))
+                            (with-hooks (make-webhook "a" "https://a"))))
+        "same hook: no change")
+    (ok (equal (ops (diff-schemas (with-hooks (make-webhook "a" "https://a"))
+                                  (with-hooks (make-webhook "a" "https://a" :only '(blog)))))
+               '(:change-webhooks))
+        "narrowing an existing hook with :only is a change")))
 
 (deftest from-nothing
   (let ((changes (diff-schemas nil (schema-a))))
-    (ok (equal (ops changes) '(:add-space :add-model :add-field :add-field :add-model :add-field)))
+    (ok (equal (ops changes) '(:add-model :add-field :add-field :add-model :add-field))
+        "an empty space is the same as no space at all")
     (ng (destructive-changes-p changes))))
 
 (deftest full-diff
@@ -93,8 +92,7 @@
                '(:change-webhooks
                  :remove-model
                  :change-field-options :change-field-type :add-field
-                 :add-model :add-field
-                 :add-space)))
+                 :add-model :add-field)))
     (ok (destructive-changes-p changes))
     (let ((type-change (find :change-field-type changes :key (lambda (c) (getf c :op)))))
       (ok (string= (getf type-change :field) "body"))
@@ -103,6 +101,7 @@
       (ok (search "richtext -> textarea" (format-change type-change)))
       (ok (jget (change->jobject type-change) "destructive"))
       (ok (string= (jget (change->jobject type-change) "op") "change_field_type"))
-      (ok (string= (jget (change->jobject type-change) "path") "website.blog.body")))
-    (ok (search "- website.about" (format-change (second changes))))
-    (ok (string= (string-trim " " (format-change (first (diff-schemas nil (schema-a))))) "+ website"))))
+      (ok (string= (jget (change->jobject type-change) "path") "blog.body")))
+    (ok (search "- about" (format-change (second changes))))
+    (ok (string= (string-trim " " (format-change (first changes))) "~ webhooks changed")
+        "the space's own webhooks are named by the path, not by a space")))

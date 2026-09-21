@@ -1,9 +1,11 @@
 # The schema format
 
 A koya schema is the JSON document that `(koya:deploy)` sends to
-`PUT /admin/api/schema` and that `GET /admin/api/schema` returns. The server
-stores it as is and generates the admin UI's forms, the delivery API's shapes and
-content validation from it. This page specifies that document, version
+`PUT /admin/api/schema/{space}` and that `GET /admin/api/schema/{space}` returns.
+It describes **one space**: the space itself is made in the admin UI and named by
+the URL, so the document carries neither its name nor anything else about it. The
+server stores it as is and generates the admin UI's forms, the delivery API's
+shapes and content validation from it. This page specifies that document, version
 `koyaSchema: 1`, for anyone producing or consuming it without the Lisp library —
 the Lisp DSL that produces it is in [CLIENT.md](CLIENT.md), the endpoints in
 [openapi.yaml](openapi.yaml).
@@ -13,7 +15,6 @@ breaks any of them is rejected whole with `400 invalid_schema` and a message
 naming the problem.
 
 - [Document](#document)
-- [Space](#space)
 - [Webhook](#webhook)
 - [Model](#model)
 - [Field](#field)
@@ -26,22 +27,6 @@ naming the problem.
 ```
 {
   "koyaSchema": 1,
-  "spaces": [ …space… ]
-}
-```
-
-| Key | Type | Rules |
-|---|---|---|
-| `koyaSchema` | integer | must be `1` |
-| `spaces` | array of [space](#space) | may be empty or absent; names unique |
-
-The array order is the order the admin UI shows.
-
-## Space
-
-```
-{
-  "name": "website",
   "webhooks": [ …webhook… ],
   "models": [ …model… ]
 }
@@ -49,16 +34,20 @@ The array order is the order the admin UI shows.
 
 | Key | Type | Rules |
 |---|---|---|
-| `name` | string | `^[a-z][a-z0-9-]*$`; used in URLs |
-| `webhooks` | array of [webhook](#webhook) | optional; fire for every model of the space; labels unique |
-| `models` | array of [model](#model) | optional; names unique within the space |
+| `koyaSchema` | integer | must be `1` |
+| `webhooks` | array of [webhook](#webhook) | optional; labels unique |
+| `models` | array of [model](#model) | optional; names unique |
+
+The `models` order is the order the admin UI shows. A deploy to a space that does
+not exist is refused with `404 not_found`; it never makes one.
 
 ## Webhook
 
 ```json
 {
   "label": "revalidate",
-  "url": "https://example.com/api/revalidate"
+  "url": "https://example.com/api/revalidate",
+  "only": ["blog", "about"]
 }
 ```
 
@@ -66,6 +55,11 @@ The array order is the order the admin UI shows.
 |---|---|---|
 | `label` | string | non-empty; defaults to `url` when absent on input |
 | `url` | string | non-empty; receives the POST |
+| `only` | array of string | optional; model names, each one a model of this schema, no duplicates |
+
+Every webhook belongs to the space and fires for **every model**, unless `only`
+narrows it to the models it names. Absent, empty or missing `only` means every
+model, including models added later.
 
 Every webhook is sent every event -- `publish`, `unpublish`, `delete` and
 `draft` -- and the payload names the event; there is nothing to subscribe to.
@@ -80,7 +74,6 @@ The payload is described in [CLIENT.md](CLIENT.md#webhooks).
   "kind": "list",
   "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
   "publicUrl": "https://example.com/blog/{CONTENT_ID}",
-  "webhooks": [ …webhook… ],
   "fields": [ …field… ]
 }
 ```
@@ -92,10 +85,11 @@ The payload is described in [CLIENT.md](CLIENT.md#webhooks).
 | `fields` | array of [field](#field) | optional; names unique within the model |
 | `previewUrl` | string | optional; template for the editor's *Preview draft* link |
 | `publicUrl` | string | optional; template for the editor's *Published page* link |
-| `webhooks` | array of [webhook](#webhook) | optional; added to the space's for this model only |
 
 The URL templates substitute `{CONTENT_ID}` and `{DRAFT_KEY}`. Optional keys are
-omitted from the output when they have no value.
+omitted from the output when they have no value. A model carries no webhooks of
+its own: a `webhooks` key here, which schemas written before they all moved to
+the space had, is ignored on input.
 
 ## Field
 
@@ -176,34 +170,35 @@ Validation failures come back as `422 validation_failed` with
 
 ## Changes
 
-`POST /admin/api/schema/plan` and `PUT /admin/api/schema` describe the difference
-between the stored schema and the one sent as a list of **changes**:
+`POST /admin/api/schema/{space}/plan` and `PUT /admin/api/schema/{space}` describe
+the difference between the space's stored schema and the one sent as a list of
+**changes**:
 
 ```json
 {
   "op": "remove_field",
-  "path": "website.blog.summary",
+  "path": "blog.summary",
   "destructive": true,
-  "description": "! - website.blog.summary (text)"
+  "description": "! - blog.summary (text)"
 }
 ```
 
 | `op` | Meaning | Destructive |
 |---|---|---|
-| `add_space` `add_model` `add_field` | something new | no |
-| `remove_space` `remove_model` `remove_field` | something gone | **yes** |
+| `add_model` `add_field` | something new | no |
+| `remove_model` `remove_field` | something gone | **yes** |
 | `change_kind` | a model's `kind` changed | **yes** |
 | `change_field_type` | a field's `type` changed | **yes** |
 | `change_field_options` | a field's options changed | yes when tightened, see below |
 | `change_model_options` | `previewUrl` / `publicUrl` changed | no |
-| `change_webhooks` `change_model_webhooks` | a space's / a model's webhooks changed | no |
+| `change_webhooks` | the space's webhooks changed | no |
 
 Options are **tightened** when they can reject content the old ones accepted:
 `required`, `unique` or `integer` turned on, `many` switched either way,
 `maxLength` or `max` lowered, `min` raised, `pattern` changed, or a value dropped
 from `options`.
 
-`path` is `space`, `space.model` or `space.model.field`. A `PUT` whose changes
+`path` is `webhooks` (the space's own), `model` or `model.field`. A `PUT` whose changes
 include a destructive one is refused with `409 destructive_changes` (the changes
 in `details`) unless `?force=true` is given. Applying a schema never touches
 stored content: rows that no longer fit stay as they are.
@@ -213,40 +208,33 @@ stored content: rows that no longer fit stay as they are.
 ```json
 {
   "koyaSchema": 1,
-  "spaces": [
+  "webhooks": [
+    {"label": "revalidate", "url": "https://example.com/api/revalidate"},
+    {"label": "preview-build", "url": "https://preview.example/hook", "only": ["blog"]}
+  ],
+  "models": [
     {
-      "name": "website",
-      "webhooks": [
-        {"label": "revalidate", "url": "https://example.com/api/revalidate"}
-      ],
-      "models": [
-        {
-          "name": "blog",
-          "kind": "list",
-          "publicUrl": "https://example.com/blog/{CONTENT_ID}",
-          "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
-          "webhooks": [
-            {"label": "preview-build", "url": "https://preview.example/hook"}
-          ],
-          "fields": [
-            {"name": "title",   "type": "text", "required": true},
-            {"name": "slug",    "type": "slug", "from": "title", "unique": true},
-            {"name": "cover",   "type": "media"},
-            {"name": "content", "type": "richtext"},
-            {"name": "tags",    "type": "reference", "many": true, "model": "tag"}
-          ]
-        },
-        {
-          "name": "tag",
-          "kind": "list",
-          "fields": [{"name": "name", "type": "text", "required": true}]
-        },
-        {
-          "name": "about",
-          "kind": "object",
-          "fields": [{"name": "body", "type": "richtext"}]
-        }
+      "name": "blog",
+      "kind": "list",
+      "publicUrl": "https://example.com/blog/{CONTENT_ID}",
+      "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
+      "fields": [
+        {"name": "title",   "type": "text", "required": true},
+        {"name": "slug",    "type": "slug", "from": "title", "unique": true},
+        {"name": "cover",   "type": "media"},
+        {"name": "content", "type": "richtext"},
+        {"name": "tags",    "type": "reference", "many": true, "model": "tag"}
       ]
+    },
+    {
+      "name": "tag",
+      "kind": "list",
+      "fields": [{"name": "name", "type": "text", "required": true}]
+    },
+    {
+      "name": "about",
+      "kind": "object",
+      "fields": [{"name": "body", "type": "richtext"}]
     }
   ]
 }

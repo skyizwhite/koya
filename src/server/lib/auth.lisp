@@ -7,11 +7,13 @@
   (:import-from #:koya-server/db/api-keys
                 #:space-for-api-key)
   (:import-from #:koya-server/db/management-keys
-                #:management-key-p)
+                #:space-for-management-key)
   (:import-from #:ironclad
                 #:constant-time-equal)
   (:import-from #:babel
                 #:string-to-octets)
+  (:import-from #:lack/request
+                #:request-env)
   (:import-from #:bordeaux-threads-2)
   (:import-from #:koya-server/lib/totp
                 #:totp-enabled-p #:totp-code-valid-p)
@@ -19,7 +21,7 @@
            #:login-locked-p
            #:note-login-failure
            #:clear-login-failures
-           #:owner-env-p
+           #:calling-space
            #:*admin-auth-middleware*
            #:require-api-key
            #:session-login
@@ -30,8 +32,9 @@
 ;;; Four keys, three kinds of callers:
 ;;;  - the owner secret (KOYA_SECRET) logs into the admin UI; the session cookie
 ;;;    then carries the owner through the UI and the admin API
-;;;  - a management key (Bearer, made on the settings page) drives the admin API
-;;;    without a session: schema deploys, imports, content management from a REPL
+;;;  - a management key (Bearer, made on a space's keys page) drives the admin API
+;;;    without a session: schema deploys, imports, content management from a REPL.
+;;;    It belongs to one space and reaches nothing outside it
 ;;;  - a delivery key (X-KOYA-API-KEY, made per space) reads the delivery API
 ;;;  - the webhook secret is the one koya sends, not one it checks (see lib/webhook)
 
@@ -91,12 +94,28 @@ wrong secret never learns whether a code would have been accepted."
 (defun session-logout ()
   (remhash "owner" (ningle:context :session)))
 
-(defun owner-env-p (env)
-  "True for the owner's session or a Bearer management key. The owner secret is
-not accepted here: it is the login password, kept behind the second factor."
+(defun session-env-owner-p (env)
+  "True for the owner's session. The owner secret itself is not accepted on the
+admin API: it is the login password, kept behind the second factor."
   (let ((session (getf env :lack.session)))
-    (or (and session (gethash "owner" session) t)
-        (management-key-p (bearer-token env)))))
+    (and session (gethash "owner" session) t)))
+
+(defun path-segments (path)
+  (remove "" (uiop:split-string (or path "") :separator "/") :test #'string=))
+
+(defun space-path-p (space path)
+  "True when PATH, taken under /admin/api, stays inside SPACE. Every route but
+/me is <resource>/<space>/..., so the space is the second segment; a path without
+one is refused rather than guessed at."
+  (let ((segments (path-segments path)))
+    (cond ((equal segments '("me")) t)
+          ((< (length segments) 2) nil)
+          (t (string= (second segments) space)))))
+
+(defun calling-space ()
+  "The space of the management key making this request, or NIL for the owner's
+session, which reaches every space."
+  (space-for-management-key (bearer-token (request-env ningle:*request*))))
 
 (defun cross-origin-write-p (env)
   "A state-changing request whose Origin/Referer does not match this server. The
@@ -108,13 +127,20 @@ session cookie would otherwise let a page on another site drive the admin API."
 (defparameter *admin-auth-middleware*
   (lambda (app)
     (lambda (env)
-      (cond ((not (owner-env-p env))
-             (json-response 401 (error-object "unauthorized" "Log in, or send a management key as a Bearer token")))
-            ((cross-origin-write-p env)
-             (json-response 403 (error-object "forbidden" "Cross-origin request rejected")))
-            (t (funcall app env)))))
-  "Lack middleware guarding the admin API: owner session or Bearer secret, and
-no cross-origin writes.")
+      (let* ((owner (session-env-owner-p env))
+             (space (and (not owner) (space-for-management-key (bearer-token env)))))
+        (cond ((and (not owner) (null space))
+               (json-response 401 (error-object "unauthorized" "Log in, or send a management key as a Bearer token")))
+              ;; deny by default: a key reaches its own space and nothing else,
+              ;; whatever route is added later
+              ((and space (not (space-path-p space (getf env :path-info))))
+               (json-response 403 (error-object "forbidden"
+                                                (format nil "This management key only reaches space ~a" space))))
+              ((cross-origin-write-p env)
+               (json-response 403 (error-object "forbidden" "Cross-origin request rejected")))
+              (t (funcall app env))))))
+  "Lack middleware guarding the admin API: the owner's session reaches every space,
+a Bearer management key only its own, and no request writes cross-origin.")
 
 (defun require-api-key (space)
   "Signal 401/403 unless the request carries an API key valid for SPACE."

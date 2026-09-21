@@ -3,10 +3,10 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-name #:model-fields #:field-name #:field-type #:field-option #:space-model
-                #:space-webhooks #:model-webhooks)
+                #:model-kind #:model-name #:model-fields #:field-name #:field-type #:field-option
+                #:webhook-covers-p)
   (:import-from #:koya/core/json #:json-null)
-  (:import-from #:koya-server/db/schema-store #:find-space)
+  (:import-from #:koya-server/db/schema-store #:find-space #:find-model #:space-webhooks)
   (:import-from #:koya-server/db/contents
                 #:list-contents #:find-object-content #:content-id #:content-status #:content-data)
   (:import-from #:koya-server/lib/query #:parse-query #:make-query)
@@ -66,10 +66,10 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
   (let ((table (make-hash-table :test 'equal)))
     (dolist (field (model-fields model) table)
       (when (eq (field-type field) :reference)
-        (let ((target (space-model space (field-option field :model)))
+        (let ((target (find-model space (field-option field :model)))
               (targets (make-hash-table :test 'equal)))
           (when target
-            (dolist (content (list-contents (koya/core/schema:space-name space) (model-name target) target
+            (dolist (content (list-contents space (model-name target) target
                                             (make-query :limit 1000) :status :all))
               (setf (gethash (content-id content) targets) (content-label content target))))
           (setf (gethash (field-name field) table) targets))))))
@@ -128,8 +128,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
   (with-owner
     (let* ((space (path-param params :space))
            (model-name (path-param params :model))
-           (space-object (find-space space))
-           (model (and space-object (space-model space-object model-name))))
+           (model (and (find-space space) (find-model space model-name))))
       (cond ((null model)
              (set-response-status 404)
              (hsx (~layout :space space (h1 :class "text-xl font-bold" "Model not found"))))
@@ -144,7 +143,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                                               (cons "orders" "-createdAt")))))
               (multiple-value-bind (contents total) (list-contents space model-name model query :status :all)
                (let* ((fields (model-fields model))
-                      (ref-labels (reference-labels space-object model))
+                      (ref-labels (reference-labels space model))
                       (pages (max 1 (ceiling total +page-size+))))
                  (hsx
                   (~layout :space space :crumbs (list (cons model-name nil))
@@ -154,7 +153,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                       (div :class "flex items-center gap-2"
                         ;; the space's log, narrowed to what this model set off;
                         ;; without a hook that can fire, that log can hold nothing
-                        (if (or (space-webhooks space-object) (model-webhooks model))
+                        (if (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space))
                             (hsx (a :href (webhook-log-url space :model model-name) :class "btn"
                                     (~icon :name :webhook) "Webhooks"))
                             (hsx (<>)))

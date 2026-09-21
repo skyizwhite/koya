@@ -4,8 +4,9 @@
   (:import-from #:koya-server/db/api-keys #:create-api-key)
   (:import-from #:koya-server/db/management-keys #:create-management-key)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
-  (:import-from #:koya/config #:defspace #:defmodel #:clear-schema #:current-schema)
-  (:import-from #:koya/core/schema #:schema-spaces #:space-name #:space-models #:model-name)
+  (:import-from #:koya-server/db/schema-store #:create-space)
+  (:import-from #:koya/config #:defmodel #:clear-schema #:current-schema)
+  (:import-from #:koya/core/schema #:schema-models #:model-name)
   (:import-from #:koya/client
                 #:configure #:koya-error #:koya-error-status #:koya-error-code
                 #:pull #:get-list #:get-item #:get-object
@@ -25,17 +26,20 @@
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (start :server :woo :port *port* :db ":memory:")
-  (configure :base-url (format nil "http://127.0.0.1:~a" *port*) :management-key (create-management-key :label "client") :space "website")
+  ;; the space is made here, as the admin UI would: a deploy never creates one
+  (create-space "website")
+  (configure :base-url (format nil "http://127.0.0.1:~a" *port*)
+             :management-key (create-management-key "website" :label "client")
+             :space "website")
   (clear-schema)
-  (defspace website)
-  (defmodel (website blog) (:kind :list)
+  (defmodel blog (:kind :list)
     (title :text :required t)
     (body :richtext)
     (tags :reference :model tag :many t)
     (cover :media))
-  (defmodel (website tag) (:kind :list)
+  (defmodel tag (:kind :list)
     (name :text :required t))
-  (defmodel (website about) (:kind :object)
+  (defmodel about (:kind :object)
     (body :richtext)))
 
 (teardown
@@ -44,24 +48,27 @@
 
 (deftest deploy-plan-pull
   (let ((changes (koya/client:plan :stream (make-broadcast-stream))))
-    (ok (= (length changes) 10) "everything is new"))
+    (ok (= (length changes) 9) "everything is new"))
   (let ((applied (koya/client:deploy :stream (make-broadcast-stream))))
-    (ok (= (length applied) 10)))
+    (ok (= (length applied) 9)))
   (ok (null (koya/client:plan :stream (make-broadcast-stream))) "nothing left to change")
   (let ((remote (pull)))
-    (ok (equal (mapcar #'model-name (space-models (first (schema-spaces remote)))) '("blog" "tag" "about"))))
+    (ok (equal (mapcar #'model-name (schema-models remote)) '("blog" "tag" "about"))))
+  (testing "a management key reaches its own space and no other"
+    (let ((e (handler-case (pull :space "other") (koya-error (e) e))))
+      (ok (= (koya-error-status e) 403))
+      (ok (string= (koya-error-code e) "forbidden"))))
   (testing "destructive push without confirmation is refused"
     (clear-schema)
-    (defspace website)
-    (defmodel (website blog) (:kind :list) (title :text :required t))
+    (defmodel blog (:kind :list) (title :text :required t))
     (ok (null (koya/client:deploy :confirm nil :stream (make-broadcast-stream))))
-    (ok (= (length (space-models (first (schema-spaces (pull))))) 3) "untouched")
+    (ok (= (length (schema-models (pull))) 3) "untouched")
     (ok (koya/client:deploy :force t :stream (make-broadcast-stream)))
-    (ok (= (length (space-models (first (schema-spaces (pull))))) 1))
+    (ok (= (length (schema-models (pull))) 1))
     ;; restore
-    (defmodel (website blog) (:kind :list) (title :text :required t) (body :richtext) (tags :reference :model tag :many t) (cover :media))
-    (defmodel (website tag) (:kind :list) (name :text :required t))
-    (defmodel (website about) (:kind :object) (body :richtext))
+    (defmodel blog (:kind :list) (title :text :required t) (body :richtext) (tags :reference :model tag :many t) (cover :media))
+    (defmodel tag (:kind :list) (name :text :required t))
+    (defmodel about (:kind :object) (body :richtext))
     (koya/client:deploy :force t :stream (make-broadcast-stream))))
 
 (deftest contents-and-delivery

@@ -17,6 +17,7 @@
   (:export #:*media-middleware*
            #:store-upload
            #:remove-media
+           #:remove-space-media
            #:media-path
            #:media-url
            #:media->jobject
@@ -80,6 +81,13 @@ row. Signals a 4xx api-error for unsupported or oversized data."
         (error (e)
           (ignore-errors (delete-file path))
           (error e))))))
+
+(defun remove-space-media (space)
+  "Delete every file of SPACE. Called when the space itself is deleted, after the
+rows have gone with it; nothing is left to reference them, so nothing is checked."
+  (let ((directory (merge-pathnames (format nil "~a/" space) (uiop:ensure-directory-pathname (media-dir)))))
+    (when (uiop:directory-exists-p directory)
+      (uiop:delete-directory-tree directory :validate t))))
 
 (defun remove-media (media)
   "Delete the row and the file. A missing file is not an error; a file some

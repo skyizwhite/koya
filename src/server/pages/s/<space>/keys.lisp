@@ -3,6 +3,8 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/db/schema-store #:find-space #:space-webhook-secret #:rotate-webhook-secret)
   (:import-from #:koya-server/db/api-keys #:create-api-key #:list-api-keys #:delete-api-key)
+  (:import-from #:koya-server/db/management-keys
+                #:create-management-key #:list-management-keys #:delete-management-key)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:param #:short-time #:set-flash #:redirect-to
@@ -10,47 +12,71 @@
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/keys)
 
-(defcomp ~keys-page (&key space new-key)
+;;; Every key of one space: the delivery keys that read its published content and
+;;; the management keys that drive the admin API for it. Both belong to the space
+;;; and are kept apart because what they may do is not the same -- a delivery key
+;;; is handed to a front end, a management key deploys schemas.
+
+(defcomp ~new-key (&key key)
+  (hsx (div :class "mb-4 rounded-md border border-ok/40 bg-ok/5 px-4 py-3 text-sm"
+         (p :class "font-medium text-ok" "New key created. Copy it now; it will not be shown again.")
+         (code :class "mt-2 block select-all break-all rounded bg-panel px-2 py-1 font-mono" key))))
+
+(defcomp ~key-table (&key space keys delete-action)
+  (if (null keys)
+      (hsx (~empty-state "No keys yet."))
+      ;; framed like the other lists
+      (hsx (div :class "overflow-x-auto rounded-md border border-line bg-panel"
+             (table :class "w-full text-sm"
+               (thead (tr :class "border-b border-line text-left text-muted"
+                        (th :class "py-2 pl-4 pr-4 font-medium" "label")
+                        (th :class "py-2 pr-4 font-medium whitespace-nowrap" "created at")
+                        (th)))
+               (tbody :class "divide-y divide-line"
+                 (loop :for key :in keys :collect
+                   (hsx (tr
+                          (td :class "py-2 pl-4 pr-4 font-medium"
+                            (if (string= (getf key :label) "")
+                                (hsx (span :class "text-muted" "(no label)"))
+                                (getf key :label)))
+                          (td :class "py-2 pr-4 whitespace-nowrap text-muted" (short-time (getf key :created-at)))
+                          (td :class "py-2 pl-4 pr-4 text-right"
+                            (form :method "post" :action (format nil "~a/keys" (space-url space))
+                              (input :type "hidden" :name "action" :value delete-action)
+                              (input :type "hidden" :name "id" :value (getf key :id))
+                              ;; the cell is narrow, so the icon stands for the label
+                              (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete key"
+                                (~icon :name :delete)))))))))))))
+
+(defcomp ~create-key (&key space action placeholder)
+  (hsx (form :method "post" :action (format nil "~a/keys" (space-url space)) :class "mt-4 flex items-end gap-3"
+         (input :type "hidden" :name "action" :value action)
+         (div :class "flex-1"
+           (label :class "label" "Label")
+           (input :type "text" :name "label" :class "input mt-1.5" :placeholder placeholder))
+         (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create key"))))
+
+(defcomp ~keys-page (&key space new-delivery-key new-management-key)
   (hsx
-   (~layout :space space :crumbs (list (cons "Delivery keys" nil))
-     (h1 :class "mb-6 text-2xl font-bold" "Delivery keys")
-     (p :class "mb-6 text-sm text-muted"
-       "Sent as " (code "X-KOYA-API-KEY") " to read this space through the delivery API. Keys for the admin API are made under Settings.")
-     (when new-key
-       (hsx (div :class "mb-6 rounded-md border border-ok/40 bg-ok/5 px-4 py-3 text-sm"
-              (p :class "font-medium text-ok" "New key created. Copy it now; it will not be shown again.")
-              (code :class "mt-2 block select-all break-all rounded bg-panel px-2 py-1 font-mono" new-key))))
-     (let ((keys (list-api-keys space)))
-       (if (null keys)
-           (hsx (~empty-state "No delivery keys yet."))
-           ;; framed like the other lists
-           (hsx (div :class "overflow-x-auto rounded-md border border-line bg-panel"
-                  (table :class "w-full text-sm"
-                    (thead (tr :class "border-b border-line text-left text-muted"
-                             (th :class "py-2 pl-4 pr-4 font-medium" "label")
-                             (th :class "py-2 pr-4 font-medium whitespace-nowrap" "created at")
-                             (th)))
-                    (tbody :class "divide-y divide-line"
-                      (loop :for key :in keys :collect
-                        (hsx (tr
-                               (td :class "py-2 pl-4 pr-4 font-medium"
-                                 (if (string= (getf key :label) "")
-                                     (hsx (span :class "text-muted" "(no label)"))
-                                     (getf key :label)))
-                               (td :class "py-2 pr-4 whitespace-nowrap text-muted" (short-time (getf key :created-at)))
-                               (td :class "py-2 pl-4 pr-4 text-right"
-                                 (form :method "post" :action (format nil "~a/keys" (space-url space))
-                                   (input :type "hidden" :name "action" :value "delete")
-                                   (input :type "hidden" :name "id" :value (getf key :id))
-                                   ;; the cell is narrow, so the icon stands for the label
-                                   (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete key"
-                                     (~icon :name :delete)))))))))))))
-     (form :method "post" :action (format nil "~a/keys" (space-url space)) :class "mt-8 flex items-end gap-3"
-       (input :type "hidden" :name "action" :value "create")
-       (div :class "flex-1"
-         (label :for "label" :class "label" "Label")
-         (input :type "text" :id "label" :name "label" :class "input mt-1.5" :placeholder "e.g. production site"))
-       (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create key"))
+   (~layout :space space :crumbs (list (cons "Keys" nil))
+     (h1 :class "mb-8 text-2xl font-bold" "Keys")
+     (section
+       (h2 :class "mb-1 text-lg font-bold" "Delivery keys")
+       (p :class "mb-4 text-sm text-muted"
+         "Sent as " (code "X-KOYA-API-KEY") " to read this space's published content through the delivery API. "
+         "Safe to put where a site's front end can reach it.")
+       (when new-delivery-key (hsx (~new-key :key new-delivery-key)))
+       (~key-table :space space :keys (list-api-keys space) :delete-action "delete")
+       (~create-key :space space :action "create" :placeholder "e.g. production site"))
+     (section :class "mt-12"
+       (h2 :class "mb-1 text-lg font-bold" "Management keys")
+       (p :class "mb-4 text-sm text-muted"
+         "Sent as " (code "Authorization: Bearer …") " to the admin API: schema deploys and content or media "
+         "management from a site's code or REPL. A key reaches this space and nothing else, and does not log "
+         "into this UI; the owner secret does the opposite.")
+       (when new-management-key (hsx (~new-key :key new-management-key)))
+       (~key-table :space space :keys (list-management-keys space) :delete-action "delete-management")
+       (~create-key :space space :action "create-management" :placeholder "e.g. deploys from CI"))
      (section :class "mt-12"
        (h2 :class "mb-2 text-lg font-bold" "Webhook secret")
        (p :class "mb-3 text-sm text-muted"
@@ -64,28 +90,38 @@
              (~icon :name :rotate) "Rotate")))))))
 
 (defun ensure-space (params)
-  (let ((name (path-param params :space)))
-    (and (find-space name) name)))
+  (find-space (path-param params :space)))
+
+(defun page-title (space) (format nil "Keys · ~a · koya" space))
 
 (defun @get (params)
   (with-owner
     (let ((space (ensure-space params)))
       (cond ((null space) (set-response-status 404) (hsx (~layout (h1 "Space not found"))))
-            (t (set-title (format nil "Delivery keys · ~a · koya" space))
+            (t (set-title (page-title space))
                (hsx (~keys-page :space space)))))))
 
 (defun @post (params)
   (with-owner-post
     (let ((space (ensure-space params))
-          (action (param params "action")))
+          (action (param params "action"))
+          (label (or (param params "label") ""))
+          (id (or (param params "id") "")))
       (cond ((null space) (set-response-status 404) (hsx (~layout (h1 "Space not found"))))
+            ;; create renders directly because the plaintext key is shown only
+            ;; once; delete and rotate redirect so a reload cannot repeat them
             ((equal action "create")
-             (set-title (format nil "Delivery keys · ~a · koya" space))
-             (hsx (~keys-page :space space :new-key (create-api-key space :label (or (param params "label") "")))))
-            ;; delete and rotate redirect so a reload cannot repeat them; create
-            ;; renders directly because the plaintext key is shown only once
+             (set-title (page-title space))
+             (hsx (~keys-page :space space :new-delivery-key (create-api-key space :label label))))
+            ((equal action "create-management")
+             (set-title (page-title space))
+             (hsx (~keys-page :space space :new-management-key (create-management-key space :label label))))
             ((equal action "delete")
-             (delete-api-key space (or (param params "id") ""))
+             (delete-api-key space id)
+             (set-flash "Key deleted.")
+             (redirect-to (format nil "~a/keys" (space-url space))))
+            ((equal action "delete-management")
+             (delete-management-key space id)
              (set-flash "Key deleted.")
              (redirect-to (format nil "~a/keys" (space-url space))))
             ((equal action "rotate-webhook-secret")
