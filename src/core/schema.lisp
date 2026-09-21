@@ -31,11 +31,9 @@
            #:model-field
            #:model-options
            #:model-webhooks
-           #:+webhook-events+
            #:make-webhook
            #:webhook-label
            #:webhook-url
-           #:webhook-events
            #:webhook->jobject
            #:model-preview-url
            #:model-public-url
@@ -179,41 +177,26 @@ checked here so that validation never trips over a wrong type or a broken regex.
 (defun field-many-p (field) (and (field-option field :many) t))
 
 ;;; ---------------------------------------------------------------------------
-;;; Webhooks: plists (:label L :url U :events (...)) so EQUAL compares them.
+;;; Webhooks: plists (:label L :url U) so EQUAL compares them. Every webhook is
+;;; sent every event -- publish, unpublish, delete and draft -- and the payload
+;;; names the event; the receiver decides what to act on (see lib/webhook).
 ;;; A space's webhooks apply to every model; a model adds its own.
-
-(defparameter +webhook-events+ '(:publish :unpublish :delete :draft))
 
 (defun webhook-label (webhook) (getf webhook :label))
 (defun webhook-url (webhook) (getf webhook :url))
-(defun webhook-events (webhook) (getf webhook :events))
 
-(defun normalize-events (events label)
-  "EVENTS as keywords from +WEBHOOK-EVENTS+, in canonical order, no duplicates."
-  (let ((keys (mapcar (lambda (e)
-                        (or (find-keyword (if (symbolp e) (string-downcase (symbol-name e)) e) +webhook-events+)
-                            (fail "webhook ~s: unknown event ~s (use ~{~(~a~)~^, ~})" label e +webhook-events+)))
-                      (if (json-array-p events) (coerce events 'list) events))))
-    (remove-if-not (lambda (e) (member e keys)) +webhook-events+)))
-
-(defun make-webhook (label url &key (events nil events-p))
-  "A webhook: LABEL names it in plans and logs, URL receives the POST, EVENTS is a
-non-empty subset of +WEBHOOK-EVENTS+ (:publish :unpublish :delete :draft). There is
-no default: when a webhook fires is always written down where it is defined."
+(defun make-webhook (label url)
+  "A webhook: LABEL names it in plans and logs, URL receives the POST."
   (unless (and (stringp label) (plusp (length label))) (fail "webhook label must be a non-empty string, got ~s" label))
   (unless (and (stringp url) (plusp (length url))) (fail "webhook ~s: url must be a non-empty string, got ~s" label url))
-  (unless (and events-p events)
-    (fail "webhook ~s: :events must name when it fires, from ~{~(~a~)~^, ~}" label +webhook-events+))
-  (unless (or (listp events) (json-array-p events))
-    (fail "webhook ~s: :events must be a list, got ~s" label events))
-  (list :label label :url url :events (normalize-events events label)))
+  (list :label label :url url))
 
 (defun normalize-webhook (entry)
   "ENTRY is a webhook plist from the DSL or a wire-format object."
   (cond ((and (consp entry) (keywordp (first entry)))
-         (make-webhook (getf entry :label) (getf entry :url) :events (getf entry :events)))
+         (make-webhook (getf entry :label) (getf entry :url)))
         ((hash-table-p entry) (jobject->webhook entry))
-        (t (fail "a webhook must be (webhook label url :events (...)), got ~s" entry))))
+        (t (fail "a webhook must be (webhook label url), got ~s" entry))))
 
 (defun normalize-webhooks (webhooks where)
   (unless (or (listp webhooks) (json-array-p webhooks))
@@ -342,14 +325,14 @@ no default: when a webhook fires is always written down where it is defined."
 
 (defun webhook->jobject (webhook)
   (jobject "label" (webhook-label webhook)
-           "url" (webhook-url webhook)
-           "events" (map 'vector (lambda (e) (string-downcase (symbol-name e))) (webhook-events webhook))))
+           "url" (webhook-url webhook)))
 
 (defun jobject->webhook (obj)
+  "Any other key -- the \"events\" older schemas carried -- is ignored, so a
+stored schema loads and is rewritten in the current shape on the next deploy."
   (unless (hash-table-p obj) (fail "each webhook must be an object"))
-  (let ((label (jget obj "label")) (url (jget obj "url")) (events (jget obj "events")))
-    (unless (json-array-p events) (fail "webhook ~s: events must be an array" (or label url)))
-    (make-webhook (or label url) url :events (coerce events 'list))))
+  (let ((label (jget obj "label")) (url (jget obj "url")))
+    (make-webhook (or label url) url)))
 
 (defun model->jobject (model)
   (let ((obj (jobject "name" (model-name model)

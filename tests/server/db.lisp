@@ -27,7 +27,7 @@
 
 (defun schema-a ()
   (make-schema (list (make-space "website"
-                                 :webhooks (list (make-webhook "hook" "https://x/hook" :events '(:publish :unpublish :delete)))
+                                 :webhooks (list (make-webhook "hook" "https://x/hook"))
                                  :models (list (make-model "blog" :list (list (make-field :title :text :required t)
                                                                               (make-field :body :richtext)))
                                                (make-model "about" :object (list (make-field :body :richtext))))))))

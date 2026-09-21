@@ -24,8 +24,7 @@
 ;;; collected into an in-memory registry; CURRENT-SCHEMA turns it into a
 ;;; validated schema that DEPLOY sends to the server.
 ;;;
-;;;   (defspace website :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate"
-;;;                                   :events '(:publish :unpublish :delete))))
+;;;   (defspace website :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
 ;;;
 ;;;   (defmodel (website blog) (:kind :list)
 ;;;     (title        :text :required t)
@@ -72,14 +71,10 @@
           (make-space key :webhooks (space-webhooks space) :models new-models))
     model))
 
-(defun webhook (label url &key (events nil events-p))
-  "A webhook for :webhooks of defspace or defmodel. EVENTS must be given: a non-empty
-list from (:publish :unpublish :delete :draft) saying when it fires."
-  ;; passed through as given so that MAKE-WEBHOOK, the one place that checks
-  ;; webhooks, also tells a missing :events from an empty one
-  (if events-p
-      (make-webhook label url :events events)
-      (make-webhook label url)))
+(defun webhook (label url)
+  "A webhook for :webhooks of defspace or defmodel. It is sent every event
+(publish, unpublish, delete, draft); the payload's \"event\" says which."
+  (make-webhook label url))
 
 (defmacro defspace (name &key webhooks)
   "Define (or redefine) a space. WEBHOOKS is evaluated: a list of (webhook ...) that

@@ -20,7 +20,7 @@
 
 (defun schema-b ()
   (make-schema (list (make-space "website"
-                                 :webhooks (list (make-webhook "x" "https://x" :events '(:publish :unpublish :delete)))
+                                 :webhooks (list (make-webhook "x" "https://x"))
                                  :models (list (make-model "blog" :list
                                                            (list (make-field :title :text :required t :max-length 50)
                                                                  (make-field :body :textarea)
@@ -76,13 +76,11 @@
            (make-schema (list (make-space "website"
                                           :models (list (make-model "blog" :list (list (make-field :title :text))
                                                                     :webhooks hooks)))))))
-    (let ((changes (diff-schemas (blog) (blog (make-webhook "preview" "https://p" :events '(:draft))))))
+    (let ((changes (diff-schemas (blog) (blog (make-webhook "preview" "https://p")))))
       (ok (equal (ops changes) '(:change-model-webhooks)))
       (ng (destructive-changes-p changes))
       (ok (search "webhooks changed" (format-change (first changes)))))
-    (ok (null (diff-schemas (blog (make-webhook "a" "https://a" :events '(:publish :draft)))
-                            (blog (make-webhook "a" "https://a" :events '("draft" :publish :publish)))))
-        "same hook, different spelling: no change")))
+    (ok (null (diff-schemas (blog (make-webhook "a" "https://a")) (blog (make-webhook "a" "https://a")))) "same hook: no change")))
 
 (deftest from-nothing
   (let ((changes (diff-schemas nil (schema-a))))

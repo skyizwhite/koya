@@ -50,8 +50,9 @@ and links to **Media** and **Delivery keys**.
 
 Underneath, **Webhooks** shows every webhook that can fire for this space: the
 space's own (marked *all models*) and each model's (*`{model}` only*), with the
-label, the URL and the events it subscribes to. Webhooks are part of the schema,
-so they are read-only here; change them in `defspace` / `defmodel` and deploy.
+label and the URL. Every webhook receives every event (publish, unpublish,
+delete, draft); the payload says which. Webhooks are part of the schema, so
+they are read-only here; change them in `defspace` / `defmodel` and deploy.
 
 ## Contents of a model
 

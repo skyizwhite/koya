@@ -831,13 +831,11 @@ components:
 
     Webhook:
       type: object
-      required: [url, events]
+      description: Sent every event; the payload's `event` says which. An `events` key from older schemas is ignored.
+      required: [url]
       properties:
-            label: { type: string, description: Defaults to `url` }
-            url: { type: string }
-            events:
-              type: array
-              items: { type: string, enum: [publish, unpublish, delete, draft] }
+        label: { type: string, description: Defaults to `url` }
+        url: { type: string }
 
     Change:
       type: object

@@ -425,7 +425,8 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
   delivery / webhook の 4 種。management key は Settings で発行、`management_keys` に SHA-256 保存、
   管理 API の Bearer はこれのみ。`KOYA_SECRET` はログイン専用に。クライアントは `:management-key` /
   `KOYA_MANAGEMENT_KEY`。0.2.0)。webhook 単位の秘密(`:secret`)は受け口が増えたときに。
-- 2026-09-21: webhook の `:events` は必須(既定値と URL 文字列の省略形を廃止)。`:boolean` の `:default t` を
+- 2026-09-21: webhook の `:events` は必須化したのち同日撤廃(0.3.0): 全 webhook に全イベントを送り、payload の
+  `event`(publish / unpublish / delete / draft)で受け手が分岐する。microCMS 互換の `type` は廃止。`:boolean` の `:default t` を
   新規作成時に適用。参照中のメディアは削除拒否(409 `in_use`)。
 - 配信: webhook は通知ごとにスレッドを起こすので、大量インポート時はキューにまとめる。
 - 依存: hsx の `&` エスケープ修正は koya で取り込み済み。website は `qlot update koya` で koya の変更を追従。

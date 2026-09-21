@@ -77,16 +77,14 @@ the REPL.
 
 ```lisp
 (defspace website
-  ;; fires for every model of the space
-  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate"
-                           :events '(:publish :unpublish :delete))))
+  ;; fires for every model of the space, on every event
+  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
 
 (defmodel (website blog) (:kind :list
                           :public-url  "https://example.com/blog/{CONTENT_ID}"
                           :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
-                          ;; this model only, on draft saves as well
-                          :webhooks (list (webhook "preview-build" "https://preview.example/hook"
-                                                   :events '(:draft))))
+                          ;; this model only, in addition to the space's
+                          :webhooks (list (webhook "preview-build" "https://preview.example/hook")))
   (title   :text :required t)
   (slug    :slug :from title :unique t)
   (cover   :media)
@@ -156,30 +154,33 @@ blank `:slug` filled from `:from`, …) is specified in
 ## Webhooks
 
 ```lisp
-(webhook label url &key events)
+(webhook label url)
 ```
 
-`:events` **must be given**: a non-empty list from `:publish`, `:unpublish`,
-`:delete` and `:draft`. There is no default and no bare-URL shorthand, so when a
-hook fires is always written next to it. A space's webhooks fire for every model;
-a model's `:webhooks` are added to them, and labels must be unique within each
-list.
-
-koya POSTs JSON to each subscribed URL:
+A space's webhooks fire for every model; a model's `:webhooks` are added to
+them, and labels must be unique within each list. There is nothing to
+subscribe to: **every webhook is sent every event**, and the payload says which,
+so the receiver decides what to act on.
 
 ```json
 {"service": "website", "api": "blog", "id": "01J…",
- "type": "new" | "edit" | "delete" | "draft",
+ "event": "publish" | "unpublish" | "delete" | "draft",
  "contents": {"old": {…} | null, "new": {…} | null}}
 ```
 
-The bodies are the same shape the delivery API returns. `type` is `new` on a first
-publish, `edit` on a later publish or an unpublish, `delete` on a delete and
-`draft` on a draft save. Discarding a draft sends nothing: what is published did
-not change. Every call carries the space's webhook secret in
-`X-KOYA-WEBHOOK-KEY` — read it with `(koya:webhook-secret)` or from the space's
-Delivery keys page — and delivery is fire-and-forget: koya logs a failure and does not
-retry.
+| `event` | When | `old` / `new` |
+|---|---|---|
+| `publish` | a content is published, first time or again | the previous published data or `null` / the new |
+| `unpublish` | a published content is taken off the delivery API | the published data / `null` |
+| `delete` | a published content is deleted (deleting an unpublished draft sends nothing) | the published data / `null` |
+| `draft` | a draft is saved or created | the published data or `null` / the draft |
+
+The bodies are the same shape the delivery API returns. Discarding a draft sends
+nothing: what is published did not change. Note that `draft` arrives on every
+save, so a hook that rebuilds or revalidates a site should return early on it.
+Every call carries the space's webhook secret in `X-KOYA-WEBHOOK-KEY` -- read it
+with `(koya:webhook-secret)` or from the space's Delivery keys page -- and
+delivery is fire-and-forget: koya logs a failure and does not retry.
 
 ## Deploying the schema
 

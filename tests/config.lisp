@@ -12,7 +12,7 @@
 (defhook :after (clear-schema))
 
 (deftest dsl
-  (defspace website :webhooks (list (webhook "hook" "https://example.com/hook" :events '(:publish :unpublish :delete))))
+  (defspace website :webhooks (list (webhook "hook" "https://example.com/hook")))
   (defmodel (website blog) (:kind :list)
     (title        :text :required t :max-length 100)
     (tags         :reference :model tag :many t)
@@ -27,9 +27,7 @@
   (let* ((schema (current-schema))
          (space (schema-space schema "website"))
          (blog (space-model space "blog")))
-    (ok (equal (space-webhooks space) '((:label "hook" :url "https://example.com/hook"
-                                         :events (:publish :unpublish :delete))))
-        "the webhook and its events as written")
+    (ok (equal (space-webhooks space) '((:label "hook" :url "https://example.com/hook"))))
     (ok (equal (mapcar #'koya/core/schema:model-name (space-models space)) '("blog" "tag" "about")))
     (ok (eq (model-kind (space-model space "tag")) :list))
     (ok (signals (macroexpand-1 '(defmodel (website nokind) () (title :text))) 'error) ":kind is required")
@@ -49,29 +47,25 @@
   (defmodel (website blog) (:kind :list) (title :text) (body :richtext))
   (ok (= (length (space-models (find-space 'website))) 1) "redefining replaces, does not duplicate")
   (ok (model-field (find-model 'website 'blog) 'body))
-  (defspace website :webhooks (list (webhook "x" "https://x" :events '(:publish :unpublish :delete))))
+  (defspace website :webhooks (list (webhook "x" "https://x")))
   (ok (= (length (space-models (find-space 'website))) 1) "redefining a space keeps its models")
   (ok (equal (mapcar #'koya/core/schema:webhook-url (space-webhooks (find-space 'website))) '("https://x"))))
 
 (deftest webhooks-dsl
   (clear-schema)
-  (defspace website :webhooks (list (webhook "revalidate" "https://site/revalidate" :events '(:publish :unpublish :delete))))
-  (ok (signals (webhook "no-events" "https://x") 'koya/core/schema:schema-error) ":events must be written down")
-  (ok (signals (webhook "no-events" "https://x" :events nil) 'koya/core/schema:schema-error) "and not be empty")
+  (defspace website :webhooks (list (webhook "revalidate" "https://site/revalidate")))
   (ok (signals (eval '(defspace bare :webhooks (list "https://x"))) 'koya/core/schema:schema-error) "a bare URL is not a webhook")
   (defmodel (website blog) (:kind :list
-                            :webhooks (list (webhook "preview" "https://preview/hook" :events '(:draft))
-                                             (webhook "index" "https://search/hook" :events '("publish" :delete))))
+                            :webhooks (list (webhook "preview" "https://preview/hook")
+                                             (webhook "index" "https://search/hook")))
     (title :text))
   (let* ((space (schema-space (current-schema) "website"))
          (blog (space-model space "blog")))
-    (ok (equal (space-webhooks space) '((:label "revalidate" :url "https://site/revalidate" :events (:publish :unpublish :delete)))))
+    (ok (equal (space-webhooks space) '((:label "revalidate" :url "https://site/revalidate"))))
     (ok (equal (mapcar #'koya/core/schema:webhook-label (koya/core/schema:model-webhooks blog)) '("preview" "index")))
-    (ok (equal (koya/core/schema:webhook-events (second (koya/core/schema:model-webhooks blog))) '(:publish :delete))
-        "events accept strings and keep canonical order"))
-  (ok (signals (eval '(defmodel (website blog) (:kind :list :webhooks (list (webhook "x" "https://x" :events '(:nope)))) (title :text)))
-               'koya/core/schema:schema-error)
-      "unknown events are rejected"))
+    (ok (equal (mapcar #'koya/core/schema:webhook-url (koya/core/schema:model-webhooks blog)) '("https://preview/hook" "https://search/hook"))))
+  (ok (signals (eval '(webhook "x" "https://x" :events '(:publish))) 'error)
+      "the old :events argument is refused rather than ignored"))
 
 (deftest errors
   (ok (signals (eval '(defmodel (nowhere blog) (:kind :list) (title :text))) 'error) "space must exist")

@@ -129,8 +129,8 @@
   "The draft (or, without one, published) data as the delivery API would show it."
   (content->jobject content model space :draft t))
 
-(defun notify (space model id type event &key old new)
-  (notify-webhooks space model id type event
+(defun notify (space model id event &key old new)
+  (notify-webhooks space model id event
                    :secret (space-webhook-secret (space-name space))
                    :old old
                    :new new))
@@ -155,8 +155,8 @@ and only PUBLISHED-AT applies."
                                      :published-at published-at :revised-at revised-at
                                      (and (check-new-id id) (list :id id)))))
                  (if publish
-                     (notify space model (content-id content) "new" :publish :new (published-view space model content))
-                     (notify space model (content-id content) "draft" :draft :new (draft-view space model content)))
+                     (notify space model (content-id content) :publish :new (published-view space model content))
+                     (notify space model (content-id content) :draft :new (draft-view space model content)))
                  content)))
         (if (eq (model-kind model) :object)
             (let ((existing (find-object-content space-name model-name)))
@@ -174,7 +174,7 @@ and only PUBLISHED-AT applies."
     (with-db-transaction
       (check-content space-name model data :exclude-id id)
       (let ((saved (save-draft id data)))
-        (notify space model id "draft" :draft :old (published-view space model saved) :new (draft-view space model saved))
+        (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved))
         saved))))
 
 (defun publish (space model id &optional data &key published-at)
@@ -184,12 +184,11 @@ and only PUBLISHED-AT applies."
          (content (resolve-content space-name model-name id))
          (data (or data (content-data content :draft t)))
          (published-at (check-published-at published-at))
-         (old (published-view space model content))
-         (type (if (content-published-at content) "edit" "new")))
+         (old (published-view space model content)))
     (with-db-transaction
       (check-content space-name model data :exclude-id id)
       (let ((published (publish-content id data :published-at published-at)))
-        (notify space model id type :publish :old old :new (published-view space model published))
+        (notify space model id :publish :old old :new (published-view space model published))
         published))))
 
 (defun unpublish (space model id)
@@ -198,7 +197,7 @@ and only PUBLISHED-AT applies."
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
     (let ((result (unpublish-content id)))
-      (when old (notify space model id "edit" :unpublish :old old))
+      (when old (notify space model id :unpublish :old old))
       result)))
 
 (defun discard (space model id)
@@ -216,5 +215,5 @@ and only PUBLISHED-AT applies."
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
     (delete-content id)
-    (when old (notify space model id "delete" :delete :old old))
+    (when old (notify space model id :delete :old old))
     t))

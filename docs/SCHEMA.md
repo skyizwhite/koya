@@ -49,21 +49,18 @@ The array order is the order the admin UI shows.
 ## Webhook
 
 ```json
-{"label": "revalidate", "url": "https://example.com/api/revalidate", "events": ["publish", "unpublish", "delete"]}
+{"label": "revalidate", "url": "https://example.com/api/revalidate"}
 ```
 
 | Key | Type | Rules |
 |---|---|---|
 | `label` | string | non-empty; defaults to `url` when absent on input |
 | `url` | string | non-empty; receives the POST |
-| `events` | array of string | **required**; a non-empty subset of `publish`, `unpublish`, `delete`, `draft` |
 
-There is no default for `events` and no bare-URL shorthand: when a webhook fires
-is always written next to it. On output `events` has no duplicates and is in the
-canonical order above.
-
-What each event means, and the payload a webhook receives, is described in
-[CLIENT.md](CLIENT.md#webhooks).
+Every webhook is sent every event -- `publish`, `unpublish`, `delete` and
+`draft` -- and the payload names the event; there is nothing to subscribe to.
+Any other key on input (older schemas carried an `events` list) is ignored.
+The payload is described in [CLIENT.md](CLIENT.md#webhooks).
 
 ## Model
 

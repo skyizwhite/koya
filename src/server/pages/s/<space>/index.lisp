@@ -3,7 +3,7 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya/core/schema
                 #:space-models #:model-name #:model-kind #:model-webhooks #:space-webhooks
-                #:webhook-label #:webhook-url #:webhook-events)
+                #:webhook-label #:webhook-url)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/contents #:count-contents)
   (:import-from #:koya-server/lib/http #:path-param)
@@ -53,9 +53,5 @@
                                       (div :class "min-w-0"
                                         (div :class "font-medium" (webhook-label hook))
                                         (code :class "block truncate text-xs text-muted" (webhook-url hook)))
-                                      ;; two lines again, mirroring the label and its URL
-                                      (div :class "shrink-0 text-right"
-                                        (div :class "text-sm text-muted"
-                                          (if model (format nil "~a only" model) "all models"))
-                                        (div :class "text-xs text-muted"
-                                          (format nil "~{~(~a~)~^, ~}" (webhook-events hook)))))))))))))))))))
+                                      (div :class "shrink-0 text-sm text-muted"
+                                        (if model (format nil "~a only" model) "all models")))))))))))))))))
