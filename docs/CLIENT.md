@@ -1,0 +1,421 @@
+# The client library
+
+`koya` is the library a site depends on. It holds three things:
+
+- a **schema DSL** — `defspace`, `defmodel`, `webhook` — that defines the space's
+  models as code in the site's own repository;
+- **`plan` / `deploy` / `pull`**, which compare that schema with the one the
+  server stores and push it across;
+- an **HTTP client** for reading published content, managing content, keys and
+  media.
+
+Everything is meant to be called from the REPL or from the site's own code; there
+is no CLI. The admin UI, which reads the deployed schema, is documented in
+[ADMIN-UI.md](ADMIN-UI.md).
+
+- [Installing](#installing)
+- [Configuration](#configuration)
+- [Defining the schema](#defining-the-schema)
+- [Field types and options](#field-types-and-options)
+- [Webhooks](#webhooks)
+- [Deploying the schema](#deploying-the-schema)
+- [Reading content](#reading-content)
+- [Managing content](#managing-content)
+- [API keys and the webhook secret](#api-keys-and-the-webhook-secret)
+- [Media](#media)
+- [Errors](#errors)
+- [Lisp and JSON](#lisp-and-json)
+- [The HTTP API underneath](#the-http-api-underneath)
+
+## Installing
+
+koya is not in Quicklisp; depend on the repository with qlot. In the site's
+`qlfile`:
+
+```
+git koya https://github.com/skyizwhite/koya.git
+```
+
+then `qlot install` (and `qlot update koya` to pick up later changes). Add `koya`
+to the site's `.asd` `:depends-on`, and `(ql:quickload :koya)` in the REPL.
+
+All symbols below live in the `koya` package, which re-exports `koya/core`,
+`koya/config` and `koya/client`. The server system (`koya-server`) is a separate
+system; a site never loads it.
+
+## Configuration
+
+```lisp
+(koya:configure :base-url "https://cms.example.com"
+                :secret   "..."        ; owner secret: schema, content and media calls
+                :api-key  "koya_..."   ; delivery API key: reading published content
+                :space    "website")   ; default space for every call
+```
+
+Each setting is a special variable with an environment-variable fallback, read at
+call time:
+
+| Variable | Environment | Used by |
+|---|---|---|
+| `koya:*base-url*` | `KOYA_URL` | everything |
+| `koya:*secret*` | `KOYA_SECRET` | `plan`, `deploy`, `pull`, content/keys/media management |
+| `koya:*api-key*` | `KOYA_API_KEY` | `get-list`, `get-item`, `get-object` |
+| `koya:*space*` | `KOYA_SPACE` | the default for every `:space` argument |
+
+Note that the server's own public URL is `KOYA_BASE_URL`; the client reads
+`KOYA_URL`, so both can sit in one `.env` without colliding. A missing setting
+signals an error naming what to set. Calls that take `:space` accept a symbol or
+a string and downcase it.
+
+## Defining the schema
+
+Definitions are collected in an in-memory registry; re-evaluating a form replaces
+the previous definition of the same name, so the schema can be edited live from
+the REPL.
+
+```lisp
+(defspace website
+  ;; fires for every model of the space
+  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
+
+(defmodel (website blog) (:kind :list
+                          :public-url  "https://example.com/blog/{CONTENT_ID}"
+                          :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
+                          ;; this model only, on draft saves as well
+                          :webhooks (list (webhook "preview-build" "https://preview.example/hook"
+                                                   :events '(:draft))))
+  (title   :text :required t)
+  (slug    :slug :from title :unique t)
+  (cover   :media)
+  (content :richtext)
+  (tags    :reference :model tag :many t))
+
+(defmodel (website tag) (:kind :list)
+  (name :text :required t))
+
+(defmodel (website about) (:kind :object)
+  (body :richtext))
+```
+
+- **`(defspace name &key webhooks)`** — `name` is taken literally; `:webhooks` is
+  evaluated. A space must exist before its models are defined.
+- **`(defmodel (space name) (&key kind preview-url public-url webhooks) &body fields)`** —
+  `:kind` is required and is `:list` (many contents) or `:object` (exactly one).
+  The URL templates and `:webhooks` are evaluated; each field form
+  `(name type . options)` is taken literally.
+- **`:preview-url` / `:public-url`** are templates for the editor's two links.
+  `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
+
+Naming rules, checked as the schema is built:
+
+| Name | Shape | Notes |
+|---|---|---|
+| space, model | `^[a-z][a-z0-9-]*` | they appear in URLs |
+| field | `^[a-z][a-zA-Z0-9]*` | a kebab-case symbol is camelised: `(published-at :datetime)` becomes `publishedAt` |
+
+`id`, `createdAt`, `updatedAt`, `publishedAt` and `revisedAt` are system fields
+that every content already has; declaring one is an error.
+
+Other helpers: `(koya:current-schema)` returns the validated schema built so far,
+`(koya:clear-schema)` empties the registry, and `(koya:find-space name)` /
+`(koya:find-model space model)` look definitions up.
+
+## Field types and options
+
+| Type | Options | Stored as |
+|---|---|---|
+| `:text` | `:required` `:max-length` `:pattern` `:unique` | string |
+| `:textarea` | `:required` `:max-length` | string |
+| `:richtext` | `:required` | HTML string |
+| `:number` | `:required` `:min` `:max` `:integer` | number |
+| `:boolean` | `:required` `:default` | true / false |
+| `:date` | `:required` | `"YYYY-MM-DD"` |
+| `:datetime` | `:required` | ISO 8601 with a zone, e.g. `"2026-09-20T10:00:00.000Z"` |
+| `:select` | `:required` `:options` `:many` | one of `:options`, or an array of them |
+| `:media` | `:required` | media id (expanded to an object by the delivery API) |
+| `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |
+| `:slug` | `:required` `:from` `:unique` `:pattern` | lowercase-hyphen string |
+
+- `:options` must be a non-empty list of distinct strings; symbols are downcased.
+- `:model` names another model **of the same space**; `:from` names a `:text` or
+  `:textarea` field of the same model other than itself. Both are checked against
+  the whole schema, so a typo fails before anything is sent.
+- `:pattern` is a `cl-ppcre` regular expression and is compiled as the schema is
+  built.
+- `:unique` is enforced by the server across both the draft and the published data
+  of the model.
+- A blank value is `null`, a whitespace-only string, or `[]` on a `:many` field;
+  `:required` rejects it. Booleans are exempt: unset means `false`.
+- A blank `:slug` is generated from its `:from` field when a content is saved.
+- `:default` on a `:boolean` is accepted by the schema but not applied yet: a new
+  content starts with the field unset, which reads as `false`.
+
+## Webhooks
+
+```lisp
+(webhook label url &key events)
+```
+
+`events` is a subset of `:publish`, `:unpublish`, `:delete` and `:draft`, and
+defaults to everything but `:draft`. A bare URL string works too, taking itself as
+its label. A space's webhooks fire for every model; a model's `:webhooks` are
+added to them, and labels must be unique within each list.
+
+koya POSTs JSON to each subscribed URL:
+
+```json
+{"service": "website", "api": "blog", "id": "01J…",
+ "type": "new" | "edit" | "delete" | "draft",
+ "contents": {"old": {…} | null, "new": {…} | null}}
+```
+
+The bodies are the same shape the delivery API returns. `type` is `new` on a first
+publish, `edit` on a later publish or an unpublish, `delete` on a delete and
+`draft` on a draft save. Discarding a draft sends nothing: what is published did
+not change. Every call carries the space's webhook secret in
+`X-KOYA-WEBHOOK-KEY` — read it with `(koya:webhook-secret)` or from the space's
+API keys page — and delivery is fire-and-forget: koya logs a failure and does not
+retry.
+
+## Deploying the schema
+
+```lisp
+(koya:plan)                ; the changes a deploy would apply; prints and returns them
+(koya:deploy)              ; apply them
+(koya:deploy :force t)     ; apply without asking about destructive changes
+(koya:pull)                ; the schema the server currently stores, as a schema object
+```
+
+Both `plan` and `deploy` take `:schema` (defaulting to `(current-schema)`) and
+`:stream`; `deploy` also takes `:confirm` (default `t`). When a deploy would
+change something destructive the server refuses it; `deploy` then prints the
+changes, marked with `!`, and asks — answering no returns `nil` and changes
+nothing. With `:confirm nil` and no `:force` it gives up the same way, without
+asking, so a script never applies a destructive change by accident.
+
+Destructive means a change that can hide or invalidate content already stored:
+
+- removing a space, a model or a field;
+- changing a model's kind or a field's type;
+- tightening a field: adding `:required`, `:unique` or `:integer`, switching
+  `:many` on or off, lowering `:max-length` or `:max`, raising `:min`, changing
+  `:pattern`, or dropping a `:select` option.
+
+Nothing migrates existing content. A deploy only replaces the stored schema; rows
+that no longer fit it stay as they are, and the delivery API returns them as
+stored.
+
+## Reading content
+
+These need an API key and return published data only.
+
+```lisp
+(koya:get-list 'blog)
+(koya:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :fields "id,title,publishedAt"))
+(koya:get-list 'blog :query '(:include "tags"))          ; embed referenced contents
+(koya:get-item 'blog "01J…")
+(koya:get-item 'blog "01J…" :query '(:draft-key "…"))    ; preview a draft
+(koya:get-object 'about)
+```
+
+Each takes `:space` to override the default. `get-list` returns a plist:
+
+```lisp
+(:contents ((:id "01J…" :title "…" :tags ("01J…") :published-at "2026-09-20T…Z" …) …)
+ :total-count 42 :offset 0 :limit 10)
+```
+
+`get-item` and `get-object` return the content plist itself.
+
+### Query options
+
+`:query` is a kebab-case plist; keys are camelised and list values joined with
+commas, so `:include '("tags" "author.avatar")` and `:include "tags,author.avatar"`
+are the same.
+
+| Key | Meaning |
+|---|---|
+| `:limit` | default 10, values above 100 are clamped to 100 |
+| `:offset` | default 0 |
+| `:orders` | comma-separated field names, `-` for descending; default newest published first |
+| `:fields` | keys to keep in each content |
+| `:filters` | see below |
+| `:include` | reference fields to embed |
+| `:draft-key` | with `get-item` / `get-object`, serves that content's draft |
+
+`:filters` is microCMS's syntax: `field[op]value`, joined with `[and]` and
+`[or]` (`[or]` separates groups of `[and]` terms). Operators are `equals`,
+`not_equals`, `contains`, `not_contains`, `begins_with`, `exists`, `not_exists`,
+`less_than` and `greater_than`. On a `:many` field, `equals` and `contains` mean
+"has this value". Filtering or ordering by an unknown field is a 400.
+
+```lisp
+(koya:get-list 'blog :query '(:filters "title[contains]lisp[and]publishedAt[exists]"))
+```
+
+### What comes back
+
+- References are ids unless named in `:include`. `include=tags,author.avatar`
+  embeds `tags`, and `avatar` inside each embedded `author`. Only reference fields
+  can be included. A referenced content that is missing or unpublished drops out of
+  a `:many` field and becomes `nil` in a single one.
+- `:media` fields are always expanded to
+  `(:id … :url … :filename … :mime … :size … :width … :height … :alt … :created-at …)`,
+  with the URL absolute. An id whose file is gone becomes `nil`.
+- `:richtext` HTML has its `/media/` sources rewritten to absolute URLs, so it can
+  be rendered on any site.
+- `:fields` is applied last, after embedding and expansion.
+- Every content carries `:id`, `:created-at`, `:updated-at`, `:published-at` and
+  `:revised-at`; the last two are `nil` while a content is not published.
+
+## Managing content
+
+These use the owner secret and see drafts as well.
+
+```lisp
+(koya:list-contents 'blog :query '(:limit 100))   ; everything, drafts included
+(koya:get-content 'blog "01J…")
+(koya:create-content 'blog '(:title "Hello" :content "<p>…</p>"))            ; as a draft
+(koya:create-content 'blog '(:title "Hello") :publish t)
+(koya:update-content 'blog "01J…" '(:title "New title"))                     ; save a draft
+(koya:publish-content 'blog "01J…")                                          ; publish the draft
+(koya:publish-content 'blog "01J…" :data '(:title "…") :published-at "2026-09-20T10:00:00.000Z")
+(koya:unpublish-content 'blog "01J…")
+(koya:discard-draft 'blog "01J…")
+(koya:delete-content 'blog "01J…")
+(koya:draft-key 'blog "01J…")                     ; for a preview URL
+```
+
+- `list-contents` returns `(:contents (…) :total-count n :offset n :limit n)` where
+  each content is `(:id … :status … :published {…} :draft {…} :draft-key … :created-at …)`.
+  `status` is `"draft"`, `"published"` or `"published+draft"`.
+- `update-content` **merges** the plist onto the current draft (or the published
+  data when there is none); a key whose value is `nil` is removed. `publish-content`
+  with `:data` replaces the data outright.
+- `create-content` also takes `:id`, `:created-at`, `:updated-at`, `:published-at`
+  and `:revised-at` — everything an import from another CMS needs to keep its ids
+  and dates. Ids are 1–64 characters from `A-Za-z0-9_-`; without one a ULID is
+  generated. A duplicate id is a 409.
+- For an `:object` model, `create-content` updates the single existing content
+  instead of adding one.
+- Saving a draft issues a new draft key, so older preview links stop working.
+- `discard-draft` needs a published content: there would be nothing left otherwise.
+
+## API keys and the webhook secret
+
+```lisp
+(koya:create-api-key :label "production site")   ; => (values "koya_…" "01J…"), shown once
+(koya:list-api-keys)                             ; ((:id … :label … :created-at …) …)
+(koya:delete-api-key "01J…")
+(koya:webhook-secret)                            ; the X-KOYA-WEBHOOK-KEY of the space
+```
+
+Only a key's SHA-256 is stored, so a lost key cannot be read back — delete it and
+create another. A key is valid for its space alone.
+
+## Media
+
+```lisp
+(koya:upload-media #p"cover.png" :alt "Cover")
+;; => (:id "01J…" :url "https://cms.example.com/media/website/01J….png" :filename "cover.png"
+;;     :mime "image/png" :size 12345 :width 1200 :height 630 :alt "Cover" :created-at "…")
+(koya:list-media :search "cover" :limit 60 :offset 0)   ; (:media (…) :total-count n :offset n :limit n)
+(koya:get-media "01J…")                                 ; adds :references — how many contents use it
+(koya:update-media "01J…" :alt "New alt text")
+(koya:delete-media "01J…")
+```
+
+PNG, JPEG, GIF and WebP up to 20 MB each; the type is decided by reading the
+file's leading bytes. A deleted file leaves any content that referenced it with a
+dangling id, which the delivery API then returns as `nil`.
+
+## Errors
+
+Anything but a 2xx signals `koya:koya-error`, with readers
+`koya-error-status`, `koya-error-code`, `koya-error-message` and
+`koya-error-details`.
+
+| Status | Code | When |
+|---|---|---|
+| 400 | `bad_request`, `bad_json`, `bad_query`, `invalid_schema` | malformed input |
+| 401 | `unauthorized` | missing or wrong secret or API key |
+| 403 | `forbidden` | an API key from another space |
+| 404 | `not_found` | unknown space, model, content or media |
+| 409 | `conflict` | a content id that already exists |
+| 409 | `destructive_changes` | a deploy that needs `:force t`; `details` lists the changes |
+| 413 | `too_large` | an upload over the limit |
+| 422 | `validation_failed` | `details` is `((:field "title" :code "required" :message "is required") …)` |
+| 500 | `internal_error` | the message is only detailed when the server runs with `KOYA_ENV=dev` |
+
+```lisp
+(handler-case (koya:create-content 'blog '(:title ""))
+  (koya:koya-error (e)
+    (when (= (koya:koya-error-status e) 422)
+      (dolist (problem (koya:koya-error-details e))
+        (format t "~a: ~a~%" (getf problem :field) (getf problem :message))))))
+```
+
+## Lisp and JSON
+
+Arguments are converted to JSON and responses back to Lisp by the same rules:
+
+| Lisp | JSON |
+|---|---|
+| plist starting with a keyword | object with camelCase keys |
+| list or vector | array |
+| `#()` | empty array |
+| `t` | `true` |
+| `nil` | `null` |
+| string, number | as they are |
+
+and coming back, an object becomes a kebab-case keyword plist, an array a list and
+`null` `nil`. So `(getf item :published-at)` is `nil` for a draft, and
+`:tags '("01J…" "01J…")` is an array of ids.
+
+There is no Lisp spelling for JSON `false`: the server treats `null` and `false`
+alike for booleans, so `nil` means "off". On `update-content`, which merges,
+`nil` removes the key instead — send the whole data with `publish-content
+:data …` when a value must be written rather than dropped.
+
+Timestamps are ISO 8601 in UTC with milliseconds, e.g. `"2026-09-20T05:04:03.123Z"`.
+`koya:now-iso`, `koya:format-iso` and `koya:parse-iso` are re-exported for
+building them, and `koya:make-ulid` for generating ids.
+
+## The HTTP API underneath
+
+Useful when writing a client in another language, or when debugging with `curl`.
+All bodies are JSON with camelCase keys; errors are
+`{"error": {"code": …, "message": …, "details": …}}`.
+
+### Delivery API — `X-KOYA-API-KEY: koya_…`
+
+| Method and path | Returns |
+|---|---|
+| `GET /api/v1/{space}/{model}?limit=&offset=&orders=&fields=&filters=&include=` | `{contents, totalCount, offset, limit}`, or the single content for an object model |
+| `GET /api/v1/{space}/{model}/{id}?fields=&include=&draftKey=` | one content |
+
+### Admin API — `Authorization: Bearer {KOYA_SECRET}`
+
+| Method and path | Purpose |
+|---|---|
+| `GET /admin/api/me` | `{owner, version}` |
+| `GET /admin/api/schema` | the stored schema |
+| `PUT /admin/api/schema?force=true` | replace it; 409 `destructive_changes` without `force` |
+| `POST /admin/api/schema/plan` | the changes a PUT would apply |
+| `GET`/`POST /admin/api/contents/{space}/{model}` | list (drafts included) / create |
+| `GET`/`PATCH`/`DELETE /admin/api/contents/{space}/{model}/{id}` | read / save a draft / delete |
+| `POST /admin/api/contents/{space}/{model}/{id}/publish` | publish; body may carry `data` and `publishedAt` |
+| `POST …/unpublish`, `…/discard-draft`, `…/draft-key` | unpublish, discard the draft, fetch the draft key |
+| `GET`/`POST /admin/api/keys/{space}` | keys and the webhook secret / create a key |
+| `DELETE /admin/api/keys/{space}/{id}` | delete a key |
+| `GET`/`POST /admin/api/media/{space}` | list / upload (`multipart/form-data`, field `file`, optional `alt`) |
+| `GET`/`PATCH`/`DELETE /admin/api/media/{space}/{id}` | read (with `references`) / set `alt` / delete |
+
+The admin API rejects a state-changing request whose `Origin` or `Referer` names
+another site, so the owner's session cookie cannot be used from one. A request
+with neither header — any non-browser client — is accepted.
+
+The schema JSON is versioned: `{"koyaSchema": 1, "spaces": [...]}`, each space
+`{name, webhooks, models}`, each model `{name, kind, fields, previewUrl?,
+publicUrl?, webhooks?}`, each field `{name, type, …options}` with camelCase option
+keys. `(koya:pull)` is the easiest way to see a real one.
