@@ -1,3 +1,5 @@
+<img src="assets/icon.svg" alt="" width="72" height="72">
+
 # koya
 
 A small, self-hosted headless CMS written in Common Lisp, for one owner and any number of sites.
@@ -19,15 +21,11 @@ The schema is code in the site's repository; the server stores a copy and builds
 
 ## Admin UI
 
-The editor is generated from the model: text and textarea inputs, a rich text editor, selects for references, a picker for media, with publish, unpublish, save-draft and discard-draft actions in a sticky bar.
+Spaces are the tenants: one per site, made and deleted in the UI. A schema deploy only ever changes the models inside one.
 
-![Editing a content](docs/img/editor.png)
+Everything else is generated from the model — the list pages, and an editor with text inputs, a rich text editor, selects for references and a picker for media, publishing and drafts in a sticky bar. Each space also has a media library, its keys, and a log of what its webhooks answered.
 
-Each space has a media library; images are uploaded here or straight from the editor and served by koya.
-
-![The media library](docs/img/media.png)
-
-More, including the space and list pages, in [docs/ADMIN-UI.md](docs/ADMIN-UI.md).
+[docs/ADMIN-UI.md](docs/ADMIN-UI.md) walks through all of it, with screenshots.
 
 ## Quick start (development)
 

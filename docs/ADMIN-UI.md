@@ -53,7 +53,7 @@ made and deleted.
   it — models, contents, media rows and files, delivery keys, management keys and
   the webhook log. It cannot be undone.
 
-![A space: its models and webhooks](img/space.png)
+![The spaces, and where a new one is made](img/spaces.png)
 
 ## A space
 
@@ -69,6 +69,8 @@ schema, so they are read-only here; change them in `defwebhooks` and deploy.
 
 Each row opens the **delivery log** filtered to that webhook; *View log →*
 beside the heading opens it unfiltered.
+
+![A space: its models and its webhooks](img/models.png)
 
 ## The webhook delivery log
 
@@ -86,6 +88,8 @@ Opening a row shows the URL it posted to, a link to the content that changed,
 how long the call took, the error when there was one, and **the response body**
 as the receiver sent it — the first 4000 characters of it, which is where a
 revalidation hook's own error message usually is.
+
+![The delivery log, one row open](img/webhooks.png)
 
 There is one log per space, and the narrower views are the same page filtered:
 
@@ -112,7 +116,7 @@ opens the editor. **Webhooks** in the header opens the space's delivery log
 filtered to this model. An object model has no such page -- its link goes
 straight to its one content -- so that button sits in its editor instead.
 
-![Contents of a list model](img/model.png)
+![Contents of a list model](img/list-contents.png)
 
 - Every field gets a preview, clamped to two lines: rich text is stripped to
   plain text, a datetime is shown as `YYYY-MM-DD HH:MM UTC`, a reference shows the
@@ -230,6 +234,8 @@ koya has four kinds of key, each for one job:
 Everything but the owner secret belongs to one space, so `/s/{space}/keys` holds
 all of it.
 
+![Delivery keys, management keys and the webhook secret](img/keys.png)
+
 - **Delivery keys** are what a site sends as `X-KOYA-API-KEY` to read this
   space's published content. Safe to put where a front end can reach it.
 - **Management keys** are what `(koya:deploy)` and the other management calls
@@ -247,6 +253,8 @@ all of it.
 
 `/settings` holds what applies to the whole server rather than to one space.
 Keys are not here: they belong to a space, and are made on its **Keys** page.
+
+![The instance settings](img/settings.png)
 
 **Time zone** is the zone every page shows times in — created and updated at,
 the list previews, and `:datetime` fields, which are also entered in it. Type an
