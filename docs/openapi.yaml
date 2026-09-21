@@ -680,7 +680,7 @@ components:
     ownerSecret:
       type: http
       scheme: bearer
-      description: A management key (`koya_mgmt_…`) from the admin UI's settings page. The admin UI's session cookie works too; the owner secret does not.
+      description: A management key (`koya_mgmt_…`) from the space's Keys page in the admin UI. It reaches that one space; another space's route is 403. The admin UI's session cookie works too and reaches every space; the owner secret does not work here at all.
 
   parameters:
     space:

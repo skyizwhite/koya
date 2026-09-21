@@ -2,11 +2,11 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
-  (:import-from #:koya-server/db/schema-store #:save-schema #:create-space)
+  (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:delete-space)
   (:import-from #:koya-server/db/contents #:create-content)
   (:import-from #:koya-server/lib/image #:sniff-image)
   (:import-from #:koya-server/lib/media-store
-                #:store-upload #:remove-media #:media-path #:media-url #:media->jobject)
+                #:store-upload #:remove-media #:remove-space-media #:media-path #:media-url #:media->jobject)
   (:import-from #:koya-server/db/media
                 #:find-media #:list-media #:count-media #:update-media #:media-references
                 #:media-id #:media-filename #:media-mime #:media-width #:media-height #:media-alt)
@@ -123,3 +123,24 @@ Returns (values octets content-type)."
                                                                        :element-type '(unsigned-byte 8) :initial-element 0)
                                                 :filename "big.png"))))
         "too large")))
+
+(deftest deleting-a-space-takes-its-files
+  ;; the rows go with the space through the foreign key; the files are the admin
+  ;; UI's job afterwards, and nothing else ever deletes a whole library
+  (create-space "doomed")
+  (let* ((kept (store-upload "website" (png-bytes) :filename "kept.png"))
+         (doomed (store-upload "doomed" (png-bytes) :filename "doomed.png"))
+         (directory (uiop:pathname-directory-pathname (media-path doomed))))
+    (ok (probe-file (media-path doomed)))
+    (delete-space "doomed")
+    (ok (null (find-media "doomed" (media-id doomed))) "the row went with the space")
+    (ok (probe-file (media-path doomed)) "but not yet the file")
+    (remove-space-media "doomed")
+    (ok (null (probe-file (media-path doomed))) "file gone")
+    (ng (uiop:directory-exists-p directory) "and the space's directory with it")
+    (ok (probe-file (media-path kept)) "another space's files are untouched")
+    (remove-media kept))
+  (testing "a space that never had a file is not an error"
+    (create-space "empty")
+    (delete-space "empty")
+    (ok (null (remove-space-media "empty")))))

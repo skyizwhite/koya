@@ -25,9 +25,9 @@
 (in-package #:koya/client)
 
 ;;; HTTP client for a koya server. Delivery calls need *API-KEY*; admin calls
-;;; (schema deploys, content management, keys, media) need *MANAGEMENT-KEY*, made
-;;; on the server's settings page. Responses are converted to kebab-case keyword
-;;; plists, arrays to lists.
+;;; (schema deploys, content management, keys, media) need *MANAGEMENT-KEY*. Both
+;;; are made on the space's keys page and are good for that space alone, which is
+;;; *SPACE*. Responses are converted to kebab-case keyword plists, arrays to lists.
 
 (defvar *base-url* nil "Server URL, e.g. https://cms.example.com. Falls back to KOYA_URL.")
 (defvar *management-key* nil "Management key for admin calls. Falls back to KOYA_MANAGEMENT_KEY.")

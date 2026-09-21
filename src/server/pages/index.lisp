@@ -28,8 +28,9 @@
        (form :method "post" :class "shrink-0"
          (input :type "hidden" :name "action" :value "delete")
          (input :type "hidden" :name "name" :value name)
+         ;; the name goes in an attribute, not an inline handler (koya-editor.js)
          (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete space"
-                 :onclick (format nil "return confirm('Delete ~a with every model, content, media file and key in it? This cannot be undone.')" name)
+                 :data-confirm (format nil "Delete ~a with every model, content, media file and key in it? This cannot be undone." name)
            (~icon :name :delete)))))))
 
 (defcomp ~new-space-dialog ()
