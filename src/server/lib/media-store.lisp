@@ -7,7 +7,7 @@
   (:import-from #:koya-server/lib/http
                 #:fail-api)
   (:import-from #:koya-server/db/media
-                #:insert-media #:find-media #:delete-media
+                #:insert-media #:find-media #:delete-media #:media-references
                 #:media-id #:media-space #:media-filename #:media-mime #:media-size
                 #:media-width #:media-height #:media-alt #:media-created-at)
   (:import-from #:koya/core/json
@@ -82,7 +82,12 @@ row. Signals a 4xx api-error for unsupported or oversized data."
           (error e))))))
 
 (defun remove-media (media)
-  "Delete the row and the file. A missing file is not an error."
+  "Delete the row and the file. A missing file is not an error; a file some
+content still uses is: it stays, and the caller gets a 409 naming the count."
+  (let ((references (media-references (media-space media) (media-id media))))
+    (when (plusp references)
+      (fail-api 409 "in_use" (format nil "~a is used by ~a content~:p; remove it from them first"
+                                     (media-filename media) references))))
   (delete-media (media-space media) (media-id media))
   (let ((path (media-path media)))
     (when (probe-file path) (delete-file path))))

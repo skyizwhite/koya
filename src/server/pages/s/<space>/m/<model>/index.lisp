@@ -12,10 +12,16 @@
   (:import-from #:koya-server/lib/forms #:number->string)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:redirect-to #:short-time #:content-label
+                #:with-owner #:set-title #:redirect-to #:param #:short-time #:content-label
                 #:~layout #:~status-badge #:~empty-state #:~icon #:content-url #:model-url)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
+
+(defparameter +page-size+ 100
+  "Contents per page of the list, newest created first.")
+
+(defun page-number (params)
+  (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
 
 (defparameter +preview-length+ 120
   "Longest field preview carried into the list, in characters.
@@ -130,12 +136,14 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                (redirect-to (content-url space model-name (if content (content-id content) "new")) 302)))
             (t
              (set-title (format nil "~a · ~a · koya" model-name space))
-             (multiple-value-bind (contents total)
-                 (list-contents space model-name model
-                                (parse-query (list (cons "limit" "100") (cons "orders" "-createdAt")))
-                                :status :all)
-               (let ((fields (model-fields model))
-                     (ref-labels (reference-labels space-object model)))
+             (let* ((page (page-number params))
+                    (query (parse-query (list (cons "limit" (princ-to-string +page-size+))
+                                              (cons "offset" (princ-to-string (* (1- page) +page-size+)))
+                                              (cons "orders" "-createdAt")))))
+              (multiple-value-bind (contents total) (list-contents space model-name model query :status :all)
+               (let* ((fields (model-fields model))
+                      (ref-labels (reference-labels space-object model))
+                      (pages (max 1 (ceiling total +page-size+))))
                  (hsx
                   (~layout :space space :crumbs (list (cons model-name nil))
                     (div :class "mb-6 flex items-center justify-between"
@@ -144,7 +152,7 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                       (a :href (content-url space model-name "new") :class "btn btn-primary"
                          (~icon :name :plus) "New content"))
                     (if (null contents)
-                        (hsx (~empty-state "No contents yet."))
+                        (hsx (~empty-state (if (> page 1) "Nothing on this page." "No contents yet.")))
                         (hsx (div :class "overflow-x-auto rounded-md border border-line bg-panel"
                                (table :class "w-full text-sm"
                                  (thead (tr :class "border-b border-line text-left text-muted"
@@ -163,4 +171,13 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
                                               (~status-badge :status (content-status content)))
                                             (loop :for field :in fields :collect
                                               (hsx (~preview-cell :field field :content content :ref-labels ref-labels)))
-                                            (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent" "›"))))))))))))))))))
+                                            (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent" "›")))))))))
+                    (when (> pages 1)
+                      (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
+                             (if (> page 1)
+                                 (hsx (a :href (format nil "?page=~a" (1- page)) :class "btn" (~icon :name :prev) "Previous"))
+                                 (hsx (<>)))
+                             (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
+                             (if (< page pages)
+                                 (hsx (a :href (format nil "?page=~a" (1+ page)) :class "btn" "Next" (~icon :name :next)))
+                                 (hsx (<>))))))))))))))))

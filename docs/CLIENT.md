@@ -21,7 +21,7 @@ is no CLI. The admin UI, which reads the deployed schema, is documented in
 - [Deploying the schema](#deploying-the-schema)
 - [Reading content](#reading-content)
 - [Managing content](#managing-content)
-- [API keys and the webhook secret](#api-keys-and-the-webhook-secret)
+- [Delivery keys and the webhook secret](#delivery-keys-and-the-webhook-secret)
 - [Media](#media)
 - [Errors](#errors)
 - [Lisp and JSON](#lisp-and-json)
@@ -47,7 +47,7 @@ system; a site never loads it.
 
 ```lisp
 (koya:configure :base-url "https://cms.example.com"
-                :secret   "..."        ; owner secret: schema, content and media calls
+                :management-key "koya_mgmt_..."  ; from Settings: schema, content and media calls
                 :api-key  "koya_..."   ; delivery API key: reading published content
                 :space    "website")   ; default space for every call
 ```
@@ -58,12 +58,14 @@ call time:
 | Variable | Environment | Used by |
 |---|---|---|
 | `koya:*base-url*` | `KOYA_URL` | everything |
-| `koya:*secret*` | `KOYA_SECRET` | `plan`, `deploy`, `pull`, content/keys/media management |
+| `koya:*management-key*` | `KOYA_MANAGEMENT_KEY` | `plan`, `deploy`, `pull`, content/keys/media management |
 | `koya:*api-key*` | `KOYA_API_KEY` | `get-list`, `get-item`, `get-object` |
 | `koya:*space*` | `KOYA_SPACE` | the default for every `:space` argument |
 
-Note that the server's own public URL is `KOYA_BASE_URL`; the client reads
-`KOYA_URL`, so both can sit in one `.env` without colliding. A missing setting
+A management key is made on the server's **Settings** page; the owner secret
+(`KOYA_SECRET`) only logs into the admin UI and is not accepted here. Note that
+the server's own public URL is `KOYA_BASE_URL`; the client reads `KOYA_URL`, so
+both can sit in one `.env` without colliding. A missing setting
 signals an error naming what to set. Calls that take `:space` accept a symbol or
 a string and downcase it.
 
@@ -76,7 +78,8 @@ the REPL.
 ```lisp
 (defspace website
   ;; fires for every model of the space
-  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
+  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate"
+                           :events '(:publish :unpublish :delete))))
 
 (defmodel (website blog) (:kind :list
                           :public-url  "https://example.com/blog/{CONTENT_ID}"
@@ -141,8 +144,9 @@ Other helpers: `(koya:current-schema)` returns the validated schema built so far
 - `:model` names another model **of the same space**; `:from` names a `:text` or
   `:textarea` field of the same model other than itself. Both are checked against
   the whole schema, so a typo fails before anything is sent.
-- `:default` on a `:boolean` is accepted by the schema but not applied yet: a new
-  content starts with the field unset, which reads as `false`.
+- `:default t` on a `:boolean` sets the field to true on a new content that does
+  not mention it (the editor starts with the box checked); an explicit `false` is
+  kept.
 
 What each type stores, what counts as blank, and how every option is enforced
 (`:unique` across drafts and published data, `:pattern` as a `cl-ppcre` regex, a
@@ -155,10 +159,11 @@ blank `:slug` filled from `:from`, …) is specified in
 (webhook label url &key events)
 ```
 
-`events` is a subset of `:publish`, `:unpublish`, `:delete` and `:draft`, and
-defaults to everything but `:draft`. A bare URL string works too, taking itself as
-its label. A space's webhooks fire for every model; a model's `:webhooks` are
-added to them, and labels must be unique within each list.
+`:events` **must be given**: a non-empty list from `:publish`, `:unpublish`,
+`:delete` and `:draft`. There is no default and no bare-URL shorthand, so when a
+hook fires is always written next to it. A space's webhooks fire for every model;
+a model's `:webhooks` are added to them, and labels must be unique within each
+list.
 
 koya POSTs JSON to each subscribed URL:
 
@@ -173,7 +178,7 @@ publish, `edit` on a later publish or an unpublish, `delete` on a delete and
 `draft` on a draft save. Discarding a draft sends nothing: what is published did
 not change. Every call carries the space's webhook secret in
 `X-KOYA-WEBHOOK-KEY` — read it with `(koya:webhook-secret)` or from the space's
-API keys page — and delivery is fire-and-forget: koya logs a failure and does not
+Delivery keys page — and delivery is fire-and-forget: koya logs a failure and does not
 retry.
 
 ## Deploying the schema
@@ -264,7 +269,7 @@ are the same.
 
 ## Managing content
 
-These use the owner secret and see drafts as well.
+These use the management key and see drafts as well.
 
 ```lisp
 (koya:list-contents 'blog :query '(:limit 100))   ; everything, drafts included
@@ -295,7 +300,7 @@ These use the owner secret and see drafts as well.
 - Saving a draft issues a new draft key, so older preview links stop working.
 - `discard-draft` needs a published content: there would be nothing left otherwise.
 
-## API keys and the webhook secret
+## Delivery keys and the webhook secret
 
 ```lisp
 (koya:create-api-key :label "production site")   ; => (values "koya_…" "01J…"), shown once
@@ -320,8 +325,9 @@ create another. A key is valid for its space alone.
 ```
 
 PNG, JPEG, GIF and WebP up to 20 MB each; the type is decided by reading the
-file's leading bytes. A deleted file leaves any content that referenced it with a
-dangling id, which the delivery API then returns as `nil`.
+file's leading bytes. `delete-media` refuses (409 `in_use`) while any content
+still uses the file, as a `:media` value or inside rich text — `get-media`'s
+`:references` is that count. Remove it from those contents first.
 
 ## Errors
 

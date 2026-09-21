@@ -106,6 +106,10 @@ Returns (values octets content-type)."
       (create-content "website" "blog" (parse-json (format nil "{\"title\": \"y\", \"body\": \"<img src=\\\"~a\\\">\"}" (media-url media))))
       (ok (= (media-references "website" (media-id media)) 2) "field values and richtext URLs both count"))
     (testing "remove"
+      (ok (= 409 (handler-case (progn (remove-media media) nil) (api-error (e) (api-error-status e))))
+          "a file in use stays")
+      (ok (find-media "website" (media-id media)))
+      (koya-server/db/connection:exec "DELETE FROM contents")
       (remove-media media)
       (ok (null (find-media "website" (media-id media))))
       (ok (null (probe-file (media-path media))) "file gone"))))

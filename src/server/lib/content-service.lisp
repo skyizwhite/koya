@@ -26,6 +26,7 @@
                 #:slugify)
   (:export #:resolve-model
            #:resolve-content
+           #:default-data
            #:check-content
            #:merge-data
            #:create
@@ -64,6 +65,22 @@
           (let ((slug (slugify source)))
             (when (plusp (length slug))
               (setf (gethash (field-name field) data) slug)))))))
+  data)
+
+(defun default-data (model)
+  "What a new content of MODEL starts with: every :boolean field that declares
+:default t, set to true. The other types have no defaults."
+  (let ((data (make-hash-table :test 'equal)))
+    (dolist (field (model-fields model) data)
+      (when (and (eq (koya/core/schema:field-type field) :boolean) (field-option field :default))
+        (setf (gethash (field-name field) data) t)))))
+
+(defun fill-defaults (model data)
+  "Add the defaults of DEFAULT-DATA for keys DATA does not mention (destructively)."
+  (maphash (lambda (key value)
+             (unless (nth-value 1 (gethash key data))
+               (setf (gethash key data) value)))
+           (default-data model))
   data)
 
 (defun check-content (space-name model data &key partial exclude-id)
@@ -130,7 +147,7 @@ and only PUBLISHED-AT applies."
          (published-at (check-published-at published-at))
          (revised-at (check-timestamp "revisedAt" revised-at)))
     (with-db-transaction
-      (check-content space-name model data)
+      (check-content space-name model (fill-defaults model data))
       (flet ((insert ()
                (let ((content (apply #'create-content space-name model-name data
                                      :publish publish

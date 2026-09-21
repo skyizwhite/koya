@@ -496,6 +496,28 @@ is a list of parts for MULTIPART-BODY."
           (multiple-value-bind (status) (request :post "/login" :form `(("secret" . ,*secret*)))
             (ok (= status 303) "secret alone logs in again")))))))
 
+(deftest list-paging
+  (let ((origin '(("origin" . "http://localhost:3000"))))
+    (setf *cookie* nil)
+    (request :post "/login" :form `(("secret" . ,*secret*)))
+    (dotimes (i 101)
+      (request :post "/s/website/m/blog/new" :form `(("action" . "save") ("f-title" . ,(format nil "Page filler ~3,'0d" i))) :headers origin))
+    (multiple-value-bind (status body) (request :get "/s/website/m/blog")
+      (ok (= status 200))
+      (ok (search "Page 1 of 2" body))
+      (ok (search "?page=2" body) "a link to the next page")
+      (ok (search "Page filler 100" body) "newest first")
+      (ok (not (search "Page filler 000" body)) "the oldest is on the next page"))
+    (multiple-value-bind (status body) (request :get "/s/website/m/blog" :query "page=2")
+      (ok (= status 200))
+      (ok (search "Page 2 of 2" body))
+      (ok (search "Page filler 000" body))
+      (ok (search "?page=1" body) "and back"))
+    (multiple-value-bind (status body) (request :get "/s/website/m/blog" :query "page=9")
+      (ok (= status 200))
+      (ok (search "Nothing on this page." body)))
+    (exec "DELETE FROM contents WHERE json_extract(COALESCE(draft, published), '$.title') LIKE 'Page filler %'")))
+
 (deftest time-zone-setting
   (let ((origin '(("origin" . "http://localhost:3000"))))
     (setf *cookie* nil)

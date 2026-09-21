@@ -92,7 +92,10 @@
                (redirect-to (media-page-url space))))
             ((equal action "delete")
              (let ((media (find-media space (or (param params "id") ""))))
-               (when media (remove-media media))
-               (set-flash (if media "Media deleted." "Media not found.") (if media :ok :error))
+               (handler-case
+                   (progn
+                     (when media (remove-media media))
+                     (set-flash (if media "Media deleted." "Media not found.") (if media :ok :error)))
+                 (api-error (e) (set-flash (api-error-message e) :error)))
                (redirect-to (media-page-url space))))
             (t (set-response-status 400) (hsx (~layout :space space (p "Unknown action"))))))))

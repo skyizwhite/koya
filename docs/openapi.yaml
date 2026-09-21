@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: koya
-  version: 0.1.1
+  version: 0.2.0
   summary: Delivery and admin APIs of a koya server
   description: |
     Two JSON APIs on one server.
@@ -10,7 +10,8 @@ info:
       API key, created on the space's *API keys* page. It is a microCMS-compatible
       subset.
     * The **admin API** (`/admin/api`) manages the schema, contents, keys and media
-      with the owner secret (`KOYA_SECRET`) as a Bearer token. State-changing
+      with a **management key** (made on the admin UI's settings page) as a
+      Bearer token; the owner secret only logs into the admin UI. State-changing
       requests that carry an `Origin` or `Referer` naming another site are
       rejected with 403; requests without either header (non-browser clients) are
       accepted.
@@ -646,10 +647,15 @@ paths:
     delete:
       tags: [media]
       summary: Delete a media and its file
-      description: Contents that referenced it keep the id; the delivery API returns `null` for it.
+      description: Refused with 409 `in_use` while any content still uses the file (see `references`).
       security: [{ ownerSecret: [] }]
       responses:
         "200": { $ref: "#/components/responses/Deleted" }
+        "409":
+          description: "`in_use`: the message names how many contents use the file"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -664,7 +670,7 @@ components:
     ownerSecret:
       type: http
       scheme: bearer
-      description: The server's `KOYA_SECRET`. The admin UI's session cookie works too.
+      description: A management key (`koya_mgmt_…`) from the admin UI's settings page. The admin UI's session cookie works too; the owner secret does not.
 
   parameters:
     space:
@@ -720,7 +726,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     Unauthorized:
-      description: "`unauthorized`: missing or wrong API key or secret"
+      description: "`unauthorized`: missing or wrong delivery key or management key"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -823,13 +829,10 @@ components:
                           description: The options allowed for `type`, camelCase
 
     Webhook:
-      oneOf:
-        - type: string
-          description: A bare URL (input only); label = URL, default events
-        - type: object
-          required: [url]
-          properties:
-            label: { type: string }
+      type: object
+      required: [url, events]
+      properties:
+            label: { type: string, description: Defaults to `url` }
             url: { type: string }
             events:
               type: array

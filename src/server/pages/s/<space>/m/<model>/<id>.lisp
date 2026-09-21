@@ -10,7 +10,7 @@
                 #:list-contents #:find-content #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data)
   (:import-from #:koya-server/lib/content-service
-                #:resolve-model #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
+                #:resolve-model #:default-data #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
   (:import-from #:koya-server/lib/http #:path-param #:api-error)
   (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/page
@@ -148,7 +148,7 @@
     (with-editor (space model content) params
       (set-title (format nil "~a · ~a · koya" (model-name model) (space-name space)))
       (hsx (~editor :space space :model model :content content
-                    :data (and content (content-data content :draft t)))))))
+                    :data (if content (content-data content :draft t) (default-data model)))))))
 
 (defun @post (params)
   (with-owner-post

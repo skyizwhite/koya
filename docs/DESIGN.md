@@ -420,9 +420,13 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
   `POST /admin/api/backup`)。microCMS 解約後に website の `MICROCMS_*` と `scripts/import-from-microcms.py` を削除。
 - ~~管理 UI: `:datetime` 入力のタイムゾーン変換~~(2026-09-21 完了。JS ではなくサーバ側で変換: 設定画面で選ぶ IANA 名の
   タイムゾーンを `settings` に保存し、`lib/timezone` が local-time で表示・入力を変換。保存と配信は UTC のまま)。
-  一覧のページング(現在は 100 件固定)。
-- セキュリティ: webhook 単位の秘密(`:secret`)を受け口が増えたときに。管理 API 用に `KOYA_SECRET` と
-  別のトークンを切れるようにする(現状は Bearer にオーナーシークレットをそのまま使い、二段階認証の対象外)。
+  ~~一覧のページング~~(2026-09-21 完了。100 件/ページ、`?page=`)。
+- ~~セキュリティ: 管理 API 用に `KOYA_SECRET` と別のトークン~~(2026-09-21 完了。鍵は owner / management /
+  delivery / webhook の 4 種。management key は Settings で発行、`management_keys` に SHA-256 保存、
+  管理 API の Bearer はこれのみ。`KOYA_SECRET` はログイン専用に。クライアントは `:management-key` /
+  `KOYA_MANAGEMENT_KEY`。0.2.0)。webhook 単位の秘密(`:secret`)は受け口が増えたときに。
+- 2026-09-21: webhook の `:events` は必須(既定値と URL 文字列の省略形を廃止)。`:boolean` の `:default t` を
+  新規作成時に適用。参照中のメディアは削除拒否(409 `in_use`)。
 - 配信: webhook は通知ごとにスレッドを起こすので、大量インポート時はキューにまとめる。
 - 依存: hsx の `&` エスケープ修正は koya で取り込み済み。website は `qlot update koya` で koya の変更を追従。
 

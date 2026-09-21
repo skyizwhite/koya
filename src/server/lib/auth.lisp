@@ -6,6 +6,8 @@
                 #:fail-api #:header #:json-response #:error-object #:origin-allowed-p)
   (:import-from #:koya-server/db/api-keys
                 #:space-for-api-key)
+  (:import-from #:koya-server/db/management-keys
+                #:management-key-p)
   (:import-from #:ironclad
                 #:constant-time-equal)
   (:import-from #:babel
@@ -25,9 +27,13 @@
            #:session-owner-p))
 (in-package #:koya-server/lib/auth)
 
-;;; Two kinds of callers:
-;;;  - the owner: admin UI (session cookie) and admin API (Bearer KOYA_SECRET)
-;;;  - sites: delivery API with a per-space API key
+;;; Four keys, three kinds of callers:
+;;;  - the owner secret (KOYA_SECRET) logs into the admin UI; the session cookie
+;;;    then carries the owner through the UI and the admin API
+;;;  - a management key (Bearer, made on the settings page) drives the admin API
+;;;    without a session: schema deploys, imports, content management from a REPL
+;;;  - a delivery key (X-KOYA-API-KEY, made per space) reads the delivery API
+;;;  - the webhook secret is the one koya sends, not one it checks (see lib/webhook)
 
 (defun secure-string= (a b)
   (and (stringp a) (stringp b)
@@ -86,10 +92,11 @@ wrong secret never learns whether a code would have been accepted."
   (remhash "owner" (ningle:context :session)))
 
 (defun owner-env-p (env)
+  "True for the owner's session or a Bearer management key. The owner secret is
+not accepted here: it is the login password, kept behind the second factor."
   (let ((session (getf env :lack.session)))
     (or (and session (gethash "owner" session) t)
-        (let ((token (bearer-token env)))
-          (and token (secure-string= token (koya-secret)))))))
+        (management-key-p (bearer-token env)))))
 
 (defun cross-origin-write-p (env)
   "A state-changing request whose Origin/Referer does not match this server. The
@@ -102,7 +109,7 @@ session cookie would otherwise let a page on another site drive the admin API."
   (lambda (app)
     (lambda (env)
       (cond ((not (owner-env-p env))
-             (json-response 401 (error-object "unauthorized" "Owner authentication required")))
+             (json-response 401 (error-object "unauthorized" "Log in, or send a management key as a Bearer token")))
             ((cross-origin-write-p env)
              (json-response 403 (error-object "forbidden" "Cross-origin request rejected")))
             (t (funcall app env)))))

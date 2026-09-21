@@ -56,11 +56,11 @@ The array order is the order the admin UI shows.
 |---|---|---|
 | `label` | string | non-empty; defaults to `url` when absent on input |
 | `url` | string | non-empty; receives the POST |
-| `events` | array of string | subset of `publish`, `unpublish`, `delete`, `draft`; at least one; defaults to all but `draft` when absent |
+| `events` | array of string | **required**; a non-empty subset of `publish`, `unpublish`, `delete`, `draft` |
 
-On input a webhook may also be a bare URL string, which stands for
-`{"label": url, "url": url}` with the default events. On output `events` is always
-present, without duplicates and in the canonical order above.
+There is no default for `events` and no bare-URL shorthand: when a webhook fires
+is always written next to it. On output `events` has no duplicates and is in the
+canonical order above.
 
 What each event means, and the payload a webhook receives, is described in
 [CLIENT.md](CLIENT.md#webhooks).
@@ -127,7 +127,8 @@ take their names.
 | `model` | string | a model name; **required** on `reference`, and the model must exist in the same space |
 | `from` | string | a field name; **required** on `slug`, and must name a `text` or `textarea` field of the same model other than the slug itself |
 
-`default` is accepted but not applied by the current server. On output the
+`default: true` on a `boolean` field sets it to `true` on a new content whose
+`data` does not mention it; an explicit `false` is kept. On output the
 options of a field are written in alphabetical key order, so two equal fields
 serialize identically.
 

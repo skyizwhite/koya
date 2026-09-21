@@ -11,7 +11,7 @@ The schema is code in the site's repository; the server stores a copy and builds
 
 | | |
 |---|---|
-| [docs/ADMIN-UI.md](docs/ADMIN-UI.md) | the admin UI: logging in, writing and publishing, media, API keys, settings |
+| [docs/ADMIN-UI.md](docs/ADMIN-UI.md) | the admin UI: logging in, writing and publishing, media, keys, settings |
 | [docs/CLIENT.md](docs/CLIENT.md) | the `koya` library: the schema DSL, deploying it, reading and managing content |
 | [docs/SCHEMA.md](docs/SCHEMA.md) | the schema document (`koyaSchema: 1`) and the rules content values must meet |
 | [docs/openapi.yaml](docs/openapi.yaml) | the delivery and admin HTTP APIs, for clients in other languages |
@@ -54,7 +54,8 @@ In a project that depends on `koya`, the models are Lisp:
 
 ```lisp
 (defspace website
-  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
+  :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate"
+                           :events '(:publish :unpublish :delete))))
 
 (defmodel (website blog) (:kind :list
                           :public-url "https://example.com/blog/{CONTENT_ID}"
@@ -69,7 +70,7 @@ In a project that depends on `koya`, the models are Lisp:
 and so is everything done with them, from the REPL:
 
 ```lisp
-(koya:configure :base-url "https://cms.example.com" :secret "..." :space "website")
+(koya:configure :base-url "https://cms.example.com" :management-key "koya_mgmt_..." :space "website")
 (koya:plan)     ; show the diff against the server
 (koya:deploy)   ; apply it (asks before destructive changes)
 
@@ -97,7 +98,7 @@ The `Dockerfile` builds one image: the server on port 3000, with its database an
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `KOYA_SECRET` | yes | owner secret for the admin UI and admin API |
+| `KOYA_SECRET` | yes | owner secret: the admin UI's login. Keys for the admin API are made in **Settings** |
 | `KOYA_BASE_URL` | yes | public URL, e.g. `https://cms.example.com`; used for media URLs, the same-origin check and the Secure cookie flag |
 | `KOYA_TOTP_SECRET` | no | second factor configured outside the database (see above) |
 | `KOYA_PORT` | no | listen port, default `3000` |

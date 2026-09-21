@@ -12,15 +12,17 @@
 
 (defcomp ~keys-page (&key space new-key)
   (hsx
-   (~layout :space space :crumbs (list (cons "API keys" nil))
-     (h1 :class "mb-6 text-2xl font-bold" "API keys")
+   (~layout :space space :crumbs (list (cons "Delivery keys" nil))
+     (h1 :class "mb-6 text-2xl font-bold" "Delivery keys")
+     (p :class "mb-6 text-sm text-muted"
+       "Sent as " (code "X-KOYA-API-KEY") " to read this space through the delivery API. Keys for the admin API are made under Settings.")
      (when new-key
        (hsx (div :class "mb-6 rounded-md border border-ok/40 bg-ok/5 px-4 py-3 text-sm"
               (p :class "font-medium text-ok" "New key created. Copy it now; it will not be shown again.")
               (code :class "mt-2 block select-all break-all rounded bg-panel px-2 py-1 font-mono" new-key))))
      (let ((keys (list-api-keys space)))
        (if (null keys)
-           (hsx (~empty-state "No API keys yet."))
+           (hsx (~empty-state "No delivery keys yet."))
            ;; framed like the other lists
            (hsx (div :class "overflow-x-auto rounded-md border border-line bg-panel"
                   (table :class "w-full text-sm"
@@ -69,7 +71,7 @@
   (with-owner
     (let ((space (ensure-space params)))
       (cond ((null space) (set-response-status 404) (hsx (~layout (h1 "Space not found"))))
-            (t (set-title (format nil "API keys · ~a · koya" space))
+            (t (set-title (format nil "Delivery keys · ~a · koya" space))
                (hsx (~keys-page :space space)))))))
 
 (defun @post (params)
@@ -78,7 +80,7 @@
           (action (param params "action")))
       (cond ((null space) (set-response-status 404) (hsx (~layout (h1 "Space not found"))))
             ((equal action "create")
-             (set-title (format nil "API keys · ~a · koya" space))
+             (set-title (format nil "Delivery keys · ~a · koya" space))
              (hsx (~keys-page :space space :new-key (create-api-key space :label (or (param params "label") "")))))
             ;; delete and rotate redirect so a reload cannot repeat them; create
             ;; renders directly because the plaintext key is shown only once

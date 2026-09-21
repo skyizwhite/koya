@@ -27,7 +27,7 @@
                   (h1 :class "text-2xl font-bold" name)
                   (div :class "flex gap-2"
                     (a :href (format nil "~a/media" (space-url name)) :class "btn" (~icon :name :media) "Media")
-                    (a :href (format nil "~a/keys" (space-url name)) :class "btn" (~icon :name :key) "API keys")))
+                    (a :href (format nil "~a/keys" (space-url name)) :class "btn" (~icon :name :key) "Delivery keys")))
                 (if (null (space-models space))
                     (hsx (~empty-state "This space has no models."))
                     (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"

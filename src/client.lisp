@@ -13,7 +13,7 @@
   (:import-from #:dexador)
   (:import-from #:quri
                 #:make-uri #:render-uri)
-  (:export #:*base-url* #:*secret* #:*api-key* #:*space*
+  (:export #:*base-url* #:*management-key* #:*api-key* #:*space*
            #:configure
            #:koya-error #:koya-error-status #:koya-error-code #:koya-error-message #:koya-error-details
            #:plan #:deploy #:pull
@@ -25,17 +25,18 @@
 (in-package #:koya/client)
 
 ;;; HTTP client for a koya server. Delivery calls need *API-KEY*; admin calls
-;;; (schema push, content management, keys) need *SECRET*. Responses are
-;;; converted to kebab-case keyword plists, arrays to lists.
+;;; (schema deploys, content management, keys, media) need *MANAGEMENT-KEY*, made
+;;; on the server's settings page. Responses are converted to kebab-case keyword
+;;; plists, arrays to lists.
 
 (defvar *base-url* nil "Server URL, e.g. https://cms.example.com. Falls back to KOYA_URL.")
-(defvar *secret* nil "Owner secret for admin calls. Falls back to KOYA_SECRET.")
+(defvar *management-key* nil "Management key for admin calls. Falls back to KOYA_MANAGEMENT_KEY.")
 (defvar *api-key* nil "Delivery API key. Falls back to KOYA_API_KEY.")
 (defvar *space* nil "Default space for content calls. Falls back to KOYA_SPACE.")
 
-(defun configure (&key base-url secret api-key space)
+(defun configure (&key base-url management-key api-key space)
   (when base-url (setf *base-url* base-url))
-  (when secret (setf *secret* secret))
+  (when management-key (setf *management-key* management-key))
   (when api-key (setf *api-key* api-key))
   (when space (setf *space* (string-downcase (string space))))
   (values))
@@ -45,7 +46,7 @@
       (error "koya client: ~a is not configured (set koya:~(~a~) or ~a)" what var env-name)))
 
 (defun base-url () (string-right-trim "/" (setting *base-url* "KOYA_URL" "the server URL")))
-(defun secret () (setting *secret* "KOYA_SECRET" "the owner secret"))
+(defun management-key () (setting *management-key* "KOYA_MANAGEMENT_KEY" "a management key"))
 (defun api-key () (setting *api-key* "KOYA_API_KEY" "an API key"))
 (defun space-name (space) (string-downcase (string (or space (setting *space* "KOYA_SPACE" "the space")))))
 
@@ -70,11 +71,11 @@
     (render-uri uri)))
 
 (defun request (method path &key query body form auth)
-  "Perform a request. AUTH is :owner or :api-key. BODY is sent as JSON; FORM, an
+  "Perform a request. AUTH is :management or :api-key. BODY is sent as JSON; FORM, an
 alist whose values may be pathnames, as multipart/form-data. Returns the parsed JSON value."
   (let ((headers (list (cons "Accept" "application/json"))))
     (ecase auth
-      (:owner (push (cons "Authorization" (format nil "Bearer ~a" (secret))) headers))
+      (:management (push (cons "Authorization" (format nil "Bearer ~a" (management-key))) headers))
       (:api-key (push (cons "X-KOYA-API-KEY" (api-key)) headers))
       ((nil)))
     (when body (push (cons "Content-Type" "application/json") headers))
@@ -106,7 +107,7 @@ alist whose values may be pathnames, as multipart/form-data. Returns the parsed 
 
 (defun plan (&key (schema (current-schema)) (stream *standard-output*))
   "Show what DEPLOY would change on the server. Returns the list of changes."
-  (let* ((response (request :post "/admin/api/schema/plan" :body (schema->jobject schema) :auth :owner))
+  (let* ((response (request :post "/admin/api/schema/plan" :body (schema->jobject schema) :auth :management))
          (changes (jvalue->lisp (jget response "changes"))))
     (print-changes changes stream)
     changes))
@@ -116,7 +117,7 @@ alist whose values may be pathnames, as multipart/form-data. Returns the parsed 
 after interactive confirmation when CONFIRM is true. Returns the applied changes."
   (flet ((send (force)
            (request :put "/admin/api/schema" :query (and force '(:force "true"))
-                                             :body (schema->jobject schema) :auth :owner)))
+                                             :body (schema->jobject schema) :auth :management)))
     (let ((response
             (handler-case (send force)
               (koya-error (e)
@@ -134,7 +135,7 @@ after interactive confirmation when CONFIRM is true. Returns the applied changes
 
 (defun pull ()
   "Fetch the schema currently stored on the server as a schema object."
-  (jobject->schema (request :get "/admin/api/schema" :auth :owner)))
+  (jobject->schema (request :get "/admin/api/schema" :auth :management)))
 
 ;;; --- Delivery API ------------------------------------------------------------
 
@@ -161,11 +162,11 @@ after interactive confirmation when CONFIRM is true. Returns the applied changes
   (format nil "/admin/api/contents/~a/~(~a~)~@[/~a~]~@[/~a~]" (space-name space) model id action))
 
 (defun list-contents (model &key space query)
-  "List all contents of MODEL including drafts (owner)."
-  (jvalue->lisp (request :get (admin-path space model) :query query :auth :owner)))
+  "List all contents of MODEL including drafts (management)."
+  (jvalue->lisp (request :get (admin-path space model) :query query :auth :management)))
 
 (defun get-content (model id &key space)
-  (jvalue->lisp (request :get (admin-path space model id) :auth :owner)))
+  (jvalue->lisp (request :get (admin-path space model id) :auth :management)))
 
 (defun create-content (model data &key space publish id created-at updated-at published-at revised-at)
   "Create a content. DATA is a kebab plist of field values. ID and the system
@@ -177,50 +178,50 @@ can be given explicitly, e.g. when importing from another CMS."
                                      "publishedAt" published-at "revisedAt" revised-at)
           :by #'cddr
           :when value :do (setf (gethash key body) value))
-    (jvalue->lisp (request :post (admin-path space model) :body body :auth :owner))))
+    (jvalue->lisp (request :post (admin-path space model) :body body :auth :management))))
 
 (defun update-content (model id data &key space)
   "Save DATA (kebab plist) as a draft, merged onto the current data."
-  (jvalue->lisp (request :patch (admin-path space model id) :body (jobject "data" (lisp->jvalue data)) :auth :owner)))
+  (jvalue->lisp (request :patch (admin-path space model id) :body (jobject "data" (lisp->jvalue data)) :auth :management)))
 
 (defun publish-content (model id &key space data published-at)
   "Publish the draft of content ID, or DATA when given. PUBLISHED-AT overrides the publish date."
   (let ((body (jobject)))
     (when data (setf (gethash "data" body) (lisp->jvalue data)))
     (when published-at (setf (gethash "publishedAt" body) published-at))
-    (jvalue->lisp (request :post (admin-path space model id "publish") :body body :auth :owner))))
+    (jvalue->lisp (request :post (admin-path space model id "publish") :body body :auth :management))))
 
 (defun unpublish-content (model id &key space)
-  (jvalue->lisp (request :post (admin-path space model id "unpublish") :body (jobject) :auth :owner)))
+  (jvalue->lisp (request :post (admin-path space model id "unpublish") :body (jobject) :auth :management)))
 
 (defun discard-draft (model id &key space)
   "Drop the draft of a published content, leaving the published version."
-  (jvalue->lisp (request :post (admin-path space model id "discard-draft") :body (jobject) :auth :owner)))
+  (jvalue->lisp (request :post (admin-path space model id "discard-draft") :body (jobject) :auth :management)))
 
 (defun delete-content (model id &key space)
-  (jvalue->lisp (request :delete (admin-path space model id) :auth :owner)))
+  (jvalue->lisp (request :delete (admin-path space model id) :auth :management)))
 
 (defun draft-key (model id &key space)
   "The draft key of content ID for previews."
-  (jget (request :post (admin-path space model id "draft-key") :body (jobject) :auth :owner) "draftKey"))
+  (jget (request :post (admin-path space model id "draft-key") :body (jobject) :auth :management) "draftKey"))
 
 ;;; --- Admin API: API keys ----------------------------------------------------
 
 (defun create-api-key (&key space (label ""))
   "Create a delivery API key for SPACE. Returns (values key id); the key is shown only once."
   (let ((response (request :post (format nil "/admin/api/keys/~a" (space-name space))
-                           :body (jobject "label" label) :auth :owner)))
+                           :body (jobject "label" label) :auth :management)))
     (values (jget response "key") (jget response "id"))))
 
 (defun list-api-keys (&key space)
-  (jvalue->lisp (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :owner) "keys")))
+  (jvalue->lisp (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :management) "keys")))
 
 (defun webhook-secret (&key space)
   "The secret the server sends as X-KOYA-WEBHOOK-KEY for SPACE's webhooks."
-  (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :owner) "webhookSecret"))
+  (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :management) "webhookSecret"))
 
 (defun delete-api-key (id &key space)
-  (jvalue->lisp (request :delete (format nil "/admin/api/keys/~a/~a" (space-name space) id) :auth :owner)))
+  (jvalue->lisp (request :delete (format nil "/admin/api/keys/~a/~a" (space-name space) id) :auth :management)))
 
 ;;; --- Admin API: media -------------------------------------------------------
 
@@ -229,24 +230,24 @@ can be given explicitly, e.g. when importing from another CMS."
 
 (defun list-media (&key space search (limit 60) (offset 0))
   "Media of SPACE, newest first: (:media (...) :total-count n :offset :limit). SEARCH matches file names."
-  (jvalue->lisp (request :get (media-path space) :query (list :q search :limit limit :offset offset) :auth :owner)))
+  (jvalue->lisp (request :get (media-path space) :query (list :q search :limit limit :offset offset) :auth :management)))
 
 (defun get-media (id &key space)
   "One media as a plist, including :references (contents that mention it)."
-  (jvalue->lisp (request :get (media-path space id) :auth :owner)))
+  (jvalue->lisp (request :get (media-path space id) :auth :management)))
 
 (defun upload-media (file &key space (alt ""))
   "Upload FILE (a pathname or namestring of a PNG, JPEG, GIF or WebP image) to SPACE's
 library. Returns the new media as a plist, :url included."
   (first (getf (jvalue->lisp (request :post (media-path space)
                                       :form (list (cons "alt" alt) (cons "file" (pathname file)))
-                                      :auth :owner))
+                                      :auth :management))
                :media)))
 
 (defun update-media (id &key space alt)
   "Change the alt text of media ID."
-  (jvalue->lisp (request :patch (media-path space id) :body (jobject "alt" (or alt "")) :auth :owner)))
+  (jvalue->lisp (request :patch (media-path space id) :body (jobject "alt" (or alt "")) :auth :management)))
 
 (defun delete-media (id &key space)
   "Delete media ID and its file."
-  (jvalue->lisp (request :delete (media-path space id) :auth :owner)))
+  (jvalue->lisp (request :delete (media-path space id) :auth :management)))

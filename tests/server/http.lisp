@@ -5,6 +5,7 @@
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/schema-store #:save-schema)
   (:import-from #:koya-server/db/api-keys #:create-api-key)
+  (:import-from #:koya-server/db/management-keys #:create-management-key)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema #:make-webhook #:schema->jobject)
   (:import-from #:koya-server/lib/http #:origin-allowed-p)
@@ -16,14 +17,16 @@
 (in-package #:koya-tests/server/http)
 
 (defparameter *secret* "test-secret")
+(defvar *management-key* nil "Created in SETUP; the Bearer token of every admin call.")
 (defvar *api-key* nil)
 (defvar *webhooks* '())
 
 (defun test-schema ()
   (make-schema (list (make-space "website"
-                                 :webhooks '("https://example.com/hook")
+                                 :webhooks (list (make-webhook "hook" "https://example.com/hook" :events '(:publish :unpublish :delete)))
                                  :models (list (make-model "blog" :list (list (make-field :title :text :required t :unique t)
                                                                               (make-field :body :richtext)
+                                                                              (make-field :featured :boolean :default t)
                                                                               (make-field :tags :reference :model "tag" :many t)
                                                                               (make-field :cover :media)))
                                                (make-model "tag" :list (list (make-field :name :text :required t)))
@@ -37,6 +40,7 @@
   (migrate)
   (save-schema (test-schema))
   (setf *api-key* (create-api-key "website" :label "test"))
+  (setf *management-key* (create-management-key :label "test"))
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (push (list url (parse-json payload) headers) *webhooks*))))
 
@@ -68,7 +72,7 @@
 
 (defun admin (method path &key body query)
   (request method path :query query :body body
-                       :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*)))))
+                       :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)))))
 
 (defun admin-upload (path parts)
   "POST a multipart body as the owner. Returns (values status json)."
@@ -76,7 +80,7 @@
     (let ((env (list :request-method :post :script-name "" :path-info path :query-string ""
                      :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                      :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
-                     :headers (alist-hash-table `(("authorization" . ,(format nil "Bearer ~a" *secret*))) :test 'equal)
+                     :headers (alist-hash-table `(("authorization" . ,(format nil "Bearer ~a" *management-key*))) :test 'equal)
                      :content-type content-type :content-length (length octets)
                      :raw-body (make-in-memory-input-stream octets))))
       (destructuring-bind (status headers body) (funcall *app* env)
@@ -104,29 +108,41 @@
     (ng (allowed "garbage" nil "cms.example.com"))
     (ng (allowed "https://evil.example" "https://cms.example.com/" "cms.example.com") "Origin wins over Referer")))
 
+(deftest boolean-default
+  (multiple-value-bind (status json)
+      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Defaulted") "publish" t))
+    (ok (= status 201))
+    (ok (eq (jget json "published" "featured") t) "a :boolean with :default t starts true when not given"))
+  (multiple-value-bind (status json)
+      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Explicit" "featured" nil) "publish" t))
+    (ok (= status 201))
+    (ok (eq (jget json "published" "featured") nil) "an explicit false is kept")))
+
 (deftest admin-auth
   (multiple-value-bind (status json) (request :get "/admin/api/me")
     (ok (= status 401))
     (ok (string= (jget json "error" "code") "unauthorized")))
   (multiple-value-bind (status) (request :get "/admin/api/me" :headers '(("authorization" . "Bearer wrong")))
     (ok (= status 401)))
+  (multiple-value-bind (status) (request :get "/admin/api/me" :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*))))
+    (ok (= status 401) "the owner secret logs into the UI; it is not a management key"))
   (multiple-value-bind (status json) (admin :get "/admin/api/me")
     (ok (= status 200))
     (ok (eq (jget json "owner") t)))
   (testing "writes need a matching origin when a browser sends one"
     (multiple-value-bind (status json)
         (request :post "/admin/api/schema/plan" :body (jobject "koyaSchema" 1)
-                 :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*)) ("origin" . "https://evil.example")))
+                 :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)) ("origin" . "https://evil.example")))
       (ok (= status 403))
       (ok (string= (jget json "error" "code") "forbidden")))
     (multiple-value-bind (status)
         (request :post "/admin/api/schema/plan" :body (jobject "koyaSchema" 1 "spaces" #())
-                 :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*)) ("origin" . "http://localhost:3000")
+                 :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)) ("origin" . "http://localhost:3000")
                             ("host" . "localhost:3000")))
       (ok (= status 200)))
     (multiple-value-bind (status)
         (request :get "/admin/api/me"
-                 :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*)) ("origin" . "https://evil.example")))
+                 :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)) ("origin" . "https://evil.example")))
       (ok (= status 200) "reads are not gated"))))
 
 (deftest schema-endpoints
@@ -147,9 +163,10 @@
       (ok (= (length (jget (aref (jget json "spaces") 0) "models")) 3) "not applied")))
   (testing "non-destructive push applies without force"
     (let ((new (make-schema (list (make-space "website"
-                                              :webhooks '("https://example.com/hook")
+                                              :webhooks (list (make-webhook "hook" "https://example.com/hook" :events '(:publish :unpublish :delete)))
                                               :models (list (make-model "blog" :list (list (make-field :title :text :required t :unique t)
                                                                                            (make-field :body :richtext)
+                                                                                           (make-field :featured :boolean :default t)
                                                                                            (make-field :tags :reference :model "tag" :many t)
                                                                                            (make-field :cover :media)
                                                                                            (make-field :extra :text)))
@@ -166,7 +183,7 @@
       (ok (= status 400))
       (ok (string= (jget json "error" "code") "invalid_schema"))))
   (testing "malformed JSON is a 400"
-    (multiple-value-bind (status json) (request :put "/admin/api/schema" :headers `(("authorization" . ,(format nil "Bearer ~a" *secret*))) :body "not json")
+    (multiple-value-bind (status json) (request :put "/admin/api/schema" :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*))) :body "not json")
       (ok (= status 400))
       (ok (string= (jget json "error" "code") "bad_json")))))
 
@@ -281,7 +298,7 @@
 
 (deftest model-webhooks-and-draft-events
   (let ((with-hooks
-          (make-schema (list (make-space "website" :webhooks '("https://example.com/hook")
+          (make-schema (list (make-space "website" :webhooks (list (make-webhook "hook" "https://example.com/hook" :events '(:publish :unpublish :delete)))
                                          :models (list (make-model "blog" :list (list (make-field :title :text :required t :unique t)
                                                                                       (make-field :body :richtext)
                                                                                       (make-field :tags :reference :model "tag" :many t)
@@ -427,13 +444,18 @@
           (multiple-value-bind (status json) (admin :get (format nil "/admin/api/contents/website/blog/~a" post-id))
             (ok (= status 200))
             (ok (string= (jget json "published" "cover") id) "the admin API keeps the id"))
-          (testing "delete leaves null behind"
+          (testing "a file in use cannot be deleted"
+            (multiple-value-bind (status json) (admin :delete (format nil "/admin/api/media/website/~a" id))
+              (ok (= status 409))
+              (ok (string= (jget json "error" "code") "in_use"))
+              (ok (search "1 content" (jget json "error" "message"))))
+            (multiple-value-bind (status) (request :get (format nil "/media/website/~a.png" id))
+              (ok (= status 200) "file still there")))
+          (testing "once nothing uses it, it goes"
+            (admin :delete (format nil "/admin/api/contents/website/blog/~a" post-id))
             (multiple-value-bind (status json) (admin :delete (format nil "/admin/api/media/website/~a" id))
               (ok (= status 200))
               (ok (eq (jget json "deleted") t)))
-            (multiple-value-bind (status json) (delivery (format nil "/api/v1/website/blog/~a" post-id))
-              (ok (= status 200))
-              (ok (eq (jget json "cover") koya/core/json:json-null)))
             (multiple-value-bind (status) (request :get (format nil "/media/website/~a.png" id))
               (ok (= status 404) "file gone"))))))
     (testing "richtext media paths are absolute in the delivery API"
@@ -480,9 +502,10 @@
     (ok (string= (jget json "error" "code") "unauthorized")))
   (multiple-value-bind (status) (delivery "/api/v1/website/blog" :key "koya_wrong")
     (ok (= status 401)))
-  (save-schema (make-schema (list (make-space "website" :webhooks '("https://example.com/hook")
+  (save-schema (make-schema (list (make-space "website" :webhooks (list (make-webhook "hook" "https://example.com/hook" :events '(:publish :unpublish :delete)))
                                               :models (list (make-model "blog" :list (list (make-field :title :text :required t :unique t)
                                                                                            (make-field :body :richtext)
+                                                                                           (make-field :featured :boolean :default t)
                                                                                            (make-field :tags :reference :model "tag" :many t)))
                                                             (make-model "tag" :list (list (make-field :name :text :required t)))
                                                             (make-model "about" :object (list (make-field :body :richtext)))))

@@ -7,7 +7,7 @@
   (:import-from #:koya-server/db/schema-store
                 #:load-schema #:save-schema #:find-model)
   (:import-from #:koya/core/schema
-                #:make-field #:make-model #:make-space #:make-schema
+                #:make-field #:make-model #:make-space #:make-schema #:make-webhook
                 #:schema-spaces #:space-name #:space-webhooks #:space-models #:model-name #:model-field
                 #:schema->jobject)
   (:import-from #:koya-server/db/sessions
@@ -27,7 +27,7 @@
 
 (defun schema-a ()
   (make-schema (list (make-space "website"
-                                 :webhooks '("https://x/hook")
+                                 :webhooks (list (make-webhook "hook" "https://x/hook" :events '(:publish :unpublish :delete)))
                                  :models (list (make-model "blog" :list (list (make-field :title :text :required t)
                                                                               (make-field :body :richtext)))
                                                (make-model "about" :object (list (make-field :body :richtext))))))))
@@ -39,7 +39,7 @@
                      (make-space "shop"))))
 
 (deftest migrations
-  (ok (= (current-version) 3))
+  (ok (= (current-version) 4))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 

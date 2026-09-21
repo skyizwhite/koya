@@ -2,7 +2,7 @@
 
 koya's admin UI is the web app the server serves at its own root: one owner, any
 number of spaces. It is where content is written, published and previewed, where
-images live, and where a space's API keys are made.
+images live, and where keys are made.
 
 What it does **not** do is edit the schema. Spaces, models and fields come from
 the `defspace` / `defmodel` definitions in a site's own repository and reach the
@@ -16,7 +16,7 @@ schema and builds its lists and forms from it.
 - [The editor](#the-editor)
 - [Drafts, publishing and previews](#drafts-publishing-and-previews)
 - [Media](#media)
-- [API keys](#api-keys)
+- [Delivery keys](#delivery-keys)
 - [Settings: time zone and two-factor login](#settings-time-zone-and-two-factor-login)
 - [Reference](#reference)
 
@@ -46,7 +46,7 @@ Until a schema has been deployed the page is empty and says so.
 
 `/s/{space}` lists the space's models — a stacked-rows icon for a `:list` model,
 braces for an `:object` model — with the number of contents in each list model,
-and links to **Media** and **API keys**.
+and links to **Media** and **Delivery keys**.
 
 Underneath, **Webhooks** shows every webhook that can fire for this space: the
 space's own (marked *all models*) and each model's (*`{model}` only*), with the
@@ -68,8 +68,9 @@ opens the editor.
   wide model scrolls sideways rather than squeezing every column thin.
 - A row shows its **draft** data when it has one, so the table reflects what is
   being worked on rather than what is live.
-- Contents are listed newest-created first, and the page shows up to 100 of them.
-  There is no paging yet, and no filtering or sorting from the UI.
+- Contents are listed newest-created first, 100 to a page, with **Previous** /
+  **Next** underneath when there are more. There is no filtering or sorting from
+  the UI.
 - **New content** opens an empty editor at `/s/{space}/m/{model}/new`.
 
 For an `:object` model this URL redirects straight to its single content (or to a
@@ -88,7 +89,7 @@ labelled with its name, its type and, when required, a red `*`.
 | `:textarea` | five-row textarea |
 | `:richtext` | Quill editor; its image button opens the media picker |
 | `:number` | number input (any step) |
-| `:boolean` | checkbox — unchecked means `false`, never "unset" |
+| `:boolean` | checkbox — unchecked means `false`, never "unset"; a field with `:default t` starts checked on a new content |
 | `:date` | date input |
 | `:datetime` | datetime-local input, in the zone chosen under **Settings**; stored as UTC |
 | `:select` | dropdown, or checkboxes when `:many` |
@@ -154,17 +155,26 @@ A content is in one of three states, shown as its badge:
 - The grid is thumbnails only, 48 per page, with paging underneath. The search box
   matches file names.
 - Clicking a thumbnail opens a preview dialog with the file's name, dimensions,
-  size and upload time, an **alt text** box to save, and **Delete**. Deleting asks
-  first and says how many contents use the file; contents that referenced it keep
-  a dangling id, which the delivery API then returns as `null`.
+  size and upload time, an **alt text** box to save, and **Delete**. A file that
+  any content still uses — as a `:media` value or inside rich text — cannot be
+  deleted: its button is disabled and says how many contents use it, and the
+  server refuses too. Take it out of those contents first.
 - The same library opens as a picker inside the editor — from a `:media` field's
   **Choose…** button and from Quill's image button. The picker searches and
   uploads too, so an image can go straight from the desktop into a content.
 
-## API keys
+## Delivery keys
 
-`/s/{space}/keys` manages the keys sites use to read this space through the
-delivery API.
+koya has four kinds of key, each for one job:
+
+| Key | Made where | Used for |
+|---|---|---|
+| owner secret | `KOYA_SECRET` in the environment | logging into this UI |
+| management key | **Settings** | the admin API (schema deploys, content and media management from a site's code) |
+| delivery key | a space's **Delivery keys** page | reading that space through the delivery API |
+| webhook secret | one per space, on the same page | signing the webhooks koya sends |
+
+`/s/{space}/keys` manages the delivery keys sites use to read this space.
 
 - **Create key** takes an optional label and shows the key (`koya_…`) once. Only
   its SHA-256 is stored, so a lost key cannot be recovered — delete it and make
@@ -176,7 +186,14 @@ delivery API.
 
 ## Settings: time zone and two-factor login
 
-`/settings` holds the two instance-wide settings.
+`/settings` holds the instance-wide settings.
+
+**Management keys** authenticate the admin API as `Authorization: Bearer …` —
+what `(koya:deploy)` and the other management calls of the client library send.
+**Create key** takes a label and shows the key (`koya_mgmt_…`) once; only its
+SHA-256 is stored. A management key works for every space and cannot log into
+this UI; the owner secret cannot call the admin API. Deleting a key stops
+whatever used it.
 
 **Time zone** is the zone every page shows times in — created and updated at,
 the list previews, and `:datetime` fields, which are also entered in it. Type an
@@ -203,19 +220,19 @@ takes precedence and the settings page then only reports that it is in force.
 |---|---|
 | `/` | spaces |
 | `/login`, `/logout` | log in, log out |
-| `/settings` | instance settings (time zone, two-factor login) |
+| `/settings` | instance settings (management keys, time zone, two-factor login) |
 | `/s/{space}` | a space: models and webhooks |
 | `/s/{space}/m/{model}` | contents of a model (object models redirect to their content) |
 | `/s/{space}/m/{model}/{id}` | the editor; `new` for a new content |
 | `/s/{space}/media` | media library |
-| `/s/{space}/keys` | API keys and the webhook secret |
+| `/s/{space}/keys` | delivery keys and the webhook secret |
 | `/health` | unauthenticated health check (verifies the database answers) |
 
 ### Limits worth knowing
 
 | Thing | Value |
 |---|---|
-| Contents listed on a model page | 100, newest created first, no paging |
+| Contents per page of a model list | 100, newest created first |
 | Contents offered in a reference field | 1000 |
 | Media per library page / per picker page | 48 / 24 |
 | Upload size and types | 20 MB; PNG, JPEG, GIF, WebP |

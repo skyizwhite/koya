@@ -30,9 +30,12 @@
             :class "aspect-square w-full rounded-md border border-line bg-panel object-contain")))
 
 (defun delete-confirmation (media references)
-  "What the owner is asked before a file goes, REFERENCES contents using it."
-  (format nil "Delete ~a?~a" (media-filename media)
-          (if (plusp (or references 0)) (format nil " It is used by ~a content~:p." references) "")))
+  "What the owner is asked before a file goes. A file REFERENCES contents still
+use cannot go (the server refuses), so the question becomes an explanation."
+  (if (plusp (or references 0))
+      (format nil "~a is used by ~a content~:p and cannot be deleted until they stop using it. Remove it from them first."
+              (media-filename media) references)
+      (format nil "Delete ~a?" (media-filename media))))
 
 (defcomp ~media-card (&key media space references)
   "Library card: the picture and nothing else. Its name and facts are in the
@@ -55,11 +58,14 @@ contents mention the file (shown in the confirmation)."
                :title (media-filename media)
                :aria-label (format nil "Preview ~a" (media-filename media))
          (~thumb :media media))
+       ;; a file in use keeps its button, disabled, so the owner sees why it stays
        (form :method "post" :class "absolute right-1 top-1"
          (input :type "hidden" :name "action" :value "delete")
          (input :type "hidden" :name "id" :value id)
          ;; the confirmation text is data, not inline script: koya-editor.js asks
          (button :type "submit" :class "btn btn-danger btn-icon"
+                 :disabled (plusp (or references 0))
+                 :title (if (plusp (or references 0)) (delete-confirmation media references) nil)
                  :data-confirm (delete-confirmation media references)
                  :aria-label (format nil "Delete ~a" (media-filename media))
            (~icon :name :delete)))))))

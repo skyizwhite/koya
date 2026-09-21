@@ -1,6 +1,7 @@
 (defpackage #:koya/config
   (:use #:cl)
   (:import-from #:koya/core/schema
+                #:schema-error
                 #:make-field
                 #:make-model
                 #:make-webhook
@@ -24,7 +25,8 @@
 ;;; collected into an in-memory registry; CURRENT-SCHEMA turns it into a
 ;;; validated schema that DEPLOY sends to the server.
 ;;;
-;;;   (defspace website :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate")))
+;;;   (defspace website :webhooks (list (webhook "revalidate" "https://example.com/api/revalidate"
+;;;                                   :events '(:publish :unpublish :delete))))
 ;;;
 ;;;   (defmodel (website blog) (:kind :list)
 ;;;     (title        :text :required t)
@@ -71,14 +73,16 @@
           (make-space key :webhooks (space-webhooks space) :models new-models))
     model))
 
-(defun webhook (label url &key events)
-  "A webhook for :webhooks of defspace or defmodel. EVENTS is a list from
-(:publish :unpublish :delete :draft); the default is every event except :draft."
+(defun webhook (label url &key (events nil events-p))
+  "A webhook for :webhooks of defspace or defmodel. EVENTS must be given: a non-empty
+list from (:publish :unpublish :delete :draft) saying when it fires."
+  (unless events-p
+    (error 'schema-error :message (format nil "webhook ~s: :events must be given, e.g. :events '(:publish :unpublish :delete)" label)))
   (make-webhook label url :events events))
 
 (defmacro defspace (name &key webhooks)
-  "Define (or redefine) a space. WEBHOOKS is evaluated: a list of (webhook ...) or
-bare URL strings, which every model of the space fires."
+  "Define (or redefine) a space. WEBHOOKS is evaluated: a list of (webhook ...) that
+every model of the space fires."
   `(register-space ',name :webhooks ,webhooks))
 
 (defmacro defmodel ((space name) (&key kind preview-url public-url webhooks) &body fields)

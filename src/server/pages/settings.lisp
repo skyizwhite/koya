@@ -8,8 +8,11 @@
   (:import-from #:koya-server/lib/timezone
                 #:display-timezone-name #:set-display-timezone #:timezone-names #:format-local)
   (:import-from #:koya/core/time #:now-iso)
+  (:import-from #:koya-server/db/management-keys
+                #:create-management-key #:list-management-keys #:delete-management-key)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to #:~layout #:~icon)
+                #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to #:short-time
+                #:~layout #:~empty-state #:~icon)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/settings)
 
@@ -90,10 +93,56 @@
        (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Save"))
      (p :class "mt-3 text-xs text-muted" "Now: " (format-local (now-iso))))))
 
-(defcomp ~settings-page (&key pending error timezone-error)
+(defcomp ~management-keys (&key new-key)
+  "Keys for the admin API, instance-wide. Like the delivery keys on a space's keys
+page: the plaintext is shown once, right after creation."
+  (hsx
+   (section :class "rounded-md border border-line bg-panel p-6"
+     (h2 :class "mb-1 text-lg font-bold" "Management keys")
+     (p :class "mb-4 text-sm text-muted"
+       "Sent as " (code "Authorization: Bearer …") " to the admin API: schema deploys and content or media "
+       "management from a site's code or REPL. A management key works for every space and does not log into this UI; "
+       "the owner secret does the opposite.")
+     (when new-key
+       (hsx (div :class "mb-4 rounded-md border border-ok/40 bg-ok/5 px-4 py-3 text-sm"
+              (p :class "font-medium text-ok" "New key created. Copy it now; it will not be shown again.")
+              (code :class "mt-2 block select-all break-all rounded bg-panel px-2 py-1 font-mono" new-key))))
+     (let ((keys (list-management-keys)))
+       (if (null keys)
+           (hsx (~empty-state "No management keys yet."))
+           (hsx (div :class "overflow-x-auto rounded-md border border-line"
+                  (table :class "w-full text-sm"
+                    (thead (tr :class "border-b border-line text-left text-muted"
+                             (th :class "py-2 pl-4 pr-4 font-medium" "label")
+                             (th :class "py-2 pr-4 font-medium whitespace-nowrap" "created at")
+                             (th)))
+                    (tbody :class "divide-y divide-line"
+                      (loop :for key :in keys :collect
+                        (hsx (tr
+                               (td :class "py-2 pl-4 pr-4 font-medium"
+                                 (if (string= (getf key :label) "")
+                                     (hsx (span :class "text-muted" "(no label)"))
+                                     (getf key :label)))
+                               (td :class "py-2 pr-4 whitespace-nowrap text-muted" (short-time (getf key :created-at)))
+                               (td :class "py-2 pl-4 pr-4 text-right"
+                                 (form :method "post"
+                                   (input :type "hidden" :name "action" :value "delete-management-key")
+                                   (input :type "hidden" :name "id" :value (getf key :id))
+                                   (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete key"
+                                           :data-confirm "Delete this management key? Anything using it stops working."
+                                     (~icon :name :delete)))))))))))))
+     (form :method "post" :class "mt-4 flex items-end gap-3"
+       (input :type "hidden" :name "action" :value "create-management-key")
+       (div :class "flex-1"
+         (label :for "mgmt-label" :class "label" "Label")
+         (input :type "text" :id "mgmt-label" :name "label" :class "input mt-1.5" :placeholder "e.g. website deploys"))
+       (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create key")))))
+
+(defcomp ~settings-page (&key pending error timezone-error new-key)
   (hsx (~layout :crumbs (list (cons "Settings" nil))
          (h1 :class "mb-6 text-2xl font-bold" "Settings")
          (div :class "space-y-6"
+           (~management-keys :new-key new-key)
            (~time-zone :error timezone-error)
            (~two-factor :pending pending :error error)))))
 
@@ -108,6 +157,14 @@
     (set-title "Settings · koya")
     (let ((action (param params "action")))
       (cond
+        ;; create renders the page directly: the plaintext key is shown only once
+        ((equal action "create-management-key")
+         (hsx (~settings-page :pending (pending-secret)
+                              :new-key (create-management-key :label (or (param params "label") "")))))
+        ((equal action "delete-management-key")
+         (delete-management-key (or (param params "id") ""))
+         (set-flash "Management key deleted.")
+         (redirect-to "/settings"))
         ((equal action "timezone")
          (let ((name (string-trim " " (or (param params "timezone") ""))))
            (cond ((set-display-timezone name)
