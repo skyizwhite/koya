@@ -46,12 +46,12 @@
                                      (loop :for model :in (space-models space)
                                            :append (mapcar (lambda (h) (cons (model-name model) h)) (model-webhooks model))))))
                   (when hooks
-                    ;; each row opens the log filtered to that webhook; "View all" opens it unfiltered
+                    ;; each row opens the log filtered to that webhook; "View log" opens it unfiltered
                     (hsx (section :class "mt-8"
                            (div :class "mb-2 flex items-baseline justify-between gap-3"
                              (h2 :class "text-sm font-semibold text-muted" "Webhooks")
                              (a :href (webhook-log-url name) :class "text-sm text-muted hover:text-fg hover:underline"
-                                "View all →"))
+                                "View log →"))
                            (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                              (loop :for (model . hook) :in hooks :collect
                                (hsx (li (a :href (webhook-log-url name :label (webhook-label hook))

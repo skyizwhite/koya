@@ -649,8 +649,8 @@ is a list of parts for MULTIPART-BODY."
              (multiple-value-bind (status body) (request :get "/s/website")
                (ok (= status 200))
                (ok (search "/s/website/webhooks?label=revalidate" body) "the row is a link to that hook's log")
-               (ok (search "\"/s/website/webhooks\"" body) "and View all links to the unfiltered log")
-               (ok (search "View all" body))))
+               (ok (search "\"/s/website/webhooks\"" body) "and View log links to the unfiltered log")
+               (ok (search "View log" body))))
            (testing "a model page links to the log narrowed to that model"
              (multiple-value-bind (status body) (request :get "/s/website/m/blog")
                (ok (= status 200))

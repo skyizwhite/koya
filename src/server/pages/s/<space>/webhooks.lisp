@@ -154,8 +154,8 @@
          (items (list-deliveries space :label label :model model
                                        :limit +page-size+ :offset (* (1- page) +page-size+))))
     (hsx
-     (~layout :space space :crumbs (list (cons "Webhooks" nil))
-       (h1 :class "mb-2 text-2xl font-bold" "Webhooks")
+     (~layout :space space :crumbs (list (cons "Webhook log" nil))
+       (h1 :class "mb-2 text-2xl font-bold" "Webhook log")
        (p :class "mb-4 text-sm text-muted"
          (format nil "~a call~:p~a." total (if (filtered-p label model) " match" ""))
          (format nil " Only the newest ~a of the space are kept." +keep-per-space+))
@@ -188,7 +188,7 @@
              (set-response-status 404)
              (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
             (t
-             (set-title (format nil "Webhooks · ~a · koya" space))
+             (set-title (format nil "Webhook log · ~a · koya" space))
              (hsx (~log-page :space space
                              :label (param params "label")
                              :model (param params "model")

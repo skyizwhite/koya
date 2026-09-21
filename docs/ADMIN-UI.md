@@ -54,7 +54,7 @@ label and the URL. Every webhook receives every event (publish, unpublish,
 delete, draft); the payload says which. Webhooks are part of the schema, so
 they are read-only here; change them in `defspace` / `defmodel` and deploy.
 
-Each row opens the **delivery log** filtered to that webhook; *View all →*
+Each row opens the **delivery log** filtered to that webhook; *View log →*
 beside the heading opens it unfiltered.
 
 ## The webhook delivery log
