@@ -356,7 +356,6 @@ website から流用するパターン:
 - 本体テーブルのマイグレーションは **起動時に自動適用**。`schema_version` テーブルと
   番号付き Lisp 関数のリストで up のみ持つ。down は持たない。
 - バックアップは Coolify のボリュームバックアップに任せる。
-  `POST /admin/api/backup`(`VACUUM INTO`)は後続フェーズ。
 - 環境変数: `KOYA_SECRET`、`KOYA_TOTP_SECRET`(任意)、`KOYA_DB_PATH`、`KOYA_MEDIA_DIR`、`KOYA_BASE_URL`、`KOYA_PORT`、`KOYA_ENV`。
 - `GET /health`(認証なし、DB 疎通を含む)をヘルスチェックに使う。
 - **キャッシュ**: `/assets/*` の URL は `?v=<assets/ 配下の最新更新時刻>` を付けて参照し、
@@ -365,6 +364,9 @@ website から流用するパターン:
   `no-store`。配信 API は API キー付きで利用側(website)が自前でキャッシュするため、中間キャッシュには載せない。
 
 ## 13. マイルストーン
+
+今後やることは GitHub issues で管理する(<https://github.com/skyizwhite/koya/issues>)。
+ここに残すのは、どこまで作ったかの記録だけ。
 
 ### M1: website が microCMS から乗り換えられる最小構成
 
@@ -384,7 +386,7 @@ website から流用するパターン:
   一覧でのラベル表示)、`filters` の残りの演算子、作成時のシステム日時の指定(移行用)、
   メディアライブラリ(8 章: アップロード、`/media/...` 配信、管理 API、管理画面、編集画面のピッカー、
   Quill の画像挿入、`:media` の API 展開、client)。
-- 残: `:datetime` 入力のタイムゾーン変換 JS、`docs/SCHEMA.md` と `docs/openapi.yaml` の整備。
+- 済(2026-09-21): `:datetime` 入力のタイムゾーン変換、`docs/SCHEMA.md` と `docs/openapi.yaml` の整備。
 
 ### 2026-09-20 のコードレビューと対応
 
@@ -404,19 +406,13 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 - 管理 UI: `/new` への delete / unpublish が 500 → 404。keys ページの delete / rotate → flash 付きリダイレクト(create は平文キーを一度だけ見せるため直接描画のまま)。
 - hsx: 属性値のエスケープが `"` のみ → `&` も(`<` `>` は引用符内で合法なので Alpine.js の式の読みやすさを優先して据え置き。skyizwhite/hsx 側で修正。koya は push 後に `qlot update hsx` で取り込む)。
 
-### M3: 運用・拡張
-
-- revisions、`backup`、Slynk 接続手順、非 Lisp クライアント(TypeScript)の着手。
-
-### 次にやること(2026-09-20 時点)
+### その後の記録(2026-09-21 時点)
 
 koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ済み。microCMS からのインポートを残して移行はほぼ完了。
 
 - ~~**ドキュメント整備**~~(2026-09-21 完了): 利用者向けに `docs/ADMIN-UI.md`(管理 UI)、`docs/CLIENT.md`
   (ライブラリ)、`docs/SCHEMA.md`(スキーマ JSON の仕様、`koyaSchema: 1`)、`docs/openapi.yaml`
   (配信 API / 管理 API)を書き、README は要約とリンクに絞った。DESIGN.md は経緯込みの設計書として残す。
-- 運用: `/data` ボリュームのバックアップ確認(Coolify のボリュームバックアップ、または `VACUUM INTO` の
-  `POST /admin/api/backup`)。microCMS 解約後に website の `MICROCMS_*` と `scripts/import-from-microcms.py` を削除。
 - ~~管理 UI: `:datetime` 入力のタイムゾーン変換~~(2026-09-21 完了。JS ではなくサーバ側で変換: 設定画面で選ぶ IANA 名の
   タイムゾーンを `settings` に保存し、`lib/timezone` が local-time で表示・入力を変換。保存と配信は UTC のまま)。
   ~~一覧のページング~~(2026-09-21 完了。100 件/ページ、`?page=`)。
@@ -440,7 +436,6 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
   選択肢はスキーマのモデル / webhook に、スキーマから消えてログに残っているものを足したもの。
   導線はスペース画面の "View log →" と各 webhook 行(label 指定)、モデル一覧とオブジェクトモデルの
   エディタの Webhooks ボタン(model 指定)。webhook が 1 つも無ければボタン自体を出さない。
-- 配信: webhook は通知ごとにスレッドを起こすので、大量インポート時はキューにまとめる。
 - 依存: hsx の `&` エスケープ修正は koya で取り込み済み。website は `qlot update koya` で koya の変更を追従。
 
 ## 14. 決定ログ
