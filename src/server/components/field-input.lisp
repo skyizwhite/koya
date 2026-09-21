@@ -12,6 +12,8 @@
                 #:media-url)
   (:import-from #:koya-server/lib/page
                 #:~icon)
+  (:import-from #:koya-server/lib/timezone
+                #:display-timezone-name)
   (:export #:~field-input))
 (in-package #:koya-server/components/field-input)
 
@@ -100,7 +102,7 @@ koya-editor.js to the page's media picker dialog."
           (hsx (input :type "date" :id id :name name :value string :class "input")))
          (:datetime
           (hsx (<> (input :type "datetime-local" :id id :name name :value string :class "input")
-                   (p :class "text-xs text-muted" "UTC"))))
+                   (p :class "text-xs text-muted" (display-timezone-name)))))
          (:select
           (if (field-many-p field)
               (hsx (div :class "flex flex-wrap gap-3"

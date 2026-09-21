@@ -5,6 +5,9 @@
   (:import-from #:koya-server/lib/totp
                 #:totp-enabled-p #:totp-env-secret #:totp-secret #:totp-code-valid-p
                 #:generate-totp-secret #:otpauth-uri #:enable-totp #:disable-totp)
+  (:import-from #:koya-server/lib/timezone
+                #:display-timezone-name #:set-display-timezone #:timezone-names #:format-local)
+  (:import-from #:koya/core/time #:now-iso)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to #:~layout #:~icon)
   (:export #:@get #:@post))
@@ -12,7 +15,8 @@
 
 ;;; Instance settings. Two-factor login is set up here: a fresh secret is kept in
 ;;; the session until the owner proves the authenticator has it by entering a
-;;; current code; only then is it stored and enforced.
+;;; current code; only then is it stored and enforced. The time zone is the one
+;;; every page shows times in; storage and the delivery API stay UTC.
 
 (defun pending-secret () (gethash "totp_pending" (context :session)))
 (defun (setf pending-secret) (value)
@@ -67,10 +71,31 @@
                  (input :type "hidden" :name "action" :value "begin")
                  (button :type "submit" :class "btn btn-primary" (~icon :name :shield) "Set up two-factor login")))))))))
 
-(defcomp ~settings-page (&key pending error)
+(defcomp ~time-zone (&key error)
+  (hsx
+   (section :class "rounded-md border border-line bg-panel p-6"
+     (h2 :class "mb-1 text-lg font-bold" "Time zone")
+     (p :class "mb-4 text-sm text-muted"
+       "Times in the admin UI — created and updated at, datetime fields — are shown and entered in this zone. "
+       "Stored values and the delivery API stay UTC.")
+     (when error (hsx (p :class "mb-4 text-sm text-danger" error)))
+     (form :method "post" :class "flex flex-wrap items-end gap-3"
+       (input :type "hidden" :name "action" :value "timezone")
+       (div
+         (label :for "timezone" :class "label" "IANA name")
+         (input :type "text" :id "timezone" :name "timezone" :list "timezones" :required t :autocomplete "off"
+                :value (display-timezone-name) :placeholder "Asia/Tokyo" :class "input mt-1.5 w-64"))
+       (datalist :id "timezones"
+         (loop :for name :in (timezone-names) :collect (hsx (option :value name))))
+       (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Save"))
+     (p :class "mt-3 text-xs text-muted" "Now: " (format-local (now-iso))))))
+
+(defcomp ~settings-page (&key pending error timezone-error)
   (hsx (~layout :crumbs (list (cons "Settings" nil))
          (h1 :class "mb-6 text-2xl font-bold" "Settings")
-         (~two-factor :pending pending :error error))))
+         (div :class "space-y-6"
+           (~time-zone :error timezone-error)
+           (~two-factor :pending pending :error error)))))
 
 (defun @get (params)
   (declare (ignore params))
@@ -83,6 +108,14 @@
     (set-title "Settings · koya")
     (let ((action (param params "action")))
       (cond
+        ((equal action "timezone")
+         (let ((name (string-trim " " (or (param params "timezone") ""))))
+           (cond ((set-display-timezone name)
+                  (set-flash (format nil "Times are now shown in ~a." name))
+                  (redirect-to "/settings"))
+                 (t (set-response-status 422)
+                    (hsx (~settings-page :pending (pending-secret)
+                                         :timezone-error (format nil "~s is not a time zone this server knows. Use an IANA name such as Asia/Tokyo, or UTC." name)))))))
         ((totp-env-secret)
          (set-response-status 400)
          (hsx (~settings-page :error "Two-factor login is configured by KOYA_TOTP_SECRET and cannot be changed here.")))

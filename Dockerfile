@@ -12,7 +12,7 @@ ENV KOYA_ENV=production \
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends build-essential curl libev-dev libsqlite3-dev \
+  && apt-get install -y --no-install-recommends build-essential curl libev-dev libsqlite3-dev tzdata \
   && rm -rf /var/lib/apt/lists/*
 
 RUN curl -sL https://github.com/tailwindlabs/tailwindcss/releases/download/v${TW_VERSION}/tailwindcss-linux-x64 -o /usr/local/bin/tailwindcss \

@@ -12,6 +12,8 @@
                 #:origin-allowed-p)
   (:import-from #:koya-server/lib/assets
                 #:asset-url)
+  (:import-from #:koya-server/lib/timezone
+                #:format-local)
   (:import-from #:koya/core/schema
                 #:model-fields #:field-name #:field-type)
   (:import-from #:koya/core/json
@@ -70,10 +72,8 @@
       (values (aref flash 0) (if (equal (aref flash 1) "error") :error :ok)))))
 
 (defun short-time (iso)
-  "2026-09-20T05:04:03.123Z -> 2026-09-20 05:04 UTC"
-  (if (and (stringp iso) (>= (length iso) 16))
-      (format nil "~a ~a UTC" (subseq iso 0 10) (subseq iso 11 16))
-      (or iso "")))
+  "2026-09-20T05:04:03.123Z -> 2026-09-20 14:04 JST, in the zone chosen on the settings page."
+  (format-local iso))
 
 (defun content-label (content model)
   "Human label for CONTENT: its first non-empty text or slug field, else its id."

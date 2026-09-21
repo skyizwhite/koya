@@ -418,7 +418,9 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
   (配信 API / 管理 API)を書き、README は要約とリンクに絞った。DESIGN.md は経緯込みの設計書として残す。
 - 運用: `/data` ボリュームのバックアップ確認(Coolify のボリュームバックアップ、または `VACUUM INTO` の
   `POST /admin/api/backup`)。microCMS 解約後に website の `MICROCMS_*` と `scripts/import-from-microcms.py` を削除。
-- 管理 UI: `:datetime` 入力のタイムゾーン変換 JS。一覧のページング(現在は 100 件固定)。
+- ~~管理 UI: `:datetime` 入力のタイムゾーン変換~~(2026-09-21 完了。JS ではなくサーバ側で変換: 設定画面で選ぶ IANA 名の
+  タイムゾーンを `settings` に保存し、`lib/timezone` が local-time で表示・入力を変換。保存と配信は UTC のまま)。
+  一覧のページング(現在は 100 件固定)。
 - セキュリティ: webhook 単位の秘密(`:secret`)を受け口が増えたときに。管理 API 用に `KOYA_SECRET` と
   別のトークンを切れるようにする(現状は Bearer にオーナーシークレットをそのまま使い、二段階認証の対象外)。
 - 配信: webhook は通知ごとにスレッドを起こすので、大量インポート時はキューにまとめる。

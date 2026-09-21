@@ -11,6 +11,7 @@
                "koya-tests/core/diff"
                "koya-tests/config"
                "koya-tests/server/totp"
+               "koya-tests/server/timezone"
                "koya-tests/server/db"
                "koya-tests/server/contents"
                "koya-tests/server/media"

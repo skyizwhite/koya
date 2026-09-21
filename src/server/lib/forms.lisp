@@ -8,6 +8,8 @@
                 #:regex-replace-all #:split #:scan #:quote-meta-chars)
   (:import-from #:koya-server/lib/env
                 #:base-url)
+  (:import-from #:koya-server/lib/timezone
+                #:iso->local-input #:local-input->iso)
   (:export #:form->data
            #:field-param-name
            #:form-values
@@ -84,10 +86,8 @@ except booleans which are always present (unchecked = false)."
                  (when ids (setf (gethash (field-name field) data) (coerce ids 'vector))))
                (when raw (setf (gethash (field-name field) data) raw))))
           (:datetime
-           (when raw
-             ;; datetime-local gives 2026-09-20T10:00; treat it as UTC.
-             (setf (gethash (field-name field) data)
-                   (if (and (= (length raw) 16) (char= (char raw 10) #\T)) (format nil "~a:00Z" raw) raw))))
+           ;; datetime-local gives 2026-09-20T10:00 in the display zone; stored as UTC
+           (when raw (setf (gethash (field-name field) data) (local-input->iso raw))))
           (:richtext
            ;; Quill reports an empty document as <p></p> or <p><br></p>.
            (when (and raw (not (scan "^(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" raw)))
@@ -109,8 +109,8 @@ except booleans which are always present (unchecked = false)."
         ((and (vectorp value) (not (stringp value)))
          (format nil "~{~a~^, ~}" (coerce value 'list)))
         ((eq (field-type field) :datetime)
-         ;; 2026-09-20T10:00:00.000Z -> 2026-09-20T10:00 for datetime-local
-         (if (and (stringp value) (>= (length value) 16)) (subseq value 0 16) (princ-to-string value)))
+         ;; 2026-09-20T01:00:00.000Z -> 2026-09-20T10:00 for datetime-local, in the display zone
+         (if (stringp value) (iso->local-input value) (princ-to-string value)))
         ((eq value t) "true")
         (t (princ-to-string value))))
 

@@ -17,7 +17,7 @@ schema and builds its lists and forms from it.
 - [Drafts, publishing and previews](#drafts-publishing-and-previews)
 - [Media](#media)
 - [API keys](#api-keys)
-- [Settings: two-factor login](#settings-two-factor-login)
+- [Settings: time zone and two-factor login](#settings-time-zone-and-two-factor-login)
 - [Reference](#reference)
 
 ## Logging in
@@ -90,7 +90,7 @@ labelled with its name, its type and, when required, a red `*`.
 | `:number` | number input (any step) |
 | `:boolean` | checkbox — unchecked means `false`, never "unset" |
 | `:date` | date input |
-| `:datetime` | datetime-local input, **in UTC** (there is no timezone conversion yet) |
+| `:datetime` | datetime-local input, in the zone chosen under **Settings**; stored as UTC |
 | `:select` | dropdown, or checkboxes when `:many` |
 | `:reference` | dropdown, or chips plus a dropdown when `:many` |
 | `:media` | thumbnail with **Choose…** (opens the media picker) and **Clear** |
@@ -174,9 +174,17 @@ delivery API.
   `X-KOYA-WEBHOOK-KEY` header with every webhook of the space, and can rotate it.
   Verify it on the receiving end.
 
-## Settings: two-factor login
+## Settings: time zone and two-factor login
 
-`/settings` turns the second factor on: **Set up two-factor login** shows a QR
+`/settings` holds the two instance-wide settings.
+
+**Time zone** is the zone every page shows times in — created and updated at,
+the list previews, and `:datetime` fields, which are also entered in it. Type an
+IANA name (`Asia/Tokyo`, `Europe/Berlin`; the box offers the zones the server
+knows) and save; the line underneath shows the current time in it as a check.
+The default is UTC. Storage and the delivery API are not affected: they stay UTC.
+
+**Two-factor login** turns the second factor on: **Set up two-factor login** shows a QR
 code, the Base32 secret and the `otpauth://` URI; scanning it and entering a
 current code stores the secret and starts asking for a code at login. The secret
 is only kept once the app has proved it has it.
@@ -195,7 +203,7 @@ takes precedence and the settings page then only reports that it is in force.
 |---|---|
 | `/` | spaces |
 | `/login`, `/logout` | log in, log out |
-| `/settings` | instance settings (two-factor login) |
+| `/settings` | instance settings (time zone, two-factor login) |
 | `/s/{space}` | a space: models and webhooks |
 | `/s/{space}/m/{model}` | contents of a model (object models redirect to their content) |
 | `/s/{space}/m/{model}/{id}` | the editor; `new` for a new content |
