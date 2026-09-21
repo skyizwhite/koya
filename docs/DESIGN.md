@@ -431,6 +431,9 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
   microCMS の「サービス / API」に寄せた名前をやめ、スキーマと同じ space / model で呼ぶ。v0.3.0 を配信済みなので
   受け手側(website の revalidate ハンドラ)の改修が必要。あわせて配信 API の `X-MICROCMS-API-KEY` 互換の記述と、
   openapi に残っていた `type` `new` / `edit` の記述を削除(実装は 0.3.0 で既に落ちていた)。
+- 2026-09-21: webhook の配信結果(ステータス / レスポンス本文 / 到達しなかったときのエラー)を
+  `webhook_deliveries` に記録し、管理画面 `/s/{space}/webhooks` で見られるようにした(0.4.0)。space ごとに
+  直近 200 件、本文は 4000 文字まで。定義はコードのままで、UI は読むだけ。再送は無い。
 - 配信: webhook は通知ごとにスレッドを起こすので、大量インポート時はキューにまとめる。
 - 依存: hsx の `&` エスケープ修正は koya で取り込み済み。website は `qlot update koya` で koya の変更を追従。
 

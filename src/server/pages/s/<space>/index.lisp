@@ -9,6 +9,7 @@
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:~layout #:~empty-state #:~icon #:~model-icon #:model-url #:space-url)
+  (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/index)
 
@@ -45,13 +46,18 @@
                                      (loop :for model :in (space-models space)
                                            :append (mapcar (lambda (h) (cons (model-name model) h)) (model-webhooks model))))))
                   (when hooks
+                    ;; each row opens that webhook's delivery log; the heading opens all of them
                     (hsx (section :class "mt-8"
-                           (h2 :class "mb-2 text-sm font-semibold text-muted" "Webhooks")
+                           (div :class "mb-2 flex items-baseline justify-between gap-3"
+                             (h2 :class "text-sm font-semibold text-muted" "Webhooks")
+                             (a :href (webhook-log-url name) :class "text-sm text-muted hover:text-fg hover:underline"
+                                "Delivery log"))
                            (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                              (loop :for (model . hook) :in hooks :collect
-                               (hsx (li :class "flex items-center justify-between gap-3 px-4 py-3"
-                                      (div :class "min-w-0"
-                                        (div :class "font-medium" (webhook-label hook))
-                                        (code :class "block truncate text-xs text-muted" (webhook-url hook)))
-                                      (div :class "shrink-0 text-sm text-muted"
-                                        (if model (format nil "~a only" model) "all models")))))))))))))))))
+                               (hsx (li (a :href (webhook-log-url name (webhook-label hook))
+                                           :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
+                                          (span :class "min-w-0"
+                                            (span :class "block font-medium" (webhook-label hook))
+                                            (code :class "block truncate text-xs text-muted" (webhook-url hook)))
+                                          (span :class "shrink-0 text-sm text-muted"
+                                            (if model (format nil "~a only" model) "all models"))))))))))))))))))

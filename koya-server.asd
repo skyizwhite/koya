@@ -1,6 +1,7 @@
 (register-system-packages "cl-dbi" '(:dbi))
 (register-system-packages "bordeaux-threads" '(:bordeaux-threads-2 :bt2))
 (register-system-packages "lack-middleware-session" '(:lack/middleware/session/store))
+(register-system-packages "dexador" '(:dexador.error))
 
 (defsystem "koya-server"
   :version "0.4.0"

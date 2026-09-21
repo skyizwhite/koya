@@ -5,12 +5,17 @@
   (:import-from #:koya/core/schema
                 #:space-webhooks #:space-name #:model-webhooks #:model-name
                 #:webhook-label #:webhook-url)
+  (:import-from #:koya-server/db/webhook-deliveries
+                #:record-delivery)
   (:import-from #:dexador)
+  (:import-from #:dexador.error
+                #:http-request-failed #:response-status #:response-body)
   (:import-from #:bordeaux-threads-2
                 #:make-thread)
   (:export #:notify-webhooks
            #:*webhook-sender*
-           #:*webhook-async*))
+           #:*webhook-async*
+           #:*webhook-log*))
 (in-package #:koya-server/lib/webhook)
 
 ;;; Content change notifications:
@@ -18,13 +23,22 @@
 ;;;  "contents": {"old": {...}|null, "new": {...}|null}}
 ;;; Every webhook of the space, and of the model, gets every event; the receiver
 ;;; reads "event" and decides what to do (a revalidation hook ignores "draft").
+;;; What each call answered is kept in db/webhook-deliveries for the admin UI.
 
 (defun default-sender (url payload headers)
+  "POST PAYLOAD to URL. Returns (values STATUS BODY ERROR). A 4xx or 5xx is an
+answer and carries its status and body; only a transport failure has neither."
   (handler-case
-      (dexador:post url :headers (cons '("Content-Type" . "application/json") headers) :content payload
-                        :connect-timeout 5 :read-timeout 10)
+      (multiple-value-bind (body status)
+          (dexador:post url :headers (cons '("Content-Type" . "application/json") headers) :content payload
+                            :connect-timeout 5 :read-timeout 10)
+        (values status body nil))
+    (http-request-failed (e)
+      (values (response-status e) (response-body e) nil))
     (error (e)
-      (format *error-output* "~&[koya] webhook ~a failed: ~a~%" url e))))
+      (let ((message (princ-to-string e)))
+        (format *error-output* "~&[koya] webhook ~a failed: ~a~%" url message)
+        (values nil nil message)))))
 
 (defparameter +events+ '(:publish :unpublish :delete :draft))
 
@@ -33,10 +47,44 @@
   (append (space-webhooks space) (and model (model-webhooks model))))
 
 (defvar *webhook-sender* #'default-sender
-  "Function (URL PAYLOAD-STRING HEADERS-ALIST) that delivers one webhook. Rebound in tests.")
+  "Function (URL PAYLOAD-STRING HEADERS-ALIST) that delivers one webhook and
+returns (values STATUS BODY ERROR). Rebound in tests.")
 
 (defvar *webhook-async* t
   "Deliver webhooks from a background thread. Tests bind this to NIL.")
+
+(defvar *webhook-log* t
+  "Record every delivery in the database for the admin UI's webhook log.")
+
+(defun ok-status-p (status)
+  (and (integerp status) (<= 200 status 299)))
+
+(defun elapsed-ms (start)
+  (round (* 1000 (- (get-internal-real-time) start)) internal-time-units-per-second))
+
+(defun send-and-log (hook space model id event payload headers)
+  "Deliver one webhook and record what came back. Neither a failed call nor a
+failed write may stop the hooks queued behind it."
+  (let ((start (get-internal-real-time))
+        (status nil) (body nil) (failure nil))
+    (handler-case
+        (multiple-value-setq (status body failure)
+          (funcall *webhook-sender* (webhook-url hook) payload headers))
+      (error (e) (setf status nil body nil failure (princ-to-string e))))
+    (when *webhook-log*
+      (handler-case
+          (record-delivery space
+                           :label (webhook-label hook)
+                           :url (webhook-url hook)
+                           :model model
+                           :event event
+                           :content-id id
+                           :ok (and (null failure) (ok-status-p status))
+                           :status (and (integerp status) status)
+                           :response body
+                           :error failure
+                           :duration-ms (elapsed-ms start))
+        (error (e) (format *error-output* "~&[koya] webhook log failed: ~a~%" e))))))
 
 (defun notify-webhooks (space model id event &key old new (async *webhook-async*) secret)
   "Send EVENT (one of +EVENTS+) for content ID to the webhooks of SPACE (a
@@ -47,14 +95,17 @@ asynchronous unless ASYNC is NIL."
   (let ((hooks (webhooks-for space model))
         (headers (and secret (list (cons "X-KOYA-WEBHOOK-KEY" secret)))))
     (when hooks
-      (let ((payload (to-json (jobject "space" (space-name space)
-                                       "model" (model-name model)
-                                       "id" id
-                                       "event" (string-downcase (symbol-name event))
-                                       "contents" (jobject "old" (or old json-null) "new" (or new json-null))))))
+      (let* ((space-name (space-name space))
+             (model-name (model-name model))
+             (event-name (string-downcase (symbol-name event)))
+             (payload (to-json (jobject "space" space-name
+                                        "model" model-name
+                                        "id" id
+                                        "event" event-name
+                                        "contents" (jobject "old" (or old json-null) "new" (or new json-null))))))
         (flet ((send ()
                  (dolist (hook hooks)
-                   (funcall *webhook-sender* (webhook-url hook) payload headers))))
+                   (send-and-log hook space-name model-name id event-name payload headers))))
           (if async
               (make-thread #'send :name "koya-webhook")
               (send)))))))

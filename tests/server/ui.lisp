@@ -15,6 +15,8 @@
   (:import-from #:cl-ppcre #:scan-to-strings)
   (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
+  (:import-from #:koya-server/db/webhook-deliveries #:record-delivery)
+  (:import-from #:koya/core/schema #:make-webhook)
   (:import-from #:koya-server/lib/forms #:slugify #:normalize-richtext)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema)
   (:import-from #:koya/core/json #:jget)
@@ -625,3 +627,44 @@ is a list of parts for MULTIPART-BODY."
         (ok (search "h-14" body) "every row is the same height")
         (ok (< (search ">status<" body) (search ">title<" body)) "status leads the row"))
       (request :post path :form '(("action" . "delete")) :headers '(("origin" . "http://localhost:3000"))))))
+
+(deftest webhook-log-page
+  (let ((hooked (make-schema (list (make-space "website"
+                                               :webhooks (list (make-webhook "revalidate" "https://site.test/api/revalidate"))
+                                               :models (list (blog-model)
+                                                             (make-model "about" :object (list (make-field :body :richtext)))))))))
+    (unwind-protect
+         (progn
+           (save-schema hooked)
+           (exec "DELETE FROM webhook_deliveries")
+           (record-delivery "website" :label "revalidate" :url "https://site.test/api/revalidate"
+                                      :model "blog" :event "publish" :content-id "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+                                      :ok t :status 200 :response "{\"revalidated\":[\"/blog\"]}"
+                                      :error "" :duration-ms 42)
+           (record-delivery "website" :label "revalidate" :url "https://site.test/api/revalidate"
+                                      :model "blog" :event "draft" :content-id "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+                                      :ok nil :status nil :response ""
+                                      :error "connection refused" :duration-ms 5001)
+           (testing "the space page sends each webhook to its own log"
+             (multiple-value-bind (status body) (request :get "/s/website")
+               (ok (= status 200))
+               (ok (search "/s/website/webhooks?label=revalidate" body) "the row is a link to that hook's log")
+               (ok (search "\"/s/website/webhooks\"" body) "and the heading links to all of them")))
+           (testing "the log shows the outcome and what came back"
+             (multiple-value-bind (status body) (request :get "/s/website/webhooks")
+               (ok (= status 200))
+               (ok (search "200" body) "the status is shown")
+               (ok (search "revalidated" body) "so is the response body")
+               (ok (search "connection refused" body) "and the error of the call that never arrived")
+               (ok (search "42 ms" body))
+               (ok (search "no response" body) "a call with no status says so")))
+           (testing "the label filter narrows it"
+             (multiple-value-bind (status body) (request :get "/s/website/webhooks" :query "label=nothing")
+               (ok (= status 200))
+               (ok (search "Nothing has been delivered yet" body))))
+           (multiple-value-bind (status) (request :get "/s/nope/webhooks")
+             (ok (= status 404))))
+      (save-schema (make-schema (list (make-space "website"
+                                                  :models (list (blog-model)
+                                                                (make-model "about" :object (list (make-field :body :richtext))))))))
+      (exec "DELETE FROM webhook_deliveries"))))

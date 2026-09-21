@@ -56,6 +56,14 @@ select {
   @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium;
 }
 
+/* Rows that open (the webhook log). Preflight leaves the marker; WebKit needs its own rule. */
+summary.row-toggle {
+  @apply list-none;
+}
+summary.row-toggle::-webkit-details-marker {
+  display: none;
+}
+
 /* Dialogs (media picker, image preview) */
 dialog.koya-dialog {
   @apply w-full rounded-md border border-line bg-base p-0 text-fg shadow;

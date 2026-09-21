@@ -74,7 +74,23 @@
         id TEXT PRIMARY KEY,
         key_hash TEXT NOT NULL UNIQUE,
         label TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL)")))
+        created_at TEXT NOT NULL)")
+    (5
+     "CREATE TABLE webhook_deliveries (
+        id TEXT PRIMARY KEY,
+        space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,
+        label TEXT NOT NULL DEFAULT '',
+        url TEXT NOT NULL,
+        model TEXT NOT NULL DEFAULT '',
+        event TEXT NOT NULL,
+        content_id TEXT NOT NULL DEFAULT '',
+        ok INTEGER NOT NULL,
+        status INTEGER,
+        response TEXT NOT NULL DEFAULT '',
+        error TEXT NOT NULL DEFAULT '',
+        duration_ms INTEGER,
+        created_at TEXT NOT NULL)"
+     "CREATE INDEX webhook_deliveries_by_space ON webhook_deliveries (space, id DESC)")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

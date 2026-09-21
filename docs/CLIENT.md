@@ -187,7 +187,10 @@ nothing: what is published did not change. Note that `draft` arrives on every
 save, so a hook that rebuilds or revalidates a site should return early on it.
 Every call carries the space's webhook secret in `X-KOYA-WEBHOOK-KEY` -- read it
 with `(koya:webhook-secret)` or from the space's Delivery keys page -- and
-delivery is fire-and-forget: koya logs a failure and does not retry.
+delivery is fire-and-forget: koya does not retry. What each call answered (its
+status, its body, or the error when it never arrived) is kept for the space's
+newest 200 deliveries and shown in the admin UI at `/s/{space}/webhooks`; see
+[ADMIN-UI.md](ADMIN-UI.md#the-webhook-delivery-log).
 
 ## Deploying the schema
 

@@ -7,6 +7,11 @@
   (:import-from #:koya-server/db/api-keys #:create-api-key)
   (:import-from #:koya-server/db/management-keys #:create-management-key)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
+  (:import-from #:koya-server/db/webhook-deliveries
+                #:list-deliveries #:count-deliveries #:+keep-per-space+ #:+max-response-chars+
+                #:delivery-ok #:delivery-status #:delivery-response #:delivery-error
+                #:delivery-event #:delivery-model #:delivery-label #:delivery-url
+                #:delivery-content-id #:delivery-duration-ms)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-space #:make-schema #:make-webhook #:schema->jobject)
   (:import-from #:koya-server/lib/http #:origin-allowed-p)
   (:import-from #:koya/core/json #:parse-json #:to-json #:jobject #:jget #:json-null)
@@ -42,13 +47,16 @@
   (setf *api-key* (create-api-key "website" :label "test"))
   (setf *management-key* (create-management-key :label "test"))
   (setf *webhook-async* nil)
-  (setf *webhook-sender* (lambda (url payload headers) (push (list url (parse-json payload) headers) *webhooks*))))
+  (setf *webhook-sender* (lambda (url payload headers)
+                           (push (list url (parse-json payload) headers) *webhooks*)
+                           (values 200 "{\"revalidated\":true}" nil))))
 
 (teardown
   (disconnect-db))
 
 (defhook :before
   (exec "DELETE FROM contents")
+  (exec "DELETE FROM webhook_deliveries")
   (setf *webhooks* '()))
 
 (defun request (method path &key query body headers)
@@ -355,6 +363,57 @@
       (ok (eq (jget (second hook) "contents" "new") json-null))
       (ok (= (length (cdr (assoc "X-KOYA-WEBHOOK-KEY" (third hook) :test #'string=))) 48)
           "delete webhook carries the space secret"))))
+
+(deftest webhook-delivery-log
+  (testing "what the receiver answered is kept"
+    (multiple-value-bind (status json)
+        (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Logged") "publish" t))
+      (ok (= status 201))
+      (let ((deliveries (list-deliveries "website")))
+        (ok (= (length deliveries) 1) "one hook, one call")
+        (let ((d (first deliveries)))
+          (ok (eq (delivery-ok d) t) "200 counts as accepted")
+          (ok (= (delivery-status d) 200))
+          (ok (string= (delivery-response d) "{\"revalidated\":true}") "the body is there to read")
+          (ok (string= (delivery-error d) ""))
+          (ok (string= (delivery-event d) "publish"))
+          (ok (string= (delivery-model d) "blog"))
+          (ok (string= (delivery-label d) "hook"))
+          (ok (string= (delivery-url d) "https://example.com/hook"))
+          (ok (string= (delivery-content-id d) (jget json "id")))
+          (ok (integerp (delivery-duration-ms d)))))))
+  (testing "a refusal is recorded as one, with its body"
+    (exec "DELETE FROM webhook_deliveries")
+    (let ((*webhook-sender* (lambda (url payload headers)
+                              (declare (ignore url payload headers))
+                              (values 500 "revalidation failed" nil))))
+      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Refused") "publish" t)))
+    (let ((d (first (list-deliveries "website"))))
+      (ok (null (delivery-ok d)) "5xx is not an acceptance")
+      (ok (= (delivery-status d) 500))
+      (ok (string= (delivery-response d) "revalidation failed"))))
+  (testing "a call that never arrived has no status"
+    (exec "DELETE FROM webhook_deliveries")
+    (let ((*webhook-sender* (lambda (url payload headers)
+                              (declare (ignore url payload headers))
+                              (error "connection refused"))))
+      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Unreachable") "publish" t)))
+    (let ((d (first (list-deliveries "website"))))
+      (ok (null (delivery-ok d)))
+      (ok (null (delivery-status d)))
+      (ok (search "connection refused" (delivery-error d)) "the condition is kept as the error")))
+  (testing "an oversized body is clipped, and the log does not grow without end"
+    (exec "DELETE FROM webhook_deliveries")
+    (let ((*webhook-sender* (lambda (url payload headers)
+                              (declare (ignore url payload headers))
+                              (values 200 (make-string (* 4 +max-response-chars+) :initial-element #\x) nil))))
+      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Chatty") "publish" t)))
+    (let ((d (first (list-deliveries "website"))))
+      (ok (< (length (delivery-response d)) (* 2 +max-response-chars+)) "stored clipped, not whole")
+      (ok (search "characters in all" (delivery-response d)) "and says it was clipped"))
+    (dotimes (i 5)
+      (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" (format nil "t~a" i)) "publish" t)))
+    (ok (<= (count-deliveries "website") +keep-per-space+) "the cap holds")))
 
 (deftest import-style-create
   (testing "explicit id and publishedAt"

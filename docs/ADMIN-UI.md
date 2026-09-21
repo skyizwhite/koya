@@ -54,6 +54,32 @@ label and the URL. Every webhook receives every event (publish, unpublish,
 delete, draft); the payload says which. Webhooks are part of the schema, so
 they are read-only here; change them in `defspace` / `defmodel` and deploy.
 
+Each row opens that webhook's **delivery log**, and *Delivery log* beside the
+heading opens all of them.
+
+## The webhook delivery log
+
+`/s/{space}/webhooks` is the last 200 calls the space made, newest first, 25 to
+a page. A row names the event, the model and the webhook's label, and carries
+the outcome as a badge:
+
+| Badge | Meaning |
+|---|---|
+| a 2xx status, green | the receiver accepted the call |
+| any other status, red | it answered, and refused |
+| *no response*, amber | the call never arrived: DNS, a refused connection, a timeout |
+
+Opening a row shows the URL it posted to, a link to the content that changed,
+how long the call took, the error when there was one, and **the response body**
+as the receiver sent it — the first 4000 characters of it, which is where a
+revalidation hook's own error message usually is.
+
+`?label={label}` narrows the log to one webhook; that is the link the rows on
+the space page use.
+
+Nothing here is retried, and nothing is kept beyond the newest 200 calls of a
+space: this is a log to glance at after a publish, not an audit trail.
+
 ## Contents of a model
 
 `/s/{space}/m/{model}` is a table: a status badge, then one column per field of
@@ -223,6 +249,7 @@ takes precedence and the settings page then only reports that it is in force.
 | `/login`, `/logout` | log in, log out |
 | `/settings` | instance settings (management keys, time zone, two-factor login) |
 | `/s/{space}` | a space: models and webhooks |
+| `/s/{space}/webhooks` | the webhook delivery log; `?label=` narrows it to one hook |
 | `/s/{space}/m/{model}` | contents of a model (object models redirect to their content) |
 | `/s/{space}/m/{model}/{id}` | the editor; `new` for a new content |
 | `/s/{space}/media` | media library |
@@ -236,6 +263,8 @@ takes precedence and the settings page then only reports that it is in force.
 | Contents per page of a model list | 100, newest created first |
 | Contents offered in a reference field | 1000 |
 | Media per library page / per picker page | 48 / 24 |
+| Webhook deliveries kept / shown per page | 200 per space / 25 |
+| Response body stored per delivery | 4000 characters |
 | Upload size and types | 20 MB; PNG, JPEG, GIF, WebP |
 | Session lifetime | 24 hours, stored in the database |
 | Login lockout | 5 failures per address per 5 minutes |
