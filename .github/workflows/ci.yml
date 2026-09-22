@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # the image the Dockerfile builds on, so the suite runs against the SBCL and
+    # the qlot that production uses
+    container: fukamachi/qlot
+    steps:
+      - uses: actions/checkout@v4
+
+      # what the Lisp dependencies need to compile: sqlite for cl-dbi, libev for
+      # woo, a toolchain for both
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential libev-dev libsqlite3-dev
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .qlot
+            ~/.cache/common-lisp
+          key: qlot-${{ hashFiles('qlfile.lock') }}-${{ hashFiles('**/*.asd') }}
+          restore-keys: qlot-${{ hashFiles('qlfile.lock') }}-
+
+      - run: qlot install
+
+      # the justfile's test recipe, without roswell: qlot resolves sbcl from PATH
+      - name: Run the test suite
+        run: |
+          qlot exec sbcl --non-interactive \
+            --eval '(handler-bind ((warning (function muffle-warning))) (ql:quickload :koya-tests :silent t))' \
+            --eval '(uiop:quit (if (rove:run :koya-tests :style :dot) 0 1))'
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # built, not pushed: a Dockerfile that no longer builds should be caught
+      # here rather than by the deploy
+      - run: docker build .

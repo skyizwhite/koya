@@ -2,6 +2,8 @@
 
 # koya
 
+[![CI](https://github.com/skyizwhite/koya/actions/workflows/ci.yml/badge.svg)](https://github.com/skyizwhite/koya/actions/workflows/ci.yml)
+
 A small, self-hosted headless CMS written in Common Lisp, for one owner and any number of sites.
 
 - **Server** (`koya-server`): admin UI, delivery API, admin API and media library. One process, one Docker image.
