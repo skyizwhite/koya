@@ -375,4 +375,4 @@ takes precedence and the settings page then only reports that it is in force.
 - User accounts and roles: there is one owner.
 - Revision history: a content has one published version and one draft.
 
-For the reasoning behind these, see [DESIGN.md](DESIGN.md).
+For the reasoning behind these, see [the decision records](../adr).
