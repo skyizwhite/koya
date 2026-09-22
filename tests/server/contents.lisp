@@ -145,6 +145,34 @@
       (ok (signals (list-contents "website" "blog" model (q "orders" "nope")) 'query-error))
       (ok (signals (q "limit" "abc") 'query-error)))))
 
+(deftest listing-by-status
+  (create-content "website" "blog" (data "{\"title\": \"Live\"}") :publish t)
+  (let ((both (create-content "website" "blog" (data "{\"title\": \"Live with a draft\"}") :publish t)))
+    (save-draft (content-id both) (data "{\"title\": \"Live with a draft\", \"count\": 1}")))
+  (create-content "website" "blog" (data "{\"title\": \"Only a draft\"}"))
+  (let ((model (find-model "website" "blog")))
+    (flet ((titles-with (status)
+             ;; the draft's title when there is one, as the admin list shows it
+             (sort (mapcar (lambda (c) (jget (or (content-draft c) (content-published c)) "title"))
+                           (list-contents "website" "blog" model (q "limit" "50")
+                                          :status :all :only-status status))
+                   #'string<)))
+      (ok (equal (titles-with nil) '("Live" "Live with a draft" "Only a draft"))
+          "no status is every status")
+      (ok (equal (titles-with "draft") '("Only a draft")))
+      (ok (equal (titles-with "published") '("Live"))
+          "published means published and nothing else pending, which is what the badge says")
+      (ok (equal (titles-with "published+draft") '("Live with a draft")))
+      (ok (null (titles-with "nonsense")))))
+  (testing "it narrows what the search finds, rather than replacing it"
+    (let ((model (find-model "website" "blog")))
+      (ok (= (nth-value 1 (list-contents "website" "blog" model (q "filters" "title[contains]Live")
+                                         :status :all))
+             2))
+      (ok (= (nth-value 1 (list-contents "website" "blog" model (q "filters" "title[contains]Live")
+                                         :status :all :only-status "published"))
+             1)))))
+
 (deftest parse-query-defaults
   (let ((query (q)))
     (ok (= (query-limit query) 10))

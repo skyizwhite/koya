@@ -126,12 +126,36 @@ straight to its one content -- so that button sits in its editor instead.
 - A row shows its **draft** data when it has one, so the table reflects what is
   being worked on rather than what is live.
 - Contents are listed newest-created first, 100 to a page, with **Previous** /
-  **Next** underneath when there are more. There is no filtering or sorting from
-  the UI.
+  **Next** underneath when there are more.
 - **New content** opens an empty editor at `/s/{space}/m/{model}/new`.
 
 For an `:object` model this URL redirects straight to its single content (or to a
 `new` editor when it has none): an object model holds exactly one content.
+
+### Finding one
+
+Above the table, a search box and a status filter; the column headers are the
+sort. All three live in the query string, so a list as you are reading it is a
+link you can keep or send:
+
+| | |
+|---|---|
+| `?q={text}` | matches the model's `text`, `textarea`, `slug` and `richtext` fields, and a whole content id |
+| `?status={badge}` | `draft`, `published` or `published+draft` — the three badges the list shows |
+| `?sort={field}` | ascending; `?sort=-{field}` descending. Any field of the model, and the system fields (`createdAt`, `updatedAt`, `publishedAt`, `revisedAt`, `id`) |
+
+Clicking a column header sorts by it; clicking the one already sorted turns it
+around, and an arrow marks it. Without a sort the list is newest created first.
+The count beside the heading reads *3 of 120* while a search or a filter is on,
+and **Clear** drops both while keeping the sort.
+
+A search looks inside the data the list shows — the draft when there is one.
+Rich text is searched as the HTML it is stored as, so a query that reads like
+markup can match a tag rather than the words. The id is matched whole, not as a
+fragment: ids made around the same time share a long prefix, so a short query
+would otherwise match everything. A `?sort=` or `?status=` naming something the
+model cannot have is ignored rather than refused, so an old link still opens the
+list.
 
 ## The editor
 

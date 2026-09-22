@@ -146,14 +146,17 @@ Errors when the content has no published version: there would be nothing left."
     (:published "published")
     (:all "COALESCE(draft, published)")))
 
-(defun list-contents (space model schema-model query &key (status :published))
+(defun list-contents (space model schema-model query &key (status :published) only-status)
   "Return (values contents total-count) for QUERY. STATUS :published restricts to
-published data (delivery API); :all lists everything using draft data when present (admin)."
+published data (delivery API); :all lists everything using draft data when present (admin).
+ONLY-STATUS narrows to one value of the status column -- \"draft\", \"published\" or
+\"published+draft\" -- which is the admin list's status filter; it is the badge the
+list shows, so the three choices are the three badges."
   (let ((column (data-column status)))
     (multiple-value-bind (where-sql where-params) (build-where (query-filters query) schema-model column)
-      (let* ((base (format nil "FROM contents WHERE space = ? AND model = ? AND ~a~@[ AND ~a~]"
-                           (status-clause status) where-sql))
-             (params (append (list space model) where-params))
+      (let* ((base (format nil "FROM contents WHERE space = ? AND model = ? AND ~a~@[~a~]~@[ AND ~a~]"
+                           (status-clause status) (and only-status " AND status = ?") where-sql))
+             (params (append (list space model) (and only-status (list only-status)) where-params))
              (total (col (apply #'fetch-one (format nil "SELECT COUNT(*) AS n ~a" base) params) "n"))
              (rows (apply #'fetch
                           (format nil "SELECT * ~a ORDER BY ~a LIMIT ? OFFSET ?"
