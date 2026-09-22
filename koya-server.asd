@@ -4,7 +4,7 @@
 (register-system-packages "dexador" '(:dexador.error))
 
 (defsystem "koya-server"
-  :version "0.5.0"
+  :version "0.6.0"
   :description "koya - a small headless CMS in Common Lisp (server)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
   :license "MIT"
