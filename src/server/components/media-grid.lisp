@@ -37,15 +37,22 @@ use cannot go (the server refuses), so the question becomes an explanation."
               (media-filename media) references)
       (format nil "Delete ~a?" (media-filename media))))
 
-(defcomp ~media-card (&key media space references)
+(defcomp ~media-card (&key media space references bulk-form)
   "Library card: the picture and nothing else. Its name and facts are in the
 preview dialog the thumbnail opens, along with everything that can be done to
 the file; only Delete is on the card, over its corner. REFERENCES is how many
-contents mention the file (shown in the confirmation)."
+contents mention the file (shown in the confirmation). BULK-FORM is the id of the
+page's selection form: the box belongs to it through its form attribute, because
+a form cannot be nested inside the card's own."
   (declare (ignore space))
   (let ((id (media-id media)))
     (hsx
      (li :class "relative"
+       (if bulk-form
+           (hsx (input :type "checkbox" :name "id" :value id :form bulk-form :data-bulk-item t
+                       :class "absolute left-1 top-1 z-10 h-4 w-4 cursor-pointer"
+                       :aria-label (format nil "Select ~a" (media-filename media))))
+           (hsx (<>)))
        ;; the whole thumbnail is the preview button, so the card needs no other
        (button :type "button" :class "block w-full cursor-zoom-in"
                :data-preview-src (media-url media :absolute nil)
@@ -84,7 +91,7 @@ contents mention the file (shown in the confirmation)."
        (div :class "truncate" :title (media-filename media) (media-filename media))
        (div :class "text-muted" (dimensions media))))))
 
-(defcomp ~media-grid (&key items space (mode :library))
+(defcomp ~media-grid (&key items space (mode :library) bulk-form)
   (if (null items)
       (hsx (~empty-state "No media yet. Upload an image above."))
       (let ((references (and (eq mode :library)
@@ -96,7 +103,7 @@ contents mention the file (shown in the confirmation)."
                (loop :for media :in items :collect
                  (if (eq mode :picker)
                      (hsx (~pick-card :media media))
-                     (hsx (~media-card :media media :space space
+                     (hsx (~media-card :media media :space space :bulk-form bulk-form
                                        :references (gethash (media-id media) references 0))))))))))
 
 (defcomp ~media-preview-dialog ()

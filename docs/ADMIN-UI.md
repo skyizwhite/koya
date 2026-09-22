@@ -180,6 +180,30 @@ around, and an arrow marks it. Without a sort the list is newest created first.
 The count beside the heading reads *3 of 120* while a search or a filter is on,
 and **Clear** drops both while keeping the sort.
 
+### Doing it to several at once
+
+Each row has a checkbox and the header has one for the page. Tick any and a bar
+appears above the table with **Publish**, **Unpublish** and **Delete**; Delete
+asks first, naming how many. The selection is the page's, so filter first and
+select the page: *status = draft*, select all, Publish.
+
+Each content goes through the same path a single one does — the same validation,
+the same system timestamps, the same webhooks — one at a time, each in its own
+transaction. One that cannot be done leaves the rest done: publishing three
+drafts where one is missing a field now required reports *Published 2 contents.
+1 could not be: title is required*, and the two are published.
+
+An action with nothing to do to a content leaves it alone and counts it: a
+selection made by ticking the page holds whatever the page held, so publishing
+what is already published would give every one of them a new `revisedAt` and a
+webhook for a change that did not happen, and unpublishing what is already a
+draft would issue it a new draft key and break a preview link someone is
+holding. Both are reported — *Published 2 contents. 5 were already published.*
+
+Selecting is per page, and the bulk buttons need JavaScript (the bar is hidden
+until there is a selection). Asking for a page past the end — which is where
+deleting a whole page lands you — comes back to the last page that exists.
+
 A search looks inside the data the list shows — the draft when there is one.
 Rich text is searched as the HTML it is stored as, so a query that reads like
 markup can match a tag rather than the words. The id is matched whole, not as a
@@ -259,6 +283,11 @@ A content is in one of three states, shown as its badge:
 `/s/{space}/media` is the space's image library.
 
 ![The media library](img/media.png)
+
+Each card has a checkbox, and **Select all on this page** sits above the grid.
+With a selection, **Delete** appears and asks first, naming how many. A file some
+content still uses is refused one at a time as it is singly — the rest of the
+selection still goes, and the message says how many could not and why.
 
 - **Upload** takes PNG, JPEG, GIF and WebP, several at once, up to 20 MB each.
   The type is decided by reading the file's leading bytes, not by what the browser

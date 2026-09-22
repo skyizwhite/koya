@@ -271,3 +271,46 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
+// Bulk selection: inside a [data-bulk] form, ticking any [data-bulk-item] box
+// shows the [data-bulk-bar], counts the selection into [data-bulk-count], and
+// rewrites each [data-bulk-confirm] button's question with the count. The header
+// box selects and clears the page.
+//
+// The bar is rendered hidden, so without JavaScript there is nothing to press:
+// bulk actions need this file, as the row links and the media picker do. Each
+// button still carries a question of its own in data-confirm, which is what the
+// confirmation shows until the count has been written into it.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("form[data-bulk]").forEach((form) => {
+    // form.elements, not querySelectorAll: a box may sit outside the form and be
+    // tied to it by its form attribute, which is how the media grid keeps its
+    // per-file delete form from being nested inside this one
+    const controls = () => Array.from(form.elements);
+    const boxes = () => controls().filter((el) => el.matches("[data-bulk-item]"));
+    const bar = form.querySelector("[data-bulk-bar]");
+    const all = controls().find((el) => el.matches("[data-bulk-all]"));
+    const count = form.querySelector("[data-bulk-count]");
+    const render = () => {
+      const items = boxes();
+      const n = items.filter((box) => box.checked).length;
+      if (bar) bar.hidden = n === 0;
+      if (count) count.textContent = `${n} selected`;
+      if (all) {
+        all.checked = n > 0 && n === items.length;
+        all.indeterminate = n > 0 && n < items.length;
+      }
+      form.querySelectorAll("[data-bulk-confirm]").forEach((button) => {
+        button.dataset.confirm = button.dataset.bulkConfirm.replace("{n}", n);
+      });
+    };
+    boxes().forEach((box) => box.addEventListener("change", render));
+    if (all) {
+      all.addEventListener("change", () => {
+        boxes().forEach((box) => { box.checked = all.checked; });
+        render();
+      });
+    }
+    render();
+  });
+});

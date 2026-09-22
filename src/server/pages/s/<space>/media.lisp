@@ -9,6 +9,7 @@
                 #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to
                 #:~layout #:~icon #:space-url)
   (:import-from #:koya-server/components/media-grid #:~media-grid #:~media-preview-dialog)
+  (:import-from #:koya-server/lib/forms #:form-values)
   (:export #:@get #:@post #:media-page-url))
 (in-package #:koya-server/pages/s/<space>/media)
 
@@ -23,8 +24,36 @@
 (defun page-link (page search)
   (format nil "?page=~a~@[&q=~a~]" page (and search (plusp (length search)) (quri:url-encode search))))
 
+(defun library-url (space &key search (page 1))
+  "The library as it is being read, so a redirect comes back to the same search."
+  (format nil "~a~a" (media-page-url space) (page-link page search)))
+
+(defparameter +bulk-form+ "media-bulk"
+  "The selection form's id. The boxes live on the cards and join it by their form
+attribute; a card already holds a form of its own, and forms do not nest.")
+
 (defun page-number (params)
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
+
+(defcomp ~selection (&key space search page)
+  "The selection form: the bar and nothing else. The boxes are on the cards and
+join it by their form attribute. Select all is outside the bar, which is hidden
+until something is selected -- a control that appears only once you have used it
+is no control at all."
+  (hsx
+   (div :class "mb-4 flex flex-wrap items-center gap-3"
+     (label :class "flex items-center gap-2 text-sm text-muted"
+       (input :type "checkbox" :data-bulk-all t :form +bulk-form+)
+       "Select all on this page")
+     (form :method "post" :id +bulk-form+ :data-bulk t
+       (input :type "hidden" :name "q" :value (or search ""))
+       (input :type "hidden" :name "page" :value (princ-to-string page))
+       (div :data-bulk-bar t :hidden t :class "flex flex-wrap items-center gap-2 text-sm"
+         (span :data-bulk-count t :class "mr-1 text-muted" "0 selected")
+         (button :type "submit" :name "action" :value "delete-selected" :class "btn btn-danger"
+                 :data-confirm "Delete the selected files? This cannot be undone."
+                 :data-bulk-confirm "Delete the selected files ({n})? This cannot be undone."
+           (~icon :name :delete) "Delete"))))))
 
 (defcomp ~media-page (&key space search page)
   (let* ((total (count-media space :search search))
@@ -49,7 +78,10 @@
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp"
                   :multiple t :class "hidden" :data-submit-on-change t))
          (span :class "text-muted" "PNG, JPEG, GIF or WebP, several at once."))
-       (~media-grid :items items :space space)
+       (if items
+           (hsx (~selection :space space :search search :page page))
+           (hsx (<>)))
+       (~media-grid :items items :space space :bulk-form +bulk-form+)
        (~media-preview-dialog)
        (when (> pages 1)
          (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
@@ -98,4 +130,34 @@
                      (set-flash (if media "Media deleted." "Media not found.") (if media :ok :error)))
                  (api-error (e) (set-flash (api-error-message e) :error)))
                (redirect-to (media-page-url space))))
+            ((equal action "delete-selected")
+             ;; one file at a time: a file some content still uses is refused by
+             ;; the store, and the rest of the selection still goes
+             (let ((ids (form-values params "id"))
+                   (back (library-url space :search (param params "q") :page (page-number params)))
+                   (done 0) (failed 0) (message nil))
+               (cond ((null ids) (set-flash "Nothing was selected." :error))
+                     (t (dolist (id ids)
+                          (handler-case
+                              (let ((media (find-media space id)))
+                                (cond ((null media)
+                                       (incf failed)
+                                       (unless message (setf message "one was gone already")))
+                                      (t (remove-media media) (incf done))))
+                            ;; every condition, not only the store's own: a file
+                            ;; that will not leave the disk must not take the
+                            ;; whole selection down with it, half of it deleted
+                            ;; and nothing said
+                            (api-error (e)
+                              (incf failed)
+                              (unless message (setf message (api-error-message e))))
+                            (error (e)
+                              (incf failed)
+                              (unless message (setf message (princ-to-string e))))))
+                        (set-flash (if (zerop failed)
+                                       (format nil "Deleted ~a file~:p." done)
+                                       (format nil "Deleted ~a of ~a; ~a could not be~@[: ~a~]"
+                                               done (+ done failed) failed message))
+                                   (if (plusp failed) :error :ok))))
+               (redirect-to back)))
             (t (set-response-status 400) (hsx (~layout :space space (p "Unknown action"))))))))

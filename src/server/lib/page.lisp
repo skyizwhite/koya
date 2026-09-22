@@ -115,6 +115,7 @@ See ORIGIN-ALLOWED-P."
   (let ((v (cdr (assoc name params :test #'equal))))
     (if (and (stringp v) (string= v "")) nil v)))
 
+
 (defun space-url (space) (format nil "/s/~a" space))
 (defun model-url (space model) (format nil "/s/~a/m/~a" space model))
 (defun content-url (space model id) (format nil "/s/~a/m/~a/~a" space model id))

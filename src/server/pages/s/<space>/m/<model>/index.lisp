@@ -12,13 +12,19 @@
                 #:list-contents #:count-contents #:find-object-content
                 #:content-id #:content-status #:content-data)
   (:import-from #:koya-server/lib/query #:make-query)
-  (:import-from #:koya-server/lib/forms #:number->string)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:redirect-to #:param #:short-time #:content-label
+                #:with-owner #:with-owner-post #:set-title #:redirect-to #:set-flash
+                #:param #:short-time #:content-label
                 #:~layout #:~status-badge #:~empty-state #:~icon #:content-url #:model-url)
+  (:import-from #:koya-server/lib/content-service
+                #:publish #:unpublish #:destroy)
+  (:import-from #:koya-server/lib/forms #:number->string #:form-values)
+  (:import-from #:koya-server/lib/http #:api-error #:api-error-message)
+  (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
+  (:import-from #:koya-server/db/contents #:find-content #:content-published #:content-draft)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
-  (:export #:@get))
+  (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
 
 (defparameter +page-size+ 100
@@ -218,6 +224,20 @@ the one already sorted turns it around."
              (hsx (span :class "shrink-0 text-accent" (if (eq sort-direction :asc) "↑" "↓")))
              (hsx (<>))))))))
 
+(defcomp ~bulk-bar ()
+  "What can be done to a selection. Hidden until there is one (koya-editor.js),
+and the count it shows is written into the delete question as well."
+  (hsx
+   (div :data-bulk-bar t :hidden t
+        :class "mb-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel px-4 py-2 text-sm"
+     (span :data-bulk-count t :class "mr-2 text-muted" "0 selected")
+     (button :type "submit" :name "action" :value "publish" :class "btn" (~icon :name :publish) "Publish")
+     (button :type "submit" :name "action" :value "unpublish" :class "btn" (~icon :name :unpublish) "Unpublish")
+     (button :type "submit" :name "action" :value "delete" :class "btn btn-danger"
+             :data-confirm "Delete the selected contents? This cannot be undone."
+             :data-bulk-confirm "Delete the selected contents ({n})? This cannot be undone."
+       (~icon :name :delete) "Delete"))))
+
 (defun @get (params)
   (with-owner
     (let* ((space (path-param params :space))
@@ -250,6 +270,10 @@ the one already sorted turns it around."
                         (sort-key (and sort-name (if (eq sort-direction :desc) (format nil "-~a" sort-name) sort-name)))
                         (link (lambda (page) (list-url space model-name :search-text search-text :status status
                                                                        :sort-key sort-key :page page))))
+                   (if (> page pages)
+                       ;; past the end: deleting a whole page lands here, and so
+                       ;; does a link kept from when there was more to read
+                       (redirect-to (funcall link pages) 302)
                    (hsx
                     (~layout :space space :crumbs (list (cons model-name nil))
                       (div :class "mb-6 flex items-center justify-between"
@@ -269,14 +293,22 @@ the one already sorted turns it around."
                              (~icon :name :plus) "New content")))
                       (~filters :space space :model model-name :search-text search-text :status status :sort-key sort-key)
                       (if (null contents)
-                          (hsx (~empty-state (cond ((> page 1) "Nothing on this page.")
-                                                   ((not (blank-p search-text)) "Nothing matches this search.")
+                          (hsx (~empty-state (cond ((not (blank-p search-text)) "Nothing matches this search.")
                                                    ((not (blank-p status)) "No contents with this status.")
                                                    (t "No contents yet."))))
-                          (hsx (div :class "overflow-x-auto rounded-md border border-line bg-panel"
+                          (hsx (form :method "post" :action (model-url space model-name) :data-bulk t
+                                 (input :type "hidden" :name "q" :value (or search-text ""))
+                                 (input :type "hidden" :name "status" :value (or status ""))
+                                 (input :type "hidden" :name "sort" :value (or sort-key ""))
+                                 (input :type "hidden" :name "page" :value (princ-to-string page))
+                                 (~bulk-bar)
+                                 (div :class "overflow-x-auto rounded-md border border-line bg-panel"
                                  (table :class "w-full text-sm"
                                    (thead (tr :class "border-b border-line text-left text-muted"
-                                            (th :class "py-2 pl-4 pr-4 font-medium whitespace-nowrap" "status")
+                                            (th :class "py-2 pl-4 pr-2"
+                                              (input :type "checkbox" :data-bulk-all t
+                                                     :aria-label "Select every content on this page"))
+                                            (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
                                             (loop :for field :in fields :collect
                                               (hsx (~column-header :space space :model model-name :field field
                                                                    :search-text search-text :status status
@@ -288,11 +320,16 @@ the one already sorted turns it around."
                                        (hsx (tr :class (clsx "group cursor-pointer transition hover:bg-base" +row-height+)
                                                 :data-href (content-url space model-name (content-id content))
                                                 :tabindex "0" :role "link"
-                                              (td :class "py-2 pl-4 pr-4 whitespace-nowrap"
+                                              ;; the row opens the editor, but not from inside the box
+                                              (td :class "py-2 pl-4 pr-2"
+                                                (input :type "checkbox" :name "id" :data-bulk-item t
+                                                       :value (content-id content)
+                                                       :aria-label (format nil "Select ~a" (content-label content model))))
+                                              (td :class "py-2 pr-4 whitespace-nowrap"
                                                 (~status-badge :status (content-status content)))
                                               (loop :for field :in fields :collect
                                                 (hsx (~preview-cell :field field :content content :ref-labels ref-labels)))
-                                              (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent" "›")))))))))
+                                              (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent" "›"))))))))))
                       (when (> pages 1)
                         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
                                (if (> page 1)
@@ -301,4 +338,92 @@ the one already sorted turns it around."
                                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
                                (if (< page pages)
                                    (hsx (a :href (funcall link (1+ page)) :class "btn" "Next" (~icon :name :next)))
-                                   (hsx (<>))))))))))))))))))
+                                   (hsx (<>)))))))))))))))))))
+
+;;; Bulk actions. Each content goes through content-service one at a time, so the
+;;; validation, the system timestamps and the webhooks are the same as for a
+;;; single one, and each is its own transaction: a content that cannot be
+;;; published -- a field made required after its draft was written -- leaves the
+;;; rest to go through and is counted.
+
+(defun bulk-action-function (action)
+  (cond ((equal action "publish") #'publish)
+        ((equal action "unpublish") #'unpublish)
+        ((equal action "delete") #'destroy)))
+
+(defun nothing-to-do-p (action content)
+  "True when ACTION would change nothing about CONTENT. A selection is made with
+one tick of the header box, so it holds whatever the page held: publishing what
+is already published would give every one of them a new revisedAt and a webhook
+for a change that did not happen, and unpublishing what is already a draft would
+issue it a new draft key and break a preview link someone is holding."
+  (and content
+       (cond ((equal action "publish") (and (content-published content) (null (content-draft content))))
+             ((equal action "unpublish") (null (content-published content)))
+             (t nil))))
+
+(defun failure-message (condition)
+  "What to tell the owner about one that did not go through. A validation failure
+is the field that stopped it, not the condition's own report."
+  (typecase condition
+    (validation-error
+     (format nil "~{~a~^, ~}"
+             (mapcar (lambda (e) (format nil "~a ~a" (getf e :field) (getf e :message)))
+                     (validation-error-errors condition))))
+    (api-error (api-error-message condition))
+    (t (princ-to-string condition))))
+
+(defun apply-to-each (space model ids action)
+  "Do ACTION to each of IDS. Returns (values DONE SKIPPED FAILED FIRST-MESSAGE)."
+  (let ((function (bulk-action-function action))
+        (model-name (model-name model))
+        (done 0)
+        (skipped 0)
+        (failed 0)
+        (message nil))
+    (dolist (id ids (values done skipped failed message))
+      (handler-case
+          (if (nothing-to-do-p action (find-content space model-name id))
+              (incf skipped)
+              (progn (funcall function space model id)
+                     (incf done)))
+        (error (e) (incf failed) (unless message (setf message (failure-message e))))))))
+
+(defun bulk-flash (action done skipped failed message)
+  (let ((verb (cond ((equal action "publish") "Published")
+                    ((equal action "unpublish") "Unpublished")
+                    (t "Deleted")))
+        (already (if (equal action "publish") "already published" "not published")))
+    (format nil "~a ~a content~:p.~@[ ~a.~]~@[ ~a.~]"
+            verb done
+            (when (plusp skipped)
+              (format nil "~a ~:[was~;were~] ~a" skipped (> skipped 1) already))
+            (when (plusp failed)
+              (format nil "~a could not be~@[: ~a~]" failed message)))))
+
+(defun @post (params)
+  (with-owner-post
+    (let* ((space (path-param params :space))
+           (model-name (path-param params :model))
+           (model (and (find-space space) (find-model space model-name)))
+           (action (param params "action"))
+           (ids (form-values params "id"))
+           (back (list-url space model-name
+                           :search-text (param params "q")
+                           :status (param params "status")
+                           :sort-key (param params "sort")
+                           :page (page-number params))))
+      (cond ((null model)
+             (set-response-status 404)
+             (hsx (~layout :space space (h1 :class "text-xl font-bold" "Model not found"))))
+            ((null (bulk-action-function action))
+             (set-response-status 400)
+             (hsx (~layout :space space (p "Unknown action"))))
+            ((null ids)
+             (set-flash "Nothing was selected." :error)
+             (redirect-to back))
+            (t
+             (multiple-value-bind (done skipped failed message) (apply-to-each space model ids action)
+               (set-flash (bulk-flash action done skipped failed message)
+                          (if (plusp failed) :error :ok)))
+             (redirect-to back))))))
