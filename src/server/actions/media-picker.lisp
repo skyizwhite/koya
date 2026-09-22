@@ -24,10 +24,12 @@
   (hsx
    (div :id "media-picker-body" :class "space-y-4"
      (form :hx-get (media-picker :space space) :hx-target "#media-picker-body" :hx-swap "outerHTML"
-           :hx-trigger "input changed delay:300ms from:find input, submit" :class "flex gap-2"
+           :hx-trigger "input changed delay:300ms from:'find input', submit" :class "flex gap-2"
        (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
      (form :hx-post (media-picker-upload :space space) :hx-target "#media-picker-body" :hx-swap "outerHTML"
-           :hx-encoding "multipart/form-data" :hx-trigger "change from:find input[type=file]"
+           :hx-encoding "multipart/form-data" :hx-trigger "change from:'find input[type=file]'"
+           ;; htmx aborts a request after 60s by default; a 20 MB upload may need longer
+           :hx-config "timeout:0"
            :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
        (label :class "btn" (~icon :name :upload) "Upload…"
          (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
@@ -66,5 +68,6 @@
      (div :class "flex items-center justify-between border-b border-line px-4 py-3"
        (h2 :class "font-semibold" "Media")
        (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close" (~icon :name :close)))
-     (div :class "max-h-[70vh] overflow-y-auto p-4"
+     ;; loaded into as a whole: an error fragment may replace #media-picker-body
+     (div :id "media-picker-content" :class "max-h-[70vh] overflow-y-auto p-4"
        (div :id "media-picker-body" :class "text-sm text-muted" "Loading…")))))

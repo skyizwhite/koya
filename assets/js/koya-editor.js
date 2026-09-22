@@ -128,8 +128,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const picker = {
     open(t) {
       target = t;
-      const body = dialog.querySelector("#media-picker-body");
-      if (body && window.htmx) htmx.ajax("GET", dialog.dataset.pickerUrl, { target: body, swap: "outerHTML" });
+      const content = dialog.querySelector("#media-picker-content");
+      if (content && window.htmx) htmx.ajax("GET", dialog.dataset.pickerUrl, { target: content, swap: "innerHTML" });
       dialog.showModal();
     },
     close() {

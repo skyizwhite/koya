@@ -87,9 +87,13 @@
       (let ((length (getf env :content-length)))
         (if (and (integerp length) (> length +max-body-bytes+))
             ;; before anything parses the body: lack reads a multipart body whole
-            (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")
-                  (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"Request body is limited to ~a MB\"}}"
-                                (floor +max-body-bytes+ (* 1024 1024)))))
+            (let ((message (format nil "Request body is limited to ~a MB" (floor +max-body-bytes+ (* 1024 1024)))))
+              ;; htmx swaps an error response in, so it gets a fragment rather than JSON
+              (if (gethash "hx-request" (getf env :headers))
+                  (list 413 (list :content-type "text/html; charset=utf-8" :cache-control "no-store")
+                        (list (format nil "<p class=\"text-sm text-danger\">~a</p>" message)))
+                  (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")
+                        (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message)))))
             (funcall app env)))))
   "Rejects oversized bodies by Content-Length, outermost, so no parser allocates for them.")
 

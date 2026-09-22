@@ -501,7 +501,10 @@ admin API, which the session reaches as well as a management key does."
         (ok (= status 200))
         (ok (search "data-pick-id=" body))
         (ok (search "data-pick-url=\"/media/website/" body))
-        (ok (not (search "<html" body)) "a fragment, not a page"))
+        (ok (not (search "<html" body)) "a fragment, not a page")
+        ;; htmx 4 reads an unquoted from:find input as from:find plus a modifier
+        (ok (search "from:'find input'" body) "trigger selectors are quoted")
+        (ok (search "from:'find input[type=file]'" body)))
       (let ((*cookie* nil))
         (multiple-value-bind (status) (request-url :get (media-picker :space "website"))
           (ok (= status 403) "the picker needs the owner session"))))
@@ -839,16 +842,22 @@ admin API, which the session reaches as well as a management key does."
       (ok (= status 303) "logs in again once the lock is cleared"))))
 
 (deftest body-size-limit
-  (let ((env (list :request-method :post :script-name "" :path-info "/login" :query-string ""
-                   :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
-                   :request-uri "/login" :url-scheme "http" :remote-addr "127.0.0.1"
-                   :headers (alist-hash-table '(("host" . "localhost:3000")) :test 'equal)
-                   :content-type "multipart/form-data; boundary=x" :content-length (* 3000 1024 1024)
-                   :raw-body (make-in-memory-input-stream (string-to-octets "")))))
-    (destructuring-bind (status headers body) (funcall *app* env)
+  (flet ((huge-post (headers)
+           (funcall *app* (list :request-method :post :script-name "" :path-info "/login" :query-string ""
+                                :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                                :request-uri "/login" :url-scheme "http" :remote-addr "127.0.0.1"
+                                :headers (alist-hash-table (acons "host" "localhost:3000" headers) :test 'equal)
+                                :content-type "multipart/form-data; boundary=x" :content-length (* 3000 1024 1024)
+                                :raw-body (make-in-memory-input-stream (string-to-octets ""))))))
+    (destructuring-bind (status headers body) (huge-post nil)
       (declare (ignore headers))
       (ok (= status 413) "a huge Content-Length is refused before the body is read")
-      (ok (search "too_large" (first body))))))
+      (ok (search "too_large" (first body))))
+    (destructuring-bind (status headers body) (huge-post '(("hx-request" . "true")))
+      (ok (= status 413))
+      (ok (search "text/html" (getf headers :content-type)) "htmx swaps it in, so it is HTML")
+      (ok (search "limited to" (first body)))
+      (ok (not (search "too_large" (first body)))))))
 
 (deftest list-columns-are-bounded
   (multiple-value-bind (status body headers)
