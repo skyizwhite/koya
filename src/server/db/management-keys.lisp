@@ -11,6 +11,7 @@
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
   (:export #:create-management-key
+           #:management-key-label
            #:list-management-keys
            #:delete-management-key
            #:space-for-management-key))
@@ -43,6 +44,13 @@
 
 (defun delete-management-key (space id)
   (exec "DELETE FROM management_keys WHERE space = ? AND id = ?" space id))
+
+(defun management-key-label (key)
+  "The label of the management key KEY, or NIL when it is not one. An unlabelled
+key answers with the empty string it was made with."
+  (and (stringp key)
+       (let ((row (fetch-one "SELECT label FROM management_keys WHERE key_hash = ?" (hash-api-key key))))
+         (and row (col row "label")))))
 
 (defun space-for-management-key (key)
   "The space KEY manages, or NIL when it is not a management key."

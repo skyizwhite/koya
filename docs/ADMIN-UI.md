@@ -14,6 +14,8 @@ a deploy only ever changes the models of a space that already exists.
 - [Logging in](#logging-in)
 - [Spaces](#spaces)
 - [A space](#a-space)
+- [Schema deploys](#schema-deploys)
+- [The webhook delivery log](#the-webhook-delivery-log)
 - [Contents of a model](#contents-of-a-model)
 - [The editor](#the-editor)
 - [Drafts, publishing and previews](#drafts-publishing-and-previews)
@@ -71,6 +73,35 @@ Each row opens the **delivery log** filtered to that webhook; *View log →*
 beside the heading opens it unfiltered.
 
 ![A space: its models and its webhooks](img/models.png)
+
+## Schema deploys
+
+`/s/{space}/deploys` is what each deploy of this space's schema changed, newest
+first, 20 to a page. A deploy comes from a project's repository through the
+client, so this is where *when did that field go* has an answer without reading
+the source's history. **Schema Deploys** on the space page opens it.
+
+Each entry says how many changes it carried, whether any of them was
+destructive, who deployed it — `(management key: deploys from CI)`, or `owner`
+for a session — and when. Under that is the diff, one line per change — the same line `(koya:plan)` prints
+before applying it, so what is read here and what was read then are the same
+words:
+
+| Line | Meaning |
+|---|---|
+| `+ blog.title (text)` | something new, in green |
+| `- blog.summary (text)` | something gone, in red |
+| `~ blog.title renamed from heading` | a rename, in the accent colour |
+| `~ blog options changed (publicUrl none -> "https://…")` | a change, with what moved |
+| `! ~ blog.title options tightened (maxLength 100 -> 50)` | a change that can reject content already stored |
+
+A `!` in front marks a change that can hide or invalidate stored content — the
+ones a deploy refuses without `force` — and the line is red whatever its marker.
+
+Only what changed is kept, not the schema as it was: this log says *what
+happened*, and the schema itself is read from the space page or with
+`(koya:pull)`. A deploy that changed nothing leaves no entry, and only the newest
+100 of a space survive.
 
 ## The webhook delivery log
 

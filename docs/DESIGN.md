@@ -132,6 +132,9 @@ koya/
 - 差分計算は本体側(`POST /admin/api/schema/{space}/plan`)で行い、クライアントは表示するだけ。
 - deploy は **既存の space 宛てにしか通らない**(無ければ `404 not_found`)。`KOYA_SPACE` の打ち間違いで
   空の space が増えることはない。
+- 適用した deploy は `schema_deploys` に1行残し、管理画面 `/s/{space}/deploys` で読む。残すのは
+  **差分(変更の一覧)と誰が流したか**だけで、スキーマ文書そのものは持たない。何も変えなかった
+  deploy は記録しない。
 - JSON 保存(4 章)のため field 削除でも `contents` のデータは消えない。
 - **リネーム**: model / field に `:was` を書くと、差分は削除+追加ではなく `rename_model` /
   `rename_field` になり、deploy がスキーマ書き込みと同じトランザクションで `contents` の
@@ -160,6 +163,7 @@ koya/
 | `management_keys` | 管理 API キー(hash 保存)。表は分けたまま(14 章) |
 | `media` | アップロードされたファイルのメタデータ |
 | `webhook_deliveries` | webhook 送信ログ。`/s/{space}/webhooks` で見る |
+| `schema_deploys` | deploy が何を変えたかの記録。`/s/{space}/deploys` で見る |
 | `settings` | インスタンス設定(二段階認証の鍵など) |
 | `sessions` | 管理画面のログインセッション |
 
@@ -526,3 +530,4 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-22 | DB スキーマは宣言的定義 + 自動差分(Atlas 方式)にはせず、migrations を正のまま `src/server/db/schema.sql` を生成物として持つ | 現在形が1ファイルで読めるという利点は生成物で足りる。SQLite は `ALTER TABLE` が貧弱でテーブル再構築が必要な上、差分からは「列を足す」か「捨てて作り直す」かの意図が復元できない(v6 の `management_keys` がそれ)。他人の本番インスタンスで起動時に自動 DDL を当てるのも避けたい |
 | 2026-09-22 | model / field のリネームは `:was` で宣言する。deploy が `contents` の model 名と JSON のキーを同じトランザクションで書き換え、`:was` 自体は保存しない | 名前で突き合わせる差分ではリネームが削除+追加になり、model なら contents ごと消え(FK の ON DELETE CASCADE)、field なら値が旧キーに取り残されて編集画面から見えず次の保存で落ちる。宣言があれば「同じもの」と分かるので、破壊的変更にせずに済む |
 | 2026-09-23 | 管理画面の一覧に検索・ステータス絞り込み・並べ替えを追加し、状態は全てクエリ文字列に置く。検索対象はテキスト系フィールドと id で、**id だけは完全一致** | 配信 API の `build-where` / `build-order-by` をそのまま使い、問い合わせ経路を二重に持たない。ULID は同時期の生成分が長い接頭辞を共有するため、id を部分一致にすると短い語で全件ヒットして検索が壊れる。id は配信 API のレスポンスやログから貼って引くためのもの |
+| 2026-09-23 | deploy の差分を `schema_deploys` に残し、`/s/{space}/deploys` で git のように色付きで読む。保存するのは差分と実行者だけで、スキーマ文書は持たない | 「いつあのフィールドが消えたか」をソースの履歴を辿らずに答えられるようにする。文書まで持てば巻き戻しに届くが、それは別の機能で、持たない分だけ小さい。表示は `plan` が REPL に出す行そのものを色分けするので、適用前に読むものと後から読むものが同じ言葉になる |

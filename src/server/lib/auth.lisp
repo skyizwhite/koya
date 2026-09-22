@@ -7,7 +7,7 @@
   (:import-from #:koya-server/db/api-keys
                 #:space-for-api-key)
   (:import-from #:koya-server/db/management-keys
-                #:space-for-management-key)
+                #:space-for-management-key #:management-key-label)
   (:import-from #:ironclad
                 #:constant-time-equal)
   (:import-from #:babel
@@ -22,6 +22,7 @@
            #:note-login-failure
            #:clear-login-failures
            #:calling-space
+           #:calling-identity
            #:*admin-auth-middleware*
            #:require-api-key
            #:session-login
@@ -116,6 +117,22 @@ one is refused rather than guessed at."
   "The space of the management key making this request, or NIL for the owner's
 session, which reaches every space."
   (space-for-management-key (bearer-token (request-env ningle:*request*))))
+
+(defun calling-identity ()
+  "Who is making this request, as something to store: \"owner\", or \"key:<label>\"
+for a management key, whose label may be empty. The words a page puts around that
+are the page's business -- a log that stores them cannot be reworded afterwards,
+because the rows already written keep what they were given.
+
+The owner is looked for first, as *ADMIN-AUTH-MIDDLEWARE* does: a request that
+carries both a session and a key is authorised as the owner, and a log that named
+the key would name something that had no say in it."
+  (let ((env (request-env ningle:*request*)))
+    (if (session-env-owner-p env)
+        "owner"
+        (let ((label (management-key-label (bearer-token env))))
+          ;; nothing without one or the other gets past the middleware
+          (if label (format nil "key:~a" label) "unknown")))))
 
 (defun cross-origin-write-p (env)
   "A state-changing request whose Origin/Referer does not match this server. The

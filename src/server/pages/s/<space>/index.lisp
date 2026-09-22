@@ -10,6 +10,7 @@
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:~layout #:~empty-state #:~icon #:~model-icon #:model-url #:space-url)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
+  (:import-from #:koya-server/pages/s/<space>/deploys #:deploys-url)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/index)
 
@@ -27,6 +28,7 @@
                 (div :class "mb-6 flex items-center justify-between"
                   (h1 :class "text-2xl font-bold" name)
                   (div :class "flex gap-2"
+                    (a :href (deploys-url name) :class "btn" (~icon :name :history) "Schema Deploys")
                     (a :href (format nil "~a/media" (space-url name)) :class "btn" (~icon :name :media) "Media")
                     (a :href (format nil "~a/keys" (space-url name)) :class "btn" (~icon :name :key) "Keys")))
                 (if (null (schema-models schema))

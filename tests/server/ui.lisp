@@ -3,7 +3,7 @@
   (:import-from #:koya-server/app #:*app*)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db #:exec #:fetch-one #:col)
   (:import-from #:koya-server/db/migrations #:migrate)
-  (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:find-space)
+  (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:find-space #:delete-space)
   (:import-from #:koya-server/db/api-keys #:create-api-key #:list-api-keys)
   (:import-from #:koya-server/db/management-keys #:create-management-key #:list-management-keys)
   (:import-from #:koya-server/db/contents #:list-contents #:content-status #:content-published #:content-draft #:content-id)
@@ -21,7 +21,9 @@
   (:import-from #:koya/core/schema #:make-webhook)
   (:import-from #:koya-server/lib/forms #:slugify #:normalize-richtext)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya/core/json #:jget)
+  (:import-from #:koya/core/json #:jget #:to-json)
+  (:import-from #:koya/core/schema #:schema->jobject)
+  (:import-from #:koya-server/db/schema-deploys #:list-deploys #:deploy-by)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
@@ -61,9 +63,10 @@
 
 (teardown (disconnect-db))
 
-(defun request (method path &key form multipart headers query)
+(defun request (method path &key form multipart json headers query)
   "Returns (values status body-string headers-plist). FORM is urlencoded; MULTIPART
-is a list of parts for MULTIPART-BODY."
+is a list of parts for MULTIPART-BODY; JSON is a string sent as the body, for the
+admin API, which the session reaches as well as a management key does."
   (let* ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
                     :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                     :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
@@ -79,6 +82,11 @@ is a list of parts for MULTIPART-BODY."
     (when multipart
       (multiple-value-bind (octets content-type) (multipart-body multipart)
         (setf (getf env :content-type) content-type
+              (getf env :content-length) (length octets)
+              (getf env :raw-body) (make-in-memory-input-stream octets))))
+    (when json
+      (let ((octets (string-to-octets json :encoding :utf-8)))
+        (setf (getf env :content-type) "application/json"
               (getf env :content-length) (length octets)
               (getf env :raw-body) (make-in-memory-input-stream octets))))
     (destructuring-bind (status response-headers body) (funcall *app* env)
@@ -905,3 +913,89 @@ is a list of parts for MULTIPART-BODY."
     (multiple-value-bind (status body) (request :get "/s/website/m/about/new")
       (ok (= status 200))
       (ng (search "/s/website/webhooks" body)))))
+
+(deftest deploys-page
+  (setf *cookie* nil)
+  (request :post "/login" :form `(("secret" . ,*secret*)))
+  (create-space "deployed")
+  (save-schema "deployed"
+               (make-schema :models (list (make-model "post" :list (list (make-field :title :text)))))
+               :by "key:ci")
+  (save-schema "deployed"
+               (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t))))))
+  (unwind-protect
+       (progn
+         (multiple-value-bind (status body) (request :get "/s/deployed/deploys")
+           (ok (= status 200))
+           (ok (search "Schema Deploys" body))
+           (ok (search "2 deploys changed this space&#x27;s schema." body))
+           (testing "each change is the line plan prints, coloured by what it does"
+             (ok (search "<div class=\"text-ok\">+ post.title (text)" body) "something new is green")
+             (ok (search "<div class=\"text-ok\">+ post (list)" body))
+             (ok (search "<div class=\"text-danger\">! ~ post.title options tightened (required none -&gt; true)" body)
+                 "and a change that can reject stored content is red, and says which option moved"))
+           (testing "and each deploy says how much it changed, by whom, and whether it was destructive"
+             (ok (search "2 changes" body))
+             (ok (search "1 change<" body))
+             (ok (search "(management key: ci)" body) "a stored key:ci is read out in words")
+             (ok (search "destructive" body))))
+         (testing "a deploy with no key behind it was the owner's"
+           (save-schema "deployed"
+                        (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t)
+                                                                                  (make-field :body :richtext)))))
+                        :by "owner")
+           (multiple-value-bind (status body) (request :get "/s/deployed/deploys")
+             (ok (= status 200))
+             (ok (search "· owner" body) "and is named as such, with nothing around it")
+             (ok (search "text-danger\">destructive</span></span>" body)
+                 "while a deploy that named nobody ends after the badge, with no separator left hanging")))
+         (multiple-value-bind (status body) (request :get "/s/deployed")
+           (ok (= status 200))
+           (ok (search "/s/deployed/deploys" body) "the space page links to it")
+           (ok (search "Schema Deploys" body)))
+         (multiple-value-bind (status) (request :get "/s/nope/deploys")
+           (ok (= status 404))))
+    (delete-space "deployed"))
+  (testing "a space that has never been deployed to says so"
+    (create-space "quiet")
+    (unwind-protect
+         (multiple-value-bind (status body) (request :get "/s/quiet/deploys")
+           (ok (= status 200))
+           (ok (search "Nothing has been deployed yet." body)))
+      (delete-space "quiet"))))
+
+(deftest a-deploy-names-whoever-was-authorised
+  ;; the auth middleware takes the owner's session first and only then a
+  ;; management key, so a request carrying both is the owner's; the log has to
+  ;; say what the decision said
+  (setf *cookie* nil)
+  (request :post "/login" :form `(("secret" . ,*secret*)))
+  (create-space "witnessed")
+  (let ((key (create-management-key "witnessed" :label "ci")))
+    (unwind-protect
+         (let ((body (to-json (schema->jobject
+                               (make-schema :models (list (make-model "post" :list
+                                                                     (list (make-field :title :text)))))))))
+           (multiple-value-bind (status)
+               (request :put "/admin/api/schema/witnessed" :json body
+                        :headers `(("origin" . "http://localhost:3000")
+                                   ("authorization" . ,(format nil "Bearer ~a" key))))
+             (ok (= status 200)))
+           (ok (string= (deploy-by (first (list-deploys "witnessed"))) "owner")
+               "a session and a key together is the owner deploying, not the key"))
+      (delete-space "witnessed")))
+  (testing "and a key on its own is named by its label"
+    (create-space "by-key")
+    (let ((key (create-management-key "by-key" :label "ci")))
+      (unwind-protect
+           (let ((body (to-json (schema->jobject
+                                 (make-schema :models (list (make-model "post" :list
+                                                                       (list (make-field :title :text)))))))))
+             (setf *cookie* nil)
+             (multiple-value-bind (status)
+                 (request :put "/admin/api/schema/by-key" :json body
+                          :headers `(("origin" . "http://localhost:3000")
+                                     ("authorization" . ,(format nil "Bearer ~a" key))))
+               (ok (= status 200)))
+             (ok (string= (deploy-by (first (list-deploys "by-key"))) "key:ci")))
+        (delete-space "by-key")))))

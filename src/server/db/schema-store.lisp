@@ -11,6 +11,8 @@
                 #:parse-json #:to-json)
   (:import-from #:koya/core/diff
                 #:diff-schemas)
+  (:import-from #:koya-server/db/schema-deploys
+                #:record-deploy)
   (:import-from #:koya/core/time
                 #:now-iso)
   (:import-from #:ironclad
@@ -95,8 +97,8 @@ never changes. Returns the name, or signals on a bad or taken one."
     name))
 
 (defun delete-space (name)
-  "Delete a space with everything in it: models, contents, media rows, keys and
-the webhook log. The media files themselves are removed by the caller."
+  "Delete a space with everything in it: models, contents, media rows, keys, the
+webhook log and the deploy log. The media files themselves are removed by the caller."
   (exec "DELETE FROM spaces WHERE name = ?" name))
 
 ;;; Renames. A model or field declared with :WAS is matched by the diff, and the
@@ -144,15 +146,19 @@ so a field rename that follows one already names the model by its new name."
       (:rename-field (rename-content-field space-name (getf change :model)
                                            (getf change :from) (getf change :field))))))
 
-(defun save-schema (space-name schema)
+(defun save-schema (space-name schema &key (by ""))
   "Replace the schema of SPACE-NAME with SCHEMA. Models that disappear are deleted
 (their contents go with them); models and fields declared with :WAS are renamed,
-content included. Returns the list of changes applied."
+content included. BY names whoever is deploying, for the log. Returns the list of
+changes applied."
   (check-schema schema)
   (with-db-transaction
     (let* ((old (load-schema space-name))
            (changes (diff-schemas old schema)))
       (apply-renames space-name changes)
+      ;; in the same transaction as the change it describes: a deploy that is
+      ;; rolled back has not happened, and must not be in the log saying it did
+      (record-deploy space-name changes :by by)
       (exec "UPDATE spaces SET webhooks = ? WHERE name = ?"
             (to-json (map 'vector #'webhook->jobject (schema-webhooks schema))) space-name)
       (let ((keep (mapcar #'model-name (schema-models schema))))

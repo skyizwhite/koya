@@ -9,6 +9,10 @@
   (:import-from #:koya-server/db/schema-store
                 #:load-schema #:save-schema #:find-model
                 #:list-spaces #:create-space #:delete-space #:find-space)
+  (:import-from #:koya-server/db/schema-deploys
+                #:list-deploys #:count-deploys
+                #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by
+                #:change-description #:change-op)
   (:import-from #:koya/core/schema
                 #:make-field #:make-model #:make-schema #:make-webhook
                 #:schema-webhooks #:schema-models #:model-name #:model-field
@@ -44,7 +48,7 @@
                                                             (make-field :event-at :datetime))))))
 
 (deftest migrations
-  (ok (= (current-version) 6))
+  (ok (= (current-version) 7))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -150,3 +154,36 @@
                                                                           (make-field :subtitle :text :was :lede))
                                                                     :was 'post)))))
           "deploying the same source again changes nothing"))))
+
+(deftest a-deploy-leaves-a-record
+  (create-space "logged")
+  (save-schema "logged"
+               (make-schema :models (list (make-model "post" :list (list (make-field :title :text)))))
+               :by "key:ci")
+  (save-schema "logged"
+               (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t))))))
+  (let ((deploys (list-deploys "logged")))
+    (ok (= (count-deploys "logged") 2))
+    (ok (= (length deploys) 2))
+    ;; found by what they carry, not by where they sit: two rows written in the
+    ;; same millisecond carry ULIDs that do not say which came first, and a test
+    ;; writes both faster than a person could deploy twice
+    (let ((first-deploy (find 2 deploys :key #'deploy-change-count))
+          (second-deploy (find 1 deploys :key #'deploy-change-count)))
+      (ok (= (deploy-change-count first-deploy) 2) "a model and the field in it")
+      (ok (string= (deploy-by first-deploy) "key:ci")
+          "stored as what the server knew, not as the words a page shows")
+      (ng (deploy-destructive first-deploy))
+      (ok (equal (mapcar #'change-op (deploy-changes first-deploy)) '("add_model" "add_field")))
+      (ok (deploy-destructive second-deploy) "requiring a field can reject what is stored")
+      (ok (string= (deploy-by second-deploy) "") "a deploy with nobody named says so by saying nothing")
+      (ok (search "options tightened (required none -> true)"
+                  (change-description (first (deploy-changes second-deploy))))
+          "the log says which option moved and where to, not only that one did")))
+  (testing "a deploy that changed nothing is not an event"
+    (save-schema "logged"
+                 (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t))))))
+    (ok (= (count-deploys "logged") 2)))
+  (testing "the log goes with the space"
+    (delete-space "logged")
+    (ok (= (count-deploys "logged") 0))))

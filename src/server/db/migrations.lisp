@@ -100,7 +100,17 @@
         space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,
         key_hash TEXT NOT NULL UNIQUE,
         label TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL)")))
+        created_at TEXT NOT NULL)")
+    (7
+     "CREATE TABLE schema_deploys (
+        id TEXT PRIMARY KEY,
+        space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,
+        changes TEXT NOT NULL,
+        change_count INTEGER NOT NULL,
+        destructive INTEGER NOT NULL,
+        deployed_by TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL)"
+     "CREATE INDEX schema_deploys_by_space ON schema_deploys (space, id DESC)")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

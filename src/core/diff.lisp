@@ -7,6 +7,8 @@
                 #:forget-rename)
   (:import-from #:koya/core/json
                 #:jobject)
+  (:import-from #:koya/core/case
+                #:camel-key)
   (:export #:diff-schemas
            #:destructive-change-p
            #:destructive-changes-p
@@ -143,6 +145,39 @@ of one space; OLD may be NIL, which is the same as an empty space."
                         :from (and old (schema-webhooks old)) :to (schema-webhooks new))))
           (diff-models (and old (schema-models old)) (schema-models new))))
 
+;;; What an options change did, named rather than summarised: "options tightened"
+;;; says a deploy may reject content, but not which rule it is. Options are named
+;;; as the schema document names them.
+
+(defparameter +absent+ '%missing)
+
+(defun option-value (value)
+  (cond ((eq value +absent+) "none")
+        ((eq value t) "true")
+        ((null value) "false")
+        ;; quoted, because an option's values may have spaces in them and a list
+        ;; run together reads as a different number of values than it is
+        ((and (consp value) (every #'stringp value)) (format nil "~{~s~^, ~}" value))
+        (t (princ-to-string value))))
+
+(defun option-differences (from to)
+  "Each option that differs, as \"name old -> new\", in a stable order."
+  (let ((keys (sort (remove-duplicates
+                     (append (loop :for (k nil) :on from :by #'cddr :collect k)
+                             (loop :for (k nil) :on to :by #'cddr :collect k)))
+                    #'string< :key #'camel-key)))
+    (loop :for key :in keys
+          :for was := (getf from key +absent+)
+          :for now := (getf to key +absent+)
+          :unless (equal was now)
+            :collect (format nil "~a ~a -> ~a" (camel-key key) (option-value was) (option-value now)))))
+
+(defun options-detail (change label)
+  (let ((differences (option-differences (getf change :from) (getf change :to))))
+    (if differences
+        (format nil "~a (~{~a~^, ~})" label differences)
+        label)))
+
 (defun path (change)
   (format nil "~@[~a~]~@[.~a~]" (or (getf change :model) "webhooks") (getf change :field)))
 
@@ -164,8 +199,9 @@ of one space; OLD may be NIL, which is the same as an empty space."
                (format nil "renamed from ~a" (getf change :from)))
               ((:change-kind :change-field-type)
                (format nil "~(~a~) -> ~(~a~)" (getf change :from) (getf change :to)))
-              (:change-field-options (if (destructive-change-p change) "options tightened" "options changed"))
-              (:change-model-options "options changed")
+              (:change-field-options
+               (options-detail change (if (destructive-change-p change) "options tightened" "options changed")))
+              (:change-model-options (options-detail change "options changed"))
               (:change-webhooks "changed")
               (t nil)))))
 

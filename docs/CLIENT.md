@@ -262,10 +262,14 @@ asking, so a script never applies a destructive change by accident.
 Destructive means a change that can hide or invalidate content already stored:
 removing a model or field, changing a kind or a field type, or tightening a
 field's options. Deleting the space itself is not among them — that is done in
-the admin UI, with its own confirmation. The exact list, and the shape of each change, is in
-[SCHEMA.md, "Changes"](SCHEMA.md#changes). Apart from a rename declared with
-`:was`, nothing migrates existing content: a deploy replaces the stored schema,
-and rows that no longer fit it stay as they are.
+the admin UI, with its own confirmation. The exact list, and the shape of each
+change, is in [SCHEMA.md, "Changes"](SCHEMA.md#changes). Apart from a rename
+declared with `:was`, nothing migrates existing content: a deploy replaces the
+stored schema, and rows that no longer fit it stay as they are.
+
+Every deploy that changed something is recorded — what it changed, and the label
+of the management key that sent it — and is read afterwards in the admin UI at
+`/s/{space}/deploys`; see [ADMIN-UI.md](ADMIN-UI.md#schema-deploys).
 
 ## Reading content
 
