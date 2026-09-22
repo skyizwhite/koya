@@ -6,7 +6,7 @@
   (:import-from #:koya-server/db/media #:list-media)
   (:import-from #:koya-server/lib/media-store #:store-upload)
   (:import-from #:koya-server/lib/http #:uploaded-files #:api-error #:api-error-message)
-  (:import-from #:koya-server/lib/page #:owner-p #:same-origin-p #:param #:~icon)
+  (:import-from #:koya-server/lib/page #:param #:~icon)
   (:import-from #:koya-server/components/media-grid #:~media-grid)
   (:export #:media-picker
            #:media-picker-upload
@@ -15,7 +15,8 @@
 
 ;;; The media picker: a <dialog> on the editor page whose body is fetched from
 ;;; these actions with HTMX, so the same grid serves :media fields and Quill's
-;;; image button. Selecting a card is handled in koya-editor.js.
+;;; image button. Selecting a card is handled in koya-editor.js. The owner
+;;; session and same-origin checks are *actions-auth-middleware*'s.
 
 (defparameter +picker-size+ 24)
 
@@ -43,14 +44,11 @@
     (and space (find-space space) space)))
 
 (defaction media-picker :get (params)
-  (cond ((not (owner-p)) (forbidden "Log in again to browse media."))
-        ((null (picker-space params)) (forbidden "Unknown space."))
+  (cond ((null (picker-space params)) (forbidden "Unknown space."))
         (t (hsx (~picker-body :space (picker-space params) :search (param params "q"))))))
 
 (defaction media-picker-upload :post (params)
-  (cond ((not (owner-p)) (forbidden "Log in again to upload."))
-        ((not (same-origin-p)) (forbidden "Cross-origin request rejected."))
-        ((null (picker-space params)) (forbidden "Unknown space."))
+  (cond ((null (picker-space params)) (forbidden "Unknown space."))
         (t (let ((space (picker-space params))
                  (files (uploaded-files params "file")))
              (handler-case

@@ -25,7 +25,7 @@
   (:import-from #:koya-server/lib/http
                 #:make-json-app)
   (:import-from #:koya-server/lib/auth
-                #:*admin-auth-middleware*)
+                #:*admin-auth-middleware* #:*actions-auth-middleware*)
   (:import-from #:koya-server/db/sessions
                 #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/document
@@ -123,6 +123,7 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
   (install-middleware *page-app* *trim-trailing-slash*)
   (install-middleware *page-app* (with-args *lack-middleware-mount* "/admin/api"
                                             (lack:builder *admin-auth-middleware* *admin-api-app*)))
+  (install-middleware *page-app* *actions-auth-middleware*)
   (install-middleware *page-app* *actions-middleware*)
   (static-path *page-app* "/assets/" "assets/")
   (configure *page-app*))

@@ -79,7 +79,10 @@ SBCL with package-inferred systems — a file under `src/` is a package — and
 | Tests | rove (`koya-tests`) |
 
 The four apps — pages, delivery API, admin API and actions — are separate ningle
-apps mounted together, so each decides its own response type.
+apps mounted together, so each decides its own response type. The admin API and
+the actions are each guarded where they are mounted (`*admin-auth-middleware*`,
+`*actions-auth-middleware*`), so a route added later is covered without checking
+for itself; pages check with `with-owner`.
 
 ## Running it
 

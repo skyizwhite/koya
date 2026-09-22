@@ -24,6 +24,7 @@
            #:calling-space
            #:calling-identity
            #:*admin-auth-middleware*
+           #:*actions-auth-middleware*
            #:require-delivery-key
            #:session-login
            #:session-logout
@@ -155,6 +156,27 @@ session cookie would otherwise let a page on another site drive the admin API."
               (t (funcall app env))))))
   "Lack middleware guarding the admin API: the owner's session reaches every space,
 a Bearer management key only its own, and no request writes cross-origin.")
+
+(defun actions-path-p (path)
+  ;; the prefix ningle-actions mounts under, matched as lack's mount matches it
+  (and (stringp path)
+       (or (string= path "/actions")
+           (and (> (length path) 9) (string= "/actions/" path :end2 9)))))
+
+(defun html-forbidden (message)
+  (list 403 (list :content-type "text/html; charset=utf-8")
+        (list (format nil "<p class=\"text-sm text-danger\">~a</p>" message))))
+
+(defparameter *actions-auth-middleware*
+  (lambda (app)
+    (lambda (env)
+      (cond ((not (actions-path-p (getf env :path-info))) (funcall app env))
+            ((not (session-env-owner-p env)) (html-forbidden "Log in again to continue."))
+            ((cross-origin-write-p env) (html-forbidden "Cross-origin request rejected."))
+            (t (funcall app env)))))
+  "Lack middleware guarding every ningle-actions endpoint: owner session only, no
+cross-origin writes. Installed just outside *ACTIONS-MIDDLEWARE*, so an action
+defined later is covered without checking for itself.")
 
 (defun require-delivery-key (space)
   "Signal 401/403 unless the request carries a delivery key valid for SPACE."
