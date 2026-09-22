@@ -9,8 +9,8 @@
                 #:unique-value-taken-p
                 #:content-id #:content-status #:content-published #:content-draft #:content-published-at
                 #:content-revised-at #:content-draft-key)
-  (:import-from #:koya-server/db/api-keys
-                #:create-api-key #:list-api-keys #:delete-api-key #:space-for-api-key)
+  (:import-from #:koya-server/db/delivery-keys
+                #:create-delivery-key #:list-delivery-keys #:delete-delivery-key #:space-for-delivery-key)
   (:import-from #:koya-server/lib/query
                 #:parse-query #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
                 #:query-error)
@@ -186,12 +186,12 @@
     (ok (equal (query-filters query) '((("a" "equals" "1") ("b" "exists" "")) (("c" "equals" "2")))))))
 
 (deftest api-keys
-  (multiple-value-bind (key id) (create-api-key "website" :label "site")
+  (multiple-value-bind (key id) (create-delivery-key "website" :label "site")
     (ok (string= (subseq key 0 5) "koya_"))
-    (ok (string= (space-for-api-key key) "website"))
-    (ng (space-for-api-key "koya_nope"))
-    (ng (space-for-api-key nil))
-    (ok (equal (mapcar (lambda (k) (getf k :label)) (list-api-keys "website")) '("site")))
-    (delete-api-key "website" id)
-    (ok (null (list-api-keys "website")))
-    (ng (space-for-api-key key))))
+    (ok (string= (space-for-delivery-key key) "website"))
+    (ng (space-for-delivery-key "koya_nope"))
+    (ng (space-for-delivery-key nil))
+    (ok (equal (mapcar (lambda (k) (getf k :label)) (list-delivery-keys "website")) '("site")))
+    (delete-delivery-key "website" id)
+    (ok (null (list-delivery-keys "website")))
+    (ng (space-for-delivery-key key))))

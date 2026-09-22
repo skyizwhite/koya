@@ -85,9 +85,8 @@
     (:slug      :required :from :unique :pattern)))
 
 ;;; Options every field type accepts on top of its own. :WAS names what the field
-;;; is called in the deployed schema; a deploy turns it into a rename -- of the
-;;; field and of the key in every stored content -- and stores the field without
-;;; it, so it is an instruction, not part of a field's shape.
+;;; was called in the deployed schema: an instruction to the deploy, which
+;;; renames and then stores the field without it.
 (defparameter *universal-options* '(:was))
 
 (defun field-type-p (type)
@@ -125,8 +124,7 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
     (case key
       (:model (name-string value))
-      ;; a JSON null is not a name: left alone, it fails the option's own check
-      ;; rather than becoming a field called "null"
+      ;; a JSON null is left alone, to fail the option's own check
       ((:from :was) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
       (:options (if (or (listp value) (json-array-p value))
                     (map 'list #'name-string value)
@@ -134,8 +132,8 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
       (t value))))
 
 (defun check-option-value (field-name key value)
-  "Option values come from Lisp code or from JSON sent to the server; both are
-checked here so that validation never trips over a wrong type or a broken regex."
+  "Option values come from Lisp or from JSON, and are checked here so that
+validation never trips over a wrong type or a broken regex."
   (flet ((bad (what) (fail "field ~s: option ~s must be ~a, got ~s" field-name key what value)))
     (case key
       ((:required :unique :integer :many :default)
@@ -163,7 +161,7 @@ checked here so that validation never trips over a wrong type or a broken regex.
 
 (defun make-field (name type &rest options)
   (let ((name (if (stringp name) name (camel-key name)))
-        ;; :was NIL is not a rename but an option given as nothing, as on a model
+        ;; :was NIL is an option given as nothing, not a rename
         (options (loop :for (k v) :on options :by #'cddr
                        :unless (and (eq k :was) (null v))
                          :append (list k (normalize-option k v)))))
@@ -191,17 +189,17 @@ checked here so that validation never trips over a wrong type or a broken regex.
   (getf (field-options field) key default))
 
 (defun field-was (field)
-  "The name FIELD had in the deployed schema, or NIL. See *UNIVERSAL-OPTIONS*."
+  "The name FIELD had in the deployed schema, or NIL."
   (field-option field :was))
 
 (defun forget-rename (options)
-  "OPTIONS without :WAS. A rename is an instruction to the deploy that applies it,
-so it takes no part in comparing two shapes and is not stored."
+  "OPTIONS without :WAS: a rename takes no part in comparing shapes, and is not
+stored."
   (loop :for (key value) :on options :by #'cddr
         :unless (eq key :was) :append (list key value)))
 
 (defun field-forget-rename (field)
-  "FIELD as the server stores it: without the :WAS the deploy has consumed."
+  "FIELD as the server stores it: without its :WAS."
   (if (field-was field)
       (%make-field :name (field-name field) :type (field-type field)
                    :options (forget-rename (field-options field)))
@@ -211,11 +209,9 @@ so it takes no part in comparing two shapes and is not stored."
 (defun field-many-p (field) (and (field-option field :many) t))
 
 ;;; ---------------------------------------------------------------------------
-;;; Webhooks: plists (:label L :url U :only (M...)) so EQUAL compares them. Every
-;;; webhook is sent every event -- publish, unpublish, delete and draft -- and the
-;;; payload names the event; the receiver decides what to act on (see lib/webhook).
-;;; They all belong to the space: :ONLY narrows one to some of its models, and a
-;;; webhook without :ONLY fires for every model.
+;;; Webhooks: plists (:label L :url U :only (M...)), so EQUAL compares them. They
+;;; belong to the space and fire for every model unless :ONLY narrows them; every
+;;; one is sent every event (see lib/webhook).
 
 (defun webhook-label (webhook) (getf webhook :label))
 (defun webhook-url (webhook) (getf webhook :url))
@@ -287,10 +283,9 @@ every model of the space."
         (fail "model ~s: a field is renamed from ~s, which the model still declares" model-name was)))))
 
 (defun name-designator (value)
-  "VALUE as a lowercase name, or VALUE itself when it is not one to begin with --
-a number, or the JSON null a client may send for an option it is not setting.
-What is left over fails the check that reads it, instead of passing as a thing
-called \"null\"."
+  "VALUE as a lowercase name, or VALUE itself when it is not one -- a number, or a
+JSON null -- which then fails the check that reads it rather than passing as a
+thing called \"null\"."
   (cond ((json-null-p value) value)
         ((stringp value) (string-downcase value))
         ((and value (symbolp value)) (string-downcase (symbol-name value)))
@@ -324,11 +319,11 @@ called \"null\"."
 (defun model-public-url (model) (getf (model-options model) :public-url))
 
 (defun model-was (model)
-  "The name MODEL had in the deployed schema, or NIL. See *UNIVERSAL-OPTIONS*."
+  "The name MODEL had in the deployed schema, or NIL."
   (getf (model-options model) :was))
 
 (defun model-forget-renames (model)
-  "MODEL as the server stores it: no :WAS on the model, none on its fields."
+  "MODEL as the server stores it: no :WAS, on it or on its fields."
   (%make-model :name (model-name model) :kind (model-kind model)
                :fields (mapcar #'field-forget-rename (model-fields model))
                :options (forget-rename (model-options model))))
@@ -337,10 +332,8 @@ called \"null\"."
   (find (if (stringp name) name (camel-key name)) (model-fields model)
         :key #'field-name :test #'string=))
 
-;;; A schema is one space's contents: the models, and the webhooks every model of
-;;; the space fires. The space itself -- its name, label and secrets -- is made
-;;; in the admin UI and is not part of the document; the name travels in the URL
-;;; a deploy is sent to.
+;;; A schema is one space's models and webhooks. The space itself is made in the
+;;; admin UI and is not part of the document; its name travels in the deploy URL.
 
 (defstruct (schema (:constructor %make-schema))
   webhooks  ; list of webhook plists, fired by every model

@@ -2,8 +2,8 @@
   (:use #:cl)
   (:import-from #:koya-server/db/connection
                 #:exec #:fetch #:fetch-one #:col)
-  (:import-from #:koya-server/db/api-keys
-                #:hash-api-key)
+  (:import-from #:koya-server/db/delivery-keys
+                #:hash-key)
   (:import-from #:koya/core/ulid
                 #:make-ulid)
   (:import-from #:koya/core/time
@@ -24,7 +24,7 @@
 ;;; delivery keys, only the SHA-256 is stored and the plaintext is shown once, on
 ;;; the space's keys page.
 ;;;
-;;; Delivery keys live in a table of their own (db/api-keys). The two are the same
+;;; Delivery keys live in a table of their own (db/delivery-keys). The two are the same
 ;;; shape today but not the same thing: one WHERE clause standing between a key
 ;;; that is handed to a front end and the right to deploy a schema is not a
 ;;; separation worth having.
@@ -34,7 +34,7 @@
   (let ((key (format nil "koya_mgmt_~a" (byte-array-to-hex-string (random-data 24))))
         (id (make-ulid)))
     (exec "INSERT INTO management_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
-          id space (hash-api-key key) label (now-iso))
+          id space (hash-key key) label (now-iso))
     (values key id)))
 
 (defun list-management-keys (space)
@@ -49,11 +49,11 @@
   "The label of the management key KEY, or NIL when it is not one. An unlabelled
 key answers with the empty string it was made with."
   (and (stringp key)
-       (let ((row (fetch-one "SELECT label FROM management_keys WHERE key_hash = ?" (hash-api-key key))))
+       (let ((row (fetch-one "SELECT label FROM management_keys WHERE key_hash = ?" (hash-key key))))
          (and row (col row "label")))))
 
 (defun space-for-management-key (key)
   "The space KEY manages, or NIL when it is not a management key."
   (and (stringp key)
-       (let ((row (fetch-one "SELECT space FROM management_keys WHERE key_hash = ?" (hash-api-key key))))
+       (let ((row (fetch-one "SELECT space FROM management_keys WHERE key_hash = ?" (hash-key key))))
          (and row (col row "space")))))

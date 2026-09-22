@@ -35,30 +35,23 @@ particular content is found.")
 (defun page-number (params)
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
 
-;;; Search, status and sort, all in the query string so that a list as someone is
-;;; reading it is a link they can send or keep. They go through the same query
-;;; machinery as the delivery API -- lib/query builds the WHERE and the ORDER BY
-;;; over the JSON -- rather than a second way of asking the same questions.
+;;; Search, status and sort live in the query string, so a list as it is being
+;;; read is a link. All three go through lib/query, the delivery API's own
+;;; machinery for a WHERE and an ORDER BY over the JSON.
 
 (defparameter +searchable-types+ '(:text :textarea :slug :richtext)
-  "Field types a search looks inside. A :RICHTEXT field is searched as the HTML it
-is stored as, so a query that reads like markup can match a tag; the rest is the
-text as it was typed.")
+  "Field types a search looks inside. :RICHTEXT is searched as the HTML it is
+stored as, so a query that reads like markup can match a tag.")
 
 (defparameter +statuses+ '("draft" "published" "published+draft")
-  "The status filter's choices: the three badges the list shows, so what is
-filtered and what is read are the same word.")
+  "The status filter's choices: the three badges the list shows.")
 
 (defun blank-p (value) (or (null value) (zerop (length value))))
 
 (defun search-filters (model search-text)
-  "Filter groups matching SEARCH-TEXT against every searchable field of MODEL, and
-against its id whole, OR'ed together by BUILD-WHERE.
-
-The id is matched whole rather than as a substring: ULIDs made in the same period
-share a long prefix, so any short query would match every content by id and the
-search would look broken. Pasting an id finds its content, which is what the id
-is there for; finding one from a fragment of it is not."
+  "Filter groups matching SEARCH-TEXT against every searchable field of MODEL and
+against its id whole, OR'ed together by BUILD-WHERE. Whole, because ids made in
+the same period share a prefix and a short query would match them all."
   (let ((text-fields (loop :for field :in (model-fields model)
                            :when (member (field-type field) +searchable-types+)
                              :collect (field-name field))))
@@ -71,8 +64,8 @@ is there for; finding one from a fragment of it is not."
            (member name +system-fields+ :test #'string=))))
 
 (defun parse-sort (raw model)
-  "(values NAME DIRECTION) for ?sort=, or NIL when it names nothing this model can
-be sorted by -- a stale link orders by the default rather than failing."
+  "(values NAME DIRECTION) for ?sort=, or NIL when it names nothing sortable: a
+stale link falls back to the default order."
   (let* ((desc (and (not (blank-p raw)) (char= (char raw 0) #\-)))
          (name (and (not (blank-p raw)) (if desc (subseq raw 1) raw))))
     (when (sortable-p model name)
@@ -83,8 +76,7 @@ be sorted by -- a stale link orders by the default rather than failing."
   (if name (list (cons name direction)) (list (cons "createdAt" :desc))))
 
 (defun list-url (space model &key search-text status sort-key (page 1))
-  "This model's list, as it is being read: the search, the filter, the sort and
-the page it is on."
+  "This model's list with the search, filter, sort and page it is being read at."
   (let ((query (append (unless (blank-p search-text) (list (format nil "q=~a" (quri:url-encode search-text))))
                        (unless (blank-p status) (list (format nil "status=~a" (quri:url-encode status))))
                        (unless (blank-p sort-key) (list (format nil "sort=~a" (quri:url-encode sort-key))))
@@ -92,10 +84,8 @@ the page it is on."
     (format nil "~a~@[?~{~a~^&~}~]" (model-url space model) query)))
 
 (defparameter +preview-length+ 120
-  "Longest field preview carried into the list, in characters.
-A cell is two lines tall and ellipsises whatever does not fit, so this is only a
-guard against putting a whole richtext body in the HTML: it sits above what the
-widest column can show, which leaves the visible cut to the browser.")
+  "Longest field preview carried into the list, in characters: a guard against
+putting a whole richtext body in the HTML. The visible cut is the browser's.")
 
 (defparameter +column-widths+
   '((:text      . "min-w-32 max-w-56")
@@ -109,26 +99,21 @@ widest column can show, which leaves the visible cut to the browser.")
     (:media     . "min-w-24 max-w-36")
     (:reference . "min-w-32 max-w-48")
     (:slug      . "min-w-32 max-w-48"))
-  "Bounds for a list column, per field type, as classes on the cell's inner box.
-The minimum keeps a column readable and lets a wide model outgrow the page
-rather than squeezing every column thin; the maximum stops one long text field
-from taking the whole width. Between the two the preview sizes to its content.
-They are deliberately tight: a preview gets two lines, so a narrow column still
-shows a useful amount of text and more of the model fits on screen.")
+  "Bounds for a list column, per field type. The minimum keeps a column readable
+and lets a wide model outgrow the page; the maximum stops one long text field
+taking the whole width.")
 
 (defun column-width (field)
   "Width bounds for FIELD's column, as classes on the cell's inner box."
   (or (cdr (assoc (field-type field) +column-widths+)) "min-w-24 max-w-48"))
 
 (defparameter +row-height+ "h-14"
-  "Two text-sm lines plus the cells' padding: the height of every row.
-A preview is clamped to two lines, so no row outgrows it, and the height is set
-on the row rather than the cell so that the cells' own middle alignment centres
-a shorter preview — and the status badge and the chevron with it.")
+  "Two text-sm lines plus padding. On the row, not the cell, so that a shorter
+preview is centred with the badge and the chevron.")
 
 (defun reference-labels (space model)
-  "Field name -> hash of referenced id -> label, for every reference field of MODEL.
-Components render lazily, so this is passed explicitly rather than bound dynamically."
+  "Field name -> hash of referenced id -> label, for every reference field of
+MODEL. Passed explicitly: components render lazily."
   (let ((table (make-hash-table :test 'equal)))
     (dolist (field (model-fields model) table)
       (when (eq (field-type field) :reference)
@@ -191,9 +176,8 @@ Components render lazily, so this is passed explicitly rather than bound dynamic
            (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—"))))))
 
 (defcomp ~filters (&key space model search-text status sort-key)
-  "The search box and the status filter, as a plain GET form: what is filtered is
-shown, and setting it is the same control. Submitting drops ?page= and starts at
-the first again, and keeps the sort, which is the column headers' business."
+  "The search box and the status filter, as a GET form. Submitting drops ?page=
+and keeps the sort."
   (hsx
    (form :method "get" :action (model-url space model)
          :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
@@ -211,8 +195,7 @@ the first again, and keeps the sort, which is the column headers' business."
        (hsx (a :href (list-url space model :sort-key sort-key) :class "btn" (~icon :name :close) "Clear"))))))
 
 (defcomp ~column-header (&key space model field search-text status sort-name sort-direction)
-  "A column header is the sort control: it orders by its own field, and clicking
-the one already sorted turns it around."
+  "The header sorts by its field; clicking the sorted one turns it around."
   (let* ((name (field-name field))
          (active (equal name sort-name))
          (next (if (and active (eq sort-direction :asc)) (format nil "-~a" name) name)))
@@ -225,8 +208,7 @@ the one already sorted turns it around."
            (hsx (span :class "shrink-0 text-accent" (if (eq sort-direction :asc) "↑" "↓")))))))))
 
 (defcomp ~bulk-bar ()
-  "What can be done to a selection. Hidden until there is one (koya-editor.js),
-and the count it shows is written into the delete question as well."
+  "What can be done to a selection. Hidden until there is one (koya-editor.js)."
   (hsx
    (div :data-bulk-bar t :hidden t
         :class "mb-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel px-4 py-2 text-sm"
@@ -234,8 +216,8 @@ and the count it shows is written into the delete question as well."
      (button :type "submit" :name "action" :value "publish" :class "btn" (~icon :name :publish) "Publish")
      (button :type "submit" :name "action" :value "unpublish" :class "btn" (~icon :name :unpublish) "Unpublish")
      (button :type "submit" :name "action" :value "delete" :class "btn btn-danger"
-             :data-confirm "Delete the selected contents? This cannot be undone."
-             :data-bulk-confirm "Delete the selected contents ({n})? This cannot be undone."
+             :data-confirm "Delete the selected contents?"
+             :data-bulk-confirm "Delete the selection ({n})? This cannot be undone."
        (~icon :name :delete) "Delete"))))
 
 (defun @get (params)
@@ -271,8 +253,7 @@ and the count it shows is written into the delete question as well."
                         (link (lambda (page) (list-url space model-name :search-text search-text :status status
                                                                        :sort-key sort-key :page page))))
                    (if (> page pages)
-                       ;; past the end: deleting a whole page lands here, and so
-                       ;; does a link kept from when there was more to read
+                       ;; past the end: deleting a whole page lands here
                        (redirect-to (funcall link pages) 302)
                    (hsx
                     (~layout :space space :crumbs (list (cons model-name nil))
@@ -283,8 +264,7 @@ and the count it shows is written into the delete question as well."
                                 (format nil "~a of ~a" total (count-contents space model-name))
                                 (format nil "~a content~:p" total))))
                         (div :class "flex items-center gap-2"
-                          ;; the space's log, narrowed to what this model set off;
-                          ;; without a hook that can fire, that log can hold nothing
+                          ;; only where a hook can fire, or the log can hold nothing
                           (when (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space))
                             (hsx (a :href (webhook-log-url space :model model-name) :class "btn"
                                     (~icon :name :webhook) "Webhooks")))
@@ -319,7 +299,6 @@ and the count it shows is written into the delete question as well."
                                        (hsx (tr :class (clsx "group cursor-pointer transition hover:bg-base" +row-height+)
                                                 :data-href (content-url space model-name (content-id content))
                                                 :tabindex "0" :role "link"
-                                              ;; the row opens the editor, but not from inside the box
                                               (td :class "py-2 pl-4 pr-2"
                                                 (input :type "checkbox" :name "id" :data-bulk-item t
                                                        :value (content-id content)
@@ -337,11 +316,9 @@ and the count it shows is written into the delete question as well."
                                (when (< page pages)
                                  (hsx (a :href (funcall link (1+ page)) :class "btn" "Next" (~icon :name :next))))))))))))))))))))
 
-;;; Bulk actions. Each content goes through content-service one at a time, so the
-;;; validation, the system timestamps and the webhooks are the same as for a
-;;; single one, and each is its own transaction: a content that cannot be
-;;; published -- a field made required after its draft was written -- leaves the
-;;; rest to go through and is counted.
+;;; Bulk actions: one content at a time through content-service, so validation,
+;;; timestamps and webhooks behave as they do for a single one. One that fails
+;;; leaves the rest to go through.
 
 (defun bulk-action-function (action)
   (cond ((equal action "publish") #'publish)
@@ -349,19 +326,17 @@ and the count it shows is written into the delete question as well."
         ((equal action "delete") #'destroy)))
 
 (defun nothing-to-do-p (action content)
-  "True when ACTION would change nothing about CONTENT. A selection is made with
-one tick of the header box, so it holds whatever the page held: publishing what
-is already published would give every one of them a new revisedAt and a webhook
-for a change that did not happen, and unpublishing what is already a draft would
-issue it a new draft key and break a preview link someone is holding."
+  "True when ACTION would change nothing. A selection is a tick of the header box,
+so it holds published and draft alike: publishing what is published again would
+move revisedAt and fire a webhook, and unpublishing a draft would reissue its
+draft key and break a preview link."
   (and content
        (cond ((equal action "publish") (and (content-published content) (null (content-draft content))))
              ((equal action "unpublish") (null (content-published content)))
              (t nil))))
 
 (defun failure-message (condition)
-  "What to tell the owner about one that did not go through. A validation failure
-is the field that stopped it, not the condition's own report."
+  "A validation failure as the field that stopped it, not the condition's report."
   (typecase condition
     (validation-error
      (format nil "~{~a~^, ~}"

@@ -101,15 +101,12 @@ never changes. Returns the name, or signals on a bad or taken one."
 webhook log and the deploy log. The media files themselves are removed by the caller."
   (exec "DELETE FROM spaces WHERE name = ?" name))
 
-;;; Renames. A model or field declared with :WAS is matched by the diff, and the
-;;; deploy carries the rename through to the stored content in the same
-;;; transaction as the schema write: without that, the old key stays in every
-;;; content object, the editor renders the new field empty and the next save
-;;; drops the value.
+;;; Renames. A :WAS matched by the diff is carried through to the stored content
+;;; in the same transaction as the schema write.
 
 (defun rename-model-rows (space from to)
-  "Move a model's row and all its contents from name FROM to name TO. The contents
-move before the old model row goes, because they reference it ON DELETE CASCADE."
+  "Move a model's row and its contents from FROM to TO. The contents move before
+the old row goes: they reference it ON DELETE CASCADE."
   (exec "INSERT INTO models (space, name, kind, definition, position)
          SELECT space, ?, kind, definition, position FROM models WHERE space = ? AND name = ?"
         to space from)
@@ -138,8 +135,8 @@ of MODEL."
               (and published (to-json published)) (and draft (to-json draft)) (col row "id"))))))
 
 (defun apply-renames (space-name changes)
-  "Carry out the rename changes of a deploy. Model renames come first in CHANGES,
-so a field rename that follows one already names the model by its new name."
+  "Carry out a deploy's renames. Model renames come first in CHANGES, so a field
+rename names its model by the new name."
   (dolist (change changes)
     (case (getf change :op)
       (:rename-model (rename-model-rows space-name (getf change :from) (getf change :model)))
@@ -156,8 +153,7 @@ changes applied."
     (let* ((old (load-schema space-name))
            (changes (diff-schemas old schema)))
       (apply-renames space-name changes)
-      ;; in the same transaction as the change it describes: a deploy that is
-      ;; rolled back has not happened, and must not be in the log saying it did
+      ;; in the transaction: a deploy that rolls back must not be in the log
       (record-deploy space-name changes :by by)
       (exec "UPDATE spaces SET webhooks = ? WHERE name = ?"
             (to-json (map 'vector #'webhook->jobject (schema-webhooks schema))) space-name)

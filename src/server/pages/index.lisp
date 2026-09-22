@@ -10,13 +10,9 @@
   (:export #:@get #:@head #:@post))
 (in-package #:koya-server/pages/index)
 
-;;; The spaces, and everything that makes or unmakes one. A space is a tenant --
-;;; it owns the contents, media, keys and webhook secret -- so it is made here and
-;;; never by a schema deploy, which only ever changes the models inside one.
-;;;
-;;; A space has nothing but its name, and the name is an id: it is in every URL
-;;; and in the delivery API, so there is nothing here to edit -- only to make, in
-;;; the dialog behind the New space button, and to delete.
+;;; The spaces. A space owns the contents, media, keys and webhook secret, so it
+;;; is made and deleted here, never by a deploy, which only changes its models.
+;;; Its name is its id -- it is in every URL -- so there is nothing to edit.
 
 (defcomp ~space-row (&key space)
   (let ((name (getf space :name)))

@@ -1,14 +1,8 @@
--- koya database schema, version 7.
+-- koya database schema, version 8.
 --
 -- Generated from src/server/db/migrations.lisp; do not edit by hand.
 -- Regenerate it from the REPL with (koya-server:write-schema-snapshot).
 
-CREATE TABLE api_keys (
-  id TEXT PRIMARY KEY,
-  space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,
-  key_hash TEXT NOT NULL UNIQUE,
-  label TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL);
 CREATE TABLE contents (
   id TEXT PRIMARY KEY,
   space TEXT NOT NULL,
@@ -23,6 +17,12 @@ CREATE TABLE contents (
   revised_at TEXT,
   FOREIGN KEY (space, model) REFERENCES models(space, name) ON DELETE CASCADE);
 CREATE INDEX contents_by_model ON contents (space, model, status, published_at);
+CREATE TABLE "delivery_keys" (
+  id TEXT PRIMARY KEY,
+  space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,
+  key_hash TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL);
 CREATE TABLE management_keys (
   id TEXT PRIMARY KEY,
   space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,

@@ -17,13 +17,11 @@
   (:export #:@get #:webhook-log-url))
 (in-package #:koya-server/pages/s/<space>/webhooks)
 
-;;; One log per space, holding the last +KEEP-PER-SPACE+ webhook calls it made:
-;;; whether the receiver accepted each one, and what it answered. The same page
-;;; serves every narrower view through ?label= (one webhook) and ?model= (one
-;;; model). A space's webhooks fire for every model, so a model's view holds
-;;; their calls as well as that model's own webhooks'.
+;;; One log per space: the last +KEEP-PER-SPACE+ calls it made and what came
+;;; back. ?label= narrows it to one webhook, ?model= to the calls one model set
+;;; off -- which includes the space's own hooks, since they fire for every model.
 
-(defparameter +page-size+ 20 "Rows per page, as everywhere else in the admin UI.")
+(defparameter +page-size+ 20)
 
 (defun blank-p (value) (or (null value) (zerop (length value))))
 
@@ -159,11 +157,11 @@ option it silently replaces with the first one, which here reads \"All\"."
      (~layout :space space :crumbs (list (cons "Webhooks" nil))
        (h1 :class "mb-2 text-2xl font-bold" "Webhooks")
        (p :class "mb-4 text-sm text-muted"
-         (format nil "~a call~:p~a." total
+         (format nil "~a call~:p~a. The newest ~a of the space are kept." total
                  (cond ((not (filtered-p label model)) "")
                        ((= total 1) " matches")
-                       (t " match")))
-         (format nil " Only the newest ~a of the space are kept." +keep-per-space+))
+                       (t " match"))
+                 +keep-per-space+))
        (~filters :space space :schema schema :label label :model model)
        (if (null items)
            (hsx (~empty-state (if (filtered-p label model)

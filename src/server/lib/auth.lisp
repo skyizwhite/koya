@@ -4,8 +4,8 @@
                 #:koya-secret)
   (:import-from #:koya-server/lib/http
                 #:fail-api #:header #:json-response #:error-object #:origin-allowed-p)
-  (:import-from #:koya-server/db/api-keys
-                #:space-for-api-key)
+  (:import-from #:koya-server/db/delivery-keys
+                #:space-for-delivery-key)
   (:import-from #:koya-server/db/management-keys
                 #:space-for-management-key #:management-key-label)
   (:import-from #:ironclad
@@ -24,7 +24,7 @@
            #:calling-space
            #:calling-identity
            #:*admin-auth-middleware*
-           #:require-api-key
+           #:require-delivery-key
            #:session-login
            #:session-logout
            #:session-owner-p))
@@ -36,7 +36,7 @@
 ;;;  - a management key (Bearer, made on a space's keys page) drives the admin API
 ;;;    without a session: schema deploys, imports, content management from a REPL.
 ;;;    It belongs to one space and reaches nothing outside it
-;;;  - a delivery key (X-KOYA-API-KEY, made per space) reads the delivery API
+;;;  - a delivery key (X-KOYA-DELIVERY-KEY, made per space) reads the delivery API
 ;;;  - the webhook secret is the one koya sends, not one it checks (see lib/webhook)
 
 (defun secure-string= (a b)
@@ -119,14 +119,11 @@ session, which reaches every space."
   (space-for-management-key (bearer-token (request-env ningle:*request*))))
 
 (defun calling-identity ()
-  "Who is making this request, as something to store: \"owner\", or \"key:<label>\"
-for a management key, whose label may be empty. The words a page puts around that
-are the page's business -- a log that stores them cannot be reworded afterwards,
-because the rows already written keep what they were given.
+  "Who is making this request, to store: \"owner\" or \"key:<label>\". The wording a
+page puts around it is the page's, so it can be changed later.
 
-The owner is looked for first, as *ADMIN-AUTH-MIDDLEWARE* does: a request that
-carries both a session and a key is authorised as the owner, and a log that named
-the key would name something that had no say in it."
+The owner comes first, as *ADMIN-AUTH-MIDDLEWARE* does it: a request carrying
+both a session and a key is authorised as the owner."
   (let ((env (request-env ningle:*request*)))
     (if (session-env-owner-p env)
         "owner"
@@ -159,11 +156,11 @@ session cookie would otherwise let a page on another site drive the admin API."
   "Lack middleware guarding the admin API: the owner's session reaches every space,
 a Bearer management key only its own, and no request writes cross-origin.")
 
-(defun require-api-key (space)
-  "Signal 401/403 unless the request carries an API key valid for SPACE."
-  (let* ((key (header "x-koya-api-key"))
-         (key-space (space-for-api-key key)))
-    (cond ((null key) (fail-api 401 "unauthorized" "X-KOYA-API-KEY header is required"))
-          ((null key-space) (fail-api 401 "unauthorized" "Invalid API key"))
-          ((string/= key-space space) (fail-api 403 "forbidden" "API key does not belong to this space"))
+(defun require-delivery-key (space)
+  "Signal 401/403 unless the request carries a delivery key valid for SPACE."
+  (let* ((key (header "x-koya-delivery-key"))
+         (key-space (space-for-delivery-key key)))
+    (cond ((null key) (fail-api 401 "unauthorized" "X-KOYA-DELIVERY-KEY header is required"))
+          ((null key-space) (fail-api 401 "unauthorized" "Invalid delivery key"))
+          ((string/= key-space space) (fail-api 403 "forbidden" "Delivery key does not belong to this space"))
           (t t))))

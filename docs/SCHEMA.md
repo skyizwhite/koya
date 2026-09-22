@@ -146,12 +146,11 @@ serialize identically.
 
 ## Renames
 
-A model or a field is matched by its name, so renaming one and deploying reads as
-a removal and an addition: the model's contents are deleted with it, and a
-renamed field leaves its value behind under the old key, where the editor cannot
-see it and the next save drops it.
+A model or a field is matched by its name, so renaming one reads as a removal and
+an addition: the model's contents go with it, and a renamed field's values are
+left under the old key, where the editor cannot see them.
 
-`was` says that this is the same thing under a new name:
+`was` says it is the same thing under a new name:
 
 ```json
 {
@@ -162,29 +161,24 @@ see it and the next save drops it.
 }
 ```
 
-A deploy then renames it and carries the stored content with it, in the same
-transaction as the schema write: the contents move to the new model name, and the
-key moves in every content's published data and draft. The field keeps its type
-and options, so a rename is **not** destructive and needs no `force`; changing
-the type or tightening the options at the same time still is, and is reported as
-its own change.
+The deploy renames it and moves the stored content with it — the contents to the
+new model name, the key in every published object and draft — in the same
+transaction as the schema write. Nothing is lost, so a rename is **not**
+destructive and needs no `force`; changing the type or tightening the options at
+the same time still is, and is reported as its own change.
 
 `was` is an instruction to the deploy, not part of the shape:
 
 - The server stores the model and the field without it, so `GET
-  /admin/api/schema/{space}` never returns a `was` and a `pull` never brings one
-  back. Leaving it in the source is harmless — once the rename is applied, `was`
-  names something the schema no longer has and later deploys see no change — and
-  so is dropping it, once **every space the schema is deployed to** has had the
-  rename. A space still at the old shape reads the document without `was` as a
-  removal and an addition.
-- It must name something else: `was` on a field cannot name that field, a system
-  field, or another field the model still declares, and two fields cannot be
-  renamed from the same one. `was` on a model cannot name the model itself or
-  another model the schema still declares.
-- If the new name already exists in the deployed schema the rename cannot be
-  meant, and the deploy falls back to a removal and an addition, which needs
-  `force`.
+  /admin/api/schema/{space}` never returns one and `pull` never brings one back.
+  Leaving it in the source is harmless, and so is dropping it once **every space
+  the schema is deployed to** has had the rename — a space still at the old shape
+  reads the document without `was` as a removal and an addition.
+- It must name something else: not the field or model itself, not a system field,
+  and not another field or model the schema still declares. Two fields cannot be
+  renamed from the same one.
+- If the new name already exists in the deployed schema, the deploy falls back to
+  a removal and an addition, which needs `force`.
 
 ## Content values
 

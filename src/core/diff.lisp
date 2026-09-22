@@ -21,10 +21,9 @@
 ;;; the space is whichever one the deploy is addressed to.
 ;;; Destructive ops are the ones that can hide or invalidate existing content.
 ;;;
-;;; A :WAS on a model or a field turns what would be a removal and an addition
-;;; into a rename, which the deploy carries through to the stored content. It is
-;;; matched here and nowhere else, and it never counts as a change of shape: two
-;;; fields that differ only in :WAS are the same field.
+;;; A :WAS on a model or a field makes a rename of what would be a removal and an
+;;; addition. It is matched here and nowhere else, and never counts as a change
+;;; of shape: two fields differing only in :WAS are the same field.
 
 (defparameter *destructive-ops* '(:remove-model :remove-field :change-kind :change-field-type))
 
@@ -73,11 +72,10 @@ was added or narrowed, or the single/many shape changed."
              :always (equal v (getf b k '%missing)))))
 
 (defun rename-pairs (old new key was)
-  "Pairs (OLD-ITEM . NEW-ITEM) where NEW-ITEM's :WAS names OLD-ITEM. A :WAS that
-names nothing in OLD is not a rename: it is the annotation left in the source
-after the rename was deployed. Neither is one whose new name OLD already uses,
-or one NEW still declares -- the schema check refuses the latter, and the diff
-does not lean on that."
+  "Pairs (OLD-ITEM . NEW-ITEM) where NEW-ITEM's :WAS names OLD-ITEM. Not a rename:
+one naming nothing in OLD (the annotation left after the rename was deployed),
+one whose new name OLD already uses, and one NEW still declares -- which the
+schema check refuses, but the guard here does not lean on that."
   (loop :for item :in new
         :for was-name = (funcall was item)
         :for match = (and was-name
@@ -145,9 +143,7 @@ of one space; OLD may be NIL, which is the same as an empty space."
                         :from (and old (schema-webhooks old)) :to (schema-webhooks new))))
           (diff-models (and old (schema-models old)) (schema-models new))))
 
-;;; What an options change did, named rather than summarised: "options tightened"
-;;; says a deploy may reject content, but not which rule it is. Options are named
-;;; as the schema document names them.
+;;; Options are named as the schema document names them.
 
 (defparameter +absent+ '%missing)
 

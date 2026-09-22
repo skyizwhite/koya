@@ -31,18 +31,15 @@
 ;;;     (content      :richtext)
 ;;;     (published-at :datetime))
 ;;;
-;;; Renaming something is a rename only when it says so: :WAS on a model or a
-;;; field names what it used to be called, and the deploy moves the stored content
-;;; with it. Without it a rename reads as a removal and an addition, which throws
-;;; the content away.
+;;; :WAS names what a model or field used to be called, so that the deploy moves
+;;; the stored content instead of dropping it:
 ;;;
 ;;;   (defmodel article (:kind :list :was blog)
 ;;;     (subtitle :text :was lede))
 ;;;
-;;; Re-evaluating a form replaces the previous definition of the same name, so
-;;; definitions can be edited live from the REPL; a model with :WAS also drops the
-;;; definition it renames, so editing the DEFMODEL BLOG above into the form below
-;;; and re-evaluating it leaves one model, not two.
+;;; Re-evaluating a form replaces the definition of the same name, so the schema
+;;; can be edited live from the REPL. A model with :WAS also drops the definition
+;;; it renames: editing DEFMODEL BLOG into the form above leaves one model.
 
 (defvar *webhooks* '()
   "Webhooks every model of the space fires.")

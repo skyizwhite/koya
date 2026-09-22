@@ -13,7 +13,7 @@
   (:export #:@get #:@post #:media-page-url))
 (in-package #:koya-server/pages/s/<space>/media)
 
-(defparameter +page-size+ 20 "Files per page, as many as the lists show rows.")
+(defparameter +page-size+ 20)
 
 (defun media-page-url (space) (format nil "~a/media" (space-url space)))
 
@@ -25,21 +25,19 @@
   (format nil "?page=~a~@[&q=~a~]" page (and search (plusp (length search)) (quri:url-encode search))))
 
 (defun library-url (space &key search (page 1))
-  "The library as it is being read, so a redirect comes back to the same search."
+  "The library with the search and page it is being read at."
   (format nil "~a~a" (media-page-url space) (page-link page search)))
 
 (defparameter +bulk-form+ "media-bulk"
-  "The selection form's id. The boxes live on the cards and join it by their form
-attribute; a card already holds a form of its own, and forms do not nest.")
+  "The selection form's id: the boxes are on the cards and join it by their form
+attribute, because the card already holds a form and forms do not nest.")
 
 (defun page-number (params)
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
 
 (defcomp ~selection (&key space search page)
-  "The selection form: the bar and nothing else. The boxes are on the cards and
-join it by their form attribute. Select all is outside the bar, which is hidden
-until something is selected -- a control that appears only once you have used it
-is no control at all."
+  "The selection bar. Select all sits outside it, since the bar itself is hidden
+until something is selected."
   (hsx
    (div :class "mb-4 flex flex-wrap items-center gap-3"
      (label :class "flex items-center gap-2 text-sm text-muted"
@@ -51,8 +49,8 @@ is no control at all."
        (div :data-bulk-bar t :hidden t :class "flex flex-wrap items-center gap-2 text-sm"
          (span :data-bulk-count t :class "mr-1 text-muted" "0 selected")
          (button :type "submit" :name "action" :value "delete-selected" :class "btn btn-danger"
-                 :data-confirm "Delete the selected files? This cannot be undone."
-                 :data-bulk-confirm "Delete the selected files ({n})? This cannot be undone."
+                 :data-confirm "Delete the selected files?"
+                 :data-bulk-confirm "Delete the selection ({n})? This cannot be undone."
            (~icon :name :delete) "Delete"))))))
 
 (defcomp ~media-page (&key space search page)
@@ -128,8 +126,7 @@ is no control at all."
                  (api-error (e) (set-flash (api-error-message e) :error)))
                (redirect-to (media-page-url space))))
             ((equal action "delete-selected")
-             ;; one file at a time: a file some content still uses is refused by
-             ;; the store, and the rest of the selection still goes
+             ;; one at a time: a file in use is refused, the rest still go
              (let ((ids (form-values params "id"))
                    (back (library-url space :search (param params "q") :page (page-number params)))
                    (done 0) (failed 0) (message nil))
@@ -143,8 +140,7 @@ is no control at all."
                                       (t (remove-media media) (incf done))))
                             ;; every condition, not only the store's own: a file
                             ;; that will not leave the disk must not take the
-                            ;; whole selection down with it, half of it deleted
-                            ;; and nothing said
+                            ;; selection down with it
                             (api-error (e)
                               (incf failed)
                               (unless message (setf message (api-error-message e))))

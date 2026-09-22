@@ -31,7 +31,7 @@
 
 (defvar *base-url* nil "Server URL, e.g. https://cms.example.com. Falls back to KOYA_URL.")
 (defvar *management-key* nil "Management key for admin calls. Falls back to KOYA_MANAGEMENT_KEY.")
-(defvar *delivery-key* nil "Delivery API key. Falls back to KOYA_DELIVERY_KEY.")
+(defvar *delivery-key* nil "Delivery key. Falls back to KOYA_DELIVERY_KEY.")
 (defvar *space* nil "Default space for content calls. Falls back to KOYA_SPACE.")
 
 (defun configure (&key base-url management-key delivery-key space)
@@ -76,7 +76,7 @@ alist whose values may be pathnames, as multipart/form-data. Returns the parsed 
   (let ((headers (list (cons "Accept" "application/json"))))
     (ecase auth
       (:management (push (cons "Authorization" (format nil "Bearer ~a" (management-key))) headers))
-      (:delivery (push (cons "X-KOYA-API-KEY" (delivery-key)) headers))
+      (:delivery (push (cons "X-KOYA-DELIVERY-KEY" (delivery-key)) headers))
       ((nil)))
     (when body (push (cons "Content-Type" "application/json") headers))
     (handler-case
@@ -212,7 +212,7 @@ can be given explicitly, e.g. when importing from another CMS."
 ;;; --- Admin API: delivery keys ------------------------------------------------
 
 (defun create-delivery-key (&key space (label ""))
-  "Create a delivery API key for SPACE. Returns (values key id); the key is shown only once."
+  "Create a delivery key for SPACE. Returns (values key id); it is shown only once."
   (let ((response (request :post (format nil "/admin/api/keys/~a" (space-name space))
                            :body (jobject "label" label) :auth :management)))
     (values (jget response "key") (jget response "id"))))

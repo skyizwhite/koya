@@ -2,7 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/db/schema-store #:find-space #:space-webhook-secret #:rotate-webhook-secret)
-  (:import-from #:koya-server/db/api-keys #:create-api-key #:list-api-keys #:delete-api-key)
+  (:import-from #:koya-server/db/delivery-keys #:create-delivery-key #:list-delivery-keys #:delete-delivery-key)
   (:import-from #:koya-server/db/management-keys
                 #:create-management-key #:list-management-keys #:delete-management-key)
   (:import-from #:koya-server/lib/http #:path-param)
@@ -63,10 +63,10 @@
      (section
        (h2 :class "mb-1 text-lg font-bold" "Delivery keys")
        (p :class "mb-4 text-sm text-muted"
-         "Sent as " (code "X-KOYA-API-KEY") " to read this space's published content through the delivery API. "
+         "Sent as " (code "X-KOYA-DELIVERY-KEY") " to read this space's published content through the delivery API. "
          "Safe to put where a site's front end can reach it.")
        (when new-delivery-key (hsx (~new-key :key new-delivery-key)))
-       (~key-table :space space :keys (list-api-keys space) :delete-action "delete")
+       (~key-table :space space :keys (list-delivery-keys space) :delete-action "delete")
        (~create-key :space space :action "create" :placeholder "e.g. production site"))
      (section :class "mt-12"
        (h2 :class "mb-1 text-lg font-bold" "Management keys")
@@ -112,12 +112,12 @@
             ;; once; delete and rotate redirect so a reload cannot repeat them
             ((equal action "create")
              (set-title (page-title space))
-             (hsx (~keys-page :space space :new-delivery-key (create-api-key space :label label))))
+             (hsx (~keys-page :space space :new-delivery-key (create-delivery-key space :label label))))
             ((equal action "create-management")
              (set-title (page-title space))
              (hsx (~keys-page :space space :new-management-key (create-management-key space :label label))))
             ((equal action "delete")
-             (delete-api-key space id)
+             (delete-delivery-key space id)
              (set-flash "Key deleted.")
              (redirect-to (format nil "~a/keys" (space-url space))))
             ((equal action "delete-management")

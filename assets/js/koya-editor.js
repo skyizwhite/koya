@@ -272,20 +272,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// Bulk selection: inside a [data-bulk] form, ticking any [data-bulk-item] box
-// shows the [data-bulk-bar], counts the selection into [data-bulk-count], and
-// rewrites each [data-bulk-confirm] button's question with the count. The header
-// box selects and clears the page.
-//
-// The bar is rendered hidden, so without JavaScript there is nothing to press:
-// bulk actions need this file, as the row links and the media picker do. Each
-// button still carries a question of its own in data-confirm, which is what the
-// confirmation shows until the count has been written into it.
+// Bulk selection: inside a [data-bulk] form, ticking a [data-bulk-item] box shows
+// the [data-bulk-bar], counts into [data-bulk-count] and writes the count into
+// each [data-bulk-confirm] question. [data-bulk-all] selects and clears the page.
+// The bar starts hidden, so bulk actions need this file.
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("form[data-bulk]").forEach((form) => {
-    // form.elements, not querySelectorAll: a box may sit outside the form and be
-    // tied to it by its form attribute, which is how the media grid keeps its
-    // per-file delete form from being nested inside this one
+    // form.elements, not querySelectorAll: a box may sit outside the form, tied
+    // to it by its form attribute (the media grid does that)
     const controls = () => Array.from(form.elements);
     const boxes = () => controls().filter((el) => el.matches("[data-bulk-item]"));
     const bar = form.querySelector("[data-bulk-bar]");

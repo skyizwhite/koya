@@ -110,7 +110,10 @@
         destructive INTEGER NOT NULL,
         deployed_by TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL)"
-     "CREATE INDEX schema_deploys_by_space ON schema_deploys (space, id DESC)")))
+     "CREATE INDEX schema_deploys_by_space ON schema_deploys (space, id DESC)")
+    (8
+     ;; the table held delivery keys under the name the header used to have
+     "ALTER TABLE api_keys RENAME TO delivery_keys")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/client
   (:use #:cl #:rove)
   (:import-from #:koya-server #:start #:stop)
-  (:import-from #:koya-server/db/api-keys #:create-api-key)
+  (:import-from #:koya-server/db/delivery-keys #:create-delivery-key)
   (:import-from #:koya-server/db/management-keys #:create-management-key)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
   (:import-from #:koya-server/db/schema-store #:create-space)
@@ -72,7 +72,7 @@
     (koya/client:deploy :force t :stream (make-broadcast-stream))))
 
 (deftest contents-and-delivery
-  (configure :delivery-key (create-api-key "website" :label "client"))
+  (configure :delivery-key (create-delivery-key "website" :label "client"))
   (let* ((tag (create-content 'tag '(:name "lisp") :publish t))
          (post (create-content 'blog (list :title "Hello" :body "# Hi" :tags (list (getf tag :id))))))
     (ok (string= (getf tag :status) "published"))

@@ -30,20 +30,18 @@
             :class "aspect-square w-full rounded-md border border-line bg-panel object-contain")))
 
 (defun delete-confirmation (media references)
-  "What the owner is asked before a file goes. A file REFERENCES contents still
-use cannot go (the server refuses), so the question becomes an explanation."
+  "What is asked before a file goes; with REFERENCES it cannot go, so the question
+becomes the reason."
   (if (plusp (or references 0))
       (format nil "~a is used by ~a content~:p and cannot be deleted until they stop using it. Remove it from them first."
               (media-filename media) references)
       (format nil "Delete ~a?" (media-filename media))))
 
 (defcomp ~media-card (&key media space references bulk-form)
-  "Library card: the picture and nothing else. Its name and facts are in the
-preview dialog the thumbnail opens, along with everything that can be done to
-the file; only Delete is on the card, over its corner. REFERENCES is how many
-contents mention the file (shown in the confirmation). BULK-FORM is the id of the
-page's selection form: the box belongs to it through its form attribute, because
-a form cannot be nested inside the card's own."
+  "Library card: the picture, a Delete over its corner, and a selection box when
+BULK-FORM names one (it joins that form by its form attribute, since forms do not
+nest). Everything else is in the preview dialog the thumbnail opens. REFERENCES
+is how many contents mention the file, shown in the confirmation."
   (declare (ignore space))
   (let ((id (media-id media)))
     (hsx
@@ -69,7 +67,7 @@ a form cannot be nested inside the card's own."
        (form :method "post" :class "absolute right-1 top-1"
          (input :type "hidden" :name "action" :value "delete")
          (input :type "hidden" :name "id" :value id)
-         ;; the confirmation text is data, not inline script: koya-editor.js asks
+         ;; the confirmation is data, not inline script: koya-editor.js asks
          (button :type "submit" :class "btn btn-danger btn-icon"
                  :disabled (plusp (or references 0))
                  :title (if (plusp (or references 0)) (delete-confirmation media references) nil)
@@ -106,9 +104,8 @@ a form cannot be nested inside the card's own."
                                        :references (gethash (media-id media) references 0))))))))))
 
 (defcomp ~media-preview-dialog ()
-  "One dialog per page; [data-preview-src] buttons fill and open it (koya-editor.js).
-The file's alt text and its Delete live here rather than on every card. Both
-forms post to the page the dialog is on, which is the media library."
+  "One dialog per page; [data-preview-src] buttons fill and open it
+(koya-editor.js). Its forms post to the media library."
   (hsx
    (dialog :id "media-preview" :class "koya-dialog max-w-3xl"
      (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
@@ -119,8 +116,8 @@ forms post to the page the dialog is on, which is the media library."
          (form :method "post"
            (input :type "hidden" :name "action" :value "delete")
            (input :type "hidden" :name "id" :value "" :data-preview-id t)
-           ;; the confirmation starts generic and is replaced with the open file's
-           ;; own, which also makes the button one koya-editor.js binds at load
+           ;; generic until the open file's own replaces it, so that
+           ;; koya-editor.js binds the button at load
            (button :type "submit" :class "btn btn-danger btn-icon" :data-preview-delete t
                    :data-confirm "Delete this file?" :aria-label "Delete"
              (~icon :name :delete)))

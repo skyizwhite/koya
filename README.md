@@ -23,7 +23,7 @@ The schema is code in the site's repository; the server stores a copy and builds
 
 Spaces are the tenants: one per site, made and deleted in the UI. A schema deploy only ever changes the models inside one.
 
-Everything else is generated from the model — the list pages, and an editor with text inputs, a rich text editor, selects for references and a picker for media, publishing and drafts in a sticky bar. Each space also has a media library, its keys, and a log of what its webhooks answered.
+Everything else is generated from the model — the list pages, and an editor with text inputs, a rich text editor, selects for references and a picker for media, publishing and drafts in a sticky bar. Each space also has a media library, its keys, a log of what its webhooks answered and one of every schema deploy.
 
 [docs/ADMIN-UI.md](docs/ADMIN-UI.md) walks through all of it, with screenshots.
 

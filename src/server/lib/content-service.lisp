@@ -37,13 +37,12 @@
            #:destroy))
 (in-package #:koya-server/lib/content-service)
 
-;;; Content operations shared by the admin API and the admin UI: model lookup,
-;;; validation (including uniqueness), persistence and webhook notification.
+;;; Content operations shared by the admin API and the admin UI: lookup,
+;;; validation, persistence and webhook notification.
 ;;;
-;;; Each write runs inside WITH-DB-TRANSACTION, which also holds the connection
-;;; lock, so the "is this value taken?" and "does the object already exist?"
-;;; checks and the insert that follows them cannot interleave with another
-;;; request. Webhooks fire inside that scope too; they are asynchronous.
+;;; Each write runs inside WITH-DB-TRANSACTION, which holds the connection lock,
+;;; so a uniqueness check and the insert after it cannot interleave with another
+;;; request. Webhooks fire inside that scope, asynchronously.
 
 (defun resolve-model (space-name model-name)
   "Return (values space-name model) or signal 404."

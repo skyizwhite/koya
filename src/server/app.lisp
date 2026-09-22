@@ -37,7 +37,7 @@
            #:build-app))
 (in-package #:koya-server/app)
 
-;;; Delivery API: /api/v1/...  (JSON, API key)
+;;; Delivery API: /api/v1/...  (JSON, delivery key)
 (defparameter *api-app* (make-json-app))
 (set-routes *api-app* :system :koya-server :dir "api")
 

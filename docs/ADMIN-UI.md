@@ -61,7 +61,7 @@ made and deleted.
 
 `/s/{space}` lists the space's models — a stacked-rows icon for a `:list` model,
 braces for an `:object` model — with the number of contents in each list model,
-and links to **Media** and **Keys**.
+and links to **Schema Deploys**, **Media** and **Keys**.
 
 Underneath, **Webhooks** shows every webhook of the space with its label, its URL
 and what it covers — *all models*, or *`blog, tag` only* for one narrowed with
@@ -77,15 +77,11 @@ beside the heading opens it unfiltered.
 ## Schema deploys
 
 `/s/{space}/deploys` is what each deploy of this space's schema changed, newest
-first, 20 to a page. A deploy comes from a project's repository through the
-client, so this is where *when did that field go* has an answer without reading
-the source's history. **Schema Deploys** on the space page opens it.
+first, 20 to a page. **Schema Deploys** on the space page opens it.
 
-Each entry says how many changes it carried, whether any of them was
-destructive, who deployed it — `(management key: deploys from CI)`, or `owner`
-for a session — and when. Under that is the diff, one line per change — the same line `(koya:plan)` prints
-before applying it, so what is read here and what was read then are the same
-words:
+Each entry says how many changes it carried, whether any was destructive, who
+deployed it — `(management key: deploys from CI)`, or `owner` — and when. Under
+that is the diff, one line per change, as `(koya:plan)` prints it:
 
 | Line | Meaning |
 |---|---|
@@ -95,13 +91,12 @@ words:
 | `~ blog options changed (publicUrl none -> "https://…")` | a change, with what moved |
 | `! ~ blog.title options tightened (maxLength 100 -> 50)` | a change that can reject content already stored |
 
-A `!` in front marks a change that can hide or invalidate stored content — the
-ones a deploy refuses without `force` — and the line is red whatever its marker.
+A `!` marks a change that can hide or invalidate stored content — the ones a
+deploy refuses without `force` — and the line is red whatever its marker.
 
-Only what changed is kept, not the schema as it was: this log says *what
-happened*, and the schema itself is read from the space page or with
-`(koya:pull)`. A deploy that changed nothing leaves no entry, and only the newest
-100 of a space survive.
+Only the changes are kept, not the schema as it was; read that from the space
+page or with `(koya:pull)`. A deploy that changed nothing leaves no entry, and
+the newest 100 of a space are kept.
 
 ## The webhook delivery log
 
@@ -165,9 +160,8 @@ For an `:object` model this URL redirects straight to its single content (or to 
 
 ### Finding one
 
-Above the table, a search box and a status filter; the column headers are the
-sort. All three live in the query string, so a list as you are reading it is a
-link you can keep or send:
+A search box and a status filter above the table, and the column headers sort.
+All three live in the query string, so the list as you are reading it is a link:
 
 | | |
 |---|---|
@@ -175,42 +169,29 @@ link you can keep or send:
 | `?status={badge}` | `draft`, `published` or `published+draft` — the three badges the list shows |
 | `?sort={field}` | ascending; `?sort=-{field}` descending. Any field of the model, and the system fields (`createdAt`, `updatedAt`, `publishedAt`, `revisedAt`, `id`) |
 
-Clicking a column header sorts by it; clicking the one already sorted turns it
-around, and an arrow marks it. Without a sort the list is newest created first.
-The count beside the heading reads *3 of 120* while a search or a filter is on,
-and **Clear** drops both while keeping the sort.
+Clicking a header sorts by it, clicking the sorted one turns it around, and an
+arrow marks it. The count beside the heading reads *3 of 120* while anything is
+filtered; **Clear** drops the search and the filter, keeping the sort.
+
+A search looks inside the data the list shows — the draft when there is one.
+Rich text is searched as its stored HTML, so a query that reads like markup can
+match a tag. The id is matched whole: ids made around the same time share a
+prefix. A `?sort=` or `?status=` the model cannot have is ignored, so an old link
+still opens the list, and a page past the end comes back to the last one.
 
 ### Doing it to several at once
 
-Each row has a checkbox and the header has one for the page. Tick any and a bar
-appears above the table with **Publish**, **Unpublish** and **Delete**; Delete
-asks first, naming how many. The selection is the page's, so filter first and
-select the page: *status = draft*, select all, Publish.
+A checkbox per row, one in the header for the page. Tick any and a bar appears
+with **Publish**, **Unpublish** and **Delete**; Delete asks first, naming how
+many. Filter first and select the page: *status = draft*, select all, Publish.
+The buttons need JavaScript.
 
-Each content goes through the same path a single one does — the same validation,
-the same system timestamps, the same webhooks — one at a time, each in its own
-transaction. One that cannot be done leaves the rest done: publishing three
-drafts where one is missing a field now required reports *Published 2 contents.
-1 could not be: title is required*, and the two are published.
-
-An action with nothing to do to a content leaves it alone and counts it: a
-selection made by ticking the page holds whatever the page held, so publishing
-what is already published would give every one of them a new `revisedAt` and a
-webhook for a change that did not happen, and unpublishing what is already a
-draft would issue it a new draft key and break a preview link someone is
-holding. Both are reported — *Published 2 contents. 5 were already published.*
-
-Selecting is per page, and the bulk buttons need JavaScript (the bar is hidden
-until there is a selection). Asking for a page past the end — which is where
-deleting a whole page lands you — comes back to the last page that exists.
-
-A search looks inside the data the list shows — the draft when there is one.
-Rich text is searched as the HTML it is stored as, so a query that reads like
-markup can match a tag rather than the words. The id is matched whole, not as a
-fragment: ids made around the same time share a long prefix, so a short query
-would otherwise match everything. A `?sort=` or `?status=` naming something the
-model cannot have is ignored rather than refused, so an old link still opens the
-list.
+Each content goes one at a time through the path a single one takes, so the
+validation, the timestamps and the webhooks are the same. One that fails leaves
+the rest done — *Published 2 contents. 1 could not be: title is required* — and
+one with nothing to do is left alone and counted, so republishing what is
+published does not move its `revisedAt`, and unpublishing a draft does not
+reissue its draft key: *Published 2 contents. 5 were already published.*
 
 ## The editor
 
@@ -284,10 +265,10 @@ A content is in one of three states, shown as its badge:
 
 ![The media library](img/media.png)
 
-Each card has a checkbox, and **Select all on this page** sits above the grid.
-With a selection, **Delete** appears and asks first, naming how many. A file some
-content still uses is refused one at a time as it is singly — the rest of the
-selection still goes, and the message says how many could not and why.
+Each card has a checkbox and **Select all** sits above the grid. With a
+selection, **Delete** appears and asks first, naming how many. A file some
+content still uses is refused as it is singly; the rest of the selection goes,
+and the message says how many could not and why.
 
 - **Upload** takes PNG, JPEG, GIF and WebP, several at once, up to 20 MB each.
   The type is decided by reading the file's leading bytes, not by what the browser
@@ -320,7 +301,7 @@ all of it.
 
 ![Delivery keys, management keys and the webhook secret](img/keys.png)
 
-- **Delivery keys** are what a site sends as `X-KOYA-API-KEY` to read this
+- **Delivery keys** are what a site sends as `X-KOYA-DELIVERY-KEY` to read this
   space's published content. Safe to put where a front end can reach it.
 - **Management keys** are what `(koya:deploy)` and the other management calls
   send as `Authorization: Bearer …`. A key reaches this space and nothing else —

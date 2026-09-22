@@ -7,7 +7,7 @@ info:
     Two JSON APIs on one server.
 
     * The **delivery API** (`/api/v1`) reads published content with a per-space
-      API key, created on the space's *Keys* page.
+      **delivery key**, created on the space's *Keys* page.
     * The **admin API** (`/admin/api`) manages the schema, contents, keys and media
       with a **management key** (made on the space's *Keys* page) as a Bearer
       token. A key belongs to one space: every route but `/admin/api/me` names a
@@ -33,13 +33,13 @@ servers:
 
 tags:
   - name: delivery
-    description: Published content, read with an API key
+    description: Published content, read with a delivery key
   - name: schema
     description: The stored schema and the diff against a new one
   - name: contents
     description: Contents including drafts
   - name: keys
-    description: Delivery API keys and the webhook secret
+    description: Delivery keys and the webhook secret
   - name: media
     description: The image library
 
@@ -54,7 +54,7 @@ paths:
         For a `list` model, a page of published contents. For an `object` model,
         its single content (published, or its draft with the right `draftKey`);
         `limit`, `offset`, `orders` and `filters` are ignored then.
-      security: [{ apiKey: [] }]
+      security: [{ deliveryKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
         - $ref: "#/components/parameters/model"
@@ -101,7 +101,7 @@ paths:
     get:
       tags: [delivery]
       summary: Read one published content
-      security: [{ apiKey: [] }]
+      security: [{ deliveryKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
         - $ref: "#/components/parameters/model"
@@ -478,7 +478,7 @@ paths:
       - $ref: "#/components/parameters/space"
     get:
       tags: [keys]
-      summary: The space's API keys and webhook secret
+      summary: The space's delivery keys and webhook secret
       security: [{ ownerSecret: [] }]
       responses:
         "200":
@@ -490,13 +490,13 @@ paths:
                 properties:
                   keys:
                     type: array
-                    items: { $ref: "#/components/schemas/ApiKey" }
+                    items: { $ref: "#/components/schemas/DeliveryKey" }
                   webhookSecret: { type: string }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       tags: [keys]
-      summary: Create an API key
+      summary: Create a delivery key
       description: The plaintext `key` appears in this response only; the server stores its SHA-256.
       security: [{ ownerSecret: [] }]
       requestBody:
@@ -525,7 +525,7 @@ paths:
   /admin/api/keys/{space}/{id}:
     delete:
       tags: [keys]
-      summary: Delete an API key
+      summary: Delete a delivery key
       security: [{ ownerSecret: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -672,11 +672,13 @@ paths:
 
 components:
   securitySchemes:
-    apiKey:
+    deliveryKey:
+      # the scheme's type is OpenAPI's own word; the header keeps its name for
+      # the sake of the clients already sending it
       type: apiKey
       in: header
-      name: X-KOYA-API-KEY
-      description: A key of the space being read (`koya_…`); a key from another space is 403.
+      name: X-KOYA-DELIVERY-KEY
+      description: A delivery key of the space being read (`koya_…`); one from another space is 403.
     ownerSecret:
       type: http
       scheme: bearer
@@ -953,7 +955,7 @@ components:
         offset: { type: integer }
         limit: { type: integer }
 
-    ApiKey:
+    DeliveryKey:
       type: object
       properties:
         id: { type: string }

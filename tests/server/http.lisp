@@ -4,7 +4,7 @@
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db #:exec)
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/schema-store #:save-schema #:create-space)
-  (:import-from #:koya-server/db/api-keys #:create-api-key)
+  (:import-from #:koya-server/db/delivery-keys #:create-delivery-key)
   (:import-from #:koya-server/db/management-keys #:create-management-key)
   (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
   (:import-from #:koya-server/db/webhook-deliveries
@@ -45,7 +45,7 @@
   (create-space "website")
   (create-space "other")
   (save-schema "website" (test-schema))
-  (setf *api-key* (create-api-key "website" :label "test"))
+  (setf *api-key* (create-delivery-key "website" :label "test"))
   (setf *management-key* (create-management-key "website" :label "test"))
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers)
@@ -98,7 +98,7 @@
           (values status (and (plusp (length text)) (ignore-errors (parse-json text)))))))))
 
 (defun delivery (path &key query (key *api-key*))
-  (request :get path :query query :headers (and key `(("x-koya-api-key" . ,key)))))
+  (request :get path :query query :headers (and key `(("x-koya-delivery-key" . ,key)))))
 
 (defun webhook-events () (mapcar (lambda (w) (jget (second w) "event")) (reverse *webhooks*)))
 
@@ -137,7 +137,7 @@
     (ok (= status 401) "the owner secret logs into the UI; it is not a management key"))
   (multiple-value-bind (status) (request :get "/admin/api/me" :headers '(("authorization" . "Bearer 鍵")))
     (ok (= status 401) "a token that is not even ASCII is just wrong, not an error"))
-  (multiple-value-bind (status) (request :get "/api/v1/website/blog" :headers '(("x-koya-api-key" . "鍵")))
+  (multiple-value-bind (status) (request :get "/api/v1/website/blog" :headers '(("x-koya-delivery-key" . "鍵")))
     (ok (= status 401)))
   (multiple-value-bind (status json) (admin :get "/admin/api/me")
     (ok (= status 200))
@@ -335,7 +335,7 @@
              (ok (equal (sent) '(("https://example.com/hook" "draft") ("https://example.com/preview" "draft")))
                  "a draft save reaches the space's hook and the one narrowed to blog, as draft")
              (ok (string= (jget (second (first *webhooks*)) "contents" "new" "title") "Draft") "with the draft data")
-             (ok (null (jget (second (first *webhooks*)) "type")) "the microCMS-style type is gone")
+             (ok (null (jget (second (first *webhooks*)) "type")) "the old type key is gone")
              (let ((id (jget json "id")))
                (setf *webhooks* '())
                (admin :patch (format nil "/admin/api/contents/website/blog/~a" id) :body (jobject "data" (jobject "title" "Draft 2")))
@@ -569,7 +569,7 @@
   (let ((env (list :request-method :get :script-name "" :path-info "/api/v1/website/blog" :query-string ""
                    :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                    :request-uri "/api/v1/website/blog" :url-scheme "http" :remote-addr "127.0.0.1"
-                   :headers (alist-hash-table `(("x-koya-api-key" . ,*api-key*)) :test 'equal)
+                   :headers (alist-hash-table `(("x-koya-delivery-key" . ,*api-key*)) :test 'equal)
                    :content-type nil :content-length nil :raw-body nil)))
     (destructuring-bind (status headers body) (funcall *app* env)
       (declare (ignore body))

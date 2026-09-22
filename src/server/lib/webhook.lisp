@@ -23,10 +23,9 @@
 ;;; Content change notifications:
 ;;; {"space": SPACE, "model": MODEL, "id": ID, "event": "publish"|"unpublish"|"delete"|"draft",
 ;;;  "contents": {"old": {...}|null, "new": {...}|null}}
-;;; Every webhook of the space gets every event for every model it covers; the
-;;; receiver reads "event" and decides what to do (a revalidation hook ignores
-;;; "draft"). A webhook covers every model unless its "only" narrows it.
-;;; What each call answered is kept in db/webhook-deliveries for the admin UI.
+;;; Every webhook gets every event for every model it covers ("only" narrows it),
+;;; and the receiver decides what to act on. What came back is kept in
+;;; db/webhook-deliveries.
 
 (defun default-sender (url payload headers)
   "POST PAYLOAD to URL. Returns (values STATUS BODY ERROR). A 4xx or 5xx is an

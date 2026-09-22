@@ -1,7 +1,7 @@
 (defpackage #:koya-server/api/v1/<space>/<model>/<id>
   (:use #:cl)
   (:import-from #:koya-server/lib/http #:path-param #:query-param #:fail-api)
-  (:import-from #:koya-server/lib/auth #:require-api-key)
+  (:import-from #:koya-server/lib/auth #:require-delivery-key)
   (:import-from #:koya-server/lib/query #:parse-query #:query-fields #:query-include)
   (:import-from #:koya-server/lib/content-service #:resolve-model)
   (:import-from #:koya-server/lib/presenter #:content->jobject)
@@ -13,7 +13,7 @@
   (let ((space-name (path-param params :space))
         (model-name (path-param params :model))
         (id (path-param params :id)))
-    (require-api-key space-name)
+    (require-delivery-key space-name)
     (multiple-value-bind (space model) (resolve-model space-name model-name)
       (let* ((query (parse-query params))
              (content (find-content space-name model-name id))

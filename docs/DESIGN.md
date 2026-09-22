@@ -8,9 +8,9 @@ Common Lisp 製ヘッドレス CMS。
 - 個人(単一オーナー)がセルフホストする、小さく堅いヘッドレス CMS。
 - ユーザーアカウント管理は持たない。管理画面は単一オーナー向け。
 - **マルチテナント対応**: 1インスタンスで複数サイト分のコンテンツを扱う。
-  テナントの単位を **space** と呼ぶ(microCMS の「サービス」相当)。
-- Strapi / Payload の重さ、microCMS 等 SaaS への依存から離れることが動機。
-  既存の skyizwhite/website は microCMS を利用しており、koya への移行先となる。
+  テナントの単位を **space** と呼ぶ。
+- セルフホスト CMS の重さと、SaaS への依存から離れることが動機。
+  既存の skyizwhite/website を koya へ移す。
 - 売り: 全部 Lisp(スキーマ・設定・管理 UI)、単一プロセスで動く、
   稼働中に REPL 接続してホットフィックス可能。
 
@@ -35,7 +35,7 @@ koya は **本体(server)** と **ライブラリ(client)** の2つで構成す�
   - **deploy**: 利用側の REPL で `(koya:deploy)` すると、定義が本体の管理 API に送られ、
     本体側のモデル定義が更新される(SQL の DDL は変わらない。4 章参照)。
   - **client**: `get-list` / `get-item` / `get-object` 等で配信 API を叩く。
-    microcms-lisp-sdk の後継。モデル定義を知っているので型に応じた変換ができる。
+    モデル定義を知っているので型に応じた変換ができる。
 - スキーマの **source of truth は利用側プロジェクトのコード**(git 管理)。本体の DB はその写し。
   ただし **space というテナントそのものは管理画面の持ち物**で、コードからは作られない(14 章 2026-09-22)。
 - 共通部分(フィールド型、バリデーション、スキーマのシリアライズ、ULID)は `koya/core` として
@@ -56,8 +56,7 @@ koya/
   Dockerfile
   docs/
     DESIGN.md         ; 本書
-    SCHEMA.md         ; スキーマ JSON 仕様(未作成、M2)
-    openapi.yaml      ; 配信 API / 管理 API 仕様(未作成、M2)
+    ADMIN-UI.md  CLIENT.md  SCHEMA.md  openapi.yaml
   src/
     main.lisp         ; koya パッケージ(config + client の再エクスポート)
     config.lisp       ; defmodel / defwebhooks / current-schema
@@ -69,7 +68,7 @@ koya/
       components/     ; フォーム入力などの hsx コンポーネント
       api/            ; 配信 API
       admin-api/      ; 管理 API(schema plan/deploy/pull、contents CRUD、keys)
-      db/             ; connection, migrations, schema-store, contents, api-keys
+      db/             ; connection, migrations, schema-store, schema-deploys, contents, delivery-keys ...
       lib/            ; env, auth, http, query, presenter, content-service, forms, page, webhook
   tests/              ; src/ を mirror
   assets/             ; style/(Tailwind 入力 / 出力)、js/(htmx, quill, koya-editor.js)
@@ -79,7 +78,7 @@ koya/
 
 - **コードファースト**。スキーマは `defmodel` マクロで Lisp コードとして定義し、git 管理する。
 - 非エンジニアによる管理 UI でのスキーマ編集はサポートしない(意図的な割り切り)。
-- 1プロジェクト = 1 space なので、モデル名は space を伴わない。microCMS 同様 **list 型 / object 型** を区別する。
+- 1プロジェクト = 1 space なので、モデル名は space を伴わない。**list 型 / object 型** を区別する。
 
 ```lisp
 ;; 評価される。webhook は全て space のもので、:only で対象モデルを絞る
@@ -116,7 +115,7 @@ koya/
 - 繰り返し(repeater)、カスタムフィールド(構造体)は初期スコープ外。
 - **richtext は HTML 文字列**。管理 UI では Quill(`assets/js/quill`、Snow テーマ)で編集し、
   `getSemanticHTML()` の結果を隠しフィールド経由で送る。API はその HTML をそのまま返す(`xxxHtml` は無い)。
-  当初の Markdown 入力(3bmd で HTML 化)は、Quill 採用に伴い廃止した。microCMS の HTML もそのまま取り込める。
+  当初の Markdown 入力(3bmd で HTML 化)は、Quill 採用に伴い廃止した。既存の HTML をそのまま取り込める。
 - モデルには `:preview-url` / `:public-url` のテンプレート(`{CONTENT_ID}` `{DRAFT_KEY}` を置換)を設定でき、
   編集画面に「Preview draft」(下書きがあるとき)と「Published page」(公開済みのとき)のリンクを出す。
 
@@ -132,14 +131,13 @@ koya/
 - 差分計算は本体側(`POST /admin/api/schema/{space}/plan`)で行い、クライアントは表示するだけ。
 - deploy は **既存の space 宛てにしか通らない**(無ければ `404 not_found`)。`KOYA_SPACE` の打ち間違いで
   空の space が増えることはない。
-- 適用した deploy は `schema_deploys` に1行残し、管理画面 `/s/{space}/deploys` で読む。残すのは
-  **差分(変更の一覧)と誰が流したか**だけで、スキーマ文書そのものは持たない。何も変えなかった
-  deploy は記録しない。
+- 適用した deploy は `schema_deploys` に1行残し、`/s/{space}/deploys` で読む。残すのは差分と
+  実行者だけで、スキーマ文書は持たない。何も変えなかった deploy は記録しない。
 - JSON 保存(4 章)のため field 削除でも `contents` のデータは消えない。
-- **リネーム**: model / field に `:was` を書くと、差分は削除+追加ではなく `rename_model` /
-  `rename_field` になり、deploy がスキーマ書き込みと同じトランザクションで `contents` の
-  model 名と JSON のキーを書き換える。失うものが無いので破壊的変更ではない。`:was` は
-  deploy への指示であって形ではないので本体は保存せず、`pull` で戻ってくることもない。
+- **リネーム**: model / field の `:was` は削除+追加ではなく `rename_model` / `rename_field` に
+  なり、deploy がスキーマ書き込みと同じトランザクションで `contents` の model 名と JSON の
+  キーを書き換える。失うものが無いので破壊的変更ではない。`:was` は保存しないので `pull` で
+  戻らない。
 
 ## 4. ストレージ
 
@@ -159,7 +157,7 @@ koya/
 | `spaces` | space。webhook 定義と webhook 署名鍵を持つ。管理画面で作る |
 | `models` | deploy されたモデル定義(`definition` はスキーマ文書そのままの JSON) |
 | `contents` | 全モデル共通のコンテンツ。`published` / `draft` が JSON |
-| `api_keys` | 配信キー(hash 保存) |
+| `delivery_keys` | 配信キー(hash 保存) |
 | `management_keys` | 管理 API キー(hash 保存)。表は分けたまま(14 章) |
 | `media` | アップロードされたファイルのメタデータ |
 | `webhook_deliveries` | webhook 送信ログ。`/s/{space}/webhooks` で見る |
@@ -170,7 +168,7 @@ koya/
 - モデル定義の変更はマイグレーション不要(`models.definition` が変わるだけ)。
   バリデーションは `koya/core` が担う。フィールド削除でも `contents` の JSON は残る。
 - 絞り込みは SQLite の JSON 関数(`json_extract`)。必要なら後で式インデックスを足す。
-- ID は **ULID**(`contents` `api_keys` `management_keys` `media` `webhook_deliveries`)。
+- ID は **ULID**(`contents` `delivery_keys` `management_keys` `media` `webhook_deliveries`)。
   Quicklisp に無いので `koya/core/ulid` として自前実装
   (48bit ミリ秒時刻 + 80bit 乱数、Crockford Base32、乱数は ironclad)。
 - 履歴が欲しくなったら `revisions` テーブルを追加する(初期は持たない)。
@@ -179,7 +177,7 @@ koya/
 
 - **REST のみ**。GraphQL は当面やらない。
 - **配信 API**: `GET /api/v1/{space}/{model}`、`GET /api/v1/{space}/{model}/{id}`。
-  microCMS 互換のサブセット: `limit` `offset` `orders` `fields` `filters` `draftKey`。
+  クエリは `limit` `offset` `orders` `fields` `filters` `draftKey`。
   参照は常に id で返し、`include=tags,author.avatar` のように名指ししたフィールドだけ埋め込む(`depth` は持たない)。
   レスポンスは `{contents, totalCount, offset, limit}`。object 型は単一オブジェクトを返す。
   `filters` は `[equals]` `[not_equals]` `[contains]` `[exists]` `[not_exists]`
@@ -196,20 +194,20 @@ koya/
   - `/admin/api/contents/{space}/{model}/{id}/publish` `/unpublish` `/discard-draft` `/draft-key`(`POST`。
     `discard-draft` は公開済みコンテンツの下書きを捨てて `published` に戻す。未公開なら 409。webhook は送らない)
   - `/admin/api/keys/{space}`: `GET` `POST`(平文キーは作成時のみ返す)、`/admin/api/keys/{space}/{id}`: `DELETE`
-  - `/admin/api/media/{space}`(M2)
+  - `/admin/api/media/{space}`: `GET` `POST`、`/admin/api/media/{space}/{id}`: `GET` `PATCH` `DELETE`
   - `/admin/api/me` 以外はすべて2番目のセグメントが space。management key はその space にしか通らず、
     他の space のパスは 403(ミドルウェアで deny by default)。
 - **システムフィールド**: `id` `createdAt` `updatedAt` `publishedAt` `revisedAt` は本体が管理し、
-  モデルのフィールド名として予約する(`defmodel` で宣言するとエラー)。microCMS と同じ扱い。
-- 配信 API の認証ヘッダは `X-KOYA-API-KEY`。
+  モデルのフィールド名として予約する(`defmodel` で宣言するとエラー)。
+- 配信 API の認証ヘッダは `X-KOYA-DELIVERY-KEY`。
 - 認証は 6 章。
 
 ### 非 Lisp クライアントへの配慮
 
 クライアントは将来 Lisp 以外(TypeScript 等)でも実装する。そのため API 関連は Lisp に依存しない形で固める。
 
-- **API は JSON のみ**。キーは camelCase(microCMS 互換。`publishedAt` `totalCount` など)。
-  Lisp クライアント側で kebab-case キーワードの plist に変換する(microcms-lisp-sdk と同じ流儀)。
+- **API は JSON のみ**。キーは camelCase(`publishedAt` `totalCount` など)。
+  Lisp クライアント側で kebab-case キーワードの plist に変換する。
 - **スキーマ定義の JSON 形式を仕様として文書化**する(`docs/SCHEMA.md`、`"koyaSchema": 1` のようなバージョン番号付き)。
   `defmodel` はこの JSON を生成する Lisp 用フロントエンドの一つに過ぎない、という位置づけ。
 - **管理 API も文書化**し、OpenAPI(YAML)を `docs/openapi.yaml` として置く。
@@ -234,7 +232,7 @@ koya/
   RFC 6238(SHA-1、30 秒、6 桁、前後 1 ステップ許容)。使ったステップはプロセス内で記憶し、同じコードで二度は入れない。
   シークレットが違えばコードの正否は判定しない(コードを消費しない)。対象はブラウザのログインのみで、
   管理 API の Bearer は機械向けなので変えない。QR は同梱の qrcode.js(davidshimjs、MIT)でブラウザ側で描く。
-- 配信 API: space ごとの API キー(`X-KOYA-API-KEY`)。**本体側で生成し、管理 UI に表示**する。
+- 配信 API: space ごとの配信キー(`X-KOYA-DELIVERY-KEY`)。**本体側で生成し、管理 UI に表示**する。
   利用側は `.env` に置いてクライアントへ渡す。利用側コードにシークレットを置かない。
   キーは高エントロピーの乱数なので SHA-256 ハッシュで保存する(bcrypt は使わない)。
 - ningle-actions のエンドポイントも含め、管理側は全てセッション必須。CSRF は Origin ヘッダ検証。
@@ -248,41 +246,42 @@ koya/
 ## 7. 管理 UI
 
 - **Lisp フルスタック**。フロントも含めて Lisp で書く。
-- SSR: hsx(HTML S 式)。SPA・JS ビルドチェーンは持ち込まない。
-  HTMX と ningle-actions は配線済みだが現時点で使う画面は無い(M2 のメディアモーダルで使う予定)。
-  素の JS は `assets/js/koya-editor.js` の1ファイルのみ(Quill 初期化、一覧の行リンク、複数参照のチップ UI)。
+- SSR: hsx(HTML S 式)。SPA・JS ビルドチェーンは持ち込まない。素の JS は
+  `assets/js/koya-editor.js` の1ファイルのみ。HTMX + ningle-actions はメディアピッカーで使う。
 - ルーティング: ningle-fbr(ファイルベース)。
 - CSS: Tailwind CSS v4(スタンドアロンバイナリ、`justfile` でビルド)。
 - フォームは DB 上のモデル定義から動的生成(フィールド型 → 入力コンポーネントの対応表)。
 - richtext は Quill。フォーム送信時に HTML を隠しフィールドへ書き戻す(`assets/js/koya-editor.js`)。
 - 完了メッセージはセッションに載せる一度きりの flash(リダイレクト後に一度だけ表示)。
-- 画面(実装済みパス): `/login`、`/`(space 一覧。作成と削除もここ)、`/s/{space}`(モデル一覧。種別アイコン、list 型は件数)、
-  `/s/{space}/keys`(配信キー・management key・webhook secret)、
-  `/s/{space}/m/{model}`(コンテンツ一覧。object 型は単一コンテンツの編集画面へリダイレクト)、
-  `/s/{space}/m/{model}/{id}`(編集。`{id}` = `new` で新規)。**メディアライブラリ**(8 章)は M2。
-- コンテンツ一覧は作成日時の新しい順。列はモデルの全フィールドのプレビュー(richtext はタグ除去、
-  参照は参照先のラベル、60 文字で省略)と status で、created / updated は出さない。
-  列幅はフィールドの型ごとに下限と上限を決め、その間でプレビューを折り返す。下限があるのでフィールドが
-  多いモデルは横スクロールになる。行全体が編集画面へのリンク。
+- 画面: `/login`、`/`(space の一覧・作成・削除)、`/settings`、`/s/{space}`(モデル一覧)、
+  `/s/{space}/keys`、`/s/{space}/media`、`/s/{space}/webhooks`(送信ログ)、
+  `/s/{space}/deploys`(スキーマ変更ログ)、`/s/{space}/m/{model}`(コンテンツ一覧。object 型は
+  単一コンテンツの編集画面へリダイレクト)、`/s/{space}/m/{model}/{id}`(編集。`new` で新規)。
+- コンテンツ一覧は作成日時の新しい順、20 件/ページ(管理 UI の一覧は全て 20)。列はモデルの全フィールドの
+  プレビュー(richtext はタグ除去、参照は参照先のラベル)と status。列幅は型ごとに下限と上限があり、
+  フィールドが多いモデルは横スクロールになる。行全体が編集画面へのリンク。
+- 一覧は `?q=`(テキスト系フィールドと id の完全一致)、`?status=`(バッジの3値)、`?sort=` で絞り込み・
+  並べ替えができ、状態はクエリ文字列に載る。チェックボックスで選んで Publish / Unpublish / Delete を
+  まとめて実行できる(1件ずつ content-service を通す)。メディアライブラリも同じく選択して一括削除。
 - フォームは通常の POST(`action` = save / publish / unpublish / discard / delete)で送る。
   「Discard draft」は `published+draft` のときだけ出る。未公開の下書きは Delete が破棄に相当する。
 - 管理側の POST は `Origin` / `Referer` が `Host` または `KOYA_BASE_URL` と一致することを要求する(CSRF 対策)。
-- `:datetime` の入力は `datetime-local` で、値は UTC として扱う(タイムゾーン変換は M2 で JS を足す)。
+- `:datetime` の入力は `datetime-local`。表示と入力は設定画面で選んだタイムゾーンに変換し(`lib/timezone`)、
+  保存と配信は UTC のまま。
 - `:slug` はフォーム・API のどちらでも、空なら `:from` のフィールドから本体側で自動生成する(ASCII のみ)。
 - `:reference` の入力は参照先モデルの全コンテンツ(下書き含む、上限 1000 件)を選択肢にした `select`。
   単一はドロップダウン、`:many` は `<select multiple>` を JS で「選択済みチップ + 追加用ドロップダウン」に置き換える
   (JS 無効時はリストボックスのまま使える)。選択肢のラベルは最初の text / slug フィールドの値、無ければ id。
   `select` の見た目はブラウザ標準(`select { all: revert }`)。
-- `:media` の入力はメディアライブラリができるまで id のテキスト入力。
-- `:media` フィールドはメディアライブラリをモーダルで開き、その場でアップロードと選択を行う(8 章)。
+- `:media` の入力はメディアライブラリをモーダルで開き、その場でアップロードと選択を行う(8 章)。
 - 実装スタイルは skyizwhite/website に準拠(10 章)。
 
 ## 8. メディア・アセット
 
 - 初期スコープは **画像アップロードのみ**。
 - **メディアライブラリ方式**: メディアは常に space ごとのライブラリに属し、コンテンツのフィールドは
-  ライブラリ内のメディアを参照する。フィールドにファイルを直接紐付ける方式は取らない。
-  Contentful / WordPress のメディアライブラリと同じ流儀。
+  ライブラリ内のメディアを参照する。フィールドにファイルを直接紐付ける方式は取らない
+  (同じ画像を複数のコンテンツから使える)。
 - ライブラリには2つの入口がある。どちらも同じ一覧・アップロードのコンポーネントを使う。
   - **専用のメディア管理画面**(space ごと): アップロード、一覧、詳細、削除。
   - **コンテンツ編集画面の `:media` フィールド**: 「メディアを選ぶ」でメディアライブラリを
@@ -310,7 +309,7 @@ koya/
 ## 9. 下書き・公開・バージョニング
 
 - `contents.published` と `contents.draft` の2カラム。status は `draft` / `published` / `published+draft`。
-- `draftKey` でドラフトをプレビュー取得(microCMS 互換)。下書き保存のたびに draft key を再生成し、
+- `draftKey` でドラフトをプレビュー取得。下書き保存のたびに draft key を再生成し、
   公開すると消す(古いプレビュー URL は無効になる)。
 - **webhook** は `defwebhooks` にまとめて `(webhook label url &key only)` で定義する。全て space のもので、
   既定では全モデルに発火し、`:only`(モデル名 1 つ、またはリスト)で絞る。モデル側には webhook を持たせない。
@@ -331,7 +330,7 @@ website(skyizwhite/website)で実績のある構成をそのまま踏襲する�
 | 依存管理 | qlot(`qlfile`、自作ライブラリは git 指定) |
 | HTTP | Clack / Lack。開発: Hunchentoot、本番: Woo |
 | ルータ | jingle(ningle 拡張)+ ningle-fbr |
-| 部分更新 | ningle-actions + HTMX(配線のみ。M2 のメディアモーダルから使用) |
+| 部分更新 | ningle-actions + HTMX(メディアピッカー) |
 | テンプレート | hsx |
 | ミドルウェア | lack-mw(trailing-slash)、clack-errors、lack accesslog / mount / session |
 | DB | cl-dbi + dbd-sqlite3 + sxql |
@@ -390,7 +389,7 @@ website から流用するパターン:
 今後やることは GitHub issues で管理する(<https://github.com/skyizwhite/koya/issues>)。
 ここに残すのは、どこまで作ったかの記録だけ。
 
-### M1: website が microCMS から乗り換えられる最小構成
+### M1: website が乗り換えられる最小構成
 
 - `koya/core`: schema plist、フィールド型(text / textarea / richtext / datetime / boolean)、
   バリデーション、JSON シリアライズ、ULID。
@@ -430,24 +429,24 @@ core / server / UI・client を通しでレビューし、確認できた問題�
 
 ### その後の記録(2026-09-21 時点)
 
-koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ済み。microCMS からのインポートを残して移行はほぼ完了。
+koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ済み。コンテンツのインポートを残して移行はほぼ完了。
 
 - ~~**ドキュメント整備**~~(2026-09-21 完了): 利用者向けに `docs/ADMIN-UI.md`(管理 UI)、`docs/CLIENT.md`
   (ライブラリ)、`docs/SCHEMA.md`(スキーマ JSON の仕様、`koyaSchema: 1`)、`docs/openapi.yaml`
   (配信 API / 管理 API)を書き、README は要約とリンクに絞った。DESIGN.md は経緯込みの設計書として残す。
 - ~~管理 UI: `:datetime` 入力のタイムゾーン変換~~(2026-09-21 完了。JS ではなくサーバ側で変換: 設定画面で選ぶ IANA 名の
   タイムゾーンを `settings` に保存し、`lib/timezone` が local-time で表示・入力を変換。保存と配信は UTC のまま)。
-  ~~一覧のページング~~(2026-09-21 完了。100 件/ページ、`?page=`)。
+  ~~一覧のページング~~(2026-09-21 完了。`?page=`。件数は後に 20 に統一)。
 - ~~セキュリティ: 管理 API 用に `KOYA_SECRET` と別のトークン~~(2026-09-21 完了。鍵は owner / management /
   delivery / webhook の 4 種。management key は Settings で発行、`management_keys` に SHA-256 保存、
   管理 API の Bearer はこれのみ。`KOYA_SECRET` はログイン専用に。クライアントは `:management-key` /
   `KOYA_MANAGEMENT_KEY`。0.2.0)。webhook 単位の秘密(`:secret`)は受け口が増えたときに。
 - 2026-09-21: webhook の `:events` は必須化したのち同日撤廃(0.3.0): 全 webhook に全イベントを送り、payload の
-  `event`(publish / unpublish / delete / draft)で受け手が分岐する。microCMS 互換の `type` は廃止。`:boolean` の `:default t` を
+  `event`(publish / unpublish / delete / draft)で受け手が分岐する。旧来の `type` は廃止。`:boolean` の `:default t` を
   新規作成時に適用。参照中のメディアは削除拒否(409 `in_use`)。
 - 2026-09-21: webhook payload のキーを koya の語彙に揃えた(0.4.0): `service` → `space`、`api` → `model`。
-  microCMS の「サービス / API」に寄せた名前をやめ、スキーマと同じ space / model で呼ぶ。v0.3.0 を配信済みなので
-  受け手側(website の revalidate ハンドラ)の改修が必要。あわせて配信 API の `X-MICROCMS-API-KEY` 互換の記述と、
+  借り物の「サービス / API」という名前をやめ、スキーマと同じ space / model で呼ぶ。v0.3.0 を配信済みなので
+  受け手側(website の revalidate ハンドラ)の改修が必要。あわせて配信 API の互換ヘッダの記述と、
   openapi に残っていた `type` `new` / `edit` の記述を削除(実装は 0.3.0 で既に落ちていた)。
 - 2026-09-21: webhook の配信結果(ステータス / レスポンス本文 / 到達しなかったときのエラー)を
   `webhook_deliveries` に記録し、管理画面 `/s/{space}/webhooks` で見られるようにした(0.4.0)。space ごとに
@@ -481,7 +480,7 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-20 | 反映関数の名前は `deploy`(`push` は `cl:push` と衝突するため) | shadow してまで `push` を使わない |
 | 2026-09-20 | `(space model)` の組でモデル命名、list/object 型を区別 | website の about/works が object 型 |
 | 2026-09-20 | 汎用 contents テーブル + JSON、ULID | モデル変更でマイグレーション不要 |
-| 2026-09-20 | 配信 API は microCMS 互換サブセット | website がほぼ無改修で移行できる |
+| 2026-09-20 | 配信 API のクエリは移行元に合わせたサブセット | website がほぼ無改修で移行できる |
 | 2026-09-20 | richtext は Markdown 入力 → HTML 変換 | JS エディタを持ち込まない |
 | 2026-09-20 | push は JSON 転送、plan → apply、差分計算は本体側 | 非 Lisp クライアントを将来実装するため |
 | 2026-09-20 | API は camelCase JSON、スキーマ JSON と OpenAPI を仕様化 | 同上 |
@@ -494,17 +493,17 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-20 | Markdown は 3bmd | 保守状況と拡張の充実 |
 | 2026-09-20 | 本体テーブルは起動時自動マイグレーション(up のみ) | 単一プロセス運用で十分 |
 | 2026-09-20 | テストは fukamachi/rove | website と同じ |
-| 2026-09-20 | JSON は jzon + kebab(jonathan ではなく) | microcms-lisp-sdk と同じ流儀。hash-table ベースで扱いやすい |
+| 2026-09-20 | JSON は jzon + kebab(jonathan ではなく) | 従来使っていた SDK と同じ流儀。hash-table ベースで扱いやすい |
 | 2026-09-20 | richtext の HTML 化は読み出し時 | DB にレンダラ依存の HTML を残さない |
-| 2026-09-20 | システムフィールド名(publishedAt 等)を予約 | microCMS 同様、公開日時は本体が管理する |
+| 2026-09-20 | システムフィールド名(publishedAt 等)を予約 | 公開日時は本体が管理する |
 | 2026-09-20 | 破壊的 push は 409 → `force=true` で再送 | 確認の UI をクライアント側に置きつつ判定は本体 |
 | 2026-09-20 | 管理 API は `/admin/api/contents/…` `/admin/api/keys/…` に配置 | `schema` 等の固定パスと space 名の衝突を避ける |
-| 2026-09-20 | 配信 API は `X-MICROCMS-API-KEY` も受理 | 既存 SDK からの移行を容易にする |
+| 2026-09-20 | 配信 API は移行元の互換ヘッダも受理 | 既存 SDK からの移行を容易にする |
 | 2026-09-20 | Webhook は space ごとの秘密を `X-KOYA-WEBHOOK-KEY` で送る(管理 UI で表示・ローテート) | 受け側が呼び出し元を検証できるようにする |
-| 2026-09-20 | 作成・公開時に `id` と `publishedAt` を明示指定できる。参照 id は URL セーフ文字列なら可 | microCMS からの移行で URL と公開日を維持する |
-| 2026-09-20 | 作成時は `createdAt` `updatedAt` `revisedAt` も明示指定できる | microCMS の 4 つのシステム日時をそのまま持ち込む。未指定は現在時刻 |
+| 2026-09-20 | 作成・公開時に `id` と `publishedAt` を明示指定できる。参照 id は URL セーフ文字列なら可 | 移行で URL と公開日を維持する |
+| 2026-09-20 | 作成時は `createdAt` `updatedAt` `revisedAt` も明示指定できる | 移行元の4つのシステム日時をそのまま持ち込む。未指定は現在時刻 |
 | 2026-09-20 | website の移行は `koya-migration` ブランチで実施(ローカル koya で全ページ表示を確認) | M1 完了条件 |
-| 2026-09-20 | richtext は Quill で編集する HTML 文字列に変更(Markdown / 3bmd 廃止) | 管理 UI の使い勝手。microCMS の HTML をそのまま移行できる |
+| 2026-09-20 | richtext は Quill で編集する HTML 文字列に変更(Markdown / 3bmd 廃止) | 管理 UI の使い勝手。既存の HTML をそのまま移行できる |
 | 2026-09-20 | モデルに `:preview-url` / `:public-url` テンプレート、draft key は保存ごとに再生成、flash はセッション一度きり | 管理 UI 改善の要望 |
 | 2026-09-20 | 参照の展開は `depth` ではなく `include`(フィールド名指し、`a.b` で入れ子)。デフォルトは id のみ | 必要な参照だけ取る。深さ指定は不要な展開を招く |
 | 2026-09-20 | 管理 UI の一覧は全フィールドのプレビュー + status、行全体がリンク。reference は select(複数はチップ + ドロップダウン)、見た目はブラウザ標準 | 一覧で内容を判断できるように。参照 id の手入力をやめる |
@@ -515,10 +514,10 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-20 | メディアは koya 自身が `/media/` で配信。形式は先頭バイトで判定し PNG / JPEG / GIF / WebP のみ、SVG は不可 | 外部ストレージなしで完結させる。Content-Type 詐称と SVG 経由のスクリプトを避ける |
 | 2026-09-20 | `:media` は配信 API で常にオブジェクト展開(`include` 不要) | 画像は URL が無いと使えず、展開が入れ子になることもない |
 | 2026-09-20 | 二段階認証は TOTP。管理画面の設定ページで有効化し鍵は `settings` テーブルへ。`KOYA_TOTP_SECRET` は上書き用 | REPL より画面の方が親切。初期無効で、アプリのコード確認を経て有効化 |
-| 2026-09-20 | webhook は label / url / events を持ち、space(全モデル)とモデルの両方に定義できる。秘密は space 単位のまま | microCMS の API 単位・イベント設定を code で取り込む。下書きイベントでプレビュービルド等を回せる |
+| 2026-09-20 | webhook は label / url / events を持ち、space(全モデル)とモデルの両方に定義できる。秘密は space 単位のまま | 移行元の API 単位・イベント設定を code で取り込む。下書きイベントでプレビュービルド等を回せる |
 | 2026-09-20 | `defmodel` の `:kind` は必須(`:list` / `:object`)。省略はマクロ展開時にエラー | 既定値があると list か object か読み手に分からない |
 | 2026-09-20 | セッションはメモリストアをやめ SQLite の `sessions` テーブルに置く(24 時間、使うたび延長、起動時に期限切れを掃除) | 再起動・再デプロイのたびにログアウトしていたため |
-| 2026-09-20 | 配信 API の互換ヘッダ `X-MICROCMS-API-KEY` を廃止。デプロイ前レビューで本文サイズ上限・ログインロック・セッション失効・空セッション非保存を追加 | 他社名を残さない。本番公開前に DoS とブルートフォースの入口を塞ぐ |
+| 2026-09-20 | 配信 API の移行元互換ヘッダを廃止。デプロイ前レビューで本文サイズ上限・ログインロック・セッション失効・空セッション非保存を追加 | 他社名を残さない。本番公開前に DoS とブルートフォースの入口を塞ぐ |
 | 2026-09-22 | space は管理画面で作る資源にし、コードからは作られない。deploy は `/admin/api/schema/{space}` で1つの space に閉じる | space はコンテンツ・メディア・キーを抱えるテナントで、寿命がスキーマより長い。全体 PUT のままでは他サイトのリポジトリからの deploy が別 space を消しうる |
 | 2026-09-22 | スキーマ文書から `spaces` を外し、`{koyaSchema, webhooks, models}` の単一 space 形式に。DSL は `defspace` を廃して `defwebhooks`、`defmodel` は space 名を取らない | 1プロジェクト1 space が前提になり、モデル定義ごとに space 名を書く必要がなくなる。差分から `add_space` / `remove_space` も消える |
 | 2026-09-22 | management key を space 単位にし、`/admin/api/me` 以外は「パスの2番目のセグメント = キーの space」をミドルウェアで強制(deny by default) | 利用側の `.env` が他サイトに届かないようにする。配信キーと同じ粒度に揃う |
@@ -531,3 +530,5 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-22 | model / field のリネームは `:was` で宣言する。deploy が `contents` の model 名と JSON のキーを同じトランザクションで書き換え、`:was` 自体は保存しない | 名前で突き合わせる差分ではリネームが削除+追加になり、model なら contents ごと消え(FK の ON DELETE CASCADE)、field なら値が旧キーに取り残されて編集画面から見えず次の保存で落ちる。宣言があれば「同じもの」と分かるので、破壊的変更にせずに済む |
 | 2026-09-23 | 管理画面の一覧に検索・ステータス絞り込み・並べ替えを追加し、状態は全てクエリ文字列に置く。検索対象はテキスト系フィールドと id で、**id だけは完全一致** | 配信 API の `build-where` / `build-order-by` をそのまま使い、問い合わせ経路を二重に持たない。ULID は同時期の生成分が長い接頭辞を共有するため、id を部分一致にすると短い語で全件ヒットして検索が壊れる。id は配信 API のレスポンスやログから貼って引くためのもの |
 | 2026-09-23 | deploy の差分を `schema_deploys` に残し、`/s/{space}/deploys` で git のように色付きで読む。保存するのは差分と実行者だけで、スキーマ文書は持たない | 「いつあのフィールドが消えたか」をソースの履歴を辿らずに答えられるようにする。文書まで持てば巻き戻しに届くが、それは別の機能で、持たない分だけ小さい。表示は `plan` が REPL に出す行そのものを色分けするので、適用前に読むものと後から読むものが同じ言葉になる |
+| 2026-09-23 | 配信 API の認証ヘッダを `X-KOYA-API-KEY` → `X-KOYA-DELIVERY-KEY` に改名。旧ヘッダは受け付けない | 語彙を delivery key に統一した際にワイヤだけ据え置いていたが、呼び名が2つある状態を残す方が高くつく。利用者は koya 本体と website の2つだけなので、互換受理を置かずに切り替える(koya をデプロイした後に `qlot update koya` で website を追従させる) |
+| 2026-09-23 | `api_keys` を `delivery_keys` に改名(マイグレーション 8)、`db/api-keys` パッケージと関数名も delivery に揃えた | ヘッダを `X-KOYA-DELIVERY-KEY` にした以上、内部だけ古い名前を残す理由が無くなった。テーブル名の変更は `ALTER TABLE ... RENAME TO` 1文で、参照する外部キーも無い |

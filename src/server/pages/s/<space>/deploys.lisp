@@ -14,17 +14,12 @@
   (:export #:@get #:deploys-url))
 (in-package #:koya-server/pages/s/<space>/deploys)
 
-;;; What each deploy of this space's schema changed, newest first. A deploy comes
-;;; from a project's own repository through the client, so this page is the one
-;;; place in koya where "when did that field go" has an answer; it is read-only,
-;;; like the schema itself.
+;;; What each deploy of this space's schema changed, newest first. Read-only:
+;;; deploys come from the project's repository through the client.
 ;;;
-;;; A change is drawn as the line PLAN prints for it, so what someone reads here
-;;; and what they read in the REPL before applying it are the same words. The
-;;; colour is the same distinction the marker makes: + is new, - is gone, ~ is
-;;; changed, and anything destructive is red whatever its marker.
+;;; Each change is drawn as the line PLAN prints for it.
 
-(defparameter +page-size+ 20 "Deploys per page, as everywhere else in the admin UI.")
+(defparameter +page-size+ 20)
 
 (defun deploys-url (space &key page)
   (format nil "~a/deploys~@[?page=~a~]" (space-url space) (and page (> page 1) page)))
@@ -35,9 +30,8 @@
 (defun blank-p (value) (or (null value) (zerop (length value))))
 
 (defun deployed-by (deploy)
-  "Whoever deployed, in words. What is stored is what the server knew -- \"owner\",
-or \"key:<label>\" -- so the wording lives here and changing it changes every row,
-not only the ones written afterwards."
+  "\"owner\" or \"key:<label>\" as stored, in words. Kept out of the row so that
+rewording it reaches the rows already written."
   (let ((by (or (deploy-by deploy) "")))
     (cond ((string= by "key:") "(management key)")
           ((eql 0 (search "key:" by)) (format nil "(management key: ~a)" (subseq by 4)))
@@ -64,8 +58,7 @@ not only the ones written afterwards."
          (span :class "font-medium" (format nil "~a change~:p" (deploy-change-count deploy)))
          (when (deploy-destructive deploy)
            (hsx (span :class "badge bg-danger/10 text-danger" "destructive")))
-         ;; a deploy from the REPL names nobody; a dangling separator would be
-         ;; the page saying there is an answer it forgot to print
+         ;; a deploy from the REPL names nobody
          (unless (blank-p (deployed-by deploy))
            (hsx (span :class "text-muted" (format nil "· ~a" (deployed-by deploy))))))
        (span :class "shrink-0 whitespace-nowrap text-muted" (short-time (deploy-created-at deploy))))
@@ -80,8 +73,7 @@ not only the ones written afterwards."
      (~layout :space space :crumbs (list (cons "Schema Deploys" nil))
        (h1 :class "mb-2 text-2xl font-bold" "Schema Deploys")
        (p :class "mb-4 text-sm text-muted"
-         (format nil "~a deploy~:p changed this space's schema." total)
-         (format nil " Only the newest ~a are kept." +keep-per-space+))
+         (format nil "~a deploy~:p, the newest ~a kept." total +keep-per-space+))
        (if (null items)
            (hsx (~empty-state "Nothing has been deployed yet."))
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"

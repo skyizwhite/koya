@@ -207,10 +207,9 @@ newest 200 deliveries and shown in the admin UI at `/s/{space}/webhooks`; see
 
 ## Renaming a model or a field
 
-Everything is matched by name, so renaming one in `defmodel` and deploying reads
-as a removal and an addition: the model's contents go with it, and a renamed
-field leaves its value behind under the old key, where the editor cannot see it
-and the next save drops it. `:was` says it is the same thing under a new name:
+Everything is matched by name, so renaming one in `defmodel` reads as a removal
+and an addition: the model's contents go with it, and a renamed field's values
+are left under the old key. `:was` says it is the same thing under a new name:
 
 ```lisp
 (defmodel article (:kind :list :was post)   ; was (defmodel post ...)
@@ -218,21 +217,17 @@ and the next save drops it. `:was` says it is the same thing under a new name:
   (subtitle :text :was lede))               ; was (lede :text)
 ```
 
-A deploy then renames it and carries the content with it — the contents move to
-the new model, and the key moves in every published object and every draft — in
-the same transaction as the schema write. Nothing is lost, so a rename is not a
-destructive change and needs no `:force`; changing the type or tightening the
-options in the same deploy still is.
+The deploy renames it and moves the content with it — the contents to the new
+model, the key in every published object and draft — in the same transaction as
+the schema write. Nothing is lost, so a rename is not destructive and needs no
+`:force`; changing the type or tightening the options at the same time still is.
 
 `:was` is an instruction to the deploy, not part of the schema: the server stores
-the new name alone, so `pull` never brings a `:was` back. Leaving it in the source
-is harmless — it then names something the schema no longer has, and later deploys
-see no change — and deleting it once the rename is deployed is just as fine.
-
-*Deployed* there means deployed to **every space this schema goes to**. A space
-still at the old shape reads the version without `:was` as a removal and an
-addition: it would be refused as destructive, and forced through it would take
-that space's contents with it. Keep the `:was` until staging has had it too.
+the new name alone, so `pull` never brings one back. Leaving it in the source is
+harmless, and so is deleting it — but only once **every space this schema goes
+to** has had the rename. A space still at the old shape reads the version without
+`:was` as a removal and an addition, and forcing that through takes its contents
+with it.
 
 What `:was` names must be something else: not the field or model itself, not a
 system field, and not another field or model the schema still declares. The full
@@ -273,7 +268,7 @@ of the management key that sent it — and is read afterwards in the admin UI at
 
 ## Reading content
 
-These need an API key and return published data only.
+These need a delivery key and return published data only.
 
 ```lisp
 (koya:get-list 'blog)
@@ -309,7 +304,7 @@ are the same.
 | `:include` | reference fields to embed |
 | `:draft-key` | with `get-item` / `get-object`, serves that content's draft |
 
-`:filters` is microCMS's syntax: `field[op]value`, joined with `[and]` and
+`:filters` is `field[op]value`, joined with `[and]` and
 `[or]` (`[or]` separates groups of `[and]` terms). Operators are `equals`,
 `not_equals`, `contains`, `not_contains`, `begins_with`, `exists`, `not_exists`,
 `less_than` and `greater_than`. On a `:many` field, `equals` and `contains` mean
