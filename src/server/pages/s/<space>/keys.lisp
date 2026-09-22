@@ -63,17 +63,14 @@
      (section
        (h2 :class "mb-1 text-lg font-bold" "Delivery keys")
        (p :class "mb-4 text-sm text-muted"
-         "Sent as " (code "X-KOYA-DELIVERY-KEY") " to read this space's published content through the delivery API. "
-         "Safe to put where a site's front end can reach it.")
+         "Read-only access to this space's published content.")
        (when new-delivery-key (hsx (~new-key :key new-delivery-key)))
        (~key-table :space space :keys (list-delivery-keys space) :delete-action "delete")
        (~create-key :space space :action "create" :placeholder "e.g. production site"))
      (section :class "mt-12"
        (h2 :class "mb-1 text-lg font-bold" "Management keys")
        (p :class "mb-4 text-sm text-muted"
-         "Sent as " (code "Authorization: Bearer …") " to the admin API: schema deploys and content or media "
-         "management from a site's code or REPL. A key reaches this space and nothing else, and does not log "
-         "into this UI; the owner secret does the opposite.")
+         "Read and write content, and deploy schema changes.")
        (when new-management-key (hsx (~new-key :key new-management-key)))
        (~key-table :space space :keys (list-management-keys space) :delete-action "delete-management")
        (~create-key :space space :action "create-management" :placeholder "e.g. deploys from CI"))
