@@ -24,7 +24,7 @@
 ;;; colour is the same distinction the marker makes: + is new, - is gone, ~ is
 ;;; changed, and anything destructive is red whatever its marker.
 
-(defparameter +page-size+ 20)
+(defparameter +page-size+ 20 "Deploys per page, as everywhere else in the admin UI.")
 
 (defun deploys-url (space &key page)
   (format nil "~a/deploys~@[?page=~a~]" (space-url space) (and page (> page 1) page)))
@@ -62,14 +62,12 @@ not only the ones written afterwards."
      (div :class "mb-2 flex flex-wrap items-center justify-between gap-2 text-sm"
        (span :class "flex items-center gap-2"
          (span :class "font-medium" (format nil "~a change~:p" (deploy-change-count deploy)))
-         (if (deploy-destructive deploy)
-             (hsx (span :class "badge bg-danger/10 text-danger" "destructive"))
-             (hsx (<>)))
+         (when (deploy-destructive deploy)
+           (hsx (span :class "badge bg-danger/10 text-danger" "destructive")))
          ;; a deploy from the REPL names nobody; a dangling separator would be
          ;; the page saying there is an answer it forgot to print
-         (if (blank-p (deployed-by deploy))
-             (hsx (<>))
-             (hsx (span :class "text-muted" (format nil "· ~a" (deployed-by deploy))))))
+         (unless (blank-p (deployed-by deploy))
+           (hsx (span :class "text-muted" (format nil "· ~a" (deployed-by deploy))))))
        (span :class "shrink-0 whitespace-nowrap text-muted" (short-time (deploy-created-at deploy))))
      (~diff :changes (deploy-changes deploy)))))
 
@@ -89,16 +87,13 @@ not only the ones written afterwards."
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                   (loop :for deploy :in items :collect
                     (hsx (~deploy :deploy deploy))))))
-       (if (> pages 1)
-           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                  (if (> page 1)
-                      (hsx (a :href (deploys-url space :page (1- page)) :class "btn" (~icon :name :prev) "Previous"))
-                      (hsx (<>)))
-                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                  (if (< page pages)
-                      (hsx (a :href (deploys-url space :page (1+ page)) :class "btn" "Next" (~icon :name :next)))
-                      (hsx (<>)))))
-           (hsx (<>)))))))
+       (when (> pages 1)
+         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
+                (when (> page 1)
+                  (hsx (a :href (deploys-url space :page (1- page)) :class "btn" (~icon :name :prev) "Previous")))
+                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
+                (when (< page pages)
+                  (hsx (a :href (deploys-url space :page (1+ page)) :class "btn" "Next" (~icon :name :next)))))))))))
 
 (defun @get (params)
   (with-owner

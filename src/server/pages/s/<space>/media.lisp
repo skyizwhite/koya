@@ -13,7 +13,7 @@
   (:export #:@get #:@post #:media-page-url))
 (in-package #:koya-server/pages/s/<space>/media)
 
-(defparameter +page-size+ 48)
+(defparameter +page-size+ 20 "Files per page, as many as the lists show rows.")
 
 (defun media-page-url (space) (format nil "~a/media" (space-url space)))
 
@@ -78,20 +78,17 @@ is no control at all."
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp"
                   :multiple t :class "hidden" :data-submit-on-change t))
          (span :class "text-muted" "PNG, JPEG, GIF or WebP, several at once."))
-       (if items
-           (hsx (~selection :space space :search search :page page))
-           (hsx (<>)))
+       (when items
+         (hsx (~selection :space space :search search :page page)))
        (~media-grid :items items :space space :bulk-form +bulk-form+)
        (~media-preview-dialog)
        (when (> pages 1)
          (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                (if (> page 1)
-                    (hsx (a :href (page-link (1- page) search) :class "btn" (~icon :name :prev) "Previous"))
-                    (hsx (<>)))
+                (when (> page 1)
+                  (hsx (a :href (page-link (1- page) search) :class "btn" (~icon :name :prev) "Previous")))
                 (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                (if (< page pages)
-                    (hsx (a :href (page-link (1+ page) search) :class "btn" "Next" (~icon :name :next)))
-                    (hsx (<>))))))))))
+                (when (< page pages)
+                  (hsx (a :href (page-link (1+ page) search) :class "btn" "Next" (~icon :name :next)))))))))))
 
 (defun @get (params)
   (with-owner

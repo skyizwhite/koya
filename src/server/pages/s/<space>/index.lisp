@@ -40,10 +40,9 @@
                                         (span :class "flex items-center gap-3 font-medium"
                                           (~model-icon :kind (model-kind model) :class "h-4 w-4 text-muted")
                                           (model-name model))
-                                        (if (eq (model-kind model) :list)
-                                            (hsx (span :class "text-sm text-muted"
-                                                   (format nil "~a content~:p" (count-contents name (model-name model)))))
-                                            (hsx (<>))))))))))
+                                        (when (eq (model-kind model) :list)
+                                          (hsx (span :class "text-sm text-muted"
+                                                 (format nil "~a content~:p" (count-contents name (model-name model)))))))))))))
                 (let ((hooks (schema-webhooks schema)))
                   (when hooks
                     ;; each row opens the log filtered to that webhook; "View log" opens it unfiltered

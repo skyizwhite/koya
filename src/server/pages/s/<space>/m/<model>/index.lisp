@@ -27,8 +27,10 @@
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
 
-(defparameter +page-size+ 100
-  "Contents per page of the list, newest created first.")
+(defparameter +page-size+ 20
+  "Rows per page, the same everywhere in the admin UI: a page is what fits on a
+screen without scrolling past it, and the search and the filters are how a
+particular content is found.")
 
 (defun page-number (params)
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
@@ -195,7 +197,7 @@ the first again, and keeps the sort, which is the column headers' business."
   (hsx
    (form :method "get" :action (model-url space model)
          :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
-     (if (blank-p sort-key) (hsx (<>)) (hsx (input :type "hidden" :name "sort" :value sort-key)))
+     (unless (blank-p sort-key) (hsx (input :type "hidden" :name "sort" :value sort-key)))
      (input :type "search" :name "q" :value (or search-text "") :placeholder "Search text and ids"
             :class "input w-64 max-w-full")
      (span :class "flex items-center gap-2"
@@ -205,9 +207,8 @@ the first again, and keeps the sort, which is the column headers' business."
          (loop :for value :in +statuses+ :collect
            (hsx (option :value value :selected (equal value status) value)))))
      (button :type "submit" :class "btn" (~icon :name :search) "Filter")
-     (if (and (blank-p search-text) (blank-p status))
-         (hsx (<>))
-         (hsx (a :href (list-url space model :sort-key sort-key) :class "btn" (~icon :name :close) "Clear"))))))
+     (unless (and (blank-p search-text) (blank-p status))
+       (hsx (a :href (list-url space model :sort-key sort-key) :class "btn" (~icon :name :close) "Clear"))))))
 
 (defcomp ~column-header (&key space model field search-text status sort-name sort-direction)
   "A column header is the sort control: it orders by its own field, and clicking
@@ -220,9 +221,8 @@ the one already sorted turns it around."
        (a :href (list-url space model :search-text search-text :status status :sort-key next)
           :class "flex items-center gap-1 hover:text-fg"
          (span :class (clsx "truncate" (column-width field)) name)
-         (if active
-             (hsx (span :class "shrink-0 text-accent" (if (eq sort-direction :asc) "↑" "↓")))
-             (hsx (<>))))))))
+         (when active
+           (hsx (span :class "shrink-0 text-accent" (if (eq sort-direction :asc) "↑" "↓")))))))))
 
 (defcomp ~bulk-bar ()
   "What can be done to a selection. Hidden until there is one (koya-editor.js),
@@ -285,10 +285,9 @@ and the count it shows is written into the delete question as well."
                         (div :class "flex items-center gap-2"
                           ;; the space's log, narrowed to what this model set off;
                           ;; without a hook that can fire, that log can hold nothing
-                          (if (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space))
-                              (hsx (a :href (webhook-log-url space :model model-name) :class "btn"
-                                      (~icon :name :webhook) "Webhooks"))
-                              (hsx (<>)))
+                          (when (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space))
+                            (hsx (a :href (webhook-log-url space :model model-name) :class "btn"
+                                    (~icon :name :webhook) "Webhooks")))
                           (a :href (content-url space model-name "new") :class "btn btn-primary"
                              (~icon :name :plus) "New content")))
                       (~filters :space space :model model-name :search-text search-text :status status :sort-key sort-key)
@@ -332,13 +331,11 @@ and the count it shows is written into the delete question as well."
                                               (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent" "›"))))))))))
                       (when (> pages 1)
                         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                               (if (> page 1)
-                                   (hsx (a :href (funcall link (1- page)) :class "btn" (~icon :name :prev) "Previous"))
-                                   (hsx (<>)))
+                               (when (> page 1)
+                                 (hsx (a :href (funcall link (1- page)) :class "btn" (~icon :name :prev) "Previous")))
                                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                               (if (< page pages)
-                                   (hsx (a :href (funcall link (1+ page)) :class "btn" "Next" (~icon :name :next)))
-                                   (hsx (<>)))))))))))))))))))
+                               (when (< page pages)
+                                 (hsx (a :href (funcall link (1+ page)) :class "btn" "Next" (~icon :name :next))))))))))))))))))))
 
 ;;; Bulk actions. Each content goes through content-service one at a time, so the
 ;;; validation, the system timestamps and the webhooks are the same as for a

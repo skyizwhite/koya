@@ -48,11 +48,10 @@ a form cannot be nested inside the card's own."
   (let ((id (media-id media)))
     (hsx
      (li :class "relative"
-       (if bulk-form
-           (hsx (input :type "checkbox" :name "id" :value id :form bulk-form :data-bulk-item t
-                       :class "absolute left-1 top-1 z-10 h-4 w-4 cursor-pointer"
-                       :aria-label (format nil "Select ~a" (media-filename media))))
-           (hsx (<>)))
+       (when bulk-form
+         (hsx (input :type "checkbox" :name "id" :value id :form bulk-form :data-bulk-item t
+                     :class "absolute left-1 top-1 z-10 h-4 w-4 cursor-pointer"
+                     :aria-label (format nil "Select ~a" (media-filename media)))))
        ;; the whole thumbnail is the preview button, so the card needs no other
        (button :type "button" :class "block w-full cursor-zoom-in"
                :data-preview-src (media-url media :absolute nil)

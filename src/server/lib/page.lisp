@@ -180,20 +180,24 @@ See ORIGIN-ALLOWED-P."
         :class "h-4 w-4 shrink-0"
      (loop :for d :in (icon-paths name) :collect (hsx (path :d d))))))
 
+;;; A component whose whole body is a condition wraps it in a fragment: NIL is
+;;; nothing as a child, but a component's own value is rendered, and a NIL there
+;;; comes out as the word NIL.
+
 (defcomp ~flash (&key message (kind :ok))
-  (if message
-      (hsx (div :class (clsx "mb-6 rounded-md border px-4 py-3 text-sm"
-                             (if (eq kind :error) "border-danger/40 bg-danger/5 text-danger" "border-ok/40 bg-ok/5 text-ok"))
-             message))
-      (hsx (<>))))
+  (hsx
+   (<> (when message
+         (hsx (div :class (clsx "mb-6 rounded-md border px-4 py-3 text-sm"
+                                (if (eq kind :error) "border-danger/40 bg-danger/5 text-danger" "border-ok/40 bg-ok/5 text-ok"))
+                message))))))
 
 (defcomp ~errors (&key errors)
-  (if errors
-      (hsx (div :class "mb-6 rounded-md border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger"
-             (ul :class "list-disc pl-5"
-               (loop :for e :in errors :collect
-                 (hsx (li (strong (getf e :field)) " " (getf e :message)))))))
-      (hsx (<>))))
+  (hsx
+   (<> (when errors
+         (hsx (div :class "mb-6 rounded-md border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger"
+                (ul :class "list-disc pl-5"
+                  (loop :for e :in errors :collect
+                    (hsx (li (strong (getf e :field)) " " (getf e :message)))))))))))
 
 (defcomp ~layout (&key space crumbs children)
   (hsx

@@ -53,7 +53,7 @@
 (defcomp ~action-button (&key value (class "btn") onclick icon children)
   "A submit button for the editor form, usable outside the form element."
   (hsx (button :type "submit" :form "editor-form" :name "action" :value value :class class :onclick onclick
-         (if icon (hsx (~icon :name icon)) (hsx (<>)))
+         (when icon (hsx (~icon :name icon)))
          children)))
 
 (defcomp ~meta (&key content)
@@ -85,28 +85,25 @@
        ;; other page's title does, under the layout's padding alone.
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (h1 :class "text-2xl font-bold" model-name
-           (if object-p
-               (hsx (<>))
-               (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
-         (if content (hsx (~meta :content content)) (hsx (<>)))
+           (unless object-p
+             (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
+         (when content (hsx (~meta :content content)))
          ;; under the title, the full width: where the content can be seen on the
          ;; left, what can be done to it on the right
          (div :class "mt-3 flex flex-wrap items-center justify-between gap-2"
            (div :class "flex flex-wrap items-center gap-2"
-             (if preview-url (hsx (~external-link :href preview-url "Preview draft")) (hsx (<>)))
-             (if public-url (hsx (~external-link :href public-url "Published page")) (hsx (<>)))
+             (when preview-url (hsx (~external-link :href preview-url "Preview draft")))
+             (when public-url (hsx (~external-link :href public-url "Published page")))
              ;; an object model has no list page to carry this, and this editor
              ;; is the whole of its screen -- but only where a hook can fire
-             (if (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))
-                 (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
-                         (~icon :name :webhook) "Webhooks"))
-                 (hsx (<>))))
+             (when (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))
+               (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
+                       (~icon :name :webhook) "Webhooks"))))
            (div :class "flex flex-wrap items-center gap-2"
-             (if (and published draft)
-                 (hsx (~action-button :value "discard" :icon :discard :class "btn btn-danger"
-                                      :onclick "return confirm('Discard the draft and go back to the published version?')"
-                                      "Discard draft"))
-                 (hsx (<>)))
+             (when (and published draft)
+               (hsx (~action-button :value "discard" :icon :discard :class "btn btn-danger"
+                                    :onclick "return confirm('Discard the draft and go back to the published version?')"
+                                    "Discard draft")))
              (~action-button :value "save" :icon :save "Save draft")
              (~action-button :value "publish" :icon :publish :class "btn btn-primary" "Publish"))))
        (~errors :errors errors)
@@ -121,19 +118,18 @@
        ;; one picker per page, shared by :media fields and Quill's image button
        (~media-picker-dialog :space space-name)
        ;; the two ways to take content off the site, kept away from the daily ones
-       (if content
-           (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
-                  (div
-                    (p :class "font-medium text-danger" "Danger zone")
-                    (p :class "text-muted"
-                      (if object-p
-                          "Unpublishing takes the content off the site; deleting empties it and starts over."
-                          "Unpublishing takes the content off the site; deleting removes it for good.")))
-                  (div :class "flex flex-wrap items-center gap-2"
-                    (if published (hsx (~action-button :value "unpublish" :icon :unpublish "Unpublish")) (hsx (<>)))
-                    (~action-button :value "delete" :icon :delete :class "btn btn-danger"
-                                    :onclick "return confirm('Delete this content?')" "Delete"))))
-           (hsx (<>)))))))
+       (when content
+         (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
+                (div
+                  (p :class "font-medium text-danger" "Danger zone")
+                  (p :class "text-muted"
+                    (if object-p
+                        "Unpublishing takes the content off the site; deleting empties it and starts over."
+                        "Unpublishing takes the content off the site; deleting removes it for good.")))
+                (div :class "flex flex-wrap items-center gap-2"
+                  (when published (hsx (~action-button :value "unpublish" :icon :unpublish "Unpublish")))
+                  (~action-button :value "delete" :icon :delete :class "btn btn-danger"
+                                  :onclick "return confirm('Delete this content?')" "Delete")))))))))
 
 (defun load-editor (params)
   "Return (values space model content) for the route, or signal 404 for unknown model."

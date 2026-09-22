@@ -23,7 +23,7 @@
 ;;; model). A space's webhooks fire for every model, so a model's view holds
 ;;; their calls as well as that model's own webhooks'.
 
-(defparameter +page-size+ 25)
+(defparameter +page-size+ 20 "Rows per page, as everywhere else in the admin UI.")
 
 (defun blank-p (value) (or (null value) (zerop (length value))))
 
@@ -94,19 +94,18 @@ option it silently replaces with the first one, which here reads \"All\"."
   ;; so it is loaded once a request, not once a lookup
   (let ((labels (union-options (webhook-labels schema) (delivery-labels space) label))
         (models (union-options (model-names schema) (delivery-models space) model)))
-    (if (and (null labels) (null models))
-        (hsx (<>))
-        (hsx
-         (form :method "get" :action (format nil "~a/webhooks" (space-url space))
-               :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
-           (~filter-select :name "label" :label "Webhook" :all "All webhooks"
-                           :options labels :selected label)
-           (~filter-select :name "model" :label "Model" :all "All models"
-                           :options models :selected model)
-           (button :type "submit" :class "btn" (~icon :name :search) "Filter")
-           (if (filtered-p label model)
-               (hsx (a :href (webhook-log-url space) :class "btn" (~icon :name :close) "Clear"))
-               (hsx (<>))))))))
+    (hsx
+     (<> (unless (and (null labels) (null models))
+           (hsx
+            (form :method "get" :action (format nil "~a/webhooks" (space-url space))
+                  :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
+              (~filter-select :name "label" :label "Webhook" :all "All webhooks"
+                              :options labels :selected label)
+              (~filter-select :name "model" :label "Model" :all "All models"
+                              :options models :selected model)
+              (button :type "submit" :class "btn" (~icon :name :search) "Filter")
+              (when (filtered-p label model)
+                (hsx (a :href (webhook-log-url space) :class "btn" (~icon :name :close) "Clear"))))))))))
 
 (defcomp ~field (&key label children)
   (hsx
@@ -145,10 +144,9 @@ option it silently replaces with the first one, which here reads \"All\"."
          (if (delivery-duration-ms delivery)
              (hsx (format nil "~a ms" (delivery-duration-ms delivery)))
              (hsx (span :class "text-muted" "-"))))
-       (if (blank-p (delivery-error delivery))
-           (hsx (<>))
-           (hsx (~field :label "error"
-                  (span :class "text-danger" (delivery-error delivery)))))
+       (unless (blank-p (delivery-error delivery))
+         (hsx (~field :label "error"
+                (span :class "text-danger" (delivery-error delivery)))))
        (~field :label "response" (~body-block :text (delivery-response delivery)))))))
 
 (defcomp ~log-page (&key space schema label model page)
@@ -174,18 +172,15 @@ option it silently replaces with the first one, which here reads \"All\"."
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                   (loop :for delivery :in items :collect
                     (hsx (li (~delivery :space space :delivery delivery)))))))
-       (if (> pages 1)
-           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                  (if (> page 1)
-                      (hsx (a :href (webhook-log-url space :label label :model model :page (1- page))
-                              :class "btn" (~icon :name :prev) "Previous"))
-                      (hsx (<>)))
-                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                  (if (< page pages)
-                      (hsx (a :href (webhook-log-url space :label label :model model :page (1+ page))
-                              :class "btn" "Next" (~icon :name :next)))
-                      (hsx (<>)))))
-           (hsx (<>)))))))
+       (when (> pages 1)
+         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
+                (when (> page 1)
+                  (hsx (a :href (webhook-log-url space :label label :model model :page (1- page))
+                          :class "btn" (~icon :name :prev) "Previous")))
+                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
+                (when (< page pages)
+                  (hsx (a :href (webhook-log-url space :label label :model model :page (1+ page))
+                          :class "btn" "Next" (~icon :name :next)))))))))))
 
 (defun @get (params)
   (with-owner

@@ -105,7 +105,7 @@ happened*, and the schema itself is read from the space page or with
 
 ## The webhook delivery log
 
-`/s/{space}/webhooks` is the last 200 calls the space made, newest first, 25 to
+`/s/{space}/webhooks` is the last 200 calls the space made, newest first, 20 to
 a page. A row names the event, the model and the webhook's label, and carries
 the outcome as a badge:
 
@@ -156,8 +156,8 @@ straight to its one content -- so that button sits in its editor instead.
   wide model scrolls sideways rather than squeezing every column thin.
 - A row shows its **draft** data when it has one, so the table reflects what is
   being worked on rather than what is live.
-- Contents are listed newest-created first, 100 to a page, with **Previous** /
-  **Next** underneath when there are more.
+- Contents are listed newest-created first, 20 to a page, with **Previous** /
+  **Next** underneath when there are more. Every list in the admin UI shows 20.
 - **New content** opens an empty editor at `/s/{space}/m/{model}/new`.
 
 For an `:object` model this URL redirects straight to its single content (or to a
@@ -293,7 +293,7 @@ selection still goes, and the message says how many could not and why.
   The type is decided by reading the file's leading bytes, not by what the browser
   claims. Files are stored under `KOYA_MEDIA_DIR/{space}/` and served at
   `/media/{space}/{id}.{ext}` with a long immutable cache.
-- The grid is thumbnails only, 48 per page, with paging underneath. The search box
+- The grid is thumbnails only, 20 per page, with paging underneath. The search box
   matches file names.
 - Clicking a thumbnail opens a preview dialog with the file's name, dimensions,
   size and upload time, an **alt text** box to save, and **Delete**. A file that

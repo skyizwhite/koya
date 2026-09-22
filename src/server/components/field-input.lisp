@@ -46,7 +46,7 @@
      (<>
        ;; a many-reference is enhanced into chips + a dropdown by koya-editor.js
        (select :id name :name name :multiple many :data-picker many
-         (if many (hsx (<>)) (hsx (option :value "" "—")))
+         (unless many (hsx (option :value "" "—")))
          (loop :for (id . label) :in choices :collect
            (hsx (option :value id :selected (selected-p value id) label))))
        (p :class "text-xs text-muted"
@@ -120,6 +120,5 @@ koya-editor.js to the page's media picker dialog."
          (:media
           (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media)))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))
-       (if error
-           (hsx (p :class "text-xs text-danger" error))
-           (hsx (<>)))))))
+       (when error
+         (hsx (p :class "text-xs text-danger" error)))))))
