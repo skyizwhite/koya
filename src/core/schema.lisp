@@ -7,7 +7,8 @@
                 #:jobject
                 #:jget
                 #:jkeys
-                #:json-array-p)
+                #:json-array-p
+                #:json-null-p)
   (:import-from #:cl-ppcre
                 #:scan #:create-scanner)
   (:export #:+schema-version+
@@ -23,6 +24,9 @@
            #:field-option
            #:field-required-p
            #:field-many-p
+           #:field-was
+           #:forget-rename
+           #:field-forget-rename
            #:model
            #:make-model
            #:model-name
@@ -30,6 +34,8 @@
            #:model-fields
            #:model-field
            #:model-options
+           #:model-was
+           #:model-forget-renames
            #:make-webhook
            #:webhook-label
            #:webhook-url
@@ -78,11 +84,17 @@
     (:reference :required :model :many)
     (:slug      :required :from :unique :pattern)))
 
+;;; Options every field type accepts on top of its own. :WAS names what the field
+;;; is called in the deployed schema; a deploy turns it into a rename -- of the
+;;; field and of the key in every stored content -- and stores the field without
+;;; it, so it is an instruction, not part of a field's shape.
+(defparameter *universal-options* '(:was))
+
 (defun field-type-p (type)
   (and (assoc type *field-types*) t))
 
 (defun field-type-options (type)
-  (rest (assoc type *field-types*)))
+  (append (rest (assoc type *field-types*)) *universal-options*))
 
 (define-condition schema-error (error)
   ((message :initarg :message :reader schema-error-message))
@@ -113,7 +125,9 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
     (case key
       (:model (name-string value))
-      (:from (if (symbolp value) (camel-key value) value))
+      ;; a JSON null is not a name: left alone, it fails the option's own check
+      ;; rather than becoming a field called "null"
+      ((:from :was) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
       (:options (if (or (listp value) (json-array-p value))
                     (map 'list #'name-string value)
                     value))
@@ -141,12 +155,18 @@ checked here so that validation never trips over a wrong type or a broken regex.
       (:model
        (unless (slug-name-p value) (bad "a model name")))
       (:from
-       (unless (field-name-p value) (bad "a field name"))))))
+       (unless (field-name-p value) (bad "a field name")))
+      (:was
+       (unless (field-name-p value) (bad "a field name"))
+       (when (member value +system-fields+ :test #'string=)
+         (fail "field ~s: :was names the system field ~s" field-name value))))))
 
 (defun make-field (name type &rest options)
   (let ((name (if (stringp name) name (camel-key name)))
+        ;; :was NIL is not a rename but an option given as nothing, as on a model
         (options (loop :for (k v) :on options :by #'cddr
-                       :append (list k (normalize-option k v)))))
+                       :unless (and (eq k :was) (null v))
+                         :append (list k (normalize-option k v)))))
     (unless (field-name-p name)
       (fail "field name ~s must be a camelCase identifier" name))
     (when (member name +system-fields+ :test #'string=)
@@ -163,10 +183,29 @@ checked here so that validation never trips over a wrong type or a broken regex.
       (fail "reference field ~s needs :model" name))
     (when (and (eq type :slug) (null (getf options :from)))
       (fail "slug field ~s needs :from" name))
+    (when (equal (getf options :was) name)
+      (fail "field ~s: :was must name the field it was renamed from, not itself" name))
     (%make-field :name name :type type :options options)))
 
 (defun field-option (field key &optional default)
   (getf (field-options field) key default))
+
+(defun field-was (field)
+  "The name FIELD had in the deployed schema, or NIL. See *UNIVERSAL-OPTIONS*."
+  (field-option field :was))
+
+(defun forget-rename (options)
+  "OPTIONS without :WAS. A rename is an instruction to the deploy that applies it,
+so it takes no part in comparing two shapes and is not stored."
+  (loop :for (key value) :on options :by #'cddr
+        :unless (eq key :was) :append (list key value)))
+
+(defun field-forget-rename (field)
+  "FIELD as the server stores it: without the :WAS the deploy has consumed."
+  (if (field-was field)
+      (%make-field :name (field-name field) :type (field-type field)
+                   :options (forget-rename (field-options field)))
+      field))
 
 (defun field-required-p (field) (and (field-option field :required) t))
 (defun field-many-p (field) (and (field-option field :many) t))
@@ -235,26 +274,64 @@ every model of the space."
   name     ; slug string
   kind     ; :list or :object
   fields   ; list of FIELD
-  options) ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY})
+  options) ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY}), :was
 
-(defun make-model (name kind fields &key preview-url public-url)
-  (let ((name (string-downcase (string name))))
+(defun check-field-renames (model-name fields)
+  "A field's :WAS must name one field, once, and one this model no longer declares."
+  (let ((names (mapcar #'field-name fields))
+        (renames (remove nil (mapcar #'field-was fields))))
+    (when (/= (length renames) (length (remove-duplicates renames :test #'string=)))
+      (fail "model ~s: two fields are renamed from the same field" model-name))
+    (dolist (was renames)
+      (when (member was names :test #'string=)
+        (fail "model ~s: a field is renamed from ~s, which the model still declares" model-name was)))))
+
+(defun name-designator (value)
+  "VALUE as a lowercase name, or VALUE itself when it is not one to begin with --
+a number, or the JSON null a client may send for an option it is not setting.
+What is left over fails the check that reads it, instead of passing as a thing
+called \"null\"."
+  (cond ((json-null-p value) value)
+        ((stringp value) (string-downcase value))
+        ((and value (symbolp value)) (string-downcase (symbol-name value)))
+        (t value)))
+
+(defun make-model (name kind fields &key preview-url public-url was)
+  (let ((name (string-downcase (string name)))
+        (was (name-designator was)))
     (dolist (url (list preview-url public-url))
       (unless (or (null url) (stringp url))
         (fail "model ~s: URL templates must be strings" name)))
     (unless (slug-name-p name)
       (fail "model name ~s must be lowercase letters, digits and hyphens" name))
+    (when was
+      (unless (slug-name-p was)
+        (fail "model ~s: :was ~s must be a model name" name was))
+      (when (string= was name)
+        (fail "model ~s: :was must name the model it was renamed from, not itself" name)))
     (unless (member kind '(:list :object))
       (fail "model ~s: kind must be :list or :object, got ~s" name kind))
     (let ((names (mapcar #'field-name fields)))
       (when (/= (length names) (length (remove-duplicates names :test #'string=)))
         (fail "model ~s has duplicate field names" name)))
+    (check-field-renames name fields)
     (%make-model :name name :kind kind :fields fields
                  :options (append (and preview-url (list :preview-url preview-url))
-                                  (and public-url (list :public-url public-url))))))
+                                  (and public-url (list :public-url public-url))
+                                  (and was (list :was was))))))
 
 (defun model-preview-url (model) (getf (model-options model) :preview-url))
 (defun model-public-url (model) (getf (model-options model) :public-url))
+
+(defun model-was (model)
+  "The name MODEL had in the deployed schema, or NIL. See *UNIVERSAL-OPTIONS*."
+  (getf (model-options model) :was))
+
+(defun model-forget-renames (model)
+  "MODEL as the server stores it: no :WAS on the model, none on its fields."
+  (%make-model :name (model-name model) :kind (model-kind model)
+               :fields (mapcar #'field-forget-rename (model-fields model))
+               :options (forget-rename (model-options model))))
 
 (defun model-field (model name)
   (find (if (stringp name) name (camel-key name)) (model-fields model)
@@ -284,6 +361,17 @@ every model of the space."
 (defun schema-errors (schema)
   "Return a list of human readable problems, empty when the schema is consistent."
   (let ((errors '()))
+    (let ((renames (remove nil (mapcar #'model-was (schema-models schema)))))
+      (dolist (was (remove-duplicates renames :test #'string= :from-end t))
+        (when (> (count was renames :test #'string=) 1)
+          (push (format nil "two models are renamed from ~s; only one of them can have its contents" was)
+                errors))))
+    (dolist (model (schema-models schema))
+      (let ((was (model-was model)))
+        (when (and was (schema-model schema was))
+          (push (format nil "model ~a is renamed from ~s, which the schema still declares"
+                        (model-name model) was)
+                errors))))
     (dolist (hook (schema-webhooks schema))
       (dolist (name (webhook-only hook))
         (unless (schema-model schema name)
@@ -356,6 +444,7 @@ stored schema loads and is rewritten in the current shape on the next deploy."
                       "fields" (map 'vector #'field->jobject (model-fields model)))))
     (when (model-preview-url model) (setf (gethash "previewUrl" obj) (model-preview-url model)))
     (when (model-public-url model) (setf (gethash "publicUrl" obj) (model-public-url model)))
+    (when (model-was model) (setf (gethash "was" obj) (model-was model)))
     obj))
 
 (defun schema->jobject (schema)
@@ -375,7 +464,8 @@ never interned: an unknown name stays a string."
        (find string candidates :key (lambda (k) (string-downcase (symbol-name k))) :test #'string=)))
 
 (defparameter *option-keys*
-  (remove-duplicates (loop :for (nil . options) :in *field-types* :append options)))
+  (remove-duplicates (append (loop :for (nil . options) :in *field-types* :append options)
+                             *universal-options*)))
 
 (defun jobject->field (obj)
   (unless (hash-table-p obj) (fail "each field must be an object"))
@@ -405,7 +495,8 @@ never interned: an unknown name stays a string."
     (make-model name kind
                 (map 'list #'jobject->field (or fields #()))
                 :preview-url (jget obj "previewUrl")
-                :public-url (jget obj "publicUrl"))))
+                :public-url (jget obj "publicUrl")
+                :was (jget obj "was"))))
 
 (defun jobject->schema (obj)
   "Parse a wire-format schema object. Signals SCHEMA-ERROR on malformed input."

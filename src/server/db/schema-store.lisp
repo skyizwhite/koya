@@ -5,7 +5,8 @@
   (:import-from #:koya/core/schema
                 #:make-schema #:schema-webhooks #:schema-models
                 #:webhook->jobject #:jobject->webhook #:slug-name-p
-                #:model-name #:model-kind #:model->jobject #:jobject->model #:check-schema)
+                #:model-name #:model-kind #:model->jobject #:jobject->model #:check-schema
+                #:model-forget-renames)
   (:import-from #:koya/core/json
                 #:parse-json #:to-json)
   (:import-from #:koya/core/diff
@@ -98,13 +99,60 @@ never changes. Returns the name, or signals on a bad or taken one."
 the webhook log. The media files themselves are removed by the caller."
   (exec "DELETE FROM spaces WHERE name = ?" name))
 
+;;; Renames. A model or field declared with :WAS is matched by the diff, and the
+;;; deploy carries the rename through to the stored content in the same
+;;; transaction as the schema write: without that, the old key stays in every
+;;; content object, the editor renders the new field empty and the next save
+;;; drops the value.
+
+(defun rename-model-rows (space from to)
+  "Move a model's row and all its contents from name FROM to name TO. The contents
+move before the old model row goes, because they reference it ON DELETE CASCADE."
+  (exec "INSERT INTO models (space, name, kind, definition, position)
+         SELECT space, ?, kind, definition, position FROM models WHERE space = ? AND name = ?"
+        to space from)
+  (exec "UPDATE contents SET model = ? WHERE space = ? AND model = ?" to space from)
+  (exec "DELETE FROM models WHERE space = ? AND name = ?" space from))
+
+(defun rename-key (object from to)
+  "Move key FROM to TO in OBJECT, if it holds one. Returns true when it changed."
+  (multiple-value-bind (value presentp) (gethash from object)
+    (when presentp
+      (remhash from object)
+      (setf (gethash to object) value)
+      t)))
+
+(defun rename-content-field (space model from to)
+  "Rewrite the key FROM to TO in the published data and the draft of every content
+of MODEL."
+  (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?"
+                      space model))
+    (let* ((published (let ((v (col row "published"))) (and v (parse-json v))))
+           (draft (let ((v (col row "draft"))) (and v (parse-json v))))
+           (in-published (and published (rename-key published from to)))
+           (in-draft (and draft (rename-key draft from to))))
+      (when (or in-published in-draft)
+        (exec "UPDATE contents SET published = ?, draft = ? WHERE id = ?"
+              (and published (to-json published)) (and draft (to-json draft)) (col row "id"))))))
+
+(defun apply-renames (space-name changes)
+  "Carry out the rename changes of a deploy. Model renames come first in CHANGES,
+so a field rename that follows one already names the model by its new name."
+  (dolist (change changes)
+    (case (getf change :op)
+      (:rename-model (rename-model-rows space-name (getf change :from) (getf change :model)))
+      (:rename-field (rename-content-field space-name (getf change :model)
+                                           (getf change :from) (getf change :field))))))
+
 (defun save-schema (space-name schema)
   "Replace the schema of SPACE-NAME with SCHEMA. Models that disappear are deleted
-(their contents go with them). Returns the list of changes applied."
+(their contents go with them); models and fields declared with :WAS are renamed,
+content included. Returns the list of changes applied."
   (check-schema schema)
   (with-db-transaction
     (let* ((old (load-schema space-name))
            (changes (diff-schemas old schema)))
+      (apply-renames space-name changes)
       (exec "UPDATE spaces SET webhooks = ? WHERE name = ?"
             (to-json (map 'vector #'webhook->jobject (schema-webhooks schema))) space-name)
       (let ((keep (mapcar #'model-name (schema-models schema))))
@@ -117,5 +165,5 @@ the webhook log. The media files themselves are removed by the caller."
                        ON CONFLICT(space, name) DO UPDATE SET kind = excluded.kind,
                          definition = excluded.definition, position = excluded.position"
                       space-name (model-name model) (string-downcase (symbol-name (model-kind model)))
-                      (to-json (model->jobject model)) position))
+                      (to-json (model->jobject (model-forget-renames model))) position))
       changes)))

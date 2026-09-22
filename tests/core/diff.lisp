@@ -65,6 +65,52 @@
         (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b")) (sel :options '("a")))))
         (ng (destructive-changes-p (diff-schemas (sel :options '("a")) (sel :options '("a" "b")))))))))
 
+(deftest renames
+  (flet ((posts (&rest fields)
+           (make-schema :models (list (make-model "post" :list fields))))
+         (articles (&rest fields)
+           (make-schema :models (list (make-model "article" :list fields :was 'post)))))
+    (testing "a field named by :was is renamed, not removed and added"
+      (let ((changes (diff-schemas (posts (make-field :lede :text))
+                                   (posts (make-field :subtitle :text :was :lede)))))
+        (ok (equal (ops changes) '(:rename-field)))
+        (ng (destructive-changes-p changes) "nothing is lost, so no force is needed")
+        (ok (string= (getf (first changes) :from) "lede"))
+        (ok (string= (getf (first changes) :field) "subtitle"))
+        (ok (search "post.subtitle renamed from lede" (format-change (first changes))))
+        (ok (string= (jget (change->jobject (first changes)) "op") "rename_field"))
+        (ok (string= (jget (change->jobject (first changes)) "path") "post.subtitle"))))
+    (testing "without :was the same edit throws the content away"
+      (ok (equal (ops (diff-schemas (posts (make-field :lede :text))
+                                    (posts (make-field :subtitle :text))))
+                 '(:remove-field :add-field))))
+    (testing "a renamed field is still compared"
+      (let ((changes (diff-schemas (posts (make-field :lede :text))
+                                   (posts (make-field :subtitle :text :required t :was :lede)))))
+        (ok (equal (ops changes) '(:rename-field :change-field-options)))
+        (ok (destructive-changes-p changes) "the rename is free, the new constraint is not")))
+    (testing "a leftover :was is not a change"
+      (ok (null (diff-schemas (posts (make-field :subtitle :text))
+                              (posts (make-field :subtitle :text :was :lede))))
+          "the annotation stays in the source after the deploy that consumed it"))
+    (testing "an ambiguous :was renames nothing"
+      (ok (equal (ops (diff-schemas (posts (make-field :lede :text) (make-field :subtitle :text))
+                                    (posts (make-field :subtitle :text :was :lede))))
+                 '(:remove-field))
+          "the new name is already taken in the deployed schema, so this drops a field"))
+    (testing "a model is renamed the same way"
+      (let ((changes (diff-schemas (posts (make-field :title :text))
+                                   (articles (make-field :title :text)))))
+        (ok (equal (ops changes) '(:rename-model)))
+        (ng (destructive-changes-p changes))
+        (ok (search "article renamed from post" (format-change (first changes))))
+        (ok (string= (jget (change->jobject (first changes)) "op") "rename_model")))
+      (let ((changes (diff-schemas (posts (make-field :lede :text))
+                                   (articles (make-field :subtitle :text :was :lede)))))
+        (ok (equal (ops changes) '(:rename-model :rename-field))
+            "the model moves first, so the field rename names it by its new name")
+        (ok (string= (getf (second changes) :model) "article"))))))
+
 (deftest webhooks
   (flet ((with-hooks (&rest hooks)
            (make-schema :webhooks hooks :models (list (make-model "blog" :list (list (make-field :title :text)))))))

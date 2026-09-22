@@ -815,6 +815,12 @@ components:
               kind: { type: string, enum: [list, object] }
               previewUrl: { type: string }
               publicUrl: { type: string }
+              was:
+                type: string
+                description: |
+                  The name this model had. A deploy renames it and moves its
+                  contents instead of dropping them; the stored schema keeps the
+                  new name alone, so a GET never returns it. See SCHEMA.md.
               fields:
                 type: array
                 items:
@@ -825,6 +831,12 @@ components:
                     type:
                       type: string
                       enum: [text, textarea, richtext, number, boolean, date, datetime, select, media, reference, slug]
+                    was:
+                      type: string
+                      description: |
+                        The name this field had. A deploy renames it and moves the
+                        key in every stored content instead of orphaning it; the
+                        stored schema keeps the new name alone. See SCHEMA.md.
                   additionalProperties:
                     description: The options allowed for `type`, camelCase
 
@@ -848,8 +860,8 @@ components:
       properties:
         op:
           type: string
-          enum: [change_webhooks, add_model, remove_model, change_kind,
-                 change_model_options, add_field, remove_field,
+          enum: [change_webhooks, add_model, remove_model, rename_model, change_kind,
+                 change_model_options, add_field, remove_field, rename_field,
                  change_field_type, change_field_options]
         path: { type: string, examples: ["blog.title"] }
         destructive: { type: boolean }

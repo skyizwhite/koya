@@ -6,7 +6,8 @@
                 #:make-webhook
                 #:make-schema
                 #:check-schema
-                #:model-name)
+                #:model-name
+                #:model-was)
   (:export #:defwebhooks
            #:defmodel
            #:webhook
@@ -30,8 +31,18 @@
 ;;;     (content      :richtext)
 ;;;     (published-at :datetime))
 ;;;
-;;; Re-evaluating a form replaces the previous definition of the same name,
-;;; so definitions can be edited live from the REPL.
+;;; Renaming something is a rename only when it says so: :WAS on a model or a
+;;; field names what it used to be called, and the deploy moves the stored content
+;;; with it. Without it a rename reads as a removal and an addition, which throws
+;;; the content away.
+;;;
+;;;   (defmodel article (:kind :list :was blog)
+;;;     (subtitle :text :was lede))
+;;;
+;;; Re-evaluating a form replaces the previous definition of the same name, so
+;;; definitions can be edited live from the REPL; a model with :WAS also drops the
+;;; definition it renames, so editing the DEFMODEL BLOG above into the form below
+;;; and re-evaluating it leaves one model, not two.
 
 (defvar *webhooks* '()
   "Webhooks every model of the space fires.")
@@ -56,7 +67,13 @@
 
 (defun register-model (model)
   (let* ((key (model-name model))
+         (was (model-was model))
          (entry (assoc key *models* :test #'string=)))
+    ;; a renamed model is the same model: the registry lets the old name go, or
+    ;; re-evaluating the renamed form would leave the definition it replaced
+    ;; behind, and the schema would rename from a model it still declares
+    (when was
+      (setf *models* (remove was *models* :key #'car :test #'string=)))
     (if entry
         (setf (cdr entry) model)
         (setf *models* (append *models* (list (cons key model)))))
@@ -74,10 +91,14 @@ list of them; without it the webhook fires for every model of the space."
 narrows it. Re-evaluating replaces the whole list."
   `(register-webhooks (list ,@webhooks)))
 
-(defmacro defmodel (name (&key kind preview-url public-url) &body fields)
+(defmacro defmodel (name (&key kind preview-url public-url was) &body fields)
   "Define (or redefine) model NAME. KIND is :list or :object and must be given.
 Each field is (NAME TYPE . OPTIONS) and is taken literally, e.g.
 (tags :reference :model tag :many t).
+WAS names the model this one was called before, and :WAS on a field names the
+field it was called before; a deploy renames them and moves the stored content
+with them. Both are taken literally and are dropped once the deploy has applied
+them, so PULL never brings them back.
 PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI
 where {CONTENT_ID} and {DRAFT_KEY} are substituted, e.g.
 \"https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}\"."
@@ -90,7 +111,8 @@ where {CONTENT_ID} and {DRAFT_KEY} are substituted, e.g.
                                                     ,@(loop :for (k v) :on options :by #'cddr
                                                             :append (list k `',v)))))
                 :preview-url ,preview-url
-                :public-url ,public-url)))
+                :public-url ,public-url
+                :was ',was)))
 
 (defun current-schema ()
   "Return the validated schema built from all definitions so far."

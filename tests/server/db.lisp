@@ -13,12 +13,17 @@
                 #:make-field #:make-model #:make-schema #:make-webhook
                 #:schema-webhooks #:schema-models #:model-name #:model-field
                 #:schema->jobject)
+  (:import-from #:koya/core/diff
+                #:destructive-changes-p)
+  (:import-from #:koya-server/db/contents
+                #:create-content #:get-content
+                #:content-id #:content-model #:content-published #:content-draft)
   (:import-from #:koya-server/db/sessions
                 #:make-session-store #:purge-expired-sessions)
   (:import-from #:lack/middleware/session/store
                 #:fetch-session #:store-session #:remove-session)
   (:import-from #:koya/core/json
-                #:to-json))
+                #:to-json #:jobject #:jget))
 (in-package #:koya-tests/server/db)
 
 (setup
@@ -111,3 +116,37 @@
       (store-session (make-session-store) "sid-2" session))
     (remove-session (make-session-store) "sid-2")
     (ng (fetch-session (make-session-store) "sid-2"))))
+
+(deftest a-rename-carries-the-content-with-it
+  (create-space "magazine")
+  (save-schema "magazine"
+               (make-schema :models (list (make-model "post" :list (list (make-field :title :text)
+                                                                        (make-field :lede :text))))))
+  (let ((published (create-content "magazine" "post" (jobject "title" "One" "lede" "First words") :publish t))
+        (drafted (create-content "magazine" "post" (jobject "title" "Two" "lede" "Later words"))))
+    (let ((changes (save-schema "magazine"
+                                (make-schema :models (list (make-model "article" :list
+                                                                       (list (make-field :title :text)
+                                                                             (make-field :subtitle :text :was :lede))
+                                                                       :was 'post))))))
+      (ok (equal (mapcar (lambda (c) (getf c :op)) changes) '(:rename-model :rename-field)))
+      (ng (destructive-changes-p changes) "a rename loses nothing, so it needs no force"))
+    (ok (equal (mapcar #'model-name (schema-models (load-schema "magazine"))) '("article")))
+    (testing "the published data moved with the model and the field"
+      (let ((content (get-content (content-id published))))
+        (ok (string= (content-model content) "article"))
+        (ok (string= (jget (content-published content) "subtitle") "First words"))
+        (ng (jget (content-published content) "lede") "the orphaned key is gone")
+        (ok (string= (jget (content-published content) "title") "One") "the rest is untouched")))
+    (testing "so did the draft"
+      (let ((content (get-content (content-id drafted))))
+        (ok (string= (content-model content) "article"))
+        (ok (string= (jget (content-draft content) "subtitle") "Later words"))))
+    (testing "the stored schema keeps the shape, not the rename"
+      (ok (null (search "\"was\"" (to-json (schema->jobject (load-schema "magazine"))))))
+      (ok (null (save-schema "magazine"
+                             (make-schema :models (list (make-model "article" :list
+                                                                    (list (make-field :title :text)
+                                                                          (make-field :subtitle :text :was :lede))
+                                                                    :was 'post)))))
+          "deploying the same source again changes nothing"))))

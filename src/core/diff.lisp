@@ -2,8 +2,9 @@
   (:use #:cl)
   (:import-from #:koya/core/schema
                 #:schema-webhooks #:schema-models
-                #:model-name #:model-kind #:model-fields #:model-options
-                #:field-name #:field-type #:field-options)
+                #:model-name #:model-kind #:model-fields #:model-options #:model-was
+                #:field-name #:field-type #:field-options #:field-was
+                #:forget-rename)
   (:import-from #:koya/core/json
                 #:jobject)
   (:export #:diff-schemas
@@ -17,6 +18,11 @@
 ;;; space's schema, so a change is a plist (:op OP :model M :field F :from X :to Y);
 ;;; the space is whichever one the deploy is addressed to.
 ;;; Destructive ops are the ones that can hide or invalidate existing content.
+;;;
+;;; A :WAS on a model or a field turns what would be a removal and an addition
+;;; into a rename, which the deploy carries through to the stored content. It is
+;;; matched here and nowhere else, and it never counts as a change of shape: two
+;;; fields that differ only in :WAS are the same field.
 
 (defparameter *destructive-ops* '(:remove-model :remove-field :change-kind :change-field-type))
 
@@ -64,34 +70,70 @@ was added or narrowed, or the single/many shape changed."
        (loop :for (k v) :on a :by #'cddr
              :always (equal v (getf b k '%missing)))))
 
+(defun rename-pairs (old new key was)
+  "Pairs (OLD-ITEM . NEW-ITEM) where NEW-ITEM's :WAS names OLD-ITEM. A :WAS that
+names nothing in OLD is not a rename: it is the annotation left in the source
+after the rename was deployed. Neither is one whose new name OLD already uses,
+or one NEW still declares -- the schema check refuses the latter, and the diff
+does not lean on that."
+  (loop :for item :in new
+        :for was-name = (funcall was item)
+        :for match = (and was-name
+                          (null (find was-name new :key key :test #'string=))
+                          (null (find (funcall key item) old :key key :test #'string=))
+                          (find was-name old :key key :test #'string=))
+        :when match :collect (cons match item)))
+
+(defun without-renamed (items pairs pick)
+  (remove-if (lambda (item) (find item pairs :key pick)) items))
+
+(defun field-changes (model old new)
+  "What changed between two versions of one field, whatever it is now called."
+  (let ((from (forget-rename (field-options old)))
+        (to (forget-rename (field-options new))))
+    (cond ((not (eq (field-type old) (field-type new)))
+           (list (list :op :change-field-type :model model :field (field-name new)
+                       :from (field-type old) :to (field-type new))))
+          ((not (plist-equal from to))
+           (list (list :op :change-field-options :model model :field (field-name new)
+                       :from from :to to)))
+          (t nil))))
+
 (defun diff-fields (model old new)
-  (diff-named
-   old new #'field-name
-   (lambda (f) (list (list :op :add-field :model model :field (field-name f) :to (field-type f))))
-   (lambda (f) (list (list :op :remove-field :model model :field (field-name f) :from (field-type f))))
-   (lambda (o n)
-     (cond ((not (eq (field-type o) (field-type n)))
-            (list (list :op :change-field-type :model model :field (field-name n)
-                        :from (field-type o) :to (field-type n))))
-           ((not (plist-equal (field-options o) (field-options n)))
-            (list (list :op :change-field-options :model model :field (field-name n)
-                        :from (field-options o) :to (field-options n))))
-           (t nil)))))
+  (let ((pairs (rename-pairs old new #'field-name #'field-was)))
+    (append
+     (loop :for (o . n) :in pairs
+           :append (cons (list :op :rename-field :model model :field (field-name n) :from (field-name o))
+                         (field-changes model o n)))
+     (diff-named
+      (without-renamed old pairs #'car) (without-renamed new pairs #'cdr) #'field-name
+      (lambda (f) (list (list :op :add-field :model model :field (field-name f) :to (field-type f))))
+      (lambda (f) (list (list :op :remove-field :model model :field (field-name f) :from (field-type f))))
+      (lambda (o n) (field-changes model o n))))))
+
+(defun model-changes (old new)
+  "What changed between two versions of one model, whatever it is now called."
+  (let ((from (forget-rename (model-options old)))
+        (to (forget-rename (model-options new))))
+    (append (unless (eq (model-kind old) (model-kind new))
+              (list (list :op :change-kind :model (model-name new)
+                          :from (model-kind old) :to (model-kind new))))
+            (unless (plist-equal from to)
+              (list (list :op :change-model-options :model (model-name new) :from from :to to)))
+            (diff-fields (model-name new) (model-fields old) (model-fields new)))))
 
 (defun diff-models (old new)
-  (diff-named
-   old new #'model-name
-   (lambda (m) (cons (list :op :add-model :model (model-name m) :to (model-kind m))
-                     (diff-fields (model-name m) nil (model-fields m))))
-   (lambda (m) (list (list :op :remove-model :model (model-name m))))
-   (lambda (o n)
-     (append (unless (eq (model-kind o) (model-kind n))
-               (list (list :op :change-kind :model (model-name n)
-                           :from (model-kind o) :to (model-kind n))))
-             (unless (plist-equal (model-options o) (model-options n))
-               (list (list :op :change-model-options :model (model-name n)
-                           :from (model-options o) :to (model-options n))))
-             (diff-fields (model-name n) (model-fields o) (model-fields n))))))
+  (let ((pairs (rename-pairs old new #'model-name #'model-was)))
+    (append
+     (loop :for (o . n) :in pairs
+           :append (cons (list :op :rename-model :model (model-name n) :from (model-name o))
+                         (model-changes o n)))
+     (diff-named
+      (without-renamed old pairs #'car) (without-renamed new pairs #'cdr) #'model-name
+      (lambda (m) (cons (list :op :add-model :model (model-name m) :to (model-kind m))
+                        (diff-fields (model-name m) nil (model-fields m))))
+      (lambda (m) (list (list :op :remove-model :model (model-name m))))
+      #'model-changes))))
 
 (defun diff-schemas (old new)
   "List the changes needed to turn schema OLD into schema NEW. Both are the schema
@@ -118,6 +160,8 @@ of one space; OLD may be NIL, which is the same as an empty space."
               ((:remove-field) (getf change :from))
               (t nil))
             (case op
+              ((:rename-model :rename-field)
+               (format nil "renamed from ~a" (getf change :from)))
               ((:change-kind :change-field-type)
                (format nil "~(~a~) -> ~(~a~)" (getf change :from) (getf change :to)))
               (:change-field-options (if (destructive-change-p change) "options tightened" "options changed"))

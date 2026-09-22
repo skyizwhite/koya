@@ -2,8 +2,9 @@
   (:use #:cl #:rove)
   (:import-from #:koya/core/schema
                 #:make-field #:make-model #:make-schema
-                #:field-name #:field-type #:field-option
-                #:model-field #:model-kind #:schema-model #:schema-webhooks
+                #:field-name #:field-type #:field-option #:field-was
+                #:model-field #:model-kind #:model-was #:model-forget-renames
+                #:schema-model #:schema-webhooks
                 #:model-preview-url #:model-public-url #:make-webhook #:webhook-only #:webhook-covers-p
                 #:schema-error #:schema-errors #:check-schema
                 #:schema->jobject #:jobject->schema)
@@ -79,6 +80,56 @@
     (ok (signals (make-model "m" :list (list (make-field :a :text) (make-field :a :text))) 'schema-error))
     (ok (signals (make-schema :models (list (make-model "m" :list nil) (make-model "m" :list nil))) 'schema-error))))
 
+(deftest renames
+  (testing ":was names what something used to be called"
+    (ok (string= (field-was (make-field :subtitle :text :was :lede)) "lede") "camelCased like a field name")
+    (ok (string= (model-was (make-model "article" :list nil :was 'post)) "post"))
+    (ok (null (field-was (make-field :subtitle :text))))
+    (ok (field-was (make-field :subtitle :media :was :picture)) ":was is allowed on every type"))
+  (testing "a rename must name something other than itself"
+    (ok (signals (make-field :title :text :was :title) 'schema-error))
+    (ok (signals (make-model "blog" :list nil :was 'blog) 'schema-error))
+    (ok (signals (make-field :title :text :was "Not A Field") 'schema-error))
+    (ok (signals (make-field :title :text :was :created-at) 'schema-error) "system fields are not renamed")
+    (ok (signals (make-model "blog" :list nil :was "Not A Model") 'schema-error))
+    (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"was\": 5}]}"))
+                 'schema-error)
+        "a was that is not a name at all is refused, not left to signal elsewhere"))
+  (testing "within a model a rename is unambiguous"
+    (ok (signals (make-model "m" :list (list (make-field :a :text :was :old)
+                                             (make-field :b :text :was :old)))
+                 'schema-error)
+        "two fields cannot come from the same one")
+    (ok (signals (make-model "m" :list (list (make-field :old :text)
+                                             (make-field :new :text :was :old)))
+                 'schema-error)
+        "a field cannot be renamed from one the model still declares"))
+  (testing "the server stores the shape, not the instruction"
+    (let ((stored (model-forget-renames
+                   (make-model "article" :list (list (make-field :subtitle :text :required t :was :lede))
+                               :was 'post :public-url "https://x"))))
+      (ok (null (model-was stored)))
+      (ok (null (field-was (model-field stored :subtitle))))
+      (ok (field-option (model-field stored :subtitle) :required) "the rest of the field is untouched")
+      (ok (string= (model-public-url stored) "https://x"))))
+  (testing "an option given as nothing is not a rename"
+    (ok (null (field-was (make-field :subtitle :text :was nil))))
+    (ok (null (model-was (make-model "article" :list nil :was nil)))))
+  (testing "a JSON null is not the name \"null\""
+    (dolist (json '("{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"was\": null}]}"
+                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"a\", \"type\": \"text\", \"was\": null}]}]}"))
+      (ok (signals (jobject->schema (parse-json json)) 'schema-error) json)))
+  (testing "a rename travels over the wire"
+    (let* ((schema (make-schema :models (list (make-model "article" :list
+                                                          (list (make-field :subtitle :text :was :lede))
+                                                          :was 'post))))
+           (json (to-json (schema->jobject schema)))
+           (back (schema-model (jobject->schema (parse-json json)) "article")))
+      (ok (search "\"was\":\"post\"" json))
+      (ok (search "\"was\":\"lede\"" json))
+      (ok (string= (model-was back) "post"))
+      (ok (string= (field-was (model-field back :subtitle)) "lede")))))
+
 (deftest lookups
   (let* ((schema (sample-schema))
          (blog (schema-model schema :blog)))
@@ -97,6 +148,19 @@
     (ok (signals (check-schema broken) 'schema-error)))
   (let ((broken (make-schema :models (list (make-model "m" :list (list (make-field :s :slug :from :ghost)))))))
     (ok (= (length (schema-errors broken)) 1)))
+  (testing "two models cannot be renamed from the same one"
+    (let ((broken (make-schema :models (list (make-model "article" :list nil :was 'post)
+                                             (make-model "news" :list nil :was 'post)))))
+      (ok (= (length (schema-errors broken)) 1)
+          "only one of them could have the contents, so neither is applied")
+      (ok (signals (check-schema broken) 'schema-error))))
+  (testing "a model cannot be renamed from one the schema still declares"
+    (let ((broken (make-schema :models (list (make-model "post" :list nil)
+                                             (make-model "article" :list nil :was 'post)))))
+      (ok (= (length (schema-errors broken)) 1))
+      (ok (signals (check-schema broken) 'schema-error)))
+    (ok (null (schema-errors (make-schema :models (list (make-model "article" :list nil :was 'post)))))
+        "naming a model that is gone is the whole point"))
   (testing ":only must name models of this schema"
     (let ((broken (make-schema :webhooks (list (make-webhook "h" "https://h" :only '(ghost)))
                                :models (list (make-model "m" :list nil)))))

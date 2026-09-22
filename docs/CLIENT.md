@@ -18,6 +18,7 @@ is no CLI. The admin UI, which reads the deployed schema, is documented in
 - [Defining the schema](#defining-the-schema)
 - [Field types and options](#field-types-and-options)
 - [Webhooks](#webhooks)
+- [Renaming a model or a field](#renaming-a-model-or-a-field)
 - [Deploying the schema](#deploying-the-schema)
 - [Reading content](#reading-content)
 - [Managing content](#managing-content)
@@ -101,10 +102,13 @@ same name, so the schema can be edited live from the REPL.
 
 - **`(defwebhooks &rest webhooks)`** — each form is evaluated and must produce a
   `(webhook label url &key only)`. Re-evaluating replaces the whole list.
-- **`(defmodel name (&key kind preview-url public-url) &body fields)`** —
+- **`(defmodel name (&key kind preview-url public-url was) &body fields)`** —
   `:kind` is required and is `:list` (many contents) or `:object` (exactly one).
   The URL templates are evaluated; each field form `(name type . options)` is
   taken literally. A model carries no webhooks: they all live in `defwebhooks`.
+- **`:was`**, on the model or on a field, names what it used to be called, so
+  that a deploy renames it instead of dropping it — see
+  [Renaming a model or a field](#renaming-a-model-or-a-field).
 - **`:preview-url` / `:public-url`** are templates for the editor's two links.
   `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
 
@@ -138,6 +142,8 @@ definition up.
 | `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |
 | `:slug` | `:required` `:from` `:unique` `:pattern` | lowercase-hyphen string |
 
+- Every type also takes `:was`, which names the field this one was renamed from —
+  see [Renaming a model or a field](#renaming-a-model-or-a-field).
 - `:options` takes strings or symbols, which are downcased; `:model` and `:from`
   take a symbol or a string too.
 - `:model` names another model of the same space; `:from` names a `:text` or
@@ -199,6 +205,39 @@ status, its body, or the error when it never arrived) is kept for the space's
 newest 200 deliveries and shown in the admin UI at `/s/{space}/webhooks`; see
 [ADMIN-UI.md](ADMIN-UI.md#the-webhook-delivery-log).
 
+## Renaming a model or a field
+
+Everything is matched by name, so renaming one in `defmodel` and deploying reads
+as a removal and an addition: the model's contents go with it, and a renamed
+field leaves its value behind under the old key, where the editor cannot see it
+and the next save drops it. `:was` says it is the same thing under a new name:
+
+```lisp
+(defmodel article (:kind :list :was post)   ; was (defmodel post ...)
+  (title    :text :required t)
+  (subtitle :text :was lede))               ; was (lede :text)
+```
+
+A deploy then renames it and carries the content with it — the contents move to
+the new model, and the key moves in every published object and every draft — in
+the same transaction as the schema write. Nothing is lost, so a rename is not a
+destructive change and needs no `:force`; changing the type or tightening the
+options in the same deploy still is.
+
+`:was` is an instruction to the deploy, not part of the schema: the server stores
+the new name alone, so `pull` never brings a `:was` back. Leaving it in the source
+is harmless — it then names something the schema no longer has, and later deploys
+see no change — and deleting it once the rename is deployed is just as fine.
+
+*Deployed* there means deployed to **every space this schema goes to**. A space
+still at the old shape reads the version without `:was` as a removal and an
+addition: it would be refused as destructive, and forced through it would take
+that space's contents with it. Keep the `:was` until staging has had it too.
+
+What `:was` names must be something else: not the field or model itself, not a
+system field, and not another field or model the schema still declares. The full
+rules are in [SCHEMA.md, "Renames"](SCHEMA.md#renames).
+
 ## Deploying the schema
 
 ```lisp
@@ -224,9 +263,9 @@ Destructive means a change that can hide or invalidate content already stored:
 removing a model or field, changing a kind or a field type, or tightening a
 field's options. Deleting the space itself is not among them — that is done in
 the admin UI, with its own confirmation. The exact list, and the shape of each change, is in
-[SCHEMA.md, "Changes"](SCHEMA.md#changes). Nothing migrates existing content: a
-deploy only replaces the stored schema, and rows that no longer fit it stay as
-they are.
+[SCHEMA.md, "Changes"](SCHEMA.md#changes). Apart from a rename declared with
+`:was`, nothing migrates existing content: a deploy replaces the stored schema,
+and rows that no longer fit it stay as they are.
 
 ## Reading content
 

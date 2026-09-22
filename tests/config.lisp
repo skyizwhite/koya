@@ -49,6 +49,21 @@
   (ok (= (length (schema-models (current-schema))) 1) "setting the webhooks keeps the models")
   (ok (equal (mapcar #'koya/core/schema:webhook-url (schema-webhooks (current-schema))) '("https://x"))))
 
+(deftest renaming-a-model-in-the-repl
+  (defmodel post (:kind :list) (title :text) (lede :text))
+  (ok (equal (mapcar #'koya/core/schema:model-name (schema-models (current-schema))) '("post")))
+  ;; the same form, edited into its renamed self and evaluated again
+  (defmodel article (:kind :list :was post) (title :text) (subtitle :text :was lede))
+  (let ((models (schema-models (current-schema))))
+    (ok (equal (mapcar #'koya/core/schema:model-name models) '("article"))
+        "the definition it renames goes with it, or the schema would declare both")
+    (ok (string= (koya/core/schema:model-was (first models)) "post")
+        "and the deploy is still told where the contents are")
+    (ok (string= (koya/core/schema:field-was (model-field (first models) "subtitle")) "lede")))
+  (testing "a model that is still declared is still an error"
+    (defmodel post (:kind :list) (title :text))
+    (ok (signals (current-schema) 'schema-error))))
+
 (deftest webhooks-dsl
   (clear-schema)
   (defwebhooks (webhook "revalidate" "https://site/revalidate")

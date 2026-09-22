@@ -133,6 +133,10 @@ koya/
 - deploy は **既存の space 宛てにしか通らない**(無ければ `404 not_found`)。`KOYA_SPACE` の打ち間違いで
   空の space が増えることはない。
 - JSON 保存(4 章)のため field 削除でも `contents` のデータは消えない。
+- **リネーム**: model / field に `:was` を書くと、差分は削除+追加ではなく `rename_model` /
+  `rename_field` になり、deploy がスキーマ書き込みと同じトランザクションで `contents` の
+  model 名と JSON のキーを書き換える。失うものが無いので破壊的変更ではない。`:was` は
+  deploy への指示であって形ではないので本体は保存せず、`pull` で戻ってくることもない。
 
 ## 4. ストレージ
 
@@ -520,3 +524,4 @@ koya は cms.skyizwhite.dev、website は skyizwhite.dev に本番デプロイ�
 | 2026-09-22 | クライアントの配信キーの語彙を "api key" から "delivery key" に統一: `KOYA_DELIVERY_KEY`、`koya:*delivery-key*`、`configure :delivery-key`、`create/list/delete-delivery-key`。ワイヤの `X-KOYA-API-KEY` と DB の `api_keys` はそのまま | ドキュメントも管理画面も delivery key と呼んでいるのに、利用者が書く名前だけ api key のままだった。ヘッダは配信 API の互換性、テーブル名はマイグレーションの価値が無いので触らない |
 
 | 2026-09-22 | DB スキーマは宣言的定義 + 自動差分(Atlas 方式)にはせず、migrations を正のまま `src/server/db/schema.sql` を生成物として持つ | 現在形が1ファイルで読めるという利点は生成物で足りる。SQLite は `ALTER TABLE` が貧弱でテーブル再構築が必要な上、差分からは「列を足す」か「捨てて作り直す」かの意図が復元できない(v6 の `management_keys` がそれ)。他人の本番インスタンスで起動時に自動 DDL を当てるのも避けたい |
+| 2026-09-22 | model / field のリネームは `:was` で宣言する。deploy が `contents` の model 名と JSON のキーを同じトランザクションで書き換え、`:was` 自体は保存しない | 名前で突き合わせる差分ではリネームが削除+追加になり、model なら contents ごと消え(FK の ON DELETE CASCADE)、field なら値が旧キーに取り残されて編集画面から見えず次の保存で落ちる。宣言があれば「同じもの」と分かるので、破壊的変更にせずに済む |
