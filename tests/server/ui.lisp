@@ -69,7 +69,8 @@ is a list of parts for MULTIPART-BODY; JSON is a string sent as the body, for th
 admin API, which the session reaches as well as a management key does."
   (let* ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
                     :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
-                    :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
+                    :request-uri (format nil "~a~@[?~a~]" path query)
+                    :url-scheme "http" :remote-addr "127.0.0.1"
                     :headers (alist-hash-table (append headers (and *cookie* (list (cons "cookie" *cookie*)))
                                                        (list (cons "host" "localhost:3000")))
                                                :test 'equal)

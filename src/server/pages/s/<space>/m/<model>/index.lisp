@@ -1,5 +1,6 @@
 (defpackage #:koya-server/pages/s/<space>/m/<model>/index
   (:use #:cl #:hsx)
+  (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya/core/schema
@@ -77,11 +78,11 @@ stale link falls back to the default order."
 
 (defun list-url (space model &key search-text status sort-key (page 1))
   "This model's list with the search, filter, sort and page it is being read at."
-  (let ((query (append (unless (blank-p search-text) (list (format nil "q=~a" (quri:url-encode search-text))))
-                       (unless (blank-p status) (list (format nil "status=~a" (quri:url-encode status))))
-                       (unless (blank-p sort-key) (list (format nil "sort=~a" (quri:url-encode sort-key))))
-                       (when (> page 1) (list (format nil "page=~a" page))))))
-    (format nil "~a~@[?~{~a~^&~}~]" (model-url space model) query)))
+  (render-uri (make-uri :path (model-url space model)
+                        :query (append (unless (blank-p search-text) `(("q" . ,search-text)))
+                                       (unless (blank-p status) `(("status" . ,status)))
+                                       (unless (blank-p sort-key) `(("sort" . ,sort-key)))
+                                       (when (> page 1) `(("page" . ,page)))))))
 
 (defparameter +preview-length+ 120
   "Longest field preview carried into the list, in characters: a guard against

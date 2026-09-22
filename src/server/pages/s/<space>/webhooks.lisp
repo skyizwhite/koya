@@ -1,5 +1,6 @@
 (defpackage #:koya-server/pages/s/<space>/webhooks
   (:use #:cl #:hsx)
+  (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/db/schema-store #:load-schema)
   (:import-from #:koya/core/schema
@@ -29,10 +30,10 @@
 
 (defun webhook-log-url (space &key label model page)
   "This space's log, narrowed to LABEL and/or MODEL, at PAGE."
-  (let ((query (append (unless (blank-p label) (list (format nil "label=~a" (quri:url-encode label))))
-                       (unless (blank-p model) (list (format nil "model=~a" (quri:url-encode model))))
-                       (when (and page (> page 1)) (list (format nil "page=~a" page))))))
-    (format nil "~a/webhooks~@[?~{~a~^&~}~]" (space-url space) query)))
+  (render-uri (make-uri :path (format nil "~a/webhooks" (space-url space))
+                        :query (append (unless (blank-p label) `(("label" . ,label)))
+                                       (unless (blank-p model) `(("model" . ,model)))
+                                       (when (and page (> page 1)) `(("page" . ,page)))))))
 
 (defun page-number (params)
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))

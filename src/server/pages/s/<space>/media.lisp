@@ -1,5 +1,6 @@
 (defpackage #:koya-server/pages/s/<space>/media
   (:use #:cl #:hsx)
+  (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/media #:list-media #:count-media #:find-media #:update-media)
@@ -22,7 +23,7 @@
     (and (find-space name) name)))
 
 (defun page-link (page search)
-  (format nil "?page=~a~@[&q=~a~]" page (and search (plusp (length search)) (quri:url-encode search))))
+  (render-uri (make-uri :query `(("page" . ,page) ,@(and search (plusp (length search)) `(("q" . ,search)))))))
 
 (defun library-url (space &key search (page 1))
   "The library with the search and page it is being read at."

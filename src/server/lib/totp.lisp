@@ -1,5 +1,6 @@
 (defpackage #:koya-server/lib/totp
   (:use #:cl)
+  (:import-from #:quri #:make-uri #:render-uri #:url-encode)
   (:import-from #:ironclad
                 #:make-hmac #:update-hmac #:hmac-digest #:random-data)
   (:import-from #:koya-server/lib/env
@@ -118,5 +119,6 @@ and that step has not been used before. Accepting a code consumes its step."
 
 (defun otpauth-uri (secret &key (issuer "koya") (account "owner"))
   "The otpauth:// URI authenticator apps import (paste it, or make a QR code from it)."
-  (format nil "otpauth://totp/~a:~a?secret=~a&issuer=~a&algorithm=SHA1&digits=~a&period=~a"
-          issuer account secret issuer +digits+ +step-seconds+))
+  (render-uri (make-uri :scheme "otpauth" :host "totp" :path (format nil "/~a:~a" (url-encode issuer) (url-encode account))
+                        :query `(("secret" . ,secret) ("issuer" . ,issuer) ("algorithm" . "SHA1")
+                                 ("digits" . ,+digits+) ("period" . ,+step-seconds+)))))

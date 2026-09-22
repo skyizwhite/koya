@@ -1,5 +1,6 @@
 (defpackage #:koya-server/lib/assets
   (:use #:cl)
+  (:import-from #:quri #:make-uri #:render-uri)
   (:export #:asset-url
            #:asset-version
            #:refresh-asset-version))
@@ -31,4 +32,4 @@
 
 (defun asset-url (path)
   "URL of assets/PATH with the cache-busting version, e.g. /assets/style/dist.css?v=..."
-  (format nil "/assets/~a?v=~a" path (asset-version)))
+  (render-uri (make-uri :path (format nil "/assets/~a" path) :query `(("v" . ,(asset-version))))))

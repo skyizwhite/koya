@@ -5,9 +5,9 @@
   (:import-from #:ningle
                 #:context)
   (:import-from #:lack/request
-                #:request-method #:request-path-info #:request-query-string)
+                #:request-method #:request-uri)
   (:import-from #:quri
-                #:uri #:uri-path #:uri-query #:url-encode)
+                #:uri #:uri-path #:uri-query #:make-uri #:render-uri)
   (:import-from #:cl-ppcre
                 #:regex-replace-all)
   (:import-from #:koya-server/lib/auth
@@ -113,24 +113,24 @@ URL, so anything that a browser could read as another host (//evil, /\\evil) is 
        (not (and (> (length path) 1) (char= (char path 1) #\/)))
        (notany (lambda (c) (or (char< c #\Space) (char= c #\\))) path)))
 
+(defun path-and-query (url)
+  (let ((uri (uri url)))
+    (render-uri (make-uri :path (or (uri-path uri) "/") :query (uri-query uri)))))
+
 (defun return-path ()
   "The page to come back to after logging in: the one requested, or for a form
 post the page the form was on, since the post itself cannot be replayed."
-  (let ((request ningle:*request*))
-    (if (eq (request-method request) :get)
-        (let ((query (request-query-string request)))
-          (format nil "~a~@[?~a~]" (request-path-info request) (and query (plusp (length query)) query)))
-        (let ((referer (first (get-request-header "referer"))))
-          (and referer
-               (same-origin-p)
-               (ignore-errors
-                (let ((uri (uri referer)))
-                  (format nil "~a~@[?~a~]" (or (uri-path uri) "/") (uri-query uri)))))))))
+  (ignore-errors
+   (if (eq (request-method ningle:*request*) :get)
+       ;; the raw request line: path-info is decoded, and an encoded ? or / would change meaning
+       (path-and-query (request-uri ningle:*request*))
+       (let ((referer (first (get-request-header "referer"))))
+         (and referer (same-origin-p) (path-and-query referer))))))
 
 (defun redirect-to-login ()
   (let ((next (return-path)))
     (redirect-to (if (and (local-path-p next) (string/= next "/"))
-                     (format nil "/login?next=~a" (url-encode next))
+                     (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
                      "/login")
                  302)))
 

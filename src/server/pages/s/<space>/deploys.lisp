@@ -1,5 +1,6 @@
 (defpackage #:koya-server/pages/s/<space>/deploys
   (:use #:cl #:hsx)
+  (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/schema-deploys
@@ -22,7 +23,8 @@
 (defparameter +page-size+ 20)
 
 (defun deploys-url (space &key page)
-  (format nil "~a/deploys~@[?page=~a~]" (space-url space) (and page (> page 1) page)))
+  (render-uri (make-uri :path (format nil "~a/deploys" (space-url space))
+                        :query (when (and page (> page 1)) `(("page" . ,page))))))
 
 (defun page-number (params)
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
