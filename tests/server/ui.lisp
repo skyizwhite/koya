@@ -758,7 +758,9 @@ admin API, which the session reaches as well as a management key does."
           (ok (string= (display-timezone-name) "UTC") "back to UTC for the other tests")))))
 
 (deftest cache-control
-  (multiple-value-bind (status body headers) (request :get "/assets/style/dist.css")
+  ;; icon.svg, not the stylesheet: dist.css is built by Tailwind and is not in
+  ;; the repository, so it is there only on a machine that has run `just build`
+  (multiple-value-bind (status body headers) (request :get "/assets/icon.svg")
     (declare (ignore body))
     (ok (= status 200))
     (ok (string= (getf headers :cache-control) "public, max-age=31536000, immutable") "assets are immutable"))
