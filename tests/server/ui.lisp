@@ -775,6 +775,37 @@ admin API, which the session reaches as well as a management key does."
       (ok (search "/assets/style/dist.css?v=" body) "asset URLs carry a version")
       (ok (search "/assets/icon.svg?v=" body)))))
 
+(deftest login-returns-to-the-page
+  (let ((*cookie* nil))
+    (multiple-value-bind (status body headers) (request :get "/s/website/media" :query "page=2")
+      (declare (ignore body))
+      (ok (= status 302))
+      (ok (string= (location headers) "/login?next=%2Fs%2Fwebsite%2Fmedia%3Fpage%3D2")))
+    (multiple-value-bind (status body) (request :get "/login" :query "next=%2Fs%2Fwebsite%2Fmedia%3Fpage%3D2")
+      (ok (= status 200))
+      (ok (search "name=\"next\" value=\"/s/website/media?page=2\"" body) "the form carries it"))
+    (multiple-value-bind (status body headers)
+        (request :post "/login" :form `(("secret" . ,*secret*) ("next" . "/s/website/media?page=2")))
+      (declare (ignore body))
+      (ok (= status 303))
+      (ok (string= (location headers) "/s/website/media?page=2"))))
+  (testing "a form post returns to the page the form was on"
+    (let ((*cookie* nil))
+      (multiple-value-bind (status body headers)
+          (request :post "/s/website/keys" :form '(("action" . "create"))
+                   :headers '(("referer" . "http://localhost:3000/s/website/keys")))
+        (declare (ignore body))
+        (ok (= status 302))
+        (ok (string= (location headers) "/login?next=%2Fs%2Fwebsite%2Fkeys")))))
+  (testing "next never leaves the server"
+    (dolist (next '("//evil.test/" "/\\evil.test/" "https://evil.test/" "evil"))
+      (let ((*cookie* nil))
+        (multiple-value-bind (status body headers)
+            (request :post "/login" :form `(("secret" . ,*secret*) ("next" . ,next)))
+          (declare (ignore body))
+          (ok (= status 303))
+          (ok (string= (location headers) "/") next))))))
+
 (deftest login-lockout
   (let ((*cookie* nil))
     (clear-login-failures "127.0.0.1")

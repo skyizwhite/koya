@@ -4,6 +4,10 @@
                 #:redirect #:set-response-status #:get-request-header)
   (:import-from #:ningle
                 #:context)
+  (:import-from #:lack/request
+                #:request-method #:request-path-info #:request-query-string)
+  (:import-from #:quri
+                #:uri #:uri-path #:uri-query #:url-encode)
   (:import-from #:cl-ppcre
                 #:regex-replace-all)
   (:import-from #:koya-server/lib/auth
@@ -27,6 +31,7 @@
            #:page-title
            #:redirect-to
            #:same-origin-p
+           #:local-path-p
            #:param
            #:set-flash
            #:take-flash
@@ -99,15 +104,45 @@ See ORIGIN-ALLOWED-P."
   (flet ((h (name) (first (get-request-header name))))
     (origin-allowed-p (h "origin") (h "referer") (h "host"))))
 
+(defun local-path-p (path)
+  "True for a path on this server. What the login page redirects to comes from the
+URL, so anything that a browser could read as another host (//evil, /\\evil) is out."
+  (and (stringp path)
+       (plusp (length path))
+       (char= (char path 0) #\/)
+       (not (and (> (length path) 1) (char= (char path 1) #\/)))
+       (notany (lambda (c) (or (char< c #\Space) (char= c #\\))) path)))
+
+(defun return-path ()
+  "The page to come back to after logging in: the one requested, or for a form
+post the page the form was on, since the post itself cannot be replayed."
+  (let ((request ningle:*request*))
+    (if (eq (request-method request) :get)
+        (let ((query (request-query-string request)))
+          (format nil "~a~@[?~a~]" (request-path-info request) (and query (plusp (length query)) query)))
+        (let ((referer (first (get-request-header "referer"))))
+          (and referer
+               (same-origin-p)
+               (ignore-errors
+                (let ((uri (uri referer)))
+                  (format nil "~a~@[?~a~]" (or (uri-path uri) "/") (uri-query uri)))))))))
+
+(defun redirect-to-login ()
+  (let ((next (return-path)))
+    (redirect-to (if (and (local-path-p next) (string/= next "/"))
+                     (format nil "/login?next=~a" (url-encode next))
+                     "/login")
+                 302)))
+
 (defmacro with-owner (&body body)
   "Run BODY for the logged-in owner, otherwise redirect to the login page."
   `(if (owner-p)
        (progn ,@body)
-       (redirect-to "/login" 302)))
+       (redirect-to-login)))
 
 (defmacro with-owner-post (&body body)
   "Like WITH-OWNER for form posts: also rejects cross-origin submissions."
-  `(cond ((not (owner-p)) (redirect-to "/login" 302))
+  `(cond ((not (owner-p)) (redirect-to-login))
          ((not (same-origin-p)) (set-response-status 403) (hsx (p "Forbidden: cross-origin request")))
          (t ,@body)))
 

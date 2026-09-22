@@ -36,6 +36,10 @@ no user accounts: whoever knows the secret is the owner.
 - A session lasts 24 hours and is stored in the database, so a server restart or
   a redeploy does not log the owner out. The cookie is `HttpOnly`, `SameSite=Lax`
   and, when `KOYA_BASE_URL` is an `https://` URL, `Secure`.
+- A page reached without a session sends the owner to `/login?next=…`, and
+  logging in returns there. A form post returns to the page the form was on; what
+  it submitted is not replayed. `next` is followed only when it is a path on this
+  server.
 - Every page has **Log out** in the header; form submissions from another origin
   are rejected.
 
