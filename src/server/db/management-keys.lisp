@@ -11,6 +11,8 @@
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
   (:export #:create-management-key
+           #:stored-management-keys
+           #:import-management-key
            #:management-key-label
            #:list-management-keys
            #:delete-management-key
@@ -57,3 +59,14 @@ key answers with the empty string it was made with."
   (and (stringp key)
        (let ((row (fetch-one "SELECT space FROM management_keys WHERE key_hash = ?" (hash-key key))))
          (and row (col row "space")))))
+
+(defun stored-management-keys (space)
+  "Plists (:id :hash :label :created-at) of the keys of SPACE as stored, for an
+export: the hash is all there is, and all a moved key needs."
+  (mapcar (lambda (row) (list :id (col row "id") :hash (col row "key_hash")
+                              :label (col row "label") :created-at (col row "created_at")))
+          (fetch "SELECT * FROM management_keys WHERE space = ? ORDER BY created_at" space)))
+
+(defun import-management-key (space &key id hash label created-at)
+  (exec "INSERT INTO management_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
+        id space hash (or label "") created-at))

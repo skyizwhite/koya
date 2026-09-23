@@ -182,7 +182,8 @@ post the page the form was on, since the post itself cannot be replayed."
     (:unpublish "M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2"
                 "M8 2.5v8" "M4.8 7.3 8 10.5l3.2-3.2")
     (:upload :publish)
-    (:download :unpublish)
+    (:export :publish)
+    (:import :unpublish)
     (:delete "M2.5 4.2h11"
              "M12.3 4.2v8.3A1.5 1.5 0 0 1 10.8 14H5.2a1.5 1.5 0 0 1-1.5-1.5V4.2"
              "M5.8 4.2V2.9a1.2 1.2 0 0 1 1.2-1.2h2a1.2 1.2 0 0 1 1.2 1.2v1.3")

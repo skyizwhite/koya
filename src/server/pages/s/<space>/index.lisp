@@ -31,8 +31,8 @@
                     (a :href (deploys-url name) :class "btn" (~icon :name :history) "Schema Deploys")
                     (a :href (format nil "~a/media" (space-url name)) :class "btn" (~icon :name :media) "Media")
                     (a :href (format nil "~a/keys" (space-url name)) :class "btn" (~icon :name :key) "Keys")
-                    (a :href (format nil "~a/export" (space-url name)) :class "btn" :download t
-                      (~icon :name :download) "Export")))
+                    (a :href (format nil "~a/export" (space-url name)) :class "btn"
+                      (~icon :name :export) "Export")))
                 (if (null (schema-models schema))
                     (hsx (~empty-state "This space has no models."))
                     (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"

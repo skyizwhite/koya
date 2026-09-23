@@ -11,6 +11,8 @@
   (:import-from #:babel
                 #:string-to-octets)
   (:export #:create-delivery-key
+           #:stored-delivery-keys
+           #:import-delivery-key
            #:list-delivery-keys
            #:delete-delivery-key
            #:space-for-delivery-key
@@ -46,3 +48,14 @@ fail to match, not fail to hash."
   (and (stringp key)
        (let ((row (fetch-one "SELECT space FROM delivery_keys WHERE key_hash = ?" (hash-key key))))
          (and row (col row "space")))))
+
+(defun stored-delivery-keys (space)
+  "Plists (:id :hash :label :created-at) of the keys of SPACE as stored, for an
+export: the hash is all there is, and all a moved key needs."
+  (mapcar (lambda (row) (list :id (col row "id") :hash (col row "key_hash")
+                              :label (col row "label") :created-at (col row "created_at")))
+          (fetch "SELECT * FROM delivery_keys WHERE space = ? ORDER BY created_at" space)))
+
+(defun import-delivery-key (space &key id hash label created-at)
+  (exec "INSERT INTO delivery_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
+        id space hash (or label "") created-at))

@@ -15,21 +15,28 @@ the whole instance; this is the portable copy of one space.
 
 **Export** on a space's page downloads a zip: `space.json` — the schema with its
 webhooks, every content with its published data, its draft, its draft key, its
-system timestamps and its history, and the media rows — plus every media file
-under `media/`. **Import** on the spaces page takes that zip and makes the space
-again under the same name, with the same ids.
+system timestamps and its history, the media rows, the delivery and management
+keys and the webhook secret — plus every media file under `media/`. **Import**
+on the spaces page takes that zip and makes the space again under the same
+name, with the same ids.
 
 - **Only in the admin UI.** There is no API for either. A management key reaches
   one space, and an import that makes the space would need a key for a space that
   does not exist yet; the owner is the one who can make spaces.
 - **Only into a space that has nothing to meet.** The name must be free, or the
-  space must have no models (a content needs a model, so it has no contents
-  either). Anything else is refused. There is no merge by id, and no check that
-  a deployed schema matches the archive's: the import owns the schema, webhooks
-  included, and records it in the deploy log as a deploy by the owner.
-- **No credentials.** Keys and the webhook secret stay behind, so the file is
-  content, not access. A space made by the import has a new secret; one that
-  existed without models keeps its own, and its keys.
+  space must be empty: no models (so no contents), no media and no keys. Its
+  webhooks and webhook secret, which a new space has from the start, are
+  replaced by the archive's. Anything else is refused and changes nothing:
+  there is no merge by id, and no check that a deployed schema matches the
+  archive's. The import owns the schema, webhooks included, and records it in
+  the deploy log as a deploy by the owner. An existing media file is never
+  replaced.
+- **Keys and the secret move too.** Keys are stored as SHA-256 and travel as
+  that, so the archive holds no key that can be used, and the site's `.env`
+  keeps working against the new instance. The webhook secret is stored in
+  plain text — it is sent with every call — and travels so, which with every
+  draft already in the file makes the archive something to keep as privately
+  as the database.
 - **Nothing is sent to the webhooks** while importing: the contents are not being
   published, they are being put back.
 - The ids are kept, so reference fields, media fields and the `/media/{space}/…`
@@ -39,10 +46,12 @@ again under the same name, with the same ids.
 
 ## Consequences
 
-Moving a space to another server is Export, Import, then issuing new delivery
-and management keys and giving the site the new webhook secret. Seeding a
-development instance copies production's webhook URLs too; with a different
-secret, the site's receiver rejects what the copy sends.
+Moving a space to another server is Export, Import, and pointing the site at
+the new instance; nothing about its keys or secret changes. Seeding a
+development instance copies production's webhooks and secret too, so edits
+there are sent to the production site, which only fetches from production
+koya and so at most rebuilds for nothing; point the copy's webhooks elsewhere
+with a deploy if that matters.
 
 The import does not go through lack's multipart parsing, which would hold the
 body in memory several times over — enough, for a large archive, to exhaust the

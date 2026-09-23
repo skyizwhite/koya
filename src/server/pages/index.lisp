@@ -67,12 +67,12 @@ taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
                 :class "input mt-1.5")
          (p :class "mt-2 text-xs text-muted"
             "A zip from a space's " (strong "Export") ". The space is made again under its own name, "
-            "with its models, webhooks, contents, history and media. A space of that name must not "
-            "exist yet, or must have no models. Nothing is sent to the webhooks."))
+            "with its models, webhooks, contents, history, media and keys. A space of that name must not "
+            "exist yet, or must be empty: no models, media or keys. Nothing is sent to the webhooks."))
        (p :class "hidden px-4 pb-3 text-sm text-danger" :data-import-error t)
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
          (button :type "button" :class "btn" :data-dialog-close t "Cancel")
-         (button :type "submit" :class "btn btn-primary" (~icon :name :upload) "Import"))))))
+         (button :type "submit" :class "btn btn-primary" (~icon :name :import) "Import"))))))
 
 (defcomp ~spaces-page (&key spaces)
   (hsx
@@ -81,7 +81,7 @@ taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
        (h1 :class "text-2xl font-bold" "Spaces")
        (div :class "flex gap-2"
          (button :type "button" :class "btn" :data-dialog-open "import-space"
-           (~icon :name :upload) "Import")
+           (~icon :name :import) "Import")
          (button :type "button" :class "btn btn-primary" :data-dialog-open "new-space"
            (~icon :name :plus) "New space")))
      (if (null spaces)

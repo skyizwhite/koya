@@ -66,12 +66,12 @@ made and deleted.
   the webhook log. It cannot be undone.
 - **Import**, beside **New space**, takes a zip made by a space's **Export** and
   makes that space again under its own name: its models and webhooks, every
-  content with its draft, timestamps and history, and its media, all with the
-  ids they had. The name must be free, or the space must have no models yet;
-  otherwise the import is refused and nothing changes. Nothing is sent to the
-  webhooks. The schema it brings is in the space's deploy log. Keys and the
-  webhook secret are not in the archive: make new keys, and give the site the
-  space's webhook secret from **Keys**.
+  content with its draft, timestamps and history, its media, its delivery and
+  management keys and its webhook secret, all as they were — the site's `.env`
+  keeps working against the new instance. The name must be free, or the space
+  must be empty: no models, media or keys (its webhooks and secret are
+  replaced). Otherwise the import is refused and nothing changes. Nothing is
+  sent to the webhooks. The schema it brings is in the space's deploy log.
 
 ![The spaces, and where a new one is made](img/spaces.png)
 
@@ -82,7 +82,8 @@ braces for an `:object` model — with the number of contents in each list model
 and links to **Schema Deploys**, **Media** and **Keys**. **Export** downloads
 the whole space as a zip for **Import** on the spaces page — `space.json` (the
 schema, the contents with their drafts and history, the media rows) and the
-media files under `media/` — without its keys or webhook secret.
+media files under `media/`, the keys as their hashes, and the webhook secret.
+Keep the file as privately as the database: it holds every draft and the secret.
 
 Underneath, **Webhooks** shows every webhook of the space with its label, its URL
 and what it covers — *all models*, or *`blog, tag` only* for one narrowed with

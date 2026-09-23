@@ -10,6 +10,10 @@
 
 ;;; The space as a zip download (lib/space-archive). The whole archive is built
 ;;; in memory before it is sent, so its size is what the process must hold.
+;;;
+;;; The link to it carries no download attribute: Content-Disposition makes the
+;;; zip a download on its own, and a failure -- a redirect to the space page with
+;;; the flash, or to the login page -- has to be shown, not saved as a file.
 
 (defun @get (params)
   (with-owner

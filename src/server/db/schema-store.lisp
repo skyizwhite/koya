@@ -26,7 +26,8 @@
            #:find-model
            #:space-webhooks
            #:space-webhook-secret
-           #:rotate-webhook-secret))
+           #:rotate-webhook-secret
+           #:set-webhook-secret))
 (in-package #:koya-server/db/schema-store)
 
 ;;; The server keeps the deployed schema in the SPACES and MODELS tables. A model's
@@ -82,6 +83,11 @@ models, because every content change needs them."
   (let ((secret (new-secret)))
     (exec "UPDATE spaces SET webhook_secret = ? WHERE name = ?" secret space-name)
     secret))
+
+(defun set-webhook-secret (space-name secret)
+  "Give SPACE-NAME the secret it had elsewhere: an imported space keeps the one
+its site already checks."
+  (exec "UPDATE spaces SET webhook_secret = ? WHERE name = ?" secret space-name))
 
 (defun create-space (name)
   "Make a space. NAME is its id: it is in every URL and in the delivery API, so it

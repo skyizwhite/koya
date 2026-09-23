@@ -3,7 +3,12 @@
   (:import-from #:koya-server/db/connection
                 #:with-db-transaction)
   (:import-from #:koya-server/db/schema-store
-                #:load-schema #:save-schema #:find-space #:create-space)
+                #:load-schema #:save-schema #:find-space #:create-space
+                #:space-webhook-secret #:set-webhook-secret)
+  (:import-from #:koya-server/db/delivery-keys
+                #:stored-delivery-keys #:import-delivery-key)
+  (:import-from #:koya-server/db/management-keys
+                #:stored-management-keys #:import-management-key)
   (:import-from #:koya-server/db/contents
                 #:space-contents #:import-content #:make-content
                 #:content-id #:content-model #:content-published #:content-draft #:content-draft-key
@@ -12,7 +17,7 @@
                 #:content-history #:import-revision
                 #:revision-event #:revision-data #:revision-by #:revision-created-at)
   (:import-from #:koya-server/db/media
-                #:space-media #:insert-media
+                #:space-media #:insert-media #:count-media
                 #:media-id #:media-filename #:media-mime #:media-size
                 #:media-width #:media-height #:media-alt #:media-created-at)
   (:import-from #:koya-server/lib/media-store
@@ -40,11 +45,14 @@
 (in-package #:koya-server/lib/space-archive)
 
 ;;; A space as one zip: space.json -- the schema, every content with its draft,
-;;; its system timestamps and its history, and the media rows -- plus the media
-;;; files under media/. Keys and the webhook secret are left out: the file would
-;;; otherwise be a credential. Importing makes the space again under the same
-;;; name, with the same ids, so references, media fields and the /media/ paths in
-;;; richtext keep pointing at the right things.
+;;; its system timestamps and its history, the media rows, the keys and the
+;;; webhook secret -- plus the media files under media/. Importing makes the space
+;;; again under the same name, with the same ids, so references, media fields,
+;;; the /media/ paths in richtext and the site's keys and secret all still work.
+;;;
+;;; Keys are stored as SHA-256 and move as that, so the archive holds no key
+;;; that can be used; it does hold the webhook secret and every draft, so it is
+;;; to be kept as privately as the database itself.
 
 (defparameter +archive-version+ 1)
 
@@ -102,6 +110,10 @@ names, so nothing else is accepted.")
            "createdAt" (media-created-at media)
            "file" (media-entry-name (media-id media) (media-mime media))))
 
+(defun key->jobject (key)
+  (jobject "id" (getf key :id) "keyHash" (getf key :hash)
+           "label" (getf key :label) "createdAt" (getf key :created-at)))
+
 (defun zip-to-octets (entries)
   "ENTRIES written as a zip, read back as octets. zippy writes to a file, so it
 goes through a temporary one."
@@ -123,7 +135,10 @@ missing from the disk: an archive without it would not restore."
                             "exportedAt" (now-iso)
                             "schema" (schema->jobject schema)
                             "contents" (map 'vector #'content->jobject (space-contents space))
-                            "media" (map 'vector #'media->jobject media))))
+                            "media" (map 'vector #'media->jobject media)
+                            "webhookSecret" (space-webhook-secret space)
+                            "deliveryKeys" (map 'vector #'key->jobject (stored-delivery-keys space))
+                            "managementKeys" (map 'vector #'key->jobject (stored-management-keys space)))))
     (zip-to-octets
      (cons (make-instance 'zip-entry :file-name "space.json"
                                      :content (string-to-octets (to-json document) :encoding :utf-8))
@@ -212,27 +227,46 @@ the file is written."
               :alt (or (string-field object "alt") "")
               :created-at (string-field object "createdAt" :required t))))))
 
+(defun parse-keys (document key)
+  "The keys under KEY of space.json as plists for IMPORT-*-KEY."
+  (let ((keys (or (nullable (jget document key)) #())))
+    (unless (json-array-p keys) (fail "~a must be an array" key))
+    (map 'list (lambda (k)
+                 (unless (hash-table-p k) (fail "Each of ~a must be an object" key))
+                 (let ((hash (string-field k "keyHash" :required t)))
+                   (unless (scan "^[0-9a-f]{64}\\z" hash) (fail "~s is not a key hash" hash))
+                   (list :id (string-field k "id" :required t) :hash hash
+                         :label (or (string-field k "label") "")
+                         :created-at (string-field k "createdAt" :required t))))
+         keys)))
+
 (defun check-target (space)
-  "A space is imported only where it would not meet anything of its own: a name
-that is free, or a space with no models yet (a content needs a model)."
-  (let ((existing (and (find-space space) (load-schema space))))
-    (when (and existing (schema-models existing))
-      (fail "Space ~a already has models. Import into a space that has none, or delete it first." space))))
+  "A space is imported only where it meets nothing of its own: a name that is
+free, or a space that is empty -- no models (so no contents), no media and no
+keys. Its webhooks and webhook secret are the archive's to replace."
+  (when (and (find-space space)
+             (or (schema-models (load-schema space))
+                 (plusp (count-media space))
+                 (stored-delivery-keys space)
+                 (stored-management-keys space)))
+    (fail "Space ~a is not empty. Import into a new space, or one with no models, media or keys." space)))
 
 (defun write-media-files (space media written)
-  "Write every file, pushing each path onto the list in the cons WRITTEN as it
-goes, so a caller that fails later knows what to take away."
+  "Write every file, pushing each path onto the list in the cons WRITTEN once it
+is made, so a caller that fails later takes away only what this import made. A
+file already there is an error, never replaced: it may be another import's."
   (dolist (m media)
     (let ((path (media-file-path space (getf m :id) (getf m :mime))))
       (ensure-directories-exist path)
-      (entry-to-file path (getf m :entry) :if-exists :supersede :restore-attributes nil)
+      (when (probe-file path) (fail "The file of media ~a is already in the media directory" (getf m :id)))
+      (entry-to-file path (getf m :entry) :if-exists :error :restore-attributes nil)
       (push path (car written)))))
 
 (defun import-space (source &key (by ""))
   "Make the space in the archive SOURCE -- a pathname, or octets -- again: its
 schema, contents with their history, and media. Returns the space's name.
 Nothing is sent to its webhooks. Signals ARCHIVE-ERROR (or a schema error) and
-changes nothing when the archive is malformed or the space already has models."
+changes nothing when the archive is malformed or the space is not empty."
   (multiple-value-bind (zip streams) (handler-case (open-zip-file source)
                                        (error () (fail "This file is not a zip archive")))
     (unwind-protect (import-from-zip zip :by by)
@@ -242,34 +276,44 @@ changes nothing when the archive is malformed or the space already has models."
   (let* ((entries (archive-entries zip))
          (document (read-document entries))
          (space (string-field document "space" :required t))
-         (schema (jobject->schema (jget document "schema")))
-         (contents (map 'list (lambda (o) (parse-content o space schema))
-                        (or (nullable (jget document "contents")) #())))
-         (media (map 'list (lambda (o) (parse-media o entries))
-                     (or (nullable (jget document "media")) #()))))
+         (schema (jobject->schema (jget document "schema"))))
     (unless (slug-name-p space) (fail "~s is not a space name" space))
     (check-target space)
-    ;; the files first, as an upload does: a failed write must not leave rows
-    ;; whose URLs 404; a failed transaction takes the files away again
-    (let ((written (list '()))
-          (done nil))
-      (unwind-protect
-           (progn
-             (write-media-files space media written)
-             (with-db-transaction
-               ;; checked again inside: another import may have made it since
-               (check-target space)
-               (unless (find-space space) (create-space space))
-               (save-schema space schema :by by)
-               (dolist (m media)
-                 (insert-media space :id (getf m :id) :filename (getf m :filename) :mime (getf m :mime)
-                                     :size (getf m :size) :width (getf m :width) :height (getf m :height)
-                                     :alt (getf m :alt) :created-at (getf m :created-at)))
-               (loop :for (content revisions) :in contents
-                     :do (import-content content)
-                         (dolist (r revisions)
-                           (import-revision (content-id content) (getf r :event) (getf r :data)
-                                            :by (getf r :by) :created-at (getf r :created-at)))))
-             (setf done t))
-        (unless done (mapc #'uiop:delete-file-if-exists (car written))))
-      space)))
+    (import-into space schema
+                 (map 'list (lambda (o) (parse-content o space schema))
+                      (or (nullable (jget document "contents")) #()))
+                 (map 'list (lambda (o) (parse-media o entries))
+                      (or (nullable (jget document "media")) #()))
+                 :secret (string-field document "webhookSecret")
+                 :delivery-keys (parse-keys document "deliveryKeys")
+                 :management-keys (parse-keys document "managementKeys")
+                 :by by)))
+
+(defun import-into (space schema contents media &key secret delivery-keys management-keys by)
+  ;; the files first, as an upload does: a failed write must not leave rows
+  ;; whose URLs 404; a failed transaction takes the files away again
+  (let ((written (list '()))
+        (done nil))
+    (unwind-protect
+         (progn
+           (write-media-files space media written)
+           (with-db-transaction
+             ;; checked again inside: another import may have made it since
+             (check-target space)
+             (unless (find-space space) (create-space space))
+             (save-schema space schema :by by)
+             (when secret (set-webhook-secret space secret))
+             (dolist (k delivery-keys) (apply #'import-delivery-key space k))
+             (dolist (k management-keys) (apply #'import-management-key space k))
+             (dolist (m media)
+               (insert-media space :id (getf m :id) :filename (getf m :filename) :mime (getf m :mime)
+                                   :size (getf m :size) :width (getf m :width) :height (getf m :height)
+                                   :alt (getf m :alt) :created-at (getf m :created-at)))
+             (loop :for (content revisions) :in contents
+                   :do (import-content content)
+                       (dolist (r revisions)
+                         (import-revision (content-id content) (getf r :event) (getf r :data)
+                                          :by (getf r :by) :created-at (getf r :created-at)))))
+           (setf done t))
+      (unless done (mapc #'uiop:delete-file-if-exists (car written))))
+    space))
