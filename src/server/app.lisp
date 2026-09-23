@@ -34,20 +34,27 @@
            #:*api-app*
            #:*admin-api-app*
            #:*page-app*
+           #:install-routes
            #:build-app))
 (in-package #:koya-server/app)
 
 ;;; Delivery API: /api/v1/...  (JSON, delivery key)
 (defparameter *api-app* (make-json-app))
-(set-routes *api-app* :system :koya-server :dir "api")
 
 ;;; Admin API: /admin/api/... (JSON, owner)
 (defparameter *admin-api-app* (make-json-app))
-(set-routes *admin-api-app* :system :koya-server :dir "admin-api")
 
 ;;; Admin UI pages: / (HTML, owner session)
 (defparameter *page-app* (make-app))
-(set-routes *page-app* :system :koya-server :dir "pages")
+
+(defun install-routes ()
+  "Load the route files and install them. A route file is not an ASDF dependency
+of this system, so loading it again leaves an edited route stale; RELOAD calls this."
+  (set-routes *api-app* :system :koya-server :dir "api")
+  (set-routes *admin-api-app* :system :koya-server :dir "admin-api")
+  (set-routes *page-app* :system :koya-server :dir "pages"))
+
+(install-routes)
 
 (defmethod process-response :around ((app (eql *page-app*)) result)
   (set-response-header :content-type "text/html; charset=utf-8")

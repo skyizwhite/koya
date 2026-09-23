@@ -21,7 +21,7 @@
 ("ningle-fbr" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/ningle-fbr.git")
-  :version "git-f23f5897390e585a5eb8eef45806c84ab1269f0e"))
+  :version "git-2829bb24ca54ced927c3f56c5fdd723f4f90cdc9"))
 ("ningle-actions" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/ningle-actions.git")

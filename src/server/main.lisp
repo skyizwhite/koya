@@ -2,7 +2,7 @@
   (:nicknames #:koya-server/main)
   (:use #:cl)
   (:import-from #:clack)
-  (:import-from #:koya-server/app #:*app*)
+  (:import-from #:koya-server/app #:*app* #:install-routes)
   (:import-from #:koya-server/lib/env #:db-path #:server-port #:dev-mode-p)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
@@ -45,6 +45,7 @@
 (defun reload ()
   (stop)
   (asdf:load-system :koya-server/app)
+  (install-routes)
   (refresh-asset-version)
   (start))
 
