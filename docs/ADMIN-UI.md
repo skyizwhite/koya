@@ -21,11 +21,12 @@ repository (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [Logging in](#logging-in)
 - [Spaces](#spaces)
 - [A space](#a-space)
-- [Schema deploys](#schema-deploys)
-- [The webhook delivery log](#the-webhook-delivery-log)
 - [Contents of a model](#contents-of-a-model)
 - [The editor](#the-editor)
 - [Drafts, publishing and previews](#drafts-publishing-and-previews)
+- [History](#history)
+- [The webhook delivery log](#the-webhook-delivery-log)
+- [Schema deploys](#schema-deploys)
 - [Media](#media)
 - [Keys](#keys)
 - [Settings: time zone and two-factor login](#settings-time-zone-and-two-factor-login)
@@ -78,9 +79,10 @@ made and deleted.
 
 ## A space
 
-`/s/{space}` lists the space's models — a stacked-rows icon for a `list` model,
-braces for an `object` model — with the number of contents in each list model,
-and links to **Schema Deploys**, **Media** and **Keys**. **Export** downloads
+`/s/{space}` lists the space's models in the schema's order — a list icon for a
+`list` model, braces for an `object` model — with the number of contents in each
+list model, and links to **Schema Deploys**, **Media** and **Keys**. A list model
+opens its contents; an object model opens straight into its editor. **Export** downloads
 the whole space as a zip for **Import** on the spaces page — `space.json` (the
 schema, the contents with their drafts and history, the media rows) and the
 media files under `media/`, the keys as their hashes, and the webhook secret.
@@ -90,72 +92,12 @@ Underneath, **Webhooks** shows every webhook of the space with its label, its UR
 and what it covers — *all models*, or *`blog, tag` only* for one narrowed with
 `only`. Every webhook receives every event (publish, unpublish, delete, draft)
 for the models it covers; the payload says which. Webhooks are part of the
-schema, so they are read-only here; change them in `defwebhooks` and deploy.
+schema, so they are read-only here; change the schema's `webhooks` and deploy.
 
 Each row opens the **delivery log** filtered to that webhook; *View log →*
 beside the heading opens it unfiltered.
 
 ![A space: its models and its webhooks](img/models.png)
-
-## Schema deploys
-
-`/s/{space}/deploys` is what each deploy of this space's schema changed, newest
-first, 20 to a page. **Schema Deploys** on the space page opens it.
-
-Each entry says how many changes it carried, whether any was destructive, who
-deployed it — `(management key: deploys from CI)`, or `owner` — and when. Under
-that is the diff, one line per change, as `koya plan` prints it:
-
-| Line | Meaning |
-|---|---|
-| `+ blog.title (text)` | something new, in green |
-| `- blog.summary (text)` | something gone, in red |
-| `~ blog.title renamed from heading` | a rename, in the accent colour |
-| `~ blog options changed (publicUrl none -> "https://…")` | a change, with what moved |
-| `! ~ blog.title options tightened (maxLength 100 -> 50)` | a change that can reject content already stored |
-
-A `!` marks a change that can hide or invalidate stored content — the ones a
-deploy refuses without `force` — and the line is red whatever its marker.
-
-Only the changes are kept, not the schema as it was; read that from the space
-page or with `koya pull`. A deploy that changed nothing leaves no entry, and
-the newest 100 of a space are kept.
-
-## The webhook delivery log
-
-`/s/{space}/webhooks` is the last 200 calls the space made, newest first, 20 to
-a page. A row names the event, the model and the webhook's label, and carries
-the outcome as a badge:
-
-| Badge | Meaning |
-|---|---|
-| a 2xx status, green | the receiver accepted the call |
-| any other status, red | it answered, and refused |
-| *no response*, amber | the call never arrived: DNS, a refused connection, a timeout |
-
-Opening a row shows the URL it posted to, a link to the content that changed,
-how long the call took, the error when there was one, and **the response body**
-as the receiver sent it — the first 4000 characters of it, which is where a
-revalidation hook's own error message usually is.
-
-![The delivery log, one row open](img/webhooks.png)
-
-There is one log per space, and the narrower views are the same page filtered:
-
-| Filter | Shows | Linked from |
-|---|---|---|
-| `?label={label}` | one webhook's calls | a webhook row on the space page |
-| `?model={model}` | every call a change to that model set off | *Webhooks* on the model's page, or in an object model's editor |
-
-Both together narrow to one webhook's calls for one model. Two selects above
-the list both show what is filtered and are how it is set, so a filter can be
-set on the page as well as arrived at by link; choosing applies it, with no
-button to press, and *Clear* drops both. They offer every model of the space
-and every webhook of it, whether or not it has fired yet, plus
-anything the log still holds that the schema no longer does.
-
-Nothing here is retried, and nothing is kept beyond the newest 200 calls of a
-space: this is a log to glance at after a publish, not an audit trail.
 
 ## Contents of a model
 
@@ -178,13 +120,19 @@ straight to its one content -- so that button sits in its editor instead.
   **Next** underneath when there are more. Every list in the admin UI shows 20.
 - **New content** opens an empty editor at `/s/{space}/m/{model}/new`.
 
-For an `object` model this URL redirects straight to its single content (or to a
-`new` editor when it has none): an object model holds exactly one content.
+### Object models
+
+An `object` model holds exactly one content — an about page, the site's
+settings — so it has no list. Its URL goes straight to that content's editor,
+or to a `new` one while it has none. The editor's heading is the model's name
+alone, it carries the **Webhooks** button the list would have, and **Delete**
+starts the content over.
 
 ### Finding one
 
-A search box and a status filter above the table, and the column headers sort.
-All three live in the query string, so the list as you are reading it is a link:
+A search box and a status filter above the table, applied with **Filter**, and
+the column headers sort. All three live in the query string, so the list as you
+are reading it is a link:
 
 | | |
 |---|---|
@@ -219,7 +167,8 @@ reissue its draft key: *Published 2 contents. 5 were already published.*
 ## The editor
 
 `/s/{space}/m/{model}/{id}` generates a form from the model. Each field is
-labelled with its name, its type and, when required, a red `*`.
+labelled with its name, its type and, when required, a red `*`. The breadcrumb
+names the content by its model's `label` field, or by its id.
 
 ![Editing a content](img/editor.png)
 
@@ -245,17 +194,23 @@ Notes on the generated controls:
 - Rich text is stored as HTML. Images inserted from the picker are stored as
   `/media/...` paths and made absolute again by the delivery API, so the HTML is
   safe to render on another site.
+- A rich text field is written back only when it was edited. Quill rewrites HTML
+  it did not write itself — it drops ids and `<figure>`s and adds `rel` to links
+  — so HTML written through the API stays exactly as it is until someone changes
+  it here, and saving another field does not show it as changed in the history.
 - When validation fails the page comes back with a summary at the top and the
   message under each offending field; nothing is saved.
 
-The sticky bar at the top of the editor carries the title, the status badge and
-the created/updated times, then:
+The sticky bar at the top of the editor carries the model's name and the
+content's id, the status badge and the created/updated times, then — where the
+content can be seen on the left, what can be done to it on the right:
 
 | Button | What it does |
 |---|---|
 | **Preview draft** | opens the model's `previewUrl` with `{CONTENT_ID}` and `{DRAFT_KEY}` filled in — shown only while a draft with a key exists |
 | **Published page** | opens the model's `publicUrl` — shown only while the content is published |
 | **History** | the content's revisions, and where an old version is restored from — see [History](#history) |
+| **Webhooks** | an object model's delivery log, where the list page would carry it — shown only while a webhook covers the model |
 | **Discard draft** | throws the draft away and goes back to the published version (published contents only) |
 | **Save draft** | saves the form as a draft, leaving what is published untouched |
 | **Publish** | validates and publishes the form as it stands |
@@ -290,17 +245,23 @@ discard, with who made it (the owner, or a management key by its label) and
 when. A draft save that changes nothing is not kept. Nothing is ever pruned;
 deleting the content deletes its history with it.
 
-`/s/{space}/m/{model}/{id}/history` shows it newest first, in two views:
+`/s/{space}/m/{model}/{id}/history` — **History** in the editor — shows it newest
+first, 20 to a page, in two views, each tab counting its revisions:
 
 | View | Shows | Each one compared with |
 |---|---|---|
 | **All changes** | every revision | the revision before it |
 | **Published** | the versions that were live | the version published before it |
 
-A revision is drawn as the fields it changed, the old value on the left and the
-new one on the right. Rich text is shown formatted, in a sandboxed frame where
-nothing in it can run; references and media carry their label or file name
-while they still exist.
+![A content's history: each revision, the fields it changed](img/history.png)
+
+Each revision is badged by what it was — *Draft saved*, *Published*,
+*Unpublished* or *Draft discarded* — with when and by whom, and drawn as the
+fields it changed, the old value on the left and the new one on the right. The
+oldest one in the view has nothing before it, so it shows every field it had,
+as *The oldest version in this view*. Rich text is shown formatted, in a
+sandboxed frame where nothing in it can run; references and media carry their
+label or file name while they still exist.
 
 **Restore** opens the editor with that version in the form, under a banner
 saying which version it is. Nothing is stored until **Save draft** or
@@ -320,6 +281,68 @@ not everything always comes back. The banner lists each field that did not:
 A deleted content cannot be restored at all: its history went with it. A field
 renamed with `was` is renamed in the history too, so its old values restore
 into it.
+
+## The webhook delivery log
+
+`/s/{space}/webhooks` is the last 200 calls the space made, newest first, 20 to
+a page; **View log →** on the space page opens it. A row names the event, the model and the webhook's label, and carries
+the outcome as a badge:
+
+| Badge | Meaning |
+|---|---|
+| a 2xx status, green | the receiver accepted the call |
+| any other status, red | it answered, and refused |
+| *no response*, amber | the call never arrived: DNS, a refused connection, a timeout |
+
+Opening a row shows the URL it posted to, a link to the content that changed,
+how long the call took, the error when there was one, and **the response body**
+as the receiver sent it — the first 4000 characters of it, which is where a
+revalidation hook's own error message usually is.
+
+![The delivery log, one row open](img/webhooks.png)
+
+There is one log per space, and the narrower views are the same page filtered:
+
+| Filter | Shows | Linked from |
+|---|---|---|
+| `?label={label}` | one webhook's calls | a webhook row on the space page |
+| `?model={model}` | every call a change to that model set off | *Webhooks* on the model's page, or in an object model's editor |
+
+Both together narrow to one webhook's calls for one model. Two selects above
+the list both show what is filtered and are how it is set, so a filter can be
+set on the page as well as arrived at by link: **Filter** applies them, and
+**Clear** drops both. They offer every model of the space
+and every webhook of it, whether or not it has fired yet, plus
+anything the log still holds that the schema no longer does.
+
+Nothing here is retried, and nothing is kept beyond the newest 200 calls of a
+space: this is a log to glance at after a publish, not an audit trail.
+
+## Schema deploys
+
+`/s/{space}/deploys` is what each deploy of this space's schema changed, newest
+first, 20 to a page. **Schema Deploys** on the space page opens it.
+
+![What each deploy changed](img/deploys.png)
+
+Each entry says how many changes it carried, whether any was destructive, who
+deployed it — `(management key: deploys from CI)`, or `owner` — and when. Under
+that is the diff, one line per change, as `koya plan` prints it:
+
+| Line | Meaning |
+|---|---|
+| `+ blog.title (text)` | something new, in green |
+| `- blog.summary (text)` | something gone, in red |
+| `~ blog.title renamed from heading` | a rename, in the accent colour |
+| `~ blog options changed (publicUrl none -> "https://…")` | a change, with what moved |
+| `! ~ blog.title options tightened (maxLength 100 -> 50)` | a change that can reject content already stored |
+
+A `!` marks a change that can hide or invalidate stored content — the ones a
+deploy refuses without `force` — and the line is red whatever its marker.
+
+Only the changes are kept, not the schema as it was; read that from the space
+page or with `koya pull`. A deploy that changed nothing leaves no entry, and
+the newest 100 of a space are kept.
 
 ## Media
 
@@ -408,9 +431,12 @@ on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key = 'totp
 | `/` | spaces: the list, and where they are made and deleted |
 | `/login`, `/logout` | log in, log out |
 | `/settings` | instance settings (time zone, two-factor login) |
+| `/import` | where **Import** posts a space's zip |
 | `/s/{space}` | a space: models and webhooks |
+| `/s/{space}/export` | the space as a zip |
+| `/s/{space}/deploys` | what each schema deploy changed |
 | `/s/{space}/webhooks` | the webhook delivery log; `?label=` and `?model=` narrow it |
-| `/s/{space}/m/{model}` | contents of a model (object models redirect to their content) |
+| `/s/{space}/m/{model}` | contents of a model; `?q=`, `?status=` and `?sort=` narrow and order it (object models redirect to their content) |
 | `/s/{space}/m/{model}/{id}` | the editor; `new` for a new content; `?revision=` fills it with an old version |
 | `/s/{space}/m/{model}/{id}/history` | the content's history; `?view=published` for the published versions alone |
 | `/s/{space}/media` | media library |
@@ -421,10 +447,11 @@ on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key = 'totp
 
 | Thing | Value |
 |---|---|
-| Contents per page of a model list | 100, newest created first |
+| Rows per page: contents, media, deliveries, deploys, revisions | 20 |
 | Contents offered in a reference field | 1000 |
-| Media per library page / per picker page | 48 / 24 |
-| Webhook deliveries kept / shown per page | 200 per space / 25 |
+| Media per picker page | 24 |
+| Webhook deliveries kept | the newest 200 per space |
+| Schema deploys kept | the newest 100 per space |
 | Response body stored per delivery | 4000 characters |
 | Upload size and types | 20 MB; PNG, JPEG, GIF, WebP |
 | Session lifetime | 24 hours, stored in the database |
