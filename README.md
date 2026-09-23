@@ -93,7 +93,7 @@ just test
 The `Dockerfile` builds one image: the server on port 3000, with its database and uploaded media under `/data`. On Coolify, create a Dockerfile application from this repository and
 
 - expose port `3000`;
-- mount a persistent volume at `/data` (database and uploaded media; back this up);
+- mount a persistent volume at `/data` (database and uploaded media);
 - set the environment variables below.
 
 | Variable | Required | Meaning |
@@ -106,6 +106,11 @@ The `Dockerfile` builds one image: the server on port 3000, with its database an
 | `KOYA_ENV` | no | `production` (default) masks error details; `dev` shows them |
 
 Health check: `GET /health` (no auth; the image declares it as `HEALTHCHECK`). Migrations run at startup. Static assets are served with long immutable caching behind versioned URLs; API and page responses are `no-store`.
+
+### Backups and moving data
+
+- **Back up the whole `/data` directory.** It holds the database and the uploaded media.
+- **To move data**, use **Export** on a space's page and **Import** on the spaces page; see [docs/ADMIN-UI.md](docs/ADMIN-UI.md).
 
 ## License
 
