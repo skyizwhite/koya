@@ -64,6 +64,14 @@ made and deleted.
 - **Delete** asks for confirmation and then removes the space with everything in
   it — models, contents, media rows and files, delivery keys, management keys and
   the webhook log. It cannot be undone.
+- **Import**, beside **New space**, takes a zip made by a space's **Export** and
+  makes that space again under its own name: its models and webhooks, every
+  content with its draft, timestamps and history, and its media, all with the
+  ids they had. The name must be free, or the space must have no models yet;
+  otherwise the import is refused and nothing changes. Nothing is sent to the
+  webhooks. The schema it brings is in the space's deploy log. Keys and the
+  webhook secret are not in the archive: make new keys, and give the site the
+  space's webhook secret from **Keys**.
 
 ![The spaces, and where a new one is made](img/spaces.png)
 
@@ -71,7 +79,10 @@ made and deleted.
 
 `/s/{space}` lists the space's models — a stacked-rows icon for a `:list` model,
 braces for an `:object` model — with the number of contents in each list model,
-and links to **Schema Deploys**, **Media** and **Keys**.
+and links to **Schema Deploys**, **Media** and **Keys**. **Export** downloads
+the whole space as a zip for **Import** on the spaces page — `space.json` (the
+schema, the contents with their drafts and history, the media rows) and the
+media files under `media/` — without its keys or webhook secret.
 
 Underneath, **Webhooks** shows every webhook of the space with its label, its URL
 and what it covers — *all models*, or *`blog, tag` only* for one narrowed with

@@ -15,7 +15,7 @@
                 #:record-revision)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
-  (:export #:content-id #:content-space #:content-model #:content-status
+  (:export #:make-content #:content-id #:content-space #:content-model #:content-status
            #:content-published #:content-draft #:content-draft-key
            #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
            #:content-data
@@ -31,14 +31,17 @@
            #:count-contents
            #:ensure-draft-key
            #:find-object-content
-           #:unique-value-taken-p))
+           #:unique-value-taken-p
+           #:space-contents
+           #:import-content))
 (in-package #:koya-server/db/contents)
 
 ;;; Content rows. PUBLISHED and DRAFT are JSON objects (hash tables) or NIL.
 ;;; status is one of "draft", "published", "published+draft".
 ;;;
 ;;; Every write records a revision in the same transaction (db/content-revisions);
-;;; BY names who made it, as lib/auth's CALLING-IDENTITY does.
+;;; BY names who made it, as lib/auth's CALLING-IDENTITY does. IMPORT-CONTENT is
+;;; the exception: an imported content brings its own history.
 
 (defstruct content
   id space model status published draft draft-key created-at updated-at published-at revised-at)
@@ -194,3 +197,21 @@ list shows, so the three choices are the three badges."
                             (format nil expr "published") (format nil expr "draft"))
                     space model (or exclude-id "") value value)
          t)))
+
+(defun space-contents (space)
+  "Every content of SPACE, oldest first: what an export carries."
+  (mapcar #'row->content
+          (fetch "SELECT * FROM contents WHERE space = ? ORDER BY created_at, id" space)))
+
+(defun import-content (content)
+  "Insert CONTENT as it is, every column included, and record no revision: the
+importer brings the content's history along with it."
+  (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        (content-id content) (content-space content) (content-model content)
+        (status-for (content-published content) (content-draft content))
+        (let ((v (content-published content))) (and v (to-json v)))
+        (let ((v (content-draft content))) (and v (to-json v)))
+        (content-draft-key content)
+        (content-created-at content) (content-updated-at content)
+        (content-published-at content) (content-revised-at content)))

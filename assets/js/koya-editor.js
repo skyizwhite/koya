@@ -322,3 +322,39 @@ document.addEventListener("DOMContentLoaded", () => {
     if (frame.contentDocument && frame.contentDocument.readyState === "complete") fit();
   });
 });
+
+// Import: the archive goes to /import as the request body itself, not as a
+// multipart form, so the server can copy it to disk instead of holding it in
+// memory. The answer is the page to go to, where the result waits as a flash.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("form[data-import]").forEach((form) => {
+    const error = form.querySelector("[data-import-error]");
+    const submit = form.querySelector("button[type=submit]");
+    const label = submit.innerHTML;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const file = form.querySelector("input[type=file]").files[0];
+      if (!file) return;
+      submit.disabled = true;
+      submit.textContent = "Importing…";
+      error.classList.add("hidden");
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: file,
+          headers: { "Content-Type": "application/zip" },
+        });
+        // a lost session answers with the login page
+        if (response.redirected) { window.location.href = response.url; return; }
+        const text = await response.text();
+        if (!response.ok) throw new Error(new DOMParser().parseFromString(text, "text/html").body.textContent);
+        window.location.href = text;
+      } catch (e) {
+        error.textContent = e.message || "The import could not be sent.";
+        error.classList.remove("hidden");
+        submit.disabled = false;
+        submit.innerHTML = label;
+      }
+    });
+  });
+});

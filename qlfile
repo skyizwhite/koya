@@ -17,4 +17,5 @@ ql ironclad
 ql local-time
 ql cl-ppcre
 ql alexandria
+ql zippy
 git rove https://github.com/fukamachi/rove

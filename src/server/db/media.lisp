@@ -9,6 +9,7 @@
   (:export #:insert-media
            #:find-media
            #:list-media
+           #:space-media
            #:count-media
            #:update-media
            #:delete-media
@@ -30,10 +31,10 @@
               :width (col row "width") :height (col row "height")
               :alt (col row "alt") :created-at (col row "created_at")))
 
-(defun insert-media (space &key filename mime size width height (alt "") (id (make-ulid)))
+(defun insert-media (space &key filename mime size width height (alt "") (id (make-ulid)) created-at)
   (exec "INSERT INTO media (id, space, filename, mime, size, width, height, alt, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        id space filename mime size width height alt (now-iso))
+        id space filename mime size width height alt (or created-at (now-iso)))
   (find-media space id))
 
 (defun find-media (space id)
@@ -55,6 +56,10 @@
     (mapcar #'row->media
             (apply #'fetch (format nil "SELECT * FROM media WHERE space = ?~a ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?" where)
                    space (append params (list limit offset))))))
+
+(defun space-media (space)
+  "Every media of SPACE, oldest first."
+  (mapcar #'row->media (fetch "SELECT * FROM media WHERE space = ? ORDER BY created_at, id" space)))
 
 (defun count-media (space &key search)
   (multiple-value-bind (where params) (search-clause search)

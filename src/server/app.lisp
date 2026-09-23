@@ -24,6 +24,8 @@
                 #:*media-middleware* #:+max-upload-bytes+)
   (:import-from #:koya-server/lib/http
                 #:make-json-app)
+  (:import-from #:koya-server/lib/space-archive
+                #:+max-archive-bytes+)
   (:import-from #:koya-server/lib/auth
                 #:*admin-auth-middleware* #:*actions-auth-middleware*)
   (:import-from #:koya-server/db/sessions
@@ -57,9 +59,13 @@ of this system, so loading it again leaves an edited route stale; RELOAD calls t
 (install-routes)
 
 (defmethod process-response :around ((app (eql *page-app*)) result)
-  (set-response-header :content-type "text/html; charset=utf-8")
-  (call-next-method app (and result (hsx:render-to-string
-                                     (hsx:hsx (~document :title (ningle:context :title) result))))))
+  (if (and (consp result) (integerp (first result)))
+      ;; a whole Lack response, such as a download: not a page to wrap
+      (call-next-method)
+      (progn
+        (set-response-header :content-type "text/html; charset=utf-8")
+        (call-next-method app (and result (hsx:render-to-string
+                                           (hsx:hsx (~document :title (ningle:context :title) result))))))))
 
 (defmethod process-response :around ((app (eql *actions-app*)) result)
   (set-response-header :content-type "text/html; charset=utf-8")
@@ -88,21 +94,38 @@ of this system, so loading it again leaves an edited route stale; RELOAD calls t
 (defparameter +max-body-bytes+ (+ +max-upload-bytes+ (* 1024 1024))
   "Largest request body accepted: the media upload limit plus room for the other parts.")
 
+(defun import-body-p (env)
+  (and (eq (getf env :request-method) :post)
+       (string= (getf env :path-info) "/import")
+       (prefix-p "application/zip" (or (getf env :content-type) ""))))
+
 (defparameter *body-limit-middleware*
   (lambda (app)
     (lambda (env)
-      (let ((length (getf env :content-length)))
-        (if (and (integerp length) (> length +max-body-bytes+))
-            ;; before anything parses the body: lack reads a multipart body whole
-            (let ((message (format nil "Request body is limited to ~a MB" (floor +max-body-bytes+ (* 1024 1024)))))
-              ;; htmx swaps an error response in, so it gets a fragment rather than JSON
-              (if (gethash "hx-request" (getf env :headers))
-                  (list 413 (list :content-type "text/html; charset=utf-8" :cache-control "no-store")
-                        (list (format nil "<p class=\"text-sm text-danger\">~a</p>" message)))
-                  (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")
-                        (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message)))))
-            (funcall app env)))))
-  "Rejects oversized bodies by Content-Length, outermost, so no parser allocates for them.")
+      (let* ((length (getf env :content-length))
+             (import-p (import-body-p env))
+             (limit (if import-p +max-archive-bytes+ +max-body-bytes+)))
+        (cond ((and (integerp length) (> length limit))
+               ;; before anything parses the body: lack reads a multipart body whole
+               (let ((message (format nil "Request body is limited to ~a MB" (floor limit (* 1024 1024)))))
+                 ;; htmx swaps an error response in, and the import form shows it
+                 ;; as it came, so both get HTML rather than JSON
+                 (if (or import-p (gethash "hx-request" (getf env :headers)))
+                     (list 413 (list :content-type "text/html; charset=utf-8" :cache-control "no-store")
+                           (list (format nil "<p class=\"text-sm text-danger\">~a</p>" message)))
+                     (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")
+                           (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message))))))
+              (import-p
+               ;; a space archive is set aside unread for pages/import, which
+               ;; copies it to a file once the owner is known. Left as the raw
+               ;; body, lack would wrap it in a stream that keeps whatever is read
+               ;; in memory.
+               (funcall app (list* :koya.import-body (getf env :raw-body)
+                                   :raw-body nil :content-length nil
+                                   env)))
+              (t (funcall app env))))))
+  "Rejects oversized bodies by Content-Length, outermost, so no parser allocates for them,
+and sets an import's body aside before anything reads it.")
 
 (defun session-cookie-state ()
   "The owner session cookie: HttpOnly so scripts cannot read it, SameSite=Lax so

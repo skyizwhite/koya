@@ -31,7 +31,11 @@
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
-  (:import-from #:quri #:url-encode-params))
+  (:import-from #:quri #:url-encode-params)
+  (:import-from #:koya-server/lib/media-store #:store-upload #:media-path #:remove-space-media)
+  (:import-from #:koya-server/db/contents #:create-content #:save-draft #:content-created-at #:content-published-at)
+  (:import-from #:koya-server/db/schema-store #:load-schema #:space-webhooks #:space-webhook-secret)
+  (:import-from #:koya/core/schema #:schema-models #:model-name #:webhook-url))
 (in-package #:koya-tests/server/ui)
 
 (defparameter *secret* "ui-secret")
@@ -68,7 +72,7 @@
 
 (teardown (disconnect-db))
 
-(defun request (method path &key form multipart json headers query)
+(defun request (method path &key form multipart json body content-type headers query)
   "Returns (values status body-string headers-plist). FORM is urlencoded; MULTIPART
 is a list of parts for MULTIPART-BODY; JSON is a string sent as the body, for the
 admin API, which the session reaches as well as a management key does."
@@ -90,6 +94,10 @@ admin API, which the session reaches as well as a management key does."
         (setf (getf env :content-type) content-type
               (getf env :content-length) (length octets)
               (getf env :raw-body) (make-in-memory-input-stream octets))))
+    (when body
+      (setf (getf env :content-type) content-type
+            (getf env :content-length) (length body)
+            (getf env :raw-body) (make-in-memory-input-stream body)))
     (when json
       (let ((octets (string-to-octets json :encoding :utf-8)))
         (setf (getf env :content-type) "application/json"
@@ -101,7 +109,9 @@ admin API, which the session reaches as well as a management key does."
           (setf *set-cookie* set-cookie
                 *cookie* (subseq set-cookie 0 (position #\; set-cookie)))))
       (values status
-              (if (pathnamep body) "" (apply #'concatenate 'string (if (listp body) body (list body))))
+              (cond ((pathnamep body) "")
+                    ((typep body '(vector (unsigned-byte 8))) body)
+                    (t (apply #'concatenate 'string (if (listp body) body (list body)))))
               response-headers))))
 
 (defun location (headers) (getf headers :location))
@@ -857,12 +867,12 @@ admin API, which the session reaches as well as a management key does."
       (ok (= status 303) "logs in again once the lock is cleared"))))
 
 (deftest body-size-limit
-  (flet ((huge-post (headers)
-           (funcall *app* (list :request-method :post :script-name "" :path-info "/login" :query-string ""
+  (flet ((huge-post (headers &key (path "/login") (mb 3000) (content-type "multipart/form-data; boundary=x"))
+           (funcall *app* (list :request-method :post :script-name "" :path-info path :query-string ""
                                 :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
-                                :request-uri "/login" :url-scheme "http" :remote-addr "127.0.0.1"
+                                :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
                                 :headers (alist-hash-table (acons "host" "localhost:3000" headers) :test 'equal)
-                                :content-type "multipart/form-data; boundary=x" :content-length (* 3000 1024 1024)
+                                :content-type content-type :content-length (* mb 1024 1024)
                                 :raw-body (make-in-memory-input-stream (string-to-octets ""))))))
     (destructuring-bind (status headers body) (huge-post nil)
       (declare (ignore headers))
@@ -872,7 +882,16 @@ admin API, which the session reaches as well as a management key does."
       (ok (= status 413))
       (ok (search "text/html" (getf headers :content-type)) "htmx swaps it in, so it is HTML")
       (ok (search "limited to" (first body)))
-      (ok (not (search "too_large" (first body)))))))
+      (ok (not (search "too_large" (first body)))))
+    (testing "an import may be larger, but not without end"
+      (ok (/= 413 (first (huge-post nil :path "/import" :mb 100 :content-type "application/zip")))
+          "a space archive carries every media file")
+      (ok (= 413 (first (huge-post nil :path "/import" :mb 100)))
+          "but only as the body itself: lack would hold a multipart one in memory")
+      (destructuring-bind (status headers body) (huge-post nil :path "/import" :content-type "application/zip")
+        (ok (= status 413))
+        (ok (search "text/html" (getf headers :content-type)) "a form post, so it is HTML")
+        (ok (search "limited to 512 MB" (first body)))))))
 
 (deftest list-columns-are-bounded
   (multiple-value-bind (status body headers)
@@ -1380,3 +1399,120 @@ admin API, which the session reaches as well as a management key does."
         (save-schema "website"
                      (make-schema :models (list (blog-model)
                                                 (make-model "about" :object (list (make-field :body :richtext))))))))))
+
+(defun archive-schema ()
+  (make-schema :webhooks (list (make-webhook "site" "https://site.test/hook"))
+               :models (list (make-model "tag" :list (list (make-field :name :text)))
+                             (make-model "post" :list (list (make-field :title :text)
+                                                            (make-field :cover :media)
+                                                            (make-field :body :richtext)
+                                                            (make-field :tags :reference :model "tag" :many t))
+                                         :label :title))))
+
+(defun import-archive (octets)
+  "Send OCTETS to /import as the import form does; (values status next-location)."
+  (multiple-value-bind (status body)
+      (request :post "/import" :headers '(("origin" . "http://localhost:3000"))
+                               :body octets :content-type "application/zip")
+    (values status body)))
+
+(deftest a-space-is-exported-and-imported-again
+  (setf *cookie* nil)
+  (request :post "/login" :form `(("secret" . ,*secret*)))
+  (create-space "archive")
+  (save-schema "archive" (archive-schema))
+  (let* ((media (store-upload "archive" (png-bytes 4 5) :filename "cover.png" :alt "A cover"))
+         (tag (content-id (create-content "archive" "tag" (alist-hash-table '(("name" . "lisp")) :test 'equal)
+                                          :publish t :id "tag-1" :created-at "2020-01-01T00:00:00.000Z"
+                                          :published-at "2020-01-02T00:00:00.000Z")))
+         (post (content-id (create-content "archive" "post"
+                                           (alist-hash-table `(("title" . "Old") ("cover" . ,(media-id media))
+                                                               ("tags" . ,(vector tag)))
+                                                             :test 'equal)
+                                           :publish t)))
+         (old-secret (space-webhook-secret "archive"))
+         (sent 0)
+         octets)
+    (save-draft post (alist-hash-table `(("title" . "New")
+                                         ("body" . ,(format nil "<p><img src=\"/media/archive/~a.png\"></p>" (media-id media))))
+                                       :test 'equal))
+    (testing "the space page offers the export"
+      (ok (search "href=\"/s/archive/export\"" (nth-value 1 (request :get "/s/archive")))))
+    (testing "export is a zip download"
+      (multiple-value-bind (status body headers) (request :get "/s/archive/export")
+        (ok (= status 200))
+        (ok (string= (getf headers :content-type) "application/zip"))
+        (ok (search "attachment; filename=\"archive-" (getf headers :content-disposition)))
+        (ok (typep body '(vector (unsigned-byte 8))))
+        (ok (equalp (subseq body 0 2) #(80 75)) "PK")
+        (setf octets body)))
+    (delete-space "archive")
+    (remove-space-media "archive")
+    (let ((*webhook-sender* (lambda (url payload headers)
+                              (declare (ignore url payload headers))
+                              (incf sent))))
+      (testing "import makes the space again"
+        (multiple-value-bind (status location) (import-archive octets)
+          (ok (= status 200))
+          (ok (string= location "/s/archive")))
+        (ok (search "Space archive imported." (nth-value 1 (request :get "/s/archive"))))
+        (ok (equal (mapcar #'model-name (schema-models (load-schema "archive"))) '("tag" "post")))
+        (ok (equal (mapcar #'webhook-url (space-webhooks "archive")) '("https://site.test/hook"))
+            "with its webhooks")
+        (ok (string/= (space-webhook-secret "archive") old-secret)
+            "but not its webhook secret: the archive carries no credential")
+        (ok (= sent 0) "and nothing is sent to them"))
+      (testing "contents keep their ids, state, draft, timestamps and history"
+        (let ((tag-content (get-content tag))
+              (post-content (get-content post)))
+          (ok (string= (content-created-at tag-content) "2020-01-01T00:00:00.000Z"))
+          (ok (string= (content-published-at tag-content) "2020-01-02T00:00:00.000Z"))
+          (ok (string= (content-status post-content) "published+draft"))
+          (ok (string= (jget (content-published post-content) "title") "Old"))
+          (ok (string= (jget (content-draft post-content) "title") "New"))
+          (ok (equalp (jget (content-published post-content) "tags") (vector tag)))
+          (ok (content-draft-key post-content) "the preview link still works")
+          (ok (= (count-revisions post) 2))
+          (ok (equal (mapcar #'revision-event (list-revisions post)) '("draft" "publish")))))
+      (testing "media keep their ids, metadata and files"
+        (let ((copy (find (media-id media) (list-media "archive") :key #'media-id :test #'string=)))
+          (ok copy)
+          (ok (string= (media-filename copy) "cover.png"))
+          (ok (string= (koya-server/db/media:media-alt copy) "A cover"))
+          (ok (equalp (alexandria:read-file-into-byte-vector (media-path copy)) (png-bytes 4 5)))))
+      (testing "the import is in the deploy log, named for whoever made it"
+        (ok (equal (mapcar #'deploy-by (list-deploys "archive")) '("owner"))))
+      (testing "a space that has models is not imported into"
+        (multiple-value-bind (status location) (import-archive octets)
+          (ok (= status 200))
+          (ok (string= location "/")))
+        (ok (search "already has models" (nth-value 1 (request :get "/"))))
+        (ok (= (length (list-deploys "archive")) 1) "and nothing changed"))
+      (testing "a space without models is imported into, keeping what it has"
+        (delete-space "archive")
+        (remove-space-media "archive")
+        (create-space "archive")
+        (let ((secret (space-webhook-secret "archive")))
+          (ok (string= (nth-value 1 (import-archive octets)) "/s/archive"))
+          (ok (get-content post))
+          (ok (string= (space-webhook-secret "archive") secret)))))
+    (testing "a file that is not an archive changes nothing"
+      (delete-space "archive")
+      (remove-space-media "archive")
+      (multiple-value-bind (status location) (import-archive (string-to-octets "not a zip"))
+        (ok (= status 200))
+        (ok (string= location "/")))
+      (ok (search "not a zip archive" (nth-value 1 (request :get "/"))))
+      (ng (find-space "archive")))
+    (testing "a multipart post is not an import"
+      (ok (string= (nth-value 1 (request :post "/import" :headers '(("origin" . "http://localhost:3000"))
+                                         :multipart (list (list "file" "a.zip" "application/zip" octets))))
+                   "/"))
+      (ok (search "Choose an archive" (nth-value 1 (request :get "/"))))
+      (ng (find-space "archive")))
+    (testing "an import from another site is refused"
+      (ok (= 403 (request :post "/import" :headers '(("origin" . "https://evil.test"))
+                                          :body octets :content-type "application/zip")))
+      (ng (find-space "archive")))
+    (testing "the import dialog is on the spaces page"
+      (ok (search "action=\"/import\" data-import" (nth-value 1 (request :get "/")))))))

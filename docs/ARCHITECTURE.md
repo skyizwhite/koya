@@ -32,7 +32,8 @@ src/
     admin-api/        ; the admin API
     db/               ; connection, migrations, and one file per table
     lib/              ; env, auth, http, query, presenter, content-service,
-                      ; forms, page, timezone, totp, media-store, webhook
+                      ; forms, page, timezone, totp, media-store, webhook,
+                      ; space-archive
 tests/                ; mirrors src/
 assets/               ; style/ (Tailwind in and out), js/
 ```
@@ -76,6 +77,7 @@ SBCL with package-inferred systems — a file under `src/` is a package — and
 | DB | cl-dbi + dbd-sqlite3 + sxql |
 | JSON | jzon, with kebab/camel conversion in `core/case` |
 | Client | dexador |
+| Archives | zippy (a space's export and import) |
 | Other | ironclad, local-time, cl-dotenv, Tailwind CSS v4 (standalone) |
 | Tests | rove (`koya-tests`) |
 
@@ -94,5 +96,6 @@ Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
 `KOYA_PORT`, `KOYA_ENV`, and `KOYA_TOTP_SECRET` to set two-factor login from
 outside the UI. `GET /health` is unauthenticated and touches the database.
 
-Backups are the volume's. Assets and media are served `immutable` (their URLs
-carry a version, and a media id is never reused); everything else is `no-store`.
+Backups are the volume's; a space's Export is the portable copy of one space.
+Assets and media are served `immutable` (their URLs carry a version, and a media
+id is never reused); everything else is `no-store`.

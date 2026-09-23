@@ -19,6 +19,7 @@
            #:remove-media
            #:remove-space-media
            #:media-path
+           #:media-file-path
            #:media-url
            #:media->jobject
            #:+max-upload-bytes+))
@@ -32,9 +33,12 @@
 (defun media-file-name (media)
   (format nil "~a.~a" (media-id media) (image-extension (media-mime media))))
 
-(defun media-path (media)
-  (merge-pathnames (format nil "~a/~a" (media-space media) (media-file-name media))
+(defun media-file-path (space id mime)
+  (merge-pathnames (format nil "~a/~a.~a" space id (image-extension mime))
                    (uiop:ensure-directory-pathname (media-dir))))
+
+(defun media-path (media)
+  (media-file-path (media-space media) (media-id media) (media-mime media)))
 
 (defun media-url (media &key (absolute t))
   (let ((path (format nil "/media/~a/~a" (media-space media) (media-file-name media))))
@@ -70,8 +74,7 @@ row. Signals a 4xx api-error for unsupported or oversized data."
     (unless mime (fail-api 422 "unsupported_type" "Only PNG, JPEG, GIF and WebP images are accepted"))
     ;; the file first: a failed write (disk full) must not leave a row whose URL 404s
     (let* ((id (koya/core/ulid:make-ulid))
-           (path (merge-pathnames (format nil "~a/~a.~a" space id (image-extension mime))
-                                  (uiop:ensure-directory-pathname (media-dir)))))
+           (path (media-file-path space id mime)))
       (ensure-directories-exist path)
       (with-open-file (out path :direction :output :element-type '(unsigned-byte 8) :if-exists :supersede)
         (write-sequence bytes out))

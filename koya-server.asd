@@ -2,6 +2,7 @@
 (register-system-packages "bordeaux-threads" '(:bordeaux-threads-2 :bt2))
 (register-system-packages "lack-middleware-session" '(:lack/middleware/session/store))
 (register-system-packages "dexador" '(:dexador.error))
+(register-system-packages "zippy" '(:org.shirakumo.zippy))
 
 (defsystem "koya-server"
   :version "0.7.0"

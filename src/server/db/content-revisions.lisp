@@ -10,6 +10,8 @@
            #:list-revisions
            #:count-revisions
            #:find-revision
+           #:content-history
+           #:import-revision
            #:revision-id #:revision-content-id #:revision-event #:revision-data
            #:revision-by #:revision-created-at))
 (in-package #:koya-server/db/content-revisions)
@@ -61,3 +63,14 @@ changes nothing against the newest revision records nothing."
 (defun find-revision (content-id id)
   (let ((row (fetch-one "SELECT * FROM content_revisions WHERE content_id = ? AND id = ?" content-id id)))
     (and row (row->revision row))))
+
+(defun content-history (content-id)
+  "Every revision of CONTENT-ID, oldest first."
+  (mapcar #'row->revision
+          (fetch "SELECT * FROM content_revisions WHERE content_id = ? ORDER BY id" content-id)))
+
+(defun import-revision (content-id event data &key (by "") created-at)
+  "Append a revision as it was written elsewhere. Imported oldest first, so the
+ids keep the order they had."
+  (exec "INSERT INTO content_revisions (content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?)"
+        content-id event (to-json data) (or by "") (or created-at (now-iso))))

@@ -51,13 +51,39 @@ taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
          (button :type "button" :class "btn" :data-dialog-close t "Cancel")
          (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create space"))))))
 
+(defcomp ~import-space-dialog ()
+  "A space archive from a space's Export. koya-editor.js sends the chosen file to
+/import as the request body (see pages/import)."
+  (hsx
+   (dialog :id "import-space" :class "koya-dialog max-w-sm"
+     (form :method "post" :action "/import" :data-import t
+       (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
+         (h2 :class "font-semibold" "Import space")
+         (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close"
+           (~icon :name :close)))
+       (div :class "px-4 py-4"
+         (label :for "archive" :class "label" "Archive")
+         (input :type "file" :id "archive" :name "file" :required t :accept ".zip,application/zip"
+                :class "input mt-1.5")
+         (p :class "mt-2 text-xs text-muted"
+            "A zip from a space's " (strong "Export") ". The space is made again under its own name, "
+            "with its models, webhooks, contents, history and media. A space of that name must not "
+            "exist yet, or must have no models. Nothing is sent to the webhooks."))
+       (p :class "hidden px-4 pb-3 text-sm text-danger" :data-import-error t)
+       (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
+         (button :type "button" :class "btn" :data-dialog-close t "Cancel")
+         (button :type "submit" :class "btn btn-primary" (~icon :name :upload) "Import"))))))
+
 (defcomp ~spaces-page (&key spaces)
   (hsx
    (~layout
      (div :class "mb-6 flex items-center justify-between gap-4"
        (h1 :class "text-2xl font-bold" "Spaces")
-       (button :type "button" :class "btn btn-primary" :data-dialog-open "new-space"
-         (~icon :name :plus) "New space"))
+       (div :class "flex gap-2"
+         (button :type "button" :class "btn" :data-dialog-open "import-space"
+           (~icon :name :upload) "Import")
+         (button :type "button" :class "btn btn-primary" :data-dialog-open "new-space"
+           (~icon :name :plus) "New space")))
      (if (null spaces)
          (hsx (~empty-state
                 (p "No spaces yet.")
@@ -65,7 +91,8 @@ taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
                    (code "(koya:deploy)") " from your project's REPL.")))
          (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                 (loop :for space :in spaces :collect (hsx (~space-row :space space))))))
-     (~new-space-dialog))))
+     (~new-space-dialog)
+     (~import-space-dialog))))
 
 (defun @get (params)
   (declare (ignore params))
