@@ -98,7 +98,7 @@ stored yet, and what did not come back."
               :crumbs (if object-p
                           (list (cons model-name nil))
                           (list (cons model-name (model-url space-name model-name))
-                                (cons (if content id "new") nil)))
+                                (cons (if content (content-label content model) "new") nil)))
        ;; Sticky action bar: title and metadata on the left, links and actions on the right.
        ;; -mt-3 takes back the bar's own top padding so the title starts where every
        ;; other page's title does, under the layout's padding alone.

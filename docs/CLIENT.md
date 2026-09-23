@@ -85,6 +85,7 @@ same name, so the schema can be edited live from the REPL.
              (webhook "preview-build" "https://preview.example/hook" :only 'blog))
 
 (defmodel blog (:kind :list
+                :label       title
                 :public-url  "https://example.com/blog/{CONTENT_ID}"
                 :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
   (title   :text :required t)
@@ -102,7 +103,7 @@ same name, so the schema can be edited live from the REPL.
 
 - **`(defwebhooks &rest webhooks)`** — each form is evaluated and must produce a
   `(webhook label url &key only)`. Re-evaluating replaces the whole list.
-- **`(defmodel name (&key kind preview-url public-url was) &body fields)`** —
+- **`(defmodel name (&key kind preview-url public-url label was) &body fields)`** —
   `:kind` is required and is `:list` (many contents) or `:object` (exactly one).
   The URL templates are evaluated; each field form `(name type . options)` is
   taken literally. A model carries no webhooks: they all live in `defwebhooks`.
@@ -111,6 +112,10 @@ same name, so the schema can be edited live from the REPL.
   [Renaming a model or a field](#renaming-a-model-or-a-field).
 - **`:preview-url` / `:public-url`** are templates for the editor's two links.
   `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
+- **`:label`** names the `:text` or `:slug` field whose value the admin UI shows
+  for a content — in the list's reference previews, the reference dropdowns and
+  the history. It is taken literally, like a field name (`:label title`).
+  Without it a content is shown by its id; no field is guessed at.
 
 Naming rules, checked as the schema is built:
 

@@ -45,6 +45,7 @@
            #:jobject->webhook
            #:model-preview-url
            #:model-public-url
+           #:model-label
            #:schema
            #:make-schema
            #:schema-webhooks
@@ -270,7 +271,8 @@ every model of the space."
   name     ; slug string
   kind     ; :list or :object
   fields   ; list of FIELD
-  options) ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY}), :was
+  options) ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY}),
+           ; :label (the field naming a content), :was
 
 (defun check-field-renames (model-name fields)
   "A field's :WAS must name one field, once, and one this model no longer declares."
@@ -291,12 +293,16 @@ thing called \"null\"."
         ((and value (symbolp value)) (string-downcase (symbol-name value)))
         (t value)))
 
-(defun make-model (name kind fields &key preview-url public-url was)
+(defun make-model (name kind fields &key preview-url public-url label was)
   (let ((name (string-downcase (string name)))
-        (was (name-designator was)))
+        (was (name-designator was))
+        ;; a field name, as :from on a slug takes it
+        (label (if (and label (symbolp label) (not (json-null-p label))) (camel-key label) label)))
     (dolist (url (list preview-url public-url))
       (unless (or (null url) (stringp url))
         (fail "model ~s: URL templates must be strings" name)))
+    (unless (or (null label) (stringp label))
+      (fail "model ~s: :label must name a field" name))
     (unless (slug-name-p name)
       (fail "model name ~s must be lowercase letters, digits and hyphens" name))
     (when was
@@ -313,10 +319,16 @@ thing called \"null\"."
     (%make-model :name name :kind kind :fields fields
                  :options (append (and preview-url (list :preview-url preview-url))
                                   (and public-url (list :public-url public-url))
+                                  (and label (list :label label))
                                   (and was (list :was was))))))
 
 (defun model-preview-url (model) (getf (model-options model) :preview-url))
 (defun model-public-url (model) (getf (model-options model) :public-url))
+
+(defun model-label (model)
+  "The name of the field whose value names a content of MODEL, or NIL: which
+field that is only the schema can say."
+  (getf (model-options model) :label))
 
 (defun model-was (model)
   "The name MODEL had in the deployed schema, or NIL."
@@ -390,6 +402,17 @@ thing called \"null\"."
                     (push (format nil "~a.~a: :from must name a text or textarea field other than itself"
                                   (model-name model) (field-name field))
                           errors))))))))
+    (dolist (model (schema-models schema))
+      (let ((label (model-label model)))
+        (when label
+          (let ((field (model-field model label)))
+            (cond ((null field)
+                   (push (format nil "model ~a: :label refers to unknown field ~s" (model-name model) label)
+                         errors))
+                  ((not (member (field-type field) '(:text :slug)))
+                   (push (format nil "model ~a: :label must name a text or slug field, and ~a is ~(~a~)"
+                                 (model-name model) label (field-type field))
+                         errors)))))))
     (nreverse errors)))
 
 (defun check-schema (schema)
@@ -437,6 +460,7 @@ stored schema loads and is rewritten in the current shape on the next deploy."
                       "fields" (map 'vector #'field->jobject (model-fields model)))))
     (when (model-preview-url model) (setf (gethash "previewUrl" obj) (model-preview-url model)))
     (when (model-public-url model) (setf (gethash "publicUrl" obj) (model-public-url model)))
+    (when (model-label model) (setf (gethash "label" obj) (model-label model)))
     (when (model-was model) (setf (gethash "was" obj) (model-was model)))
     obj))
 
@@ -489,6 +513,7 @@ never interned: an unknown name stays a string."
                 (map 'list #'jobject->field (or fields #()))
                 :preview-url (jget obj "previewUrl")
                 :public-url (jget obj "publicUrl")
+                :label (jget obj "label")
                 :was (jget obj "was"))))
 
 (defun jobject->schema (obj)

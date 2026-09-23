@@ -817,6 +817,11 @@ components:
               kind: { type: string, enum: [list, object] }
               previewUrl: { type: string }
               publicUrl: { type: string }
+              label:
+                type: string
+                description: |
+                  A text or slug field of this model, whose value the admin UI
+                  shows for a content. Absent, a content is shown by its id.
               was:
                 type: string
                 description: |

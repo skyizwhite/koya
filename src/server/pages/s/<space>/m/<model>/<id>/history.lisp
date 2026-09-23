@@ -183,7 +183,7 @@ allow-same-origin is only there so that koya-editor.js can read its height."
               :crumbs (if object-p
                           (list (cons model-name (content-url space model-name id)) (cons "History" nil))
                           (list (cons model-name (model-url space model-name))
-                                (cons id (content-url space model-name id))
+                                (cons (content-label content model) (content-url space model-name id))
                                 (cons "History" nil)))
        (h1 :class "mb-2 text-2xl font-bold" "History")
        (p :class "mb-4 text-sm text-muted"

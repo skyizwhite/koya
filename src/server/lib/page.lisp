@@ -19,7 +19,7 @@
   (:import-from #:koya-server/lib/timezone
                 #:format-local)
   (:import-from #:koya/core/schema
-                #:model-fields #:field-name #:field-type)
+                #:model-label)
   (:import-from #:koya/core/json
                 #:json-null #:json-array)
   (:import-from #:koya-server/db/contents
@@ -90,14 +90,14 @@ rewording it reaches the rows already written."
           (t by))))
 
 (defun content-label (content model)
-  "Human label for CONTENT: its first non-empty text or slug field, else its id."
-  (let ((data (content-data content :draft t)))
-    (or (and data
-             (loop :for field :in (model-fields model)
-                   :when (member (field-type field) '(:text :slug))
-                     :do (let ((value (gethash (field-name field) data)))
-                           (when (and (stringp value) (plusp (length value)))
-                             (return value)))))
+  "What CONTENT is shown as: the value of the field MODEL declares as its :label,
+else its id. No field is taken for a title unless the schema says so -- the
+first text field of one model is another's subtitle."
+  (let* ((label (model-label model))
+         (data (and label (content-data content :draft t)))
+         (value (and data (gethash label data))))
+    (if (and (stringp value) (plusp (length value)))
+        value
         (content-id content))))
 
 (defun expand-url-template (template &key id draft-key)

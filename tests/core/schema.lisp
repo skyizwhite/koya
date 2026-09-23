@@ -5,7 +5,7 @@
                 #:field-name #:field-type #:field-option #:field-was
                 #:model-field #:model-kind #:model-was #:model-forget-renames
                 #:schema-model #:schema-webhooks
-                #:model-preview-url #:model-public-url #:make-webhook #:webhook-only #:webhook-covers-p
+                #:model-preview-url #:model-public-url #:model-label #:make-webhook #:webhook-only #:webhook-covers-p
                 #:schema-error #:schema-errors #:check-schema
                 #:schema->jobject #:jobject->schema)
   (:import-from #:koya/core/json
@@ -168,6 +168,31 @@
       (ok (signals (check-schema broken) 'schema-error)))
     (ok (null (schema-errors (make-schema :webhooks (list (make-webhook "h" "https://h" :only '(m)))
                                           :models (list (make-model "m" :list nil))))))))
+
+(deftest labels
+  (testing "a model names the field that labels its contents"
+    (let ((model (make-model "blog" :list (list (make-field :event-title :text)) :label 'event-title)))
+      (ok (string= (model-label model) "eventTitle") "a symbol names the field as the field is named")
+      (ok (null (model-label (make-model "tag" :list nil))) "and nothing is assumed without one")))
+  (ok (signals (make-model "blog" :list nil :label 3) 'schema-error))
+  (flet ((errors (fields label)
+           (schema-errors (make-schema :models (list (make-model "m" :list fields :label label))))))
+    (ok (null (errors (list (make-field :title :text)) :title)))
+    (ok (null (errors (list (make-field :slug :slug :from :title) (make-field :title :text)) :slug)))
+    (ok (= (length (errors (list (make-field :title :text)) :headline)) 1)
+        "a field that is not there, removed or renamed without the label following")
+    (ok (= (length (errors (list (make-field :body :richtext)) :body)) 1)
+        "a field whose value is not a line of text")
+    (ok (= (length (errors (list (make-field :tags :select :options '("a")) ) :tags)) 1)))
+  (testing "it goes over the wire and back"
+    (let* ((schema (make-schema :models (list (make-model "m" :list (list (make-field :title :text)) :label :title))))
+           (obj (schema->jobject schema)))
+      (ok (string= (jget (aref (jget obj "models") 0) "label") "title"))
+      (ok (string= (model-label (schema-model (jobject->schema (parse-json (to-json obj))) "m")) "title"))
+      (ng (nth-value 1 (jget (aref (jget (schema->jobject (make-schema :models (list (make-model "m" :list nil))))
+                                         "models") 0)
+                             "label"))
+          "absent when there is none"))))
 
 (deftest wire-format
   (let* ((schema (sample-schema))

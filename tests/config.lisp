@@ -5,7 +5,7 @@
   (:import-from #:koya/core/schema
                 #:schema-models #:schema-webhooks #:schema-model
                 #:model-field #:model-kind #:field-option #:field-type #:schema-error
-                #:model-preview-url #:model-public-url))
+                #:model-preview-url #:model-public-url #:model-label))
 (in-package #:koya-tests/config)
 
 (defhook :before (clear-schema))
@@ -18,7 +18,7 @@
     (tags         :reference :model tag :many t)
     (category     :select :options ("news" "tech"))
     (event-at :datetime))
-  (defmodel tag (:kind :list)
+  (defmodel tag (:kind :list :label name)
     (name :text :required t))
   (defmodel about (:kind :object
                    :preview-url (format nil "~a/about?draft-key={DRAFT_KEY}" "https://x")
@@ -35,6 +35,8 @@
     (ok (string= (model-preview-url (schema-model schema "about")) "https://x/about?draft-key={DRAFT_KEY}") "options are evaluated")
     (ok (string= (model-public-url (schema-model schema "about")) "https://x/about"))
     (ok (null (model-preview-url blog)))
+    (ok (string= (model-label (schema-model schema "tag")) "name") ":label is taken literally, as a field name")
+    (ok (null (model-label blog)))
     (ok (= (field-option (model-field blog "title") :max-length) 100))
     (ok (string= (field-option (model-field blog "tags") :model) "tag"))
     (ok (equal (field-option (model-field blog "category") :options) '("news" "tech")))

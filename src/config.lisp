@@ -88,7 +88,7 @@ list of them; without it the webhook fires for every model of the space."
 narrows it. Re-evaluating replaces the whole list."
   `(register-webhooks (list ,@webhooks)))
 
-(defmacro defmodel (name (&key kind preview-url public-url was) &body fields)
+(defmacro defmodel (name (&key kind preview-url public-url label was) &body fields)
   "Define (or redefine) model NAME. KIND is :list or :object and must be given.
 Each field is (NAME TYPE . OPTIONS) and is taken literally, e.g.
 (tags :reference :model tag :many t).
@@ -98,7 +98,10 @@ with them. Both are taken literally and are dropped once the deploy has applied
 them, so PULL never brings them back.
 PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI
 where {CONTENT_ID} and {DRAFT_KEY} are substituted, e.g.
-\"https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}\"."
+\"https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}\".
+LABEL names the :text or :slug field whose value the admin UI shows for a
+content -- in lists, reference pickers and the history. Without one a content
+is shown by its id."
   (unless (member kind '(:list :object))
     (error "defmodel ~(~a~): :kind must be given as :list or :object, got ~s" name kind))
   `(register-model
@@ -109,6 +112,7 @@ where {CONTENT_ID} and {DRAFT_KEY} are substituted, e.g.
                                                             :append (list k `',v)))))
                 :preview-url ,preview-url
                 :public-url ,public-url
+                :label ',label
                 :was ',was)))
 
 (defun current-schema ()

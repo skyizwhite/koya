@@ -150,7 +150,7 @@ straight to its one content -- so that button sits in its editor instead.
 
 - Every field gets a preview, clamped to two lines: rich text is stripped to
   plain text, a datetime is shown as `YYYY-MM-DD HH:MM UTC`, a reference shows the
-  referenced content's label, a `:many` field shows its values comma-separated,
+  referenced content's label (its model's `:label` field, or its id), a `:many` field shows its values comma-separated,
   and an empty field shows `—`. Column widths are bounded per field type, so a
   wide model scrolls sideways rather than squeezing every column thin.
 - A row shows its **draft** data when it has one, so the table reflects what is
@@ -220,8 +220,8 @@ labelled with its name, its type and, when required, a red `*`.
 Notes on the generated controls:
 
 - A reference dropdown lists up to 1000 contents of the target model, drafts
-  included, labelled by the content's first non-empty `:text` or `:slug` field and
-  falling back to its id. An id that no longer resolves is kept and shown as
+  included, labelled by the field the target model names as its `:label` and
+  otherwise by the id. An id that no longer resolves is kept and shown as
   `{id} (missing)`, so a save never drops it silently.
 - Rich text is stored as HTML. Images inserted from the picker are stored as
   `/media/...` paths and made absolute again by the delivery API, so the HTML is

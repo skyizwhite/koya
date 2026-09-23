@@ -40,6 +40,16 @@
     (ng (destructive-changes-p changes))
     (ok (search "options changed" (format-change (first changes))))))
 
+(deftest a-label-is-an-option
+  (let* ((labelled (make-schema :models (list (make-model "blog" :list (list (make-field :title :text :required t)
+                                                                             (make-field :body :richtext))
+                                                          :label :title)
+                                              (make-model "about" :object (list (make-field :body :richtext))))))
+         (changes (diff-schemas (schema-a) labelled)))
+    (ok (equal (ops changes) '(:change-model-options)))
+    (ng (destructive-changes-p changes) "it changes what the admin UI shows, not what is stored")
+    (ok (search "label" (format-change (first changes))))))
+
 (deftest field-options
   (flet ((blog (&rest title-options)
            (make-schema :models (list (make-model "blog" :list

@@ -75,6 +75,7 @@ The payload is described in [CLIENT.md](CLIENT.md#webhooks).
   "kind": "list",
   "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
   "publicUrl": "https://example.com/blog/{CONTENT_ID}",
+  "label": "title",
   "fields": [ …field… ]
 }
 ```
@@ -86,6 +87,7 @@ The payload is described in [CLIENT.md](CLIENT.md#webhooks).
 | `fields` | array of [field](#field) | optional; names unique within the model |
 | `previewUrl` | string | optional; template for the editor's *Preview draft* link |
 | `publicUrl` | string | optional; template for the editor's *Published page* link |
+| `label` | string | optional; a `text` or `slug` field of this model, whose value the admin UI shows for a content. Without it a content is shown by its id |
 | `was` | string | optional; the name this model had, see [Renames](#renames) |
 
 The URL templates substitute `{CONTENT_ID}` and `{DRAFT_KEY}`. Optional keys are
@@ -230,7 +232,7 @@ the difference between the space's stored schema and the one sent as a list of
 | `change_kind` | a model's `kind` changed | **yes** |
 | `change_field_type` | a field's `type` changed | **yes** |
 | `change_field_options` | a field's options changed | yes when tightened, see below |
-| `change_model_options` | `previewUrl` / `publicUrl` changed | no |
+| `change_model_options` | `previewUrl` / `publicUrl` / `label` changed | no |
 | `change_webhooks` | the space's webhooks changed | no |
 
 Options are **tightened** when they can reject content the old ones accepted:
@@ -258,6 +260,7 @@ they are.
       "name": "blog",
       "kind": "list",
       "publicUrl": "https://example.com/blog/{CONTENT_ID}",
+      "label": "title",
       "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
       "fields": [
         {"name": "title",   "type": "text", "required": true},

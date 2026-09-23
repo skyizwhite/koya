@@ -57,6 +57,7 @@ In a project that depends on `koya`, the models of its space are Lisp:
 (defwebhooks (webhook "revalidate" "https://example.com/api/revalidate"))
 
 (defmodel blog (:kind :list
+                :label title
                 :public-url "https://example.com/blog/{CONTENT_ID}"
                 :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
   (title   :text :required t)
