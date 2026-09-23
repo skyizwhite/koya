@@ -37,6 +37,7 @@
            #:take-flash
            #:expand-url-template
            #:short-time
+           #:caller-name
            #:content-label
            #:~layout
            #:~status-badge
@@ -79,6 +80,14 @@
 (defun short-time (iso)
   "2026-09-20T05:04:03.123Z -> 2026-09-20 14:04 JST, in the zone chosen on the settings page."
   (format-local iso))
+
+(defun caller-name (by)
+  "\"owner\" or \"key:<label>\" as stored, in words. Kept out of the rows so that
+rewording it reaches the rows already written."
+  (let ((by (or by "")))
+    (cond ((string= by "key:") "(management key)")
+          ((eql 0 (search "key:" by)) (format nil "(management key: ~a)" (subseq by 4)))
+          (t by))))
 
 (defun content-label (content model)
   "Human label for CONTENT: its first non-empty text or slug field, else its id."

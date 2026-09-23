@@ -308,3 +308,17 @@ document.addEventListener("DOMContentLoaded", () => {
     render();
   });
 });
+
+// History: rich text is drawn in a sandboxed [data-fit-content] iframe, which
+// is as tall as its document once that has loaded -- its stylesheet included.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("iframe[data-fit-content]").forEach((frame) => {
+    const fit = () => {
+      const doc = frame.contentDocument;
+      // the body, not the root: the root is never shorter than the frame itself
+      if (doc && doc.body) frame.style.height = `${doc.body.scrollHeight}px`;
+    };
+    frame.addEventListener("load", fit);
+    if (frame.contentDocument && frame.contentDocument.readyState === "complete") fit();
+  });
+});

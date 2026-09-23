@@ -236,6 +236,7 @@ the created/updated times, then:
 |---|---|
 | **Preview draft** | opens the model's `:preview-url` with `{CONTENT_ID}` and `{DRAFT_KEY}` filled in — shown only while a draft with a key exists |
 | **Published page** | opens the model's `:public-url` — shown only while the content is published |
+| **History** | the content's revisions, and where an old version is restored from — see [History](#history) |
 | **Discard draft** | throws the draft away and goes back to the published version (published contents only) |
 | **Save draft** | saves the form as a draft, leaving what is published untouched |
 | **Publish** | validates and publishes the form as it stands |
@@ -262,6 +263,44 @@ A content is in one of three states, shown as its badge:
 - Publishing, unpublishing and deleting fire the matching webhooks; saving a
   draft fires `:draft` webhooks; discarding a draft fires none, since what is
   published did not change.
+
+## History
+
+Every write to a content is kept: each draft save, publish, unpublish and
+discard, with who made it (the owner, or a management key by its label) and
+when. A draft save that changes nothing is not kept. Nothing is ever pruned;
+deleting the content deletes its history with it.
+
+`/s/{space}/m/{model}/{id}/history` shows it newest first, in two views:
+
+| View | Shows | Each one compared with |
+|---|---|---|
+| **All changes** | every revision | the revision before it |
+| **Published** | the versions that were live | the version published before it |
+
+A revision is drawn as the fields it changed, the old value on the left and the
+new one on the right. Rich text is shown formatted, in a sandboxed frame where
+nothing in it can run; references and media carry their label or file name
+while they still exist.
+
+**Restore** opens the editor with that version in the form, under a banner
+saying which version it is. Nothing is stored until **Save draft** or
+**Publish** — restoring never touches what is live by itself, and **Cancel**
+goes back to the current data.
+
+The schema and the space may have changed since the version was written, so
+not everything always comes back. The banner lists each field that did not:
+
+| Case | What happens |
+|---|---|
+| the field has been removed from the model | left out |
+| the value no longer fits the field — its type or options changed, it became required, a unique value is now taken by another content | the field keeps its current value |
+| a reference to a content that has since been deleted, unpublished, or is only a draft | that reference is dropped |
+| a media that has since been deleted from the library, or re-uploaded (a new upload is a new id) | that media is dropped |
+
+A deleted content cannot be restored at all: its history went with it. A field
+renamed with `:was` is renamed in the history too, so its old values restore
+into it.
 
 ## Media
 
@@ -354,7 +393,8 @@ takes precedence and the settings page then only reports that it is in force.
 | `/s/{space}` | a space: models and webhooks |
 | `/s/{space}/webhooks` | the webhook delivery log; `?label=` and `?model=` narrow it |
 | `/s/{space}/m/{model}` | contents of a model (object models redirect to their content) |
-| `/s/{space}/m/{model}/{id}` | the editor; `new` for a new content |
+| `/s/{space}/m/{model}/{id}` | the editor; `new` for a new content; `?revision=` fills it with an old version |
+| `/s/{space}/m/{model}/{id}/history` | the content's history; `?view=published` for the published versions alone |
 | `/s/{space}/media` | media library |
 | `/s/{space}/keys` | delivery keys, management keys and the webhook secret |
 | `/health` | unauthenticated health check (verifies the database answers) |
@@ -377,6 +417,6 @@ takes precedence and the settings page then only reports that it is in force.
 - Editing the schema: the models of a space belong to the site's repository (see
   [CLIENT.md](CLIENT.md)). Making and deleting the space itself does belong here.
 - User accounts and roles: there is one owner.
-- Revision history: a content has one published version and one draft.
+- History over the APIs: revisions are read and restored in the admin UI only.
 
 For the reasoning behind these, see [the decision records](../adr).

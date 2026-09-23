@@ -122,8 +122,8 @@ the old row goes: they reference it ON DELETE CASCADE."
       t)))
 
 (defun rename-content-field (space model from to)
-  "Rewrite the key FROM to TO in the published data and the draft of every content
-of MODEL."
+  "Rewrite the key FROM to TO in the published data, the draft and the revisions
+of every content of MODEL."
   (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?"
                       space model))
     (let* ((published (let ((v (col row "published"))) (and v (parse-json v))))
@@ -132,7 +132,14 @@ of MODEL."
            (in-draft (and draft (rename-key draft from to))))
       (when (or in-published in-draft)
         (exec "UPDATE contents SET published = ?, draft = ? WHERE id = ?"
-              (and published (to-json published)) (and draft (to-json draft)) (col row "id"))))))
+              (and published (to-json published)) (and draft (to-json draft)) (col row "id")))))
+  ;; the same field in the history, so an old version still restores into it
+  (dolist (row (fetch "SELECT r.id, r.data FROM content_revisions r JOIN contents c ON c.id = r.content_id
+                        WHERE c.space = ? AND c.model = ?"
+                      space model))
+    (let ((data (parse-json (col row "data"))))
+      (when (rename-key data from to)
+        (exec "UPDATE content_revisions SET data = ? WHERE id = ?" (to-json data) (col row "id"))))))
 
 (defun apply-renames (space-name changes)
   "Carry out a deploy's renames. Model renames come first in CHANGES, so a field

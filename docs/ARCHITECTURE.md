@@ -53,6 +53,7 @@ by `(koya-server:write-schema-snapshot)` — a test fails when it is stale.
 | `spaces` | a space, its webhooks and its webhook secret |
 | `models` | a deployed model, as the schema document's own JSON |
 | `contents` | every model's contents; `published` and `draft` are JSON |
+| `content_revisions` | what each write left a content with, kept until the content is deleted |
 | `schema_deploys` | what each deploy changed |
 | `delivery_keys` `management_keys` | keys, as SHA-256 |
 | `media` | an uploaded file's metadata; the file itself is on disk |

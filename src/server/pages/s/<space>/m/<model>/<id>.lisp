@@ -23,6 +23,10 @@
   (:import-from #:koya-server/components/field-input #:~field-input)
   (:import-from #:koya-server/actions/media-picker #:~media-picker-dialog)
   (:import-from #:koya-server/db/media #:find-media)
+  (:import-from #:koya-server/db/content-revisions
+                #:find-revision #:revision-data #:revision-created-at)
+  (:import-from #:koya-server/lib/revisions #:restore-data)
+  (:import-from #:koya-server/pages/s/<space>/m/<model>/<id>/history #:history-url)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>)
 
@@ -63,7 +67,22 @@
      (span "created at " (short-time (content-created-at content)))
      (span "updated at " (short-time (content-updated-at content))))))
 
-(defcomp ~editor (&key space model content data errors)
+(defcomp ~restoring (&key space model content revision notes)
+  "Above the form while it holds an old version: which one, that nothing is
+stored yet, and what did not come back."
+  (hsx
+   (div :class "mb-6 rounded-md border border-accent/40 bg-accent/5 px-4 py-3 text-sm"
+     (div :class "flex flex-wrap items-center justify-between gap-2"
+       (p (strong "Restoring the version of " (short-time (revision-created-at revision)) ".")
+          " Nothing is stored until you save a draft or publish.")
+       (a :href (content-url space (model-name model) (content-id content)) :class "btn"
+          (~icon :name :close) "Cancel"))
+     (when notes
+       (hsx (ul :class "mt-2 list-disc pl-5 text-warn"
+              (loop :for note :in notes :collect
+                (hsx (li (strong (getf note :field)) " " (getf note :note))))))))))
+
+(defcomp ~editor (&key space model content data errors restoring)
   (let* ((space-name space)
          (model-name (model-name model))
          (id (if content (content-id content) "new"))
@@ -94,6 +113,9 @@
            (div :class "flex flex-wrap items-center gap-2"
              (when preview-url (hsx (~external-link :href preview-url "Preview draft")))
              (when public-url (hsx (~external-link :href public-url "Published page")))
+             (when content
+               (hsx (a :href (history-url space-name model-name id) :class "btn"
+                       (~icon :name :history) "History")))
              ;; an object model has no list page to carry this, and this editor
              ;; is the whole of its screen -- but only where a hook can fire
              (when (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))
@@ -107,6 +129,8 @@
              (~action-button :value "save" :icon :save "Save draft")
              (~action-button :value "publish" :icon :publish :class "btn btn-primary" "Publish"))))
        (~errors :errors errors)
+       (when restoring (hsx (~restoring :space space-name :model model :content content
+                                        :revision (getf restoring :revision) :notes (getf restoring :notes))))
        (form :id "editor-form" :method "post" :action (content-url space-name model-name id)
              :class "space-y-6" :data-editor-form t
          (loop :for field :in (model-fields model) :collect
@@ -149,12 +173,33 @@
        (set-response-status 404)
        (hsx (~layout (h1 :class "text-xl font-bold" "Model not found"))))))
 
+(defun requested-revision (params content)
+  "The revision ?revision= names, or NIL. The second value is true when one was
+named that this content does not have."
+  (let ((raw (param params "revision")))
+    (when (and raw content)
+      (let* ((n (ignore-errors (parse-integer raw)))
+             (revision (and n (find-revision (content-id content) n))))
+        (values revision (null revision))))))
+
 (defun @get (params)
   (with-owner
     (with-editor (space model content) params
       (set-title (format nil "~a · ~a · koya" (model-name model) space))
-      (hsx (~editor :space space :model model :content content
-                    :data (if content (content-data content :draft t) (default-data model)))))))
+      (multiple-value-bind (revision unknown) (requested-revision params content)
+        (let ((current (if content (content-data content :draft t) (default-data model))))
+          (cond
+            (revision
+             (multiple-value-bind (data notes)
+                 (restore-data space model (content-id content) (revision-data revision) current)
+               (hsx (~editor :space space :model model :content content :data data
+                             :restoring (list :revision revision :notes notes)))))
+            (unknown
+             (hsx (~editor :space space :model model :content content :data current
+                           :errors (list (list :field "revision"
+                                               :message "does not exist for this content; this is its current data")))))
+            (t
+             (hsx (~editor :space space :model model :content content :data current)))))))))
 
 (defun @post (params)
   (with-owner-post

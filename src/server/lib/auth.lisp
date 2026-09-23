@@ -124,13 +124,14 @@ session, which reaches every space."
 page puts around it is the page's, so it can be changed later.
 
 The owner comes first, as *ADMIN-AUTH-MIDDLEWARE* does it: a request carrying
-both a session and a key is authorised as the owner."
-  (let ((env (request-env ningle:*request*)))
-    (if (session-env-owner-p env)
-        "owner"
-        (let ((label (management-key-label (bearer-token env))))
-          ;; nothing without one or the other gets past the middleware
-          (if label (format nil "key:~a" label) "unknown")))))
+both a session and a key is authorised as the owner. Outside a request -- a
+write from the REPL -- it is \"\", the way a deploy from the REPL names nobody."
+  (let ((env (and ningle:*request* (request-env ningle:*request*))))
+    (cond ((null env) "")
+          ((session-env-owner-p env) "owner")
+          (t (let ((label (management-key-label (bearer-token env))))
+               ;; nothing without one or the other gets past the middleware
+               (if label (format nil "key:~a" label) "unknown"))))))
 
 (defun cross-origin-write-p (env)
   "A state-changing request whose Origin/Referer does not match this server. The

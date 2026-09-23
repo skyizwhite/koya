@@ -22,6 +22,8 @@
   (:import-from #:koya-server/db/contents
                 #:create-content #:get-content
                 #:content-id #:content-model #:content-published #:content-draft)
+  (:import-from #:koya-server/db/content-revisions
+                #:list-revisions #:revision-event #:revision-data #:revision-created-at)
   (:import-from #:koya-server/db/sessions
                 #:make-session-store #:purge-expired-sessions)
   (:import-from #:lack/middleware/session/store
@@ -48,7 +50,7 @@
                                                             (make-field :event-at :datetime))))))
 
 (deftest migrations
-  (ok (= (current-version) 8))
+  (ok (= (current-version) 9))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -146,6 +148,10 @@
       (let ((content (get-content (content-id drafted))))
         (ok (string= (content-model content) "article"))
         (ok (string= (jget (content-draft content) "subtitle") "Later words"))))
+    (testing "and the history, so an old version still restores into the field"
+      (let ((data (revision-data (first (list-revisions (content-id published))))))
+        (ok (string= (jget data "subtitle") "First words"))
+        (ng (jget data "lede"))))
     (testing "the stored schema keeps the shape, not the rename"
       (ok (null (search "\"was\"" (to-json (schema->jobject (load-schema "magazine"))))))
       (ok (null (save-schema "magazine"
@@ -187,3 +193,26 @@
   (testing "the log goes with the space"
     (delete-space "logged")
     (ok (= (count-deploys "logged") 0))))
+
+(deftest existing-contents-start-their-history
+  ;; a database from before the history, holding what production held then
+  (connect-db ":memory:")
+  (let ((koya-server/db/migrations::*migrations*
+          (remove 9 koya-server/db/migrations::*migrations* :key #'car :test #'<=)))
+    (migrate))
+  (exec "INSERT INTO spaces (name, webhook_secret, created_at) VALUES ('old', 's', '2026-01-01T00:00:00.000Z')")
+  (exec "INSERT INTO models (space, name, kind, definition) VALUES ('old', 'post', 'list', '{}')")
+  (exec "INSERT INTO contents (id, space, model, status, published, draft, created_at, updated_at, published_at, revised_at)
+         VALUES ('both', 'old', 'post', 'published+draft', '{\"title\":\"Live\"}', '{\"title\":\"Next\"}',
+                 '2026-01-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z', '2026-02-01T00:00:00.000Z'),
+                ('draft', 'old', 'post', 'draft', NULL, '{\"title\":\"Only\"}',
+                 '2026-01-01T00:00:00.000Z', '2026-01-05T00:00:00.000Z', NULL, NULL)")
+  (migrate)
+  (let ((both (list-revisions "both")))
+    (ok (equal (mapcar #'revision-event both) '("draft" "publish")) "the draft sits on top of the published data")
+    (ok (string= (jget (revision-data (second both)) "title") "Live"))
+    (ok (string= (revision-created-at (second both)) "2026-02-01T00:00:00.000Z") "published when it was last revised")
+    (ok (string= (revision-created-at (first both)) "2026-03-01T00:00:00.000Z")))
+  (ok (equal (mapcar #'revision-event (list-revisions "draft")) '("draft")))
+  (connect-db ":memory:")
+  (migrate))

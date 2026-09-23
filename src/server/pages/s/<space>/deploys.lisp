@@ -10,7 +10,7 @@
                 #:change-op #:change-destructive #:change-description)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:param #:short-time
+                #:with-owner #:set-title #:param #:short-time #:caller-name
                 #:~layout #:~empty-state #:~icon #:space-url)
   (:export #:@get #:deploys-url))
 (in-package #:koya-server/pages/s/<space>/deploys)
@@ -31,13 +31,7 @@
 
 (defun blank-p (value) (or (null value) (zerop (length value))))
 
-(defun deployed-by (deploy)
-  "\"owner\" or \"key:<label>\" as stored, in words. Kept out of the row so that
-rewording it reaches the rows already written."
-  (let ((by (or (deploy-by deploy) "")))
-    (cond ((string= by "key:") "(management key)")
-          ((eql 0 (search "key:" by)) (format nil "(management key: ~a)" (subseq by 4)))
-          (t by))))
+(defun deployed-by (deploy) (caller-name (deploy-by deploy)))
 
 (defun line-class (change)
   (let ((op (or (change-op change) "")))

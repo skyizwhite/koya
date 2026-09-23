@@ -1,8 +1,16 @@
--- koya database schema, version 8.
+-- koya database schema, version 9.
 --
 -- Generated from src/server/db/migrations.lisp; do not edit by hand.
 -- Regenerate it from the REPL with (koya-server:write-schema-snapshot).
 
+CREATE TABLE content_revisions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  content_id TEXT NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
+  event TEXT NOT NULL,
+  data TEXT NOT NULL,
+  written_by TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL);
+CREATE INDEX content_revisions_by_content ON content_revisions (content_id, id DESC);
 CREATE TABLE contents (
   id TEXT PRIMARY KEY,
   space TEXT NOT NULL,

@@ -9,6 +9,11 @@
                 #:unique-value-taken-p
                 #:content-id #:content-status #:content-published #:content-draft #:content-published-at
                 #:content-revised-at #:content-draft-key)
+  (:import-from #:koya-server/db/contents #:discard-draft)
+  (:import-from #:koya-server/db/content-revisions
+                #:list-revisions #:count-revisions #:find-revision
+                #:revision-id #:revision-event #:revision-data #:revision-by)
+  (:import-from #:koya-server/db/connection #:fetch-one #:col)
   (:import-from #:koya-server/db/delivery-keys
                 #:create-delivery-key #:list-delivery-keys #:delete-delivery-key #:space-for-delivery-key)
   (:import-from #:koya-server/lib/query
@@ -70,6 +75,42 @@
             (ok (string= (jget (content-draft u) "title") "Edited") "unpublish keeps the data as draft"))))
       (delete-content (content-id c))
       (ng (get-content (content-id c))))))
+
+(deftest every-write-leaves-a-revision
+  (let* ((c (create-content "website" "blog" (data "{\"title\": \"One\"}") :by "owner"))
+         (id (content-id c)))
+    (save-draft id (data "{\"title\": \"Two\"}") :by "key:ci")
+    (save-draft id (data "{\"title\": \"Two\"}"))
+    (publish-content id)
+    (save-draft id (data "{\"title\": \"Three\"}"))
+    (discard-draft id)
+    (unpublish-content id)
+    (let ((revisions (list-revisions id)))
+      (ok (equal (mapcar #'revision-event revisions) '("unpublish" "discard" "draft" "publish" "draft" "draft"))
+          "newest first; the second save of the same data is not an event")
+      (ok (equal (mapcar (lambda (r) (jget (revision-data r) "title")) revisions)
+                 '("Two" "Two" "Three" "Two" "Two" "One"))
+          "each holds what the write left the content with")
+      (ok (equal (mapcar #'revision-by (last revisions 2)) '("key:ci" "owner")))
+      (ok (string= (revision-by (first revisions)) "") "a write that names nobody stores nobody"))
+    (testing "the published ones are the versions that were live"
+      (ok (= (count-revisions id :published-only t) 1))
+      (ok (equal (mapcar #'revision-event (list-revisions id :published-only t)) '("publish"))))
+    (testing "what changes nothing that was live is not an event"
+      (let* ((draft (create-content "website" "blog" (data "{\"title\": \"Never live\"}")))
+             (live (create-content "website" "blog" (data "{\"title\": \"Live\"}") :publish t)))
+        (unpublish-content (content-id draft))
+        (ok (equal (mapcar #'revision-event (list-revisions (content-id draft))) '("draft"))
+            "unpublishing a content that was never published")
+        (discard-draft (content-id live))
+        (ok (equal (mapcar #'revision-event (list-revisions (content-id live))) '("publish"))
+            "discarding a draft that is not there")))
+    (testing "a revision belongs to its content"
+      (let ((other (create-content "website" "blog" (data "{\"title\": \"Other\"}"))))
+        (ng (find-revision (content-id other) (revision-id (first (list-revisions id)))))))
+    (testing "deleting the content deletes its history"
+      (delete-content id)
+      (ok (zerop (col (fetch-one "SELECT COUNT(*) AS n FROM content_revisions WHERE content_id = ?" id) "n"))))))
 
 (deftest draft-keys
   (let* ((c (create-content "website" "blog" (data "{\"title\": \"x\"}")))

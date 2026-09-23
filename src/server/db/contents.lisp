@@ -11,6 +11,8 @@
                 #:now-iso)
   (:import-from #:koya/core/json
                 #:parse-json #:to-json)
+  (:import-from #:koya-server/db/content-revisions
+                #:record-revision)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
   (:export #:content-id #:content-space #:content-model #:content-status
@@ -34,6 +36,9 @@
 
 ;;; Content rows. PUBLISHED and DRAFT are JSON objects (hash tables) or NIL.
 ;;; status is one of "draft", "published", "published+draft".
+;;;
+;;; Every write records a revision in the same transaction (db/content-revisions);
+;;; BY names who made it, as lib/auth's CALLING-IDENTITY does.
 
 (defstruct content
   id space model status published draft draft-key created-at updated-at published-at revised-at)
@@ -69,58 +74,72 @@
     (and row (row->content row))))
 
 (defun create-content (space model data &key publish (id (make-ulid))
-                                             created-at updated-at published-at revised-at)
+                                             created-at updated-at published-at revised-at by)
   "Insert DATA as a new content. With PUBLISH it is published immediately,
 otherwise saved as a draft. The system timestamps default to now; imports may
 supply any of CREATED-AT, UPDATED-AT, PUBLISHED-AT and REVISED-AT (ISO 8601).
 PUBLISHED-AT and REVISED-AT are only stored when publishing."
   (let ((now (now-iso)))
-    (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          id space model (if publish "published" "draft")
-          (and publish (to-json data)) (and (not publish) (to-json data))
-          (and (not publish) (new-draft-key))
-          (or created-at now) (or updated-at now)
-          (and publish (or published-at now)) (and publish (or revised-at now)))
+    (with-db-transaction
+      (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            id space model (if publish "published" "draft")
+            (and publish (to-json data)) (and (not publish) (to-json data))
+            (and (not publish) (new-draft-key))
+            (or created-at now) (or updated-at now)
+            (and publish (or published-at now)) (and publish (or revised-at now)))
+      (record-revision id (if publish "publish" "draft") data :by by))
     (get-content id)))
 
-(defun save-draft (id data)
+(defun save-draft (id data &key by)
   "Replace the draft of content ID with DATA. A fresh draft key is issued each time,
 so old preview links stop working."
   (let ((content (or (get-content id) (error "content ~a not found" id))))
-    (exec "UPDATE contents SET draft = ?, draft_key = ?, status = ?, updated_at = ? WHERE id = ?"
-          (to-json data) (new-draft-key) (status-for (content-published content) t) (now-iso) id)
+    (with-db-transaction
+      (exec "UPDATE contents SET draft = ?, draft_key = ?, status = ?, updated_at = ? WHERE id = ?"
+            (to-json data) (new-draft-key) (status-for (content-published content) t) (now-iso) id)
+      (record-revision id "draft" data :by by))
     (get-content id)))
 
-(defun publish-content (id &optional data &key published-at)
+(defun publish-content (id &optional data &key published-at by)
   "Publish DATA (or the current draft, or re-publish the published data) and clear the draft.
 PUBLISHED-AT overrides the publish date; otherwise the first publish date is kept."
   (let* ((content (or (get-content id) (error "content ~a not found" id)))
          (data (or data (content-draft content) (content-published content)))
          (now (now-iso)))
-    (exec "UPDATE contents SET published = ?, draft = NULL, draft_key = NULL, status = 'published', updated_at = ?,
-             published_at = COALESCE(?, published_at, ?), revised_at = ? WHERE id = ?"
-          (to-json data) now published-at now now id)
+    (with-db-transaction
+      (exec "UPDATE contents SET published = ?, draft = NULL, draft_key = NULL, status = 'published', updated_at = ?,
+               published_at = COALESCE(?, published_at, ?), revised_at = ? WHERE id = ?"
+            (to-json data) now published-at now now id)
+      (record-revision id "publish" data :by by))
     (get-content id)))
 
-(defun unpublish-content (id)
+(defun unpublish-content (id &key by)
   "Take content ID off the delivery API, keeping its data as a draft."
   (let* ((content (or (get-content id) (error "content ~a not found" id)))
          (data (or (content-draft content) (content-published content))))
-    (exec "UPDATE contents SET published = NULL, draft = ?, draft_key = ?, status = 'draft', updated_at = ?, published_at = NULL WHERE id = ?"
-          (to-json data) (new-draft-key) (now-iso) id)
+    (with-db-transaction
+      (exec "UPDATE contents SET published = NULL, draft = ?, draft_key = ?, status = 'draft', updated_at = ?, published_at = NULL WHERE id = ?"
+            (to-json data) (new-draft-key) (now-iso) id)
+      ;; unpublishing what was never live changes nothing the history tells
+      (when (content-published content)
+        (record-revision id "unpublish" data :by by)))
     (get-content id)))
 
-(defun discard-draft (id)
+(defun discard-draft (id &key by)
   "Drop the draft of a published content ID, so it shows its published data again.
 Errors when the content has no published version: there would be nothing left."
   (let ((content (or (get-content id) (error "content ~a not found" id))))
     (unless (content-published content) (error "content ~a is not published; delete it instead" id))
-    (exec "UPDATE contents SET draft = NULL, draft_key = NULL, status = 'published', updated_at = ? WHERE id = ?"
-          (now-iso) id)
+    (with-db-transaction
+      (exec "UPDATE contents SET draft = NULL, draft_key = NULL, status = 'published', updated_at = ? WHERE id = ?"
+            (now-iso) id)
+      (when (content-draft content)
+        (record-revision id "discard" (content-published content) :by by)))
     (get-content id)))
 
 (defun delete-content (id)
+  ;; its revisions go with it, ON DELETE CASCADE
   (exec "DELETE FROM contents WHERE id = ?" id))
 
 (defun ensure-draft-key (id)

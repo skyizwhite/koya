@@ -113,7 +113,24 @@
      "CREATE INDEX schema_deploys_by_space ON schema_deploys (space, id DESC)")
     (8
      ;; the table held delivery keys under the name the header used to have
-     "ALTER TABLE api_keys RENAME TO delivery_keys")))
+     "ALTER TABLE api_keys RENAME TO delivery_keys")
+    (9
+     "CREATE TABLE content_revisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content_id TEXT NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
+        event TEXT NOT NULL,
+        data TEXT NOT NULL,
+        written_by TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL)"
+     "CREATE INDEX content_revisions_by_content ON content_revisions (content_id, id DESC)"
+     ;; what every content already holds is its first history: the published
+     ;; data, then the draft on top of it, so the ids come out in that order
+     "INSERT INTO content_revisions (content_id, event, data, created_at)
+        SELECT id, 'publish', published, COALESCE(revised_at, updated_at) FROM contents
+         WHERE published IS NOT NULL ORDER BY created_at"
+     "INSERT INTO content_revisions (content_id, event, data, created_at)
+        SELECT id, 'draft', draft, updated_at FROM contents
+         WHERE draft IS NOT NULL ORDER BY created_at")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

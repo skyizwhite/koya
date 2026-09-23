@@ -12,7 +12,8 @@
            #:jget
            #:jset
            #:jobject
-           #:jkeys))
+           #:jkeys
+           #:json-equal))
 (in-package #:koya/core/json)
 
 ;;; Thin layer over jzon. Objects are EQUAL hash tables with string keys,
@@ -57,3 +58,16 @@
   (let ((keys '()))
     (maphash (lambda (k v) (declare (ignore v)) (push k keys)) object)
     (sort keys #'string<)))
+
+(defun json-equal (a b)
+  "True when A and B are the same JSON value. Not EQUALP: that compares strings
+without case, and \"Title\" and \"title\" are two values."
+  (cond ((and (hash-table-p a) (hash-table-p b))
+         (and (= (hash-table-count a) (hash-table-count b))
+              (loop :for key :being :the :hash-keys :of a :using (:hash-value value)
+                    :always (multiple-value-bind (other found) (gethash key b)
+                              (and found (json-equal value other))))))
+        ((and (json-array-p a) (json-array-p b))
+         (and (= (length a) (length b)) (every #'json-equal a b)))
+        ((and (numberp a) (numberp b)) (= a b))
+        (t (equal a b))))

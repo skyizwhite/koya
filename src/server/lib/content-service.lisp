@@ -24,6 +24,8 @@
                 #:fail-api)
   (:import-from #:koya-server/lib/forms
                 #:slugify)
+  (:import-from #:koya-server/lib/auth
+                #:calling-identity)
   (:export #:resolve-model
            #:resolve-content
            #:default-data
@@ -43,6 +45,8 @@
 ;;; Each write runs inside WITH-DB-TRANSACTION, which holds the connection lock,
 ;;; so a uniqueness check and the insert after it cannot interleave with another
 ;;; request. Webhooks fire inside that scope, asynchronously.
+;;;
+;;; Every write names its caller for the content's history.
 
 (defun resolve-model (space-name model-name)
   "Return (values space-name model) or signal 404."
@@ -154,6 +158,7 @@ and only PUBLISHED-AT applies."
                                      :publish publish
                                      :created-at created-at :updated-at updated-at
                                      :published-at published-at :revised-at revised-at
+                                     :by (calling-identity)
                                      (and (check-new-id id) (list :id id)))))
                  (if publish
                      (notify space model (content-id content) :publish :new (published-view space model content))
@@ -174,7 +179,7 @@ and only PUBLISHED-AT applies."
          (data (if replace patch (merge-data (content-data content :draft t) patch))))
     (with-db-transaction
       (check-content space-name model data :exclude-id id)
-      (let ((saved (save-draft id data)))
+      (let ((saved (save-draft id data :by (calling-identity))))
         (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved))
         saved))))
 
@@ -188,7 +193,7 @@ and only PUBLISHED-AT applies."
          (old (published-view space model content)))
     (with-db-transaction
       (check-content space-name model data :exclude-id id)
-      (let ((published (publish-content id data :published-at published-at)))
+      (let ((published (publish-content id data :published-at published-at :by (calling-identity))))
         (notify space model id :publish :old old :new (published-view space model published))
         published))))
 
@@ -197,7 +202,7 @@ and only PUBLISHED-AT applies."
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
-    (let ((result (unpublish-content id)))
+    (let ((result (unpublish-content id :by (calling-identity))))
       (when old (notify space model id :unpublish :old old))
       result)))
 
@@ -208,7 +213,7 @@ and only PUBLISHED-AT applies."
          (content (resolve-content space-name model-name id)))
     (unless (content-published content)
       (fail-api 409 "not_published" "Only a published content has a draft to discard; delete it instead"))
-    (discard-draft (content-id content))))
+    (discard-draft (content-id content) :by (calling-identity))))
 
 (defun destroy (space model id)
   (let* ((space-name space)
