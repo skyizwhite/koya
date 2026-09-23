@@ -90,7 +90,10 @@ for itself; pages check with `with-owner`.
 ## Running it
 
 One Docker image plus a volume for the SQLite file and the media directory,
-deployed on Coolify. Migrations apply themselves at startup.
+published to `ghcr.io/skyizwhite/koya` by the Image workflow. The Dockerfile builds in one stage and runs in another: the build loads
+`koya-server` and saves it with `(koya-server:save-executable)`, and the runtime
+image holds that executable, `assets/` and the C libraries it opens — no
+Quicklisp, sources or compiler. Migrations apply themselves at startup.
 
 Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
 `KOYA_PORT`, `KOYA_ENV`, and `KOYA_TOTP_SECRET` to set two-factor login from

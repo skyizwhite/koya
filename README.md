@@ -37,7 +37,7 @@ Everything else is generated from the model — the list pages, and an editor wi
 just install          # build tools and Lisp dependencies
 cp .env.example .env  # set KOYA_SECRET; KOYA_PORT and KOYA_BASE_URL must agree
 just build            # stylesheet
-just dev              # serves on KOYA_PORT (default 3000)
+just dev              # serves on KOYA_PORT (default 3100)
 ```
 
 Or from a REPL:
@@ -91,9 +91,38 @@ just test
 
 ## Deployment
 
-The `Dockerfile` builds one image: the server on port 3000, with its database and uploaded media under `/data`. On Coolify, create a Dockerfile application from this repository and
+koya is one image, `ghcr.io/skyizwhite/koya`: the server on port 3100, with its
+database and uploaded media under `/data`. `latest` and `X.Y.Z` / `X.Y` are
+releases, `edge` is `master`; `linux/amd64` and `linux/arm64`.
 
-- expose port `3000`;
+```sh
+docker run -d --name koya \
+  -p 3100:3100 \
+  -v koya-data:/data \
+  -e KOYA_SECRET=change-me \
+  -e KOYA_BASE_URL=http://localhost:3100 \
+  ghcr.io/skyizwhite/koya:latest
+```
+
+Or next to a site in a compose file:
+
+```yaml
+services:
+  koya:
+    image: ghcr.io/skyizwhite/koya:latest
+    ports: ["3100:3100"]
+    volumes: ["koya-data:/data"]
+    environment:
+      KOYA_SECRET: change-me
+      KOYA_BASE_URL: http://localhost:3100
+volumes:
+  koya-data:
+```
+
+On any other platform, run that image — or build the `Dockerfile`, which makes
+the same one — and
+
+- expose port `3100`;
 - mount a persistent volume at `/data` (database and uploaded media);
 - set the environment variables below.
 
@@ -102,9 +131,12 @@ The `Dockerfile` builds one image: the server on port 3000, with its database an
 | `KOYA_SECRET` | yes | owner secret: the admin UI's login. Keys for the admin API are made in **Settings** |
 | `KOYA_BASE_URL` | yes | public URL, e.g. `https://cms.example.com`; used for media URLs, the same-origin check and the Secure cookie flag |
 | `KOYA_TOTP_SECRET` | no | second factor configured outside the database (see above) |
-| `KOYA_PORT` | no | listen port, default `3000` |
+| `KOYA_PORT` | no | listen port, default `3100` |
 | `KOYA_DB_PATH`, `KOYA_MEDIA_DIR` | no | default `/data/koya.db` and `/data/media` in the image |
 | `KOYA_ENV` | no | `production` (default) masks error details; `dev` shows them |
+
+The image holds the server saved as one executable: it starts serving at once,
+and stops on `docker stop` after closing the database.
 
 Health check: `GET /health` (no auth; the image declares it as `HEALTHCHECK`). Migrations run at startup. Static assets are served with long immutable caching behind versioned URLs; API and page responses are `no-store`.
 

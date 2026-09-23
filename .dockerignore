@@ -13,3 +13,5 @@ tests/
 README.md
 justfile
 .claude/
+Dockerfile
+.github/

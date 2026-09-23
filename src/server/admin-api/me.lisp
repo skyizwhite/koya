@@ -15,4 +15,5 @@ the server version."
     (jobject "owner" (and owner t)
              "management" (not owner)
              "space" (if owner json-null (calling-space))
-             "version" (asdf:component-version (asdf:find-system :koya-server)))))
+             ;; read at load: the image the Dockerfile saves has no ASDF systems to find
+             "version" (load-time-value (asdf:component-version (asdf:find-system :koya-server))))))

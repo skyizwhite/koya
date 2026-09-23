@@ -31,11 +31,18 @@
 (defvar *repository-loaded* nil)
 (defvar *repository-lock* (bordeaux-threads-2:make-lock :name "koya-timezones"))
 
+(defun repository-path ()
+  ;; local-time's own default is the copy in its source tree, found through ASDF
+  ;; when it loads: in the executable the Dockerfile saves, a directory of the
+  ;; build stage that the image does not have
+  (let ((system #p"/usr/share/zoneinfo/"))
+    (if (probe-file system) system local-time::*default-timezone-repository-path*)))
+
 (defun ensure-repository ()
   (unless *repository-loaded*
     (bordeaux-threads-2:with-lock-held (*repository-lock*)
       (unless *repository-loaded*
-        (handler-case (reread-timezone-repository)
+        (handler-case (reread-timezone-repository :timezone-repository (repository-path))
           (error (e) (format *error-output* "~&[koya] time zone database not loaded, UTC only: ~a~%" e)))
         (setf *repository-loaded* t)))))
 

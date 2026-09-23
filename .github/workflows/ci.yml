@@ -41,9 +41,11 @@ jobs:
             --eval '(uiop:quit (if (rove:run :koya-tests :style :dot) 0 1))'
 
   image:
+    # on master and tags the Image workflow builds, checks and publishes it
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       # built, not pushed: a Dockerfile that no longer builds should be caught
-      # here rather than by the deploy
+      # here rather than after the merge
       - run: docker build .

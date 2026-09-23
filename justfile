@@ -27,7 +27,7 @@ build:
 test:
     @qlot exec ros --non-interactive -e '(handler-bind ((warning (function muffle-warning))) (ql:quickload :koya-tests :silent t))' -e '(uiop:quit (if (rove:run :koya-tests :style :dot) 0 1))' -q
 
-# Start the server in development mode (Hunchentoot, localhost:3000)
+# Start the server in development mode (Hunchentoot, localhost:3100)
 dev:
     @qlot exec ros -e '(ql:quickload :koya-server :silent t)' -e '(koya-server:start)' -e '(loop (sleep 3600))'
 
