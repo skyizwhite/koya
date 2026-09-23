@@ -9,7 +9,7 @@
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/sessions #:purge-expired-sessions)
   (:import-from #:koya-server/db/schema-dump #:write-snapshot)
-  (:import-from #:koya-server/lib/totp #:generate-totp-secret #:otpauth-uri #:totp)
+  (:import-from #:koya-server/lib/totp #:totp)
   (:import-from #:koya-server/lib/assets #:refresh-asset-version)
   (:export #:start
            #:stop
@@ -17,7 +17,6 @@
            #:main
            #:save-executable
            #:write-schema-snapshot
-           #:totp-setup
            #:totp-code))
 (in-package #:koya-server)
 
@@ -80,14 +79,6 @@ compiling anything, and needs neither Quicklisp nor a C toolchain."
   "Regenerate src/server/db/schema.sql from the migrations. Run it after adding
 one: a test fails while the snapshot is stale."
   (write-snapshot))
-
-(defun totp-setup (&key (account "owner"))
-  "For configuring two-factor login through the environment instead of the admin
-UI's settings page: generate a secret and print the KOYA_TOTP_SECRET line and
-the otpauth URI for an authenticator app. Returns the secret."
-  (let ((secret (generate-totp-secret)))
-    (format t "~&KOYA_TOTP_SECRET=~a~%~a~%" secret (otpauth-uri secret :account account))
-    secret))
 
 (defun totp-code (&optional (secret (koya-server/lib/totp:totp-secret)))
   "The one-time code valid right now, for checking a setup from the REPL."

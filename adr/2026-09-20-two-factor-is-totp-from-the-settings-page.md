@@ -1,5 +1,7 @@
 # Two-factor login is TOTP, turned on from the settings page
 
+Superseded by adr/2026-09-24-two-factor-is-set-on-the-settings-page-only.md
+
 *2026-09-20*
 
 ## Context

@@ -1,6 +1,8 @@
-# The client library
+# The Common Lisp SDK
 
-`koya` is the library a site depends on. It holds three things:
+For a site written in Common Lisp, this repository's `koya` system is to it what
+[koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) is to a TypeScript
+site. It holds three things:
 
 - a **schema DSL** — `defmodel`, `defwebhooks`, `webhook` — that defines the
   space's models as code in the site's own repository;
@@ -10,8 +12,9 @@
   media.
 
 Everything is meant to be called from the REPL or from the site's own code; there
-is no CLI. The admin UI, which reads the deployed schema, is documented in
-[ADMIN-UI.md](ADMIN-UI.md).
+is no CLI. What the calls do on the server — queries, what comes back, errors,
+webhooks — is in [API.md](API.md); the admin UI, which reads the deployed schema,
+in [ADMIN-UI.md](ADMIN-UI.md).
 
 - [Installing](#installing)
 - [Configuration](#configuration)
@@ -27,6 +30,7 @@ is no CLI. The admin UI, which reads the deployed schema, is documented in
 - [Errors](#errors)
 - [Lisp and JSON](#lisp-and-json)
 - [The HTTP API underneath](#the-http-api-underneath)
+- [License](#license)
 
 ## Installing
 
@@ -177,38 +181,10 @@ one to a model, or to a list of them; it takes symbols or strings, and each name
 must be a model of the schema, so a typo fails before anything is sent. A webhook
 without `:only` also covers models added later. Labels must be unique.
 
-There is nothing to subscribe to: **every webhook is sent every event**, and the
-payload says which, so the receiver decides what to act on.
-
-```
-{
-  "space": "website",
-  "model": "blog",
-  "id": "01J…",
-  "event": "publish" | "unpublish" | "delete" | "draft",
-  "contents": {
-    "old": {…} | null,
-    "new": {…} | null
-  }
-}
-```
-
-| `event` | When | `old` / `new` |
-|---|---|---|
-| `publish` | a content is published, first time or again | the previous published data or `null` / the new |
-| `unpublish` | a published content is taken off the delivery API | the published data / `null` |
-| `delete` | a published content is deleted (deleting an unpublished draft sends nothing) | the published data / `null` |
-| `draft` | a draft is saved or created | the published data or `null` / the draft |
-
-The bodies are the same shape the delivery API returns. Discarding a draft sends
-nothing: what is published did not change. Note that `draft` arrives on every
-save, so a hook that rebuilds or revalidates a site should return early on it.
-Every call carries the space's webhook secret in `X-KOYA-WEBHOOK-KEY` -- read it
-with `(koya:webhook-secret)` or from the space's Keys page -- and
-delivery is fire-and-forget: koya does not retry. What each call answered (its
-status, its body, or the error when it never arrived) is kept for the space's
-newest 200 deliveries and shown in the admin UI at `/s/{space}/webhooks`; see
-[ADMIN-UI.md](ADMIN-UI.md#the-webhook-delivery-log).
+Every webhook is sent every event — `publish`, `unpublish`, `delete` and
+`draft` — with the space's webhook secret in `X-KOYA-WEBHOOK-KEY`, which
+`(koya:webhook-secret)` returns. The payload and when each event fires are in
+[API.md, "Webhooks"](API.md#webhooks).
 
 ## Renaming a model or a field
 
@@ -295,8 +271,11 @@ Each takes `:space` to override the default. `get-list` returns a plist:
 
 ### Query options
 
+The query parameters are the delivery API's, described in
+[API.md, "Reading content"](API.md#reading-content); here is how to spell them.
+
 `:query` is a kebab-case plist; keys are camelised and list values joined with
-commas, so `:include '("tags" "author.avatar")` and `:include "tags,author.avatar"`
+commas, so `:include '("tags" "author.team")` and `:include "tags,author.team"`
 are the same.
 
 | Key | Meaning |
@@ -309,11 +288,7 @@ are the same.
 | `:include` | reference fields to embed |
 | `:draft-key` | with `get-item` / `get-object`, serves that content's draft |
 
-`:filters` is `field[op]value`, joined with `[and]` and
-`[or]` (`[or]` separates groups of `[and]` terms). Operators are `equals`,
-`not_equals`, `contains`, `not_contains`, `begins_with`, `exists`, `not_exists`,
-`less_than` and `greater_than`. On a `:many` field, `equals` and `contains` mean
-"has this value". Filtering or ordering by an unknown field is a 400.
+`:filters` takes the delivery API's filter syntax as a string:
 
 ```lisp
 (koya:get-list 'blog :query '(:filters "title[contains]lisp[and]publishedAt[exists]"))
@@ -321,18 +296,10 @@ are the same.
 
 ### What comes back
 
-- References are ids unless named in `:include`. `include=tags,author.avatar`
-  embeds `tags`, and `avatar` inside each embedded `author`. Only reference fields
-  can be included. A referenced content that is missing or unpublished drops out of
-  a `:many` field and becomes `nil` in a single one.
-- `:media` fields are always expanded to
-  `(:id … :url … :filename … :mime … :size … :width … :height … :alt … :created-at …)`,
-  with the URL absolute. An id whose file is gone becomes `nil`.
-- `:richtext` HTML has its `/media/` sources rewritten to absolute URLs, so it can
-  be rendered on any site.
-- `:fields` is applied last, after embedding and expansion.
-- Every content carries `:id`, `:created-at`, `:updated-at`, `:published-at` and
-  `:revised-at`; the last two are `nil` while a content is not published.
+The content objects of [API.md, "What comes back"](API.md#what-comes-back), as
+plists (see [Lisp and JSON](#lisp-and-json)): references are ids unless
+`:include`d, `:media` fields are expanded, and `:published-at` / `:revised-at`
+are `nil` while a content is not published.
 
 ## Managing content
 
@@ -445,9 +412,15 @@ building them, and `koya:make-ulid` for generating ids.
 
 ## The HTTP API underneath
 
-Every function above is one request to the server's JSON APIs, which are
-specified in [openapi.yaml](openapi.yaml) (endpoints, parameters, response
-shapes, error codes) and [SCHEMA.md](SCHEMA.md) (the schema document `deploy`
-sends, and the rules content values must meet). Those two are the reference for
-a client in another language, or for `curl`; `(koya:pull)` is the easiest way to
-see a real schema document.
+Every function above is one request to the server's JSON APIs:
+[API.md](API.md) walks through them, [openapi.yaml](openapi.yaml) specifies them
+(endpoints, parameters, response shapes, error codes) and [SCHEMA.md](SCHEMA.md)
+the schema document `deploy` sends. `(koya:pull)` is the easiest way to see a real
+schema document.
+
+## License
+
+The SDK — `koya.asd`, `src/main.lisp`, `src/client.lisp`, `src/config.lisp`,
+`src/core.lisp` and `src/core/` — is under the [MIT License](../LICENSE-MIT), so a
+site that declares its schema and reads its content with it is not bound by the
+server's AGPL.

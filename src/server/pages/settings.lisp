@@ -3,7 +3,7 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle #:context)
   (:import-from #:koya-server/lib/totp
-                #:totp-enabled-p #:totp-env-secret #:totp-secret #:totp-code-valid-p
+                #:totp-enabled-p #:totp-secret #:totp-code-valid-p
                 #:generate-totp-secret #:otpauth-uri #:enable-totp #:disable-totp)
   (:import-from #:koya-server/lib/timezone
                 #:display-timezone-name #:set-display-timezone #:timezone-names #:format-local)
@@ -41,9 +41,6 @@
        "Ask for a one-time code from an authenticator app in addition to the owner secret when logging in.")
      (when error (hsx (p :class "mb-4 text-sm text-danger" error)))
      (cond
-       ((totp-env-secret)
-        (hsx (p :class "text-sm" (span :class "badge bg-ok/10 text-ok" "Enabled")
-               " by the " (code "KOYA_TOTP_SECRET") " environment variable. Change or unset it there.")))
        ((totp-enabled-p)
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-ok/10 text-ok" "Enabled"))
@@ -119,9 +116,6 @@
                  (t (set-response-status 422)
                     (hsx (~settings-page :pending (pending-secret)
                                          :timezone-error (format nil "~s is not a time zone this server knows. Use an IANA name such as Asia/Tokyo, or UTC." name)))))))
-        ((totp-env-secret)
-         (set-response-status 400)
-         (hsx (~settings-page :error "Two-factor login is configured by KOYA_TOTP_SECRET and cannot be changed here.")))
         ((equal action "begin")
          (setf (pending-secret) (generate-totp-secret))
          (redirect-to "/settings"))

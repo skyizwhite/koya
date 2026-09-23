@@ -15,8 +15,10 @@ it like this?" about — not every edit.
 `Superseded by adr/<file>` under the old one's title. The history is the point.
 
 What is true *now* belongs in `docs/`, which is edited freely:
-ARCHITECTURE.md for the shape of the system, ADMIN-UI.md, CLIENT.md, SCHEMA.md
-and openapi.yaml for what it does.
+ARCHITECTURE.md for the shape of the system, ADMIN-UI.md, API.md, SCHEMA.md,
+lisp-sdk.md and openapi.yaml for what it does. README.md is written for the
+people who use koya from a TypeScript site and says nothing about Lisp; setting
+up to work on koya is in CONTRIBUTING.md.
 
 ## Tests
 

@@ -1,8 +1,10 @@
 # Architecture
 
 What koya is made of. The behaviour it exposes is in
-[ADMIN-UI.md](ADMIN-UI.md), [CLIENT.md](CLIENT.md), [SCHEMA.md](SCHEMA.md) and
-[openapi.yaml](openapi.yaml); why it is this way is in [../adr](../adr).
+[ADMIN-UI.md](ADMIN-UI.md), [API.md](API.md), [SCHEMA.md](SCHEMA.md),
+[openapi.yaml](openapi.yaml) and [lisp-sdk.md](lisp-sdk.md); why it is this way
+is in [../adr](../adr). Setting up to work on it is in
+[CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Two systems, one repository
 
@@ -18,7 +20,7 @@ site depends on `koya` alone; `qlot` pulls it by git.
 ```
 koya.asd  koya-server.asd  koya-tests.asd  qlfile  justfile  Dockerfile
 adr/                  ; one file per design decision
-docs/                 ; this, and the four documents above
+docs/                 ; this, and the documents above
 src/
   main.lisp           ; the koya package: config + client re-exported
   config.lisp         ; defmodel / defwebhooks / current-schema
@@ -96,8 +98,7 @@ image holds that executable, `assets/` and the C libraries it opens — no
 Quicklisp, sources or compiler. Migrations apply themselves at startup.
 
 Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
-`KOYA_PORT`, `KOYA_ENV`, and `KOYA_TOTP_SECRET` to set two-factor login from
-outside the UI. `GET /health` is unauthenticated and touches the database.
+`KOYA_PORT` and `KOYA_ENV`. `GET /health` is unauthenticated and touches the database.
 
 Backups are the volume's; a space's Export is the portable copy of one space.
 Assets and media are served `immutable` (their URLs carry a version, and a media

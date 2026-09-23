@@ -4,7 +4,7 @@
   (:import-from #:koya-server/db/connection #:disconnect-db #:fetch-one #:col)
   (:import-from #:koya-server/db/delivery-keys #:list-delivery-keys)
   (:import-from #:koya-server/db/delivery-keys #:list-delivery-keys)
-  (:import-from #:koya-server/lib/totp #:totp #:*totp-last-counter*)
+  (:import-from #:koya-server/lib/totp #:totp #:enable-totp #:disable-totp)
   (:import-from #:koya-server/lib/auth #:clear-login-failures))
 (in-package #:koya-tests/server/pages/login)
 
@@ -42,10 +42,9 @@
   (multiple-value-bind (status body) (request :get "/")
     (ok (= status 200))
     (ok (search "website" body) "space listed"))
-  (testing "two-factor login when KOYA_TOTP_SECRET is set"
+  (testing "two-factor login once a secret is stored"
     (let ((secret "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"))
-      (setf (uiop:getenv "KOYA_TOTP_SECRET") secret
-            *totp-last-counter* -1)
+      (enable-totp secret)
       (unwind-protect
            (let ((*cookie* nil))
              (multiple-value-bind (status body) (request :get "/login")
@@ -66,7 +65,7 @@
                  (multiple-value-bind (status body) (request :post "/login" :form `(("secret" . ,*secret*) ("code" . ,code)))
                    (ok (= status 401))
                    (ok (search "one-time code" body) "the same code cannot log in twice")))))
-        (setf (uiop:getenv "KOYA_TOTP_SECRET") ""))))
+        (disable-totp))))
   (testing "cross-origin posts are rejected"
     (multiple-value-bind (status) (request :post "/logout" :headers '(("origin" . "https://evil.example")))
       (ok (= status 403)))

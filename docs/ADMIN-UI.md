@@ -4,18 +4,19 @@ koya's admin UI is the web app the server serves at its own root: one owner, any
 number of spaces. It is where spaces are made, where content is written,
 published and previewed, where images live, and where keys are made.
 
-What it does **not** do is edit the schema. Models and fields come from the
-`defmodel` definitions in a site's own repository and reach the server with
-`(koya:deploy)` — see [CLIENT.md](CLIENT.md). The admin UI reads that schema and
+What it does **not** do is edit the schema. Models and fields are defined in a
+site's own repository — `koya.config.ts` with
+[koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) — and reach the server
+with `koya deploy`. The admin UI reads that schema and
 builds its lists and forms from it. **Spaces are the other way round**: a space
 owns the contents, media and keys inside it, so it is made and deleted here, and
 a deploy only ever changes the models of a space that already exists.
 
 Every page, the login page included, ends with a footer: the running koya
-version, a link to its source code (the `:homepage` of `koya-server.asd`) and
-the AGPL notice. The server is under the AGPL, which asks whoever runs a
-modified copy for others to offer them its source; a fork keeps its footer
-honest by pointing `:homepage` at its own repository.
+version, a link to its source code and the AGPL notice. The server is under the
+AGPL, which asks whoever runs a modified copy for others to offer them its
+source; a fork keeps its footer honest by pointing the link at its own
+repository (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
 - [Logging in](#logging-in)
 - [Spaces](#spaces)
@@ -59,7 +60,7 @@ made and deleted.
   it is in every admin URL and in the delivery API's `/api/v1/{space}/…` — so it
   cannot be changed afterwards. A name already taken, or one that is not a slug,
   is refused with the reason.
-- A new space is empty: deploy a schema to it with `(koya:deploy)` to give it
+- A new space is empty: deploy a schema to it with `koya deploy` to give it
   models.
 - **Delete** asks for confirmation and then removes the space with everything in
   it — models, contents, media rows and files, delivery keys, management keys and
@@ -77,8 +78,8 @@ made and deleted.
 
 ## A space
 
-`/s/{space}` lists the space's models — a stacked-rows icon for a `:list` model,
-braces for an `:object` model — with the number of contents in each list model,
+`/s/{space}` lists the space's models — a stacked-rows icon for a `list` model,
+braces for an `object` model — with the number of contents in each list model,
 and links to **Schema Deploys**, **Media** and **Keys**. **Export** downloads
 the whole space as a zip for **Import** on the spaces page — `space.json` (the
 schema, the contents with their drafts and history, the media rows) and the
@@ -87,7 +88,7 @@ Keep the file as privately as the database: it holds every draft and the secret.
 
 Underneath, **Webhooks** shows every webhook of the space with its label, its URL
 and what it covers — *all models*, or *`blog, tag` only* for one narrowed with
-`:only`. Every webhook receives every event (publish, unpublish, delete, draft)
+`only`. Every webhook receives every event (publish, unpublish, delete, draft)
 for the models it covers; the payload says which. Webhooks are part of the
 schema, so they are read-only here; change them in `defwebhooks` and deploy.
 
@@ -103,7 +104,7 @@ first, 20 to a page. **Schema Deploys** on the space page opens it.
 
 Each entry says how many changes it carried, whether any was destructive, who
 deployed it — `(management key: deploys from CI)`, or `owner` — and when. Under
-that is the diff, one line per change, as `(koya:plan)` prints it:
+that is the diff, one line per change, as `koya plan` prints it:
 
 | Line | Meaning |
 |---|---|
@@ -117,7 +118,7 @@ A `!` marks a change that can hide or invalidate stored content — the ones a
 deploy refuses without `force` — and the line is red whatever its marker.
 
 Only the changes are kept, not the schema as it was; read that from the space
-page or with `(koya:pull)`. A deploy that changed nothing leaves no entry, and
+page or with `koya pull`. A deploy that changed nothing leaves no entry, and
 the newest 100 of a space are kept.
 
 ## The webhook delivery log
@@ -168,7 +169,7 @@ straight to its one content -- so that button sits in its editor instead.
 
 - Every field gets a preview, clamped to two lines: rich text is stripped to
   plain text, a datetime is shown as `YYYY-MM-DD HH:MM UTC`, a reference shows the
-  referenced content's label (its model's `:label` field, or its id), a `:many` field shows its values comma-separated,
+  referenced content's label (its model's `label` field, or its id), a `many` field shows its values comma-separated,
   and an empty field shows `—`. Column widths are bounded per field type, so a
   wide model scrolls sideways rather than squeezing every column thin.
 - A row shows its **draft** data when it has one, so the table reflects what is
@@ -177,7 +178,7 @@ straight to its one content -- so that button sits in its editor instead.
   **Next** underneath when there are more. Every list in the admin UI shows 20.
 - **New content** opens an empty editor at `/s/{space}/m/{model}/new`.
 
-For an `:object` model this URL redirects straight to its single content (or to a
+For an `object` model this URL redirects straight to its single content (or to a
 `new` editor when it has none): an object model holds exactly one content.
 
 ### Finding one
@@ -224,21 +225,21 @@ labelled with its name, its type and, when required, a red `*`.
 
 | Field type | Control |
 |---|---|
-| `:text`, `:slug` | text input — a blank `:slug` is generated from its `:from` field on save |
-| `:textarea` | five-row textarea |
-| `:richtext` | Quill editor; its image button opens the media picker |
-| `:number` | number input (any step) |
-| `:boolean` | checkbox — unchecked means `false`, never "unset"; a field with `:default t` starts checked on a new content |
-| `:date` | date input |
-| `:datetime` | datetime-local input, in the zone chosen under **Settings**; stored as UTC |
-| `:select` | dropdown, or checkboxes when `:many` |
-| `:reference` | dropdown, or chips plus a dropdown when `:many` |
-| `:media` | thumbnail with **Choose…** (opens the media picker) and **Clear** |
+| `text`, `slug` | text input — a blank `slug` is generated from its `from` field on save |
+| `textarea` | five-row textarea |
+| `richtext` | Quill editor; its image button opens the media picker |
+| `number` | number input (any step) |
+| `boolean` | checkbox — unchecked means `false`, never "unset"; a field with `default: true` starts checked on a new content |
+| `date` | date input |
+| `datetime` | datetime-local input, in the zone chosen under **Settings**; stored as UTC |
+| `select` | dropdown, or checkboxes when `many` |
+| `reference` | dropdown, or chips plus a dropdown when `many` |
+| `media` | thumbnail with **Choose…** (opens the media picker) and **Clear** |
 
 Notes on the generated controls:
 
 - A reference dropdown lists up to 1000 contents of the target model, drafts
-  included, labelled by the field the target model names as its `:label` and
+  included, labelled by the field the target model names as its `label` and
   otherwise by the id. An id that no longer resolves is kept and shown as
   `{id} (missing)`, so a save never drops it silently.
 - Rich text is stored as HTML. Images inserted from the picker are stored as
@@ -252,8 +253,8 @@ the created/updated times, then:
 
 | Button | What it does |
 |---|---|
-| **Preview draft** | opens the model's `:preview-url` with `{CONTENT_ID}` and `{DRAFT_KEY}` filled in — shown only while a draft with a key exists |
-| **Published page** | opens the model's `:public-url` — shown only while the content is published |
+| **Preview draft** | opens the model's `previewUrl` with `{CONTENT_ID}` and `{DRAFT_KEY}` filled in — shown only while a draft with a key exists |
+| **Published page** | opens the model's `publicUrl` — shown only while the content is published |
 | **History** | the content's revisions, and where an old version is restored from — see [History](#history) |
 | **Discard draft** | throws the draft away and goes back to the published version (published contents only) |
 | **Save draft** | saves the form as a draft, leaving what is published untouched |
@@ -279,7 +280,7 @@ A content is in one of three states, shown as its badge:
   `publishedAt` on later publishes.
 - Unpublishing keeps the data as a draft and clears `publishedAt`.
 - Publishing, unpublishing and deleting fire the matching webhooks; saving a
-  draft fires `:draft` webhooks; discarding a draft fires none, since what is
+  draft fires `draft` webhooks; discarding a draft fires none, since what is
   published did not change.
 
 ## History
@@ -317,7 +318,7 @@ not everything always comes back. The banner lists each field that did not:
 | a media that has since been deleted from the library, or re-uploaded (a new upload is a new id) | that media is dropped |
 
 A deleted content cannot be restored at all: its history went with it. A field
-renamed with `:was` is renamed in the history too, so its old values restore
+renamed with `was` is renamed in the history too, so its old values restore
 into it.
 
 ## Media
@@ -339,10 +340,10 @@ and the message says how many could not and why.
   matches file names.
 - Clicking a thumbnail opens a preview dialog with the file's name, dimensions,
   size and upload time, an **alt text** box to save, and **Delete**. A file that
-  any content still uses — as a `:media` value or inside rich text — cannot be
+  any content still uses — as a `media` value or inside rich text — cannot be
   deleted: its button is disabled and says how many contents use it, and the
   server refuses too. Take it out of those contents first.
-- The same library opens as a picker inside the editor — from a `:media` field's
+- The same library opens as a picker inside the editor — from a `media` field's
   **Choose…** button and from Quill's image button. The picker searches and
   uploads too, so an image can go straight from the desktop into a content.
 
@@ -364,7 +365,7 @@ all of it.
 
 - **Delivery keys** are what a site sends as `X-KOYA-DELIVERY-KEY` to read this
   space's published content. Safe to put where a front end can reach it.
-- **Management keys** are what `(koya:deploy)` and the other management calls
+- **Management keys** are what `koya deploy` and the admin API calls
   send as `Authorization: Bearer …`. A key reaches this space and nothing else —
   sent to another space's route it is refused with 403 — and it cannot log into
   this UI, just as the owner secret cannot call the admin API.
@@ -383,7 +384,7 @@ Keys are not here: they belong to a space, and are made on its **Keys** page.
 ![The instance settings](img/settings.png)
 
 **Time zone** is the zone every page shows times in — created and updated at,
-the list previews, and `:datetime` fields, which are also entered in it. Type an
+the list previews, and `datetime` fields, which are also entered in it. Type an
 IANA name (`Asia/Tokyo`, `Europe/Berlin`; the box offers the zones the server
 knows) and save; the line underneath shows the current time in it as a check.
 The default is UTC. Storage and the delivery API are not affected: they stay UTC.
@@ -393,11 +394,10 @@ code, the Base32 secret and the `otpauth://` URI; scanning it and entering a
 current code stores the secret and starts asking for a code at login. The secret
 is only kept once the app has proved it has it.
 
-Disabling asks for a current code as well. A code can only be used once.
-
-To keep the secret out of the database, run `(koya-server:totp-setup)` in the
-server's REPL and set the `KOYA_TOTP_SECRET` it prints; the environment variable
-takes precedence and the settings page then only reports that it is in force.
+Disabling asks for a current code as well. A code can only be used once. With
+the authenticator lost, stop the server and delete the secret from the database
+on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key = 'totp_secret'"`
+— and the owner secret alone logs in again.
 
 ## Reference
 
@@ -433,7 +433,7 @@ takes precedence and the settings page then only reports that it is in force.
 ### What the UI deliberately leaves out
 
 - Editing the schema: the models of a space belong to the site's repository (see
-  [CLIENT.md](CLIENT.md)). Making and deleting the space itself does belong here.
+  [SCHEMA.md](SCHEMA.md)). Making and deleting the space itself does belong here.
 - User accounts and roles: there is one owner.
 - History over the APIs: revisions are read and restored in the admin UI only.
 

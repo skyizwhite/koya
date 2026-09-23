@@ -4,96 +4,23 @@
 
 [![CI](https://github.com/skyizwhite/koya/actions/workflows/ci.yml/badge.svg)](https://github.com/skyizwhite/koya/actions/workflows/ci.yml)
 
-A small, self-hosted headless CMS written in Common Lisp, for one owner and any number of sites.
+A small, self-hosted headless CMS for one owner and any number of sites.
 
-- **Server** (`koya-server`): admin UI, delivery API, admin API and media library. One process, one Docker image.
-- **Library** (`koya`): a schema DSL (`defmodel` / `defwebhooks` / `webhook`), `plan` / `deploy` / `pull` to push that schema to the server, and an HTTP client for reading and managing content.
+- **Your schema is code.** Models live in your site's repository, typed, and are
+  deployed from an npm script — with a plan first, and a question before anything
+  destructive.
+- **An admin UI built from it.** List pages and an editor for every model: rich
+  text, media, references, drafts, previews and the history of every version.
+- **A typed client.** [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk)
+  reads content with types generated from your schema, references embedded on
+  request.
+- **Webhooks** on every publish, unpublish, delete and draft, to revalidate or
+  rebuild your site.
+- **One Docker image**, one volume. No database server to run.
 
-The schema is code in the site's repository; the server stores a copy and builds its editing forms from it.
+## Quick start
 
-## Documentation
-
-| | |
-|---|---|
-| [docs/ADMIN-UI.md](docs/ADMIN-UI.md) | the admin UI: logging in, writing and publishing, media, keys, settings |
-| [docs/CLIENT.md](docs/CLIENT.md) | the `koya` library: the schema DSL, deploying it, reading and managing content |
-| [docs/SCHEMA.md](docs/SCHEMA.md) | the schema document (`koyaSchema: 1`) and the rules content values must meet |
-| [docs/openapi.yaml](docs/openapi.yaml) | the delivery and admin HTTP APIs, for clients in other languages |
-| [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) | the TypeScript client, generated from openapi.yaml |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | what koya is made of: the two systems, the tables, the stack, how it runs |
-| [adr/](adr) | one file per design decision, oldest first |
-
-## Admin UI
-
-Spaces are the tenants: one per site, made and deleted in the UI. A schema deploy only ever changes the models inside one.
-
-Everything else is generated from the model — the list pages, and an editor with text inputs, a rich text editor, selects for references and a picker for media, publishing and drafts in a sticky bar, and a history of every version that any of them can be restored from. Each space also has a media library, its keys, a log of what its webhooks answered and one of every schema deploy.
-
-[docs/ADMIN-UI.md](docs/ADMIN-UI.md) walks through all of it, with screenshots.
-
-## Quick start (development)
-
-```sh
-just install          # build tools and Lisp dependencies
-cp .env.example .env  # set KOYA_SECRET; KOYA_PORT and KOYA_BASE_URL must agree
-just build            # stylesheet
-just dev              # serves on KOYA_PORT (default 3100)
-```
-
-Or from a REPL:
-
-```lisp
-(ql:quickload :koya-server)
-(koya-server:start)   ; connects the DB, applies migrations, serves on KOYA_PORT
-(koya-server:reload)  ; reload the code and restart
-```
-
-Log in at `/login` with `KOYA_SECRET`. Make a space on the first page and take a management key from its **Keys** page; its models appear once a schema has been deployed to it. Two-factor login is set up in **Settings**, or outside the database with `(koya-server:totp-setup)` and `KOYA_TOTP_SECRET`.
-
-## Using koya from a site
-
-In a project that depends on `koya`, the models of its space are Lisp:
-
-```lisp
-(defwebhooks (webhook "revalidate" "https://example.com/api/revalidate"))
-
-(defmodel blog (:kind :list
-                :label title
-                :public-url "https://example.com/blog/{CONTENT_ID}"
-                :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
-  (title   :text :required t)
-  (slug    :slug :from title :unique t)
-  (cover   :media)
-  (content :richtext)
-  (tags    :reference :model tag :many t))
-```
-
-and so is everything done with them, from the REPL:
-
-```lisp
-(koya:configure :base-url "https://cms.example.com" :management-key "koya_mgmt_..." :space "website")
-(koya:plan)     ; show the diff against the space on the server
-(koya:deploy)   ; apply it (asks before destructive changes)
-
-(koya:configure :delivery-key "koya_...")
-(koya:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :include "tags"))
-(koya:get-item 'blog "01J...")
-(koya:get-object 'about)
-```
-
-Field types, query and filter syntax, content and media management and webhooks are in [docs/CLIENT.md](docs/CLIENT.md); the raw HTTP endpoints in [docs/openapi.yaml](docs/openapi.yaml).
-
-## Tests
-
-```sh
-just test
-```
-
-## Deployment
-
-koya is one image, `ghcr.io/skyizwhite/koya`: the server on port 3100, with its
-database and uploaded media under `/data`. `latest` and `X.Y.Z` / `X.Y` are
-releases, `edge` is `master`; `linux/amd64` and `linux/arm64`.
+### 1. Run the server
 
 ```sh
 docker run -d --name koya \
@@ -104,7 +31,7 @@ docker run -d --name koya \
   ghcr.io/skyizwhite/koya:latest
 ```
 
-Or next to a site in a compose file:
+or, next to your site in a compose file:
 
 ```yaml
 services:
@@ -119,35 +46,168 @@ volumes:
   koya-data:
 ```
 
-On any other platform, run that image — or build the `Dockerfile`, which makes
-the same one — and
+### 2. Make a space and its keys
 
-- expose port `3100`;
-- mount a persistent volume at `/data` (database and uploaded media);
-- set the environment variables below.
+Open <http://localhost:3100>, log in with `KOYA_SECRET`, and make a **space** —
+one per site, e.g. `website`. On its **Keys** page, make
+
+- a **delivery key** (`koya_…`), which reads published content, and
+- a **management key** (`koya_mgmt_…`), which deploys the schema and manages
+  content. Keep it on the server side.
+
+```sh
+# your site's .env
+KOYA_URL=http://localhost:3100
+KOYA_SPACE=website
+KOYA_DELIVERY_KEY=koya_…
+KOYA_MANAGEMENT_KEY=koya_mgmt_…
+```
+
+### 3. Define your models
+
+```sh
+npm install github:skyizwhite/koya-ts-sdk#v0.1.0
+```
+
+```ts
+// koya.config.ts
+import { defineConfig, defineSchema } from "koya-ts-sdk";
+
+export default defineConfig({
+  schema: defineSchema({
+    webhooks: [{ label: "revalidate", url: "https://example.com/api/revalidate" }],
+    models: [
+      {
+        name: "blog",
+        kind: "list",
+        label: "title",
+        previewUrl: "https://example.com/blog/{CONTENT_ID}?draftKey={DRAFT_KEY}",
+        fields: [
+          { name: "title", type: "text", required: true },
+          { name: "slug", type: "slug", from: "title", unique: true },
+          { name: "cover", type: "media" },
+          { name: "body", type: "richtext" },
+          { name: "tags", type: "reference", model: "tag", many: true },
+        ],
+      },
+      { name: "tag", kind: "list", fields: [{ name: "name", type: "text", required: true }] },
+      { name: "about", kind: "object", fields: [{ name: "body", type: "richtext" }] },
+    ],
+  }),
+  types: { out: "src/koya.gen.ts" },
+});
+```
+
+```json
+{
+  "scripts": {
+    "koya:plan": "koya plan",
+    "koya:deploy": "koya deploy",
+    "koya:types": "koya types"
+  }
+}
+```
+
+```sh
+npm run koya:plan     # what the deploy would change
+npm run koya:deploy   # apply it; the editor now has these models
+npm run koya:types    # src/koya.gen.ts: a type per model
+```
+
+Field types are `text`, `textarea`, `richtext`, `number`, `boolean`, `date`,
+`datetime`, `select`, `media`, `reference` and `slug`; their options and rules
+are in [docs/SCHEMA.md](docs/SCHEMA.md). A `list` model has any number of
+contents, an `object` model exactly one.
+
+### 4. Fetch content
+
+```ts
+import { createClient } from "koya-ts-sdk";
+import type { KoyaModels } from "./koya.gen.ts";
+
+const koya = createClient<KoyaModels>({
+  baseUrl: process.env.KOYA_URL!,
+  space: process.env.KOYA_SPACE!,
+  deliveryKey: process.env.KOYA_DELIVERY_KEY!,
+});
+
+const { contents, totalCount } = await koya.getList("blog", {
+  limit: 10,
+  orders: ["-publishedAt"],
+  filters: "title[contains]hello",
+  include: ["tags"], // tags come back as tag contents, not ids
+});
+
+const post = await koya.getItem("blog", id);                     // one content
+const preview = await koya.getItem("blog", id, { draftKey });    // its draft, for a preview page
+const about = await koya.getObject("about");
+```
+
+Each content is typed by its model — `post.cover?.url`, and
+`post.tags?.[0]?.name` with `include` — and carries the system fields `id`,
+`createdAt`, `updatedAt`, `publishedAt` and `revisedAt`.
+
+Read from the server side — server rendering, build time, an API route: the
+delivery API does not yet answer cross-origin requests from a browser
+([#16](https://github.com/skyizwhite/koya/issues/16)).
+
+Writing content from code, uploading media and more are in the
+[koya-ts-sdk README](https://github.com/skyizwhite/koya-ts-sdk#readme).
+
+### 5. Revalidate on publish
+
+Every webhook of the space is POSTed on every event, with the space's webhook
+secret (on its **Keys** page) in `X-KOYA-WEBHOOK-KEY`:
+
+```json
+{ "space": "website", "model": "blog", "id": "01J…", "event": "publish", "contents": { "old": null, "new": { … } } }
+```
+
+`event` is `publish`, `unpublish`, `delete` or `draft` — ignore `draft`, which
+comes on every save, when you revalidate. See
+[docs/API.md](docs/API.md#webhooks).
+
+## Documentation
+
+| | |
+|---|---|
+| [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) | the TypeScript client and the `koya` CLI |
+| [docs/ADMIN-UI.md](docs/ADMIN-UI.md) | the admin UI: writing and publishing, previews, media, keys, settings |
+| [docs/SCHEMA.md](docs/SCHEMA.md) | models and fields, the rules content values meet, what a deploy changes |
+| [docs/API.md](docs/API.md) | the delivery and admin APIs: queries, what comes back, errors, webhooks |
+| [docs/openapi.yaml](docs/openapi.yaml) | the same, as an OpenAPI 3.1 document |
+| [docs/lisp-sdk.md](docs/lisp-sdk.md) | the Common Lisp SDK |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | working on koya itself |
+
+## Running it
+
+The image is `ghcr.io/skyizwhite/koya` for `linux/amd64` and `linux/arm64`:
+`latest` and `X.Y.Z` / `X.Y` are releases, `edge` follows `master`. It serves on
+port 3100 and keeps everything under `/data`; mount a persistent volume there.
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `KOYA_SECRET` | yes | owner secret: the admin UI's login. Keys for the admin API are made in **Settings** |
-| `KOYA_BASE_URL` | yes | public URL, e.g. `https://cms.example.com`; used for media URLs, the same-origin check and the Secure cookie flag |
-| `KOYA_TOTP_SECRET` | no | second factor configured outside the database (see above) |
+| `KOYA_SECRET` | yes | the admin UI's login password |
+| `KOYA_BASE_URL` | yes | the server's public URL, e.g. `https://cms.example.com`: media URLs, the same-origin check and the Secure cookie flag use it |
 | `KOYA_PORT` | no | listen port, default `3100` |
-| `KOYA_DB_PATH`, `KOYA_MEDIA_DIR` | no | default `/data/koya.db` and `/data/media` in the image |
-| `KOYA_ENV` | no | `production` (default) masks error details; `dev` shows them |
+| `KOYA_DB_PATH`, `KOYA_MEDIA_DIR` | no | default `/data/koya.db` and `/data/media` |
+| `KOYA_ENV` | no | `production` (default) hides error details; `dev` shows them |
 
-The image holds the server saved as one executable: it starts serving at once,
-and stops on `docker stop` after closing the database.
+`GET /health` answers without a key, and the image declares it as its
+`HEALTHCHECK`. The server starts in about a second and stops cleanly on
+`docker stop`; migrations apply themselves at startup.
 
-Health check: `GET /health` (no auth; the image declares it as `HEALTHCHECK`). Migrations run at startup. Static assets are served with long immutable caching behind versioned URLs; API and page responses are `no-store`.
-
-### Backups and moving data
-
-- **Back up the whole `/data` directory.** It holds the database and the uploaded media.
-- **To move data**, use **Export** on a space's page and **Import** on the spaces page; see [docs/ADMIN-UI.md](docs/ADMIN-UI.md).
+**Back up the whole `/data` directory**: it holds the database and the uploaded
+media. To move one space to another server, use **Export** on its page and
+**Import** on the new server's spaces page; its keys come along, so the site's
+`.env` keeps working.
 
 ## License
 
-koya is licensed in two parts:
-
-- **The server** (`koya-server`: `koya-server.asd`, `src/server/`, `assets/` and everything else not listed below) is under the [GNU Affero General Public License v3.0 or later](LICENSE). Running a modified server for others means offering them its source; the admin UI's footer links to it.
-- **The library** (`koya`: `koya.asd`, `src/main.lisp`, `src/client.lisp`, `src/config.lisp`, `src/core.lisp` and `src/core/`) is under the [MIT License](LICENSE-MIT), so a site that declares its schema and reads its content with it is not bound by the AGPL.
+- **The server** is under the [GNU Affero General Public License v3.0 or
+  later](LICENSE): running a modified server for others means offering them its
+  source, which the admin UI's footer links to.
+- **The SDKs** are under the MIT License, so a site that uses them is not bound
+  by the AGPL: [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk), and the
+  SDK files of this repository listed in
+  [docs/lisp-sdk.md](docs/lisp-sdk.md#license) ([LICENSE-MIT](LICENSE-MIT)).

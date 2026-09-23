@@ -1,14 +1,15 @@
 # The schema format
 
-A koya schema is the JSON document that `(koya:deploy)` sends to
+A koya schema is the JSON document that `koya deploy` sends to
 `PUT /admin/api/schema/{space}` and that `GET /admin/api/schema/{space}` returns.
 It describes **one space**: the space itself is made in the admin UI and named by
 the URL, so the document carries neither its name nor anything else about it. The
 server stores it as is and generates the admin UI's forms, the delivery API's
 shapes and content validation from it. This page specifies that document, version
-`koyaSchema: 1`, for anyone producing or consuming it without the Lisp library —
-the Lisp DSL that produces it is in [CLIENT.md](CLIENT.md), the endpoints in
-[openapi.yaml](openapi.yaml).
+`koyaSchema: 1`. In a TypeScript site it is what `defineSchema` in
+`koya.config.ts` holds, typed field by field — see
+[koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk); the endpoints are in
+[API.md](API.md) and [openapi.yaml](openapi.yaml).
 
 Keys are camelCase. Names are checked with the rules below; a document that
 breaks any of them is rejected whole with `400 invalid_schema` and a message
@@ -65,7 +66,7 @@ model, including models added later.
 Every webhook is sent every event -- `publish`, `unpublish`, `delete` and
 `draft` -- and the payload names the event; there is nothing to subscribe to.
 Any other key on input (older schemas carried an `events` list) is ignored.
-The payload is described in [CLIENT.md](CLIENT.md#webhooks).
+The payload is described in [API.md](API.md#webhooks).
 
 ## Model
 
@@ -135,7 +136,7 @@ take their names.
 | `required` `unique` `integer` `many` `default` | boolean | |
 | `maxLength` | integer | positive |
 | `min` `max` | number | |
-| `pattern` | string | a valid `cl-ppcre` (Perl-style) regular expression |
+| `pattern` | string | a Perl-style regular expression, checked when the schema is deployed |
 | `options` | array of string | non-empty, no duplicates; **required** on `select` |
 | `model` | string | a model name; **required** on `reference`, and the model must exist in the same space |
 | `from` | string | a field name; **required** on `slug`, and must name a `text` or `textarea` field of the same model other than the slug itself |

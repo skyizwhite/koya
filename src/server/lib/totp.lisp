@@ -3,13 +3,10 @@
   (:import-from #:quri #:make-uri #:render-uri #:url-encode)
   (:import-from #:ironclad
                 #:make-hmac #:update-hmac #:hmac-digest #:random-data)
-  (:import-from #:koya-server/lib/env
-                #:env)
   (:import-from #:koya-server/db/settings
                 #:get-setting #:set-setting #:delete-setting)
   (:export #:totp-enabled-p
            #:totp-secret
-           #:totp-env-secret
            #:enable-totp
            #:disable-totp
            #:base32-decode
@@ -24,9 +21,8 @@
 
 ;;; Time-based one-time passwords (RFC 6238 over RFC 4226): HMAC-SHA1, 30 second
 ;;; steps, six digits. The owner turns the second factor on from the admin UI's
-;;; settings page, which stores the Base32 secret in the settings table. The
-;;; KOYA_TOTP_SECRET environment variable overrides that (for configuration kept
-;;; outside the database); with neither, the owner secret alone logs in.
+;;; settings page, which stores the Base32 secret in the settings table; without
+;;; one, the owner secret alone logs in.
 
 (defvar *totp-last-counter* -1
   "Highest time step that has already logged someone in; a code is single-use.")
@@ -35,11 +31,8 @@
 (defparameter +step-seconds+ 30)
 (defparameter +digits+ 6)
 
-(defun totp-env-secret ()
-  (let ((s (env "KOYA_TOTP_SECRET"))) (and s (plusp (length s)) s)))
-
 (defun totp-secret ()
-  (or (totp-env-secret) (get-setting "totp_secret")))
+  (get-setting "totp_secret"))
 
 (defun totp-enabled-p () (and (totp-secret) t))
 

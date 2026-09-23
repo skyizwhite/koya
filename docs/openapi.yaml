@@ -21,8 +21,8 @@ info:
     (`2026-09-20T05:04:03.123Z`). Every error is
     `{"error": {"code", "message", "details"?}}`; any route can also answer
     `500 internal_error`, and any request body over 21 MB `413 too_large`. The
-    schema document is specified in SCHEMA.md; the Lisp client that wraps these
-    calls in CLIENT.md.
+    schema document is specified in SCHEMA.md, and API.md walks through both
+    APIs. koya-ts-sdk (https://github.com/skyizwhite/koya-ts-sdk) wraps them.
   license:
     name: AGPL-3.0-or-later
     url: https://www.gnu.org/licenses/agpl-3.0.html
@@ -703,7 +703,7 @@ components:
       schema: { type: string }
       description: |
         Comma-separated reference fields to embed, dotted for nesting:
-        `tags,author.avatar` embeds `tags`, and `avatar` inside each `author`.
+        `tags,author.team` embeds `tags`, `author`, and `team` inside each `author`.
         Only `reference` fields may be named. Referenced contents that are
         missing or unpublished are dropped from a `many` field and `null` in a
         single one.
