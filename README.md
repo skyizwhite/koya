@@ -19,6 +19,7 @@ The schema is code in the site's repository; the server stores a copy and builds
 | [docs/CLIENT.md](docs/CLIENT.md) | the `koya` library: the schema DSL, deploying it, reading and managing content |
 | [docs/SCHEMA.md](docs/SCHEMA.md) | the schema document (`koyaSchema: 1`) and the rules content values must meet |
 | [docs/openapi.yaml](docs/openapi.yaml) | the delivery and admin HTTP APIs, for clients in other languages |
+| [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) | the TypeScript client, generated from openapi.yaml |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | what koya is made of: the two systems, the tables, the stack, how it runs |
 | [adr/](adr) | one file per design decision, oldest first |
 

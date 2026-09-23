@@ -19,8 +19,10 @@ info:
 
     Bodies use camelCase keys. Timestamps are ISO 8601 in UTC with milliseconds
     (`2026-09-20T05:04:03.123Z`). Every error is
-    `{"error": {"code", "message", "details"?}}`. The schema document is specified
-    in SCHEMA.md; the Lisp client that wraps these calls in CLIENT.md.
+    `{"error": {"code", "message", "details"?}}`; any route can also answer
+    `500 internal_error`, and any request body over 21 MB `413 too_large`. The
+    schema document is specified in SCHEMA.md; the Lisp client that wraps these
+    calls in CLIENT.md.
   license:
     name: AGPL-3.0-or-later
     url: https://www.gnu.org/licenses/agpl-3.0.html
@@ -33,6 +35,8 @@ servers:
         description: The server's KOYA_BASE_URL
 
 tags:
+  - name: server
+    description: The caller and the server itself
   - name: delivery
     description: Published content, read with a delivery key
   - name: schema
@@ -49,6 +53,7 @@ security: []
 paths:
   /api/v1/{space}/{model}:
     get:
+      operationId: getContents
       tags: [delivery]
       summary: List published contents, or read an object model's content
       description: |
@@ -59,29 +64,11 @@ paths:
       parameters:
         - $ref: "#/components/parameters/space"
         - $ref: "#/components/parameters/model"
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 0, default: 10 }
-          description: Values above 100 are clamped to 100.
-        - name: offset
-          in: query
-          schema: { type: integer, minimum: 0, default: 0 }
-        - name: orders
-          in: query
-          schema: { type: string }
-          description: |
-            Comma-separated field or system field names, `-` prefix for descending,
-            e.g. `-publishedAt,title`. Default: newest published first.
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/orders"
         - $ref: "#/components/parameters/fields"
-        - name: filters
-          in: query
-          schema: { type: string }
-          description: |
-            `field[op]value` terms joined with `[and]` and `[or]`; `[or]` separates
-            groups of `[and]` terms. Operators: `equals`, `not_equals`, `contains`,
-            `not_contains`, `begins_with`, `exists`, `not_exists`, `less_than`,
-            `greater_than`. On a `many` field, `equals` and `contains` mean "has
-            this value". Example: `title[contains]lisp[and]publishedAt[exists]`.
+        - $ref: "#/components/parameters/filters"
         - $ref: "#/components/parameters/include"
         - $ref: "#/components/parameters/draftKey"
       responses:
@@ -100,6 +87,7 @@ paths:
 
   /api/v1/{space}/{model}/{id}:
     get:
+      operationId: getContent
       tags: [delivery]
       summary: Read one published content
       security: [{ deliveryKey: [] }]
@@ -121,32 +109,42 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/api/me:
+  /health:
     get:
-      tags: [schema]
-      summary: Who am I
-      security: [{ ownerSecret: [] }]
+      operationId: getHealth
+      tags: [server]
+      summary: Liveness, touching the database
       responses:
         "200":
-          description: Confirms the secret and reports the server version
+          description: The server and its database answer; the body is a small HTML page saying `ok`
+          content:
+            text/html:
+              schema: { type: string }
+        "500":
+          description: The database does not answer
+
+  /admin/api/me:
+    get:
+      operationId: getMe
+      tags: [server]
+      summary: Who am I
+      security: [{ managementKey: [] }]
+      responses:
+        "200":
+          description: Confirms the key and reports the server version
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  owner: { type: boolean, description: "true when called with the admin UI's session" }
-                  management: { type: boolean, description: "true when called with a management key" }
-                  space: { type: [string, "null"], description: "the space a management key is limited to; null for the owner" }
-                  version: { type: string, examples: ["0.8.0"] }
+              schema: { $ref: "#/components/schemas/Me" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /admin/api/schema/{space}:
     parameters:
       - $ref: "#/components/parameters/space"
     get:
+      operationId: getSchema
       tags: [schema]
       summary: The space's stored schema
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       responses:
         "200":
           description: The schema document (see SCHEMA.md); empty `models` before any deploy
@@ -156,6 +154,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     put:
+      operationId: deploySchema
       tags: [schema]
       summary: Replace the space's schema
       description: |
@@ -163,7 +162,7 @@ paths:
         unless a destructive change is present without `force=true`, stores it.
         Existing content is never modified. The space must already exist — it is
         made in the admin UI — and a deploy to an unknown name is a 404.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       parameters:
         - name: force
           in: query
@@ -179,22 +178,16 @@ paths:
           description: Applied
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  applied:
-                    type: array
-                    items: { $ref: "#/components/schemas/Change" }
-                  schema: { $ref: "#/components/schemas/Schema" }
+              schema: { $ref: "#/components/schemas/DeployResult" }
         "400": { $ref: "#/components/responses/InvalidSchema" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: Destructive changes without `force=true`; `details` lists every change
+          description: "`destructive_changes`: destructive changes without `force=true`; `details` lists every change"
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Error" }
+              schema: { $ref: "#/components/schemas/ApiError" }
               example:
                 error:
                   code: destructive_changes
@@ -206,9 +199,10 @@ paths:
     parameters:
       - $ref: "#/components/parameters/space"
     post:
+      operationId: planSchema
       tags: [schema]
       summary: The changes a PUT of this schema would apply
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       requestBody:
         required: true
         content:
@@ -219,13 +213,7 @@ paths:
           description: The plan; nothing is stored
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  changes:
-                    type: array
-                    items: { $ref: "#/components/schemas/Change" }
-                  destructive: { type: boolean }
+              schema: { $ref: "#/components/schemas/Plan" }
         "400": { $ref: "#/components/responses/InvalidSchema" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
@@ -236,25 +224,18 @@ paths:
       - $ref: "#/components/parameters/space"
       - $ref: "#/components/parameters/model"
     get:
+      operationId: listAdminContents
       tags: [contents]
       summary: List every content of a model, drafts included
       description: |
         Takes the delivery API's `limit`, `offset`, `orders` and `filters`.
         Filters and orders apply to the draft data when a content has one.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       parameters:
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 0, default: 10 }
-        - name: offset
-          in: query
-          schema: { type: integer, minimum: 0, default: 0 }
-        - name: orders
-          in: query
-          schema: { type: string }
-        - name: filters
-          in: query
-          schema: { type: string }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/orders"
+        - $ref: "#/components/parameters/filters"
       responses:
         "200":
           description: A page of contents
@@ -265,6 +246,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
+      operationId: createAdminContent
       tags: [contents]
       summary: Create a content
       description: |
@@ -273,25 +255,12 @@ paths:
         `publishedAt` and `revisedAt` are only stored when publishing. For an
         `object` model that already has its content, that content is updated
         (drafted, or published with `publish`) instead of a second one being made.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [data]
-              properties:
-                data: { $ref: "#/components/schemas/ContentData" }
-                publish: { type: boolean, default: false }
-                id:
-                  type: string
-                  pattern: "^[A-Za-z0-9_-]{1,64}$"
-                  description: Defaults to a fresh ULID.
-                createdAt: { $ref: "#/components/schemas/Timestamp" }
-                updatedAt: { $ref: "#/components/schemas/Timestamp" }
-                publishedAt: { $ref: "#/components/schemas/Timestamp" }
-                revisedAt: { $ref: "#/components/schemas/Timestamp" }
+            schema: { $ref: "#/components/schemas/CreateContent" }
       responses:
         "201":
           description: Created
@@ -303,10 +272,10 @@ paths:
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: A content with this `id` already exists
+          description: "`conflict`: a content with this `id` already exists"
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Error" }
+              schema: { $ref: "#/components/schemas/ApiError" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
   /admin/api/contents/{space}/{model}/{id}:
@@ -315,9 +284,10 @@ paths:
       - $ref: "#/components/parameters/model"
       - $ref: "#/components/parameters/id"
     get:
+      operationId: getAdminContent
       tags: [contents]
       summary: Read a content, both versions
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       responses:
         "200":
           description: The content
@@ -327,6 +297,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
+      operationId: updateAdminContentDraft
       tags: [contents]
       summary: Save a draft
       description: |
@@ -334,16 +305,12 @@ paths:
         data): keys present replace, a `null` value removes the key, keys absent
         stay. The result is validated whole. A new draft key is issued, so earlier
         preview links stop working.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [data]
-              properties:
-                data: { $ref: "#/components/schemas/ContentData" }
+            schema: { $ref: "#/components/schemas/UpdateDraft" }
       responses:
         "200":
           description: The content with its new draft
@@ -356,10 +323,11 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
     delete:
+      operationId: deleteAdminContent
       tags: [contents]
       summary: Delete a content
       description: Removes both versions. Fires `delete` webhooks when it was published.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       responses:
         "200": { $ref: "#/components/responses/Deleted" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -368,6 +336,7 @@ paths:
 
   /admin/api/contents/{space}/{model}/{id}/publish:
     post:
+      operationId: publishAdminContent
       tags: [contents]
       summary: Publish
       description: |
@@ -375,7 +344,7 @@ paths:
         published data. Clears the draft and its key. `publishedAt` overrides the
         publish date; otherwise the first publish date is kept and `revisedAt` set
         to now. Fires `publish` webhooks.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
         - $ref: "#/components/parameters/model"
@@ -384,11 +353,7 @@ paths:
         required: false
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                data: { $ref: "#/components/schemas/ContentData" }
-                publishedAt: { $ref: "#/components/schemas/Timestamp" }
+            schema: { $ref: "#/components/schemas/PublishContent" }
       responses:
         "200":
           description: The published content
@@ -403,13 +368,14 @@ paths:
 
   /admin/api/contents/{space}/{model}/{id}/unpublish:
     post:
+      operationId: unpublishAdminContent
       tags: [contents]
       summary: Unpublish
       description: |
         Takes the content off the delivery API. Its data (the draft when there is
         one) is kept as a draft with a new draft key; `publishedAt` is cleared.
         Fires `unpublish` webhooks.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
         - $ref: "#/components/parameters/model"
@@ -426,10 +392,11 @@ paths:
 
   /admin/api/contents/{space}/{model}/{id}/discard-draft:
     post:
+      operationId: discardAdminContentDraft
       tags: [contents]
       summary: Discard the draft of a published content
       description: No webhook fires; what is published does not change.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
         - $ref: "#/components/parameters/model"
@@ -447,16 +414,17 @@ paths:
           description: "`not_published`: the content has no published version to fall back to; delete it instead"
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Error" }
+              schema: { $ref: "#/components/schemas/ApiError" }
 
   /admin/api/contents/{space}/{model}/{id}/draft-key:
     post:
+      operationId: getAdminContentDraftKey
       tags: [contents]
       summary: The content's draft key
       description: |
         For building preview URLs. Generated on first call; replaced whenever a
         draft is saved.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
         - $ref: "#/components/parameters/model"
@@ -468,6 +436,7 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [draftKey]
                 properties:
                   draftKey: { type: string, examples: ["3f1c…"] }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -478,28 +447,24 @@ paths:
     parameters:
       - $ref: "#/components/parameters/space"
     get:
+      operationId: listDeliveryKeys
       tags: [keys]
       summary: The space's delivery keys and webhook secret
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       responses:
         "200":
           description: Keys (without their plaintext) and the secret sent as `X-KOYA-WEBHOOK-KEY`
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  keys:
-                    type: array
-                    items: { $ref: "#/components/schemas/DeliveryKey" }
-                  webhookSecret: { type: string }
+              schema: { $ref: "#/components/schemas/DeliveryKeys" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
+      operationId: createDeliveryKey
       tags: [keys]
       summary: Create a delivery key
       description: The plaintext `key` appears in this response only; the server stores its SHA-256.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       requestBody:
         required: false
         content:
@@ -508,26 +473,23 @@ paths:
               type: object
               properties:
                 label: { type: string, default: "" }
+              additionalProperties: false
       responses:
         "201":
           description: The new key
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  id: { type: string }
-                  label: { type: string }
-                  key: { type: string, examples: ["koya_5d41402abc4b2a76b9719d911017c592…"] }
+              schema: { $ref: "#/components/schemas/CreatedDeliveryKey" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /admin/api/keys/{space}/{id}:
     delete:
+      operationId: deleteDeliveryKey
       tags: [keys]
       summary: Delete a delivery key
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
         - $ref: "#/components/parameters/id"
@@ -540,9 +502,10 @@ paths:
     parameters:
       - $ref: "#/components/parameters/space"
     get:
+      operationId: listMedia
       tags: [media]
       summary: List media, newest first
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       parameters:
         - name: q
           in: query
@@ -565,6 +528,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
+      operationId: uploadMedia
       tags: [media]
       summary: Upload images
       description: |
@@ -572,7 +536,7 @@ paths:
         applied to all of them. PNG, JPEG, GIF and WebP, up to 20 MB each, decided
         by the file's leading bytes; the part's Content-Type is ignored. The whole
         request body is limited to 21 MB.
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       requestBody:
         required: true
         content:
@@ -583,7 +547,7 @@ paths:
               properties:
                 file:
                   type: array
-                  items: { type: string, contentEncoding: binary }
+                  items: { type: string, format: binary }
                 alt: { type: string }
       responses:
         "201":
@@ -592,6 +556,7 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [media]
                 properties:
                   media:
                     type: array
@@ -604,38 +569,35 @@ paths:
           description: "`too_large`: a file over 20 MB, or a request body over 21 MB"
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Error" }
+              schema: { $ref: "#/components/schemas/ApiError" }
         "422":
           description: "`empty_file` or `unsupported_type`"
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Error" }
+              schema: { $ref: "#/components/schemas/ApiError" }
 
   /admin/api/media/{space}/{id}:
     parameters:
       - $ref: "#/components/parameters/space"
       - $ref: "#/components/parameters/id"
     get:
+      operationId: getMedia
       tags: [media]
       summary: Read one media
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       responses:
         "200":
           description: The media plus `references`, the number of contents whose data mentions it
           content:
             application/json:
-              schema:
-                allOf:
-                  - $ref: "#/components/schemas/Media"
-                  - type: object
-                    properties:
-                      references: { type: integer }
+              schema: { $ref: "#/components/schemas/MediaWithReferences" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
+      operationId: updateMedia
       tags: [media]
       summary: Set the alt text
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       requestBody:
         required: true
         content:
@@ -656,17 +618,18 @@ paths:
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
+      operationId: deleteMedia
       tags: [media]
       summary: Delete a media and its file
       description: Refused with 409 `in_use` while any content still uses the file (see `references`).
-      security: [{ ownerSecret: [] }]
+      security: [{ managementKey: [] }]
       responses:
         "200": { $ref: "#/components/responses/Deleted" }
         "409":
           description: "`in_use`: the message names how many contents use the file"
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Error" }
+              schema: { $ref: "#/components/schemas/ApiError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -680,7 +643,7 @@ components:
       in: header
       name: X-KOYA-DELIVERY-KEY
       description: A delivery key of the space being read (`koya_…`); one from another space is 403.
-    ownerSecret:
+    managementKey:
       type: http
       scheme: bearer
       description: A management key (`koya_mgmt_…`) from the space's Keys page in the admin UI. It reaches that one space; another space's route is 403. The admin UI's session cookie works too and reaches every space; the owner secret does not work here at all.
@@ -701,11 +664,39 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$" }
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 0, default: 10 }
+      description: Values above 100 are clamped to 100.
+    offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    orders:
+      name: orders
+      in: query
+      schema: { type: string }
+      description: |
+        Comma-separated field or system field names, `-` prefix for descending,
+        e.g. `-publishedAt,title`. Default: newest published first.
+    filters:
+      name: filters
+      in: query
+      schema: { type: string }
+      description: |
+        `field[op]value` terms joined with `[and]` and `[or]`; `[or]` separates
+        groups of `[and]` terms. Operators: `equals`, `not_equals`, `contains`,
+        `not_contains`, `begins_with`, `exists`, `not_exists`, `less_than`,
+        `greater_than`. On a `many` field, `equals` and `contains` mean "has
+        this value". Example: `title[contains]lisp[and]publishedAt[exists]`.
     fields:
       name: fields
       in: query
       schema: { type: string }
-      description: Comma-separated keys to keep in each content; applied after `include` and media expansion.
+      description: |
+        Comma-separated keys to keep in each content; applied after `include` and
+        media expansion. System fields not named are dropped too.
     include:
       name: include
       in: query
@@ -727,42 +718,42 @@ components:
       description: "`bad_request` or `bad_json`"
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ApiError" }
     BadQuery:
       description: "`bad_query`: a malformed `filters`, an unknown field in `filters`/`orders`/`include`, or a bad integer"
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ApiError" }
     InvalidSchema:
       description: "`invalid_schema` (the document breaks SCHEMA.md) or `bad_json`"
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ApiError" }
     Unauthorized:
       description: "`unauthorized`: missing or wrong delivery key or management key"
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ApiError" }
     Forbidden:
       description: "`forbidden`: the delivery or management key belongs to another space"
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ApiError" }
     CrossOrigin:
       description: "`forbidden`: a browser request from another origin"
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ApiError" }
     NotFound:
       description: "`not_found`: unknown space, model, content, media or endpoint"
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ApiError" }
     ValidationFailed:
       description: "`validation_failed`: `details` lists each problem (codes are in SCHEMA.md)"
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: "#/components/schemas/ApiError" }
           example:
             error:
               code: validation_failed
@@ -776,6 +767,7 @@ components:
         application/json:
           schema:
             type: object
+            required: [deleted]
             properties:
               deleted: { type: boolean, const: true }
 
@@ -786,7 +778,7 @@ components:
       description: ISO 8601 in UTC with milliseconds
       examples: ["2026-09-20T05:04:03.123Z"]
 
-    Error:
+    ApiError:
       type: object
       required: [error]
       properties:
@@ -794,10 +786,35 @@ components:
           type: object
           required: [code, message]
           properties:
-            code: { type: string }
+            code: { type: string, examples: [validation_failed] }
             message: { type: string }
             details:
-              description: Present for `validation_failed` (problems) and `destructive_changes` (changes)
+              description: "`validation_failed` lists problems, `destructive_changes` changes"
+              oneOf:
+                - type: array
+                  items: { $ref: "#/components/schemas/ValidationProblem" }
+                - type: array
+                  items: { $ref: "#/components/schemas/Change" }
+
+    ValidationProblem:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string }
+        code:
+          type: string
+          description: See SCHEMA.md "Content values"
+          examples: [required, unique, max_length, pattern, slug, integer, min, max, option, type, unknown_field]
+        message: { type: string }
+
+    Me:
+      type: object
+      required: [owner, management, space, version]
+      properties:
+        owner: { type: boolean, description: "true when called with the admin UI's session" }
+        management: { type: boolean, description: "true when called with a management key" }
+        space: { type: [string, "null"], description: "the space a management key is limited to; null for the owner" }
+        version: { type: string, examples: ["0.8.0"] }
 
     Schema:
       type: object
@@ -810,43 +827,201 @@ components:
           items: { $ref: "#/components/schemas/Webhook" }
         models:
           type: array
-          items:
-            type: object
-            required: [name, kind]
-            properties:
-              name: { type: string }
-              kind: { type: string, enum: [list, object] }
-              previewUrl: { type: string }
-              publicUrl: { type: string }
-              label:
-                type: string
-                description: |
-                  A text or slug field of this model, whose value the admin UI
-                  shows for a content. Absent, a content is shown by its id.
-              was:
-                type: string
-                description: |
-                  The name this model had. A deploy renames it and moves its
-                  contents instead of dropping them; the stored schema keeps the
-                  new name alone, so a GET never returns it. See SCHEMA.md.
-              fields:
-                type: array
-                items:
-                  type: object
-                  required: [name, type]
-                  properties:
-                    name: { type: string }
-                    type:
-                      type: string
-                      enum: [text, textarea, richtext, number, boolean, date, datetime, select, media, reference, slug]
-                    was:
-                      type: string
-                      description: |
-                        The name this field had. A deploy renames it and moves the
-                        key in every stored content instead of orphaning it; the
-                        stored schema keeps the new name alone. See SCHEMA.md.
-                  additionalProperties:
-                    description: The options allowed for `type`, camelCase
+          items: { $ref: "#/components/schemas/Model" }
+
+    Model:
+      type: object
+      required: [name, kind]
+      properties:
+        name: { type: string, pattern: "^[a-z][a-z0-9-]*$" }
+        kind: { type: string, enum: [list, object] }
+        previewUrl:
+          type: string
+          description: Template for the editor's preview link; `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
+        publicUrl:
+          type: string
+          description: Template for the editor's published page link; `{CONTENT_ID}` is substituted.
+        label:
+          type: string
+          description: |
+            A text or slug field of this model, whose value the admin UI
+            shows for a content. Absent, a content is shown by its id.
+        was:
+          type: string
+          description: |
+            The name this model had. A deploy renames it and moves its
+            contents instead of dropping them; the stored schema keeps the
+            new name alone, so a GET never returns it. See SCHEMA.md.
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/Field" }
+
+    Field:
+      description: |
+        A field of a model. Each `type` takes its own options (SCHEMA.md
+        "Field"); any other key is refused with `invalid_schema`. `was` names
+        the field this one was renamed from — a deploy moves the key in every
+        stored content — and is never returned by a GET.
+      oneOf:
+        - $ref: "#/components/schemas/TextField"
+        - $ref: "#/components/schemas/TextareaField"
+        - $ref: "#/components/schemas/RichtextField"
+        - $ref: "#/components/schemas/NumberField"
+        - $ref: "#/components/schemas/BooleanField"
+        - $ref: "#/components/schemas/DateField"
+        - $ref: "#/components/schemas/DatetimeField"
+        - $ref: "#/components/schemas/SelectField"
+        - $ref: "#/components/schemas/MediaField"
+        - $ref: "#/components/schemas/ReferenceField"
+        - $ref: "#/components/schemas/SlugField"
+      discriminator:
+        propertyName: type
+        mapping:
+          text: "#/components/schemas/TextField"
+          textarea: "#/components/schemas/TextareaField"
+          richtext: "#/components/schemas/RichtextField"
+          number: "#/components/schemas/NumberField"
+          boolean: "#/components/schemas/BooleanField"
+          date: "#/components/schemas/DateField"
+          datetime: "#/components/schemas/DatetimeField"
+          select: "#/components/schemas/SelectField"
+          media: "#/components/schemas/MediaField"
+          reference: "#/components/schemas/ReferenceField"
+          slug: "#/components/schemas/SlugField"
+
+    FieldName:
+      type: string
+      pattern: "^[a-z][a-zA-Z0-9]*$"
+      description: Not one of the system fields `id`, `createdAt`, `updatedAt`, `publishedAt`, `revisedAt`.
+
+    TextField:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: text }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+        maxLength: { type: integer, minimum: 1 }
+        pattern: { type: string, description: A cl-ppcre (Perl-style) regular expression }
+        unique: { type: boolean }
+
+    TextareaField:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: textarea }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+        maxLength: { type: integer, minimum: 1 }
+
+    RichtextField:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: richtext }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+
+    NumberField:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: number }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+        min: { type: number }
+        max: { type: number }
+        integer: { type: boolean }
+
+    BooleanField:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: boolean }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+        default: { type: boolean, description: "`true` sets the field on a new content whose data does not mention it" }
+
+    DateField:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: date }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+
+    DatetimeField:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: datetime }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+
+    SelectField:
+      type: object
+      required: [name, type, options]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: select }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+        options:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string }
+        many: { type: boolean }
+
+    MediaField:
+      type: object
+      required: [name, type]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: media }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+
+    ReferenceField:
+      type: object
+      required: [name, type, model]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: reference }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+        model: { type: string, description: A model of the same schema }
+        many: { type: boolean }
+
+    SlugField:
+      type: object
+      required: [name, type, from]
+      additionalProperties: false
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: slug }
+        was: { $ref: "#/components/schemas/FieldName" }
+        required: { type: boolean }
+        from: { type: string, description: "A text or textarea field of the same model, filled into a blank slug" }
+        unique: { type: boolean }
+        pattern: { type: string }
 
     Webhook:
       type: object
@@ -856,7 +1031,7 @@ components:
         older schemas is ignored.
       required: [url]
       properties:
-        label: { type: string, description: Defaults to `url` }
+        label: { type: string, description: "Defaults to `url`; always present on output" }
         url: { type: string }
         only:
           type: array
@@ -865,6 +1040,7 @@ components:
 
     Change:
       type: object
+      required: [op, path, destructive, description]
       properties:
         op:
           type: string
@@ -874,6 +1050,51 @@ components:
         path: { type: string, examples: ["blog.title"] }
         destructive: { type: boolean }
         description: { type: string, examples: ["+ blog.title (text)"] }
+
+    Plan:
+      type: object
+      required: [changes, destructive]
+      properties:
+        changes:
+          type: array
+          items: { $ref: "#/components/schemas/Change" }
+        destructive: { type: boolean }
+
+    DeployResult:
+      type: object
+      required: [applied, schema]
+      properties:
+        applied:
+          type: array
+          items: { $ref: "#/components/schemas/Change" }
+        schema: { $ref: "#/components/schemas/Schema" }
+
+    CreateContent:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/ContentData" }
+        publish: { type: boolean, default: false }
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+          description: Defaults to a fresh ULID.
+        createdAt: { $ref: "#/components/schemas/Timestamp" }
+        updatedAt: { $ref: "#/components/schemas/Timestamp" }
+        publishedAt: { $ref: "#/components/schemas/Timestamp" }
+        revisedAt: { $ref: "#/components/schemas/Timestamp" }
+
+    UpdateDraft:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/ContentData" }
+
+    PublishContent:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/ContentData" }
+        publishedAt: { $ref: "#/components/schemas/Timestamp" }
 
     ContentData:
       type: object
@@ -888,8 +1109,9 @@ components:
         Delivery shape: the data with the system fields merged in. `media` fields
         are expanded to Media objects (or `null` when the file is gone); `richtext`
         HTML has its `/media/` URLs made absolute; `reference` fields are ids
-        unless embedded through `include`.
-      required: [id, createdAt, updatedAt]
+        unless embedded through `include`. With `fields`, only the named keys
+        are present, system fields included.
+      required: [id, createdAt, updatedAt, publishedAt, revisedAt]
       properties:
         id: { type: string }
         createdAt: { $ref: "#/components/schemas/Timestamp" }
@@ -963,6 +1185,7 @@ components:
 
     DeliveryKey:
       type: object
+      required: [id, label, createdAt]
       properties:
         id: { type: string }
         label: { type: string }
@@ -983,6 +1206,31 @@ components:
           oneOf: [{ type: integer }, { type: "null" }]
         alt: { type: string }
         createdAt: { $ref: "#/components/schemas/Timestamp" }
+
+    MediaWithReferences:
+      allOf:
+        - $ref: "#/components/schemas/Media"
+        - type: object
+          required: [references]
+          properties:
+            references: { type: integer, description: The number of contents whose data mentions it }
+
+    DeliveryKeys:
+      type: object
+      required: [keys, webhookSecret]
+      properties:
+        keys:
+          type: array
+          items: { $ref: "#/components/schemas/DeliveryKey" }
+        webhookSecret: { type: string, description: "Sent as `X-KOYA-WEBHOOK-KEY` with every webhook" }
+
+    CreatedDeliveryKey:
+      type: object
+      required: [id, label, key]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        key: { type: string, examples: ["koya_5d41402abc4b2a76b9719d911017c592…"] }
 
     MediaList:
       type: object
