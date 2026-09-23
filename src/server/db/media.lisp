@@ -8,6 +8,7 @@
                 #:now-iso)
   (:export #:insert-media
            #:find-media
+           #:find-media-by-ids
            #:list-media
            #:space-media
            #:count-media
@@ -40,6 +41,17 @@
 (defun find-media (space id)
   (let ((row (fetch-one "SELECT * FROM media WHERE space = ? AND id = ?" space id)))
     (and row (row->media row))))
+
+(defun find-media-by-ids (space ids)
+  "Hash of id -> media for those of IDS that are in SPACE's library."
+  (let ((table (make-hash-table :test 'equal))
+        (ids (remove-duplicates ids :test #'equal)))
+    (when ids
+      (dolist (row (apply #'fetch (format nil "SELECT * FROM media WHERE space = ? AND id IN (~{~*?~^, ~})" ids)
+                          space ids))
+        (let ((media (row->media row)))
+          (setf (gethash (media-id media) table) media))))
+    table))
 
 (defun search-clause (search)
   (if (and search (plusp (length search)))

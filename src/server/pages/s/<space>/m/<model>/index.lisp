@@ -25,6 +25,8 @@
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/db/contents #:find-content #:content-published #:content-draft)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
+  (:import-from #:koya-server/db/media #:find-media-by-ids #:media-alt)
+  (:import-from #:koya-server/lib/media-store #:media-url)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
 
@@ -130,6 +132,18 @@ MODEL. Passed explicitly: components render lazily."
   (let ((table (and ref-labels (gethash (field-name field) ref-labels))))
     (or (and table (stringp id) (gethash id table)) id)))
 
+(defun page-media (space model contents)
+  "Hash of media id -> media for every media field of CONTENTS, the page's rows.
+An id missing from it is no longer in the library."
+  (find-media-by-ids
+   space
+   (loop :for content :in contents
+         :for data := (content-data content :draft t)
+         :nconc (loop :for field :in (model-fields model)
+                      :for value := (and data (gethash (field-name field) data))
+                      :when (and (eq (field-type field) :media) (stringp value) (plusp (length value)))
+                        :collect value))))
+
 (defun collapse-whitespace (string)
   (string-trim " " (regex-replace-all "\\s+" string " ")))
 
@@ -171,10 +185,28 @@ MODEL. Passed explicitly: components render lazily."
           ((and (stringp value) (zerop (length value))) nil)
           (t (truncate-text (scalar-preview field value ref-labels))))))
 
-(defcomp ~preview-cell (&key field content ref-labels)
-  (let ((preview (field-preview field (content-data content :draft t) ref-labels)))
-    (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
-           (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—"))))))
+(defcomp ~media-cell (&key field id media)
+  "The image itself, at the row's height. It is the original file -- koya keeps
+no smaller copy -- so it is loaded lazily, and a list of a model with large
+images costs what the images cost, once, then comes from the cache."
+  (let ((found (gethash id media)))
+    (hsx
+     (td :class (clsx "py-2 pr-4" (if found "" "text-muted"))
+       (div :class (column-width field)
+         (if found
+             (hsx (img :src (media-url found :absolute nil) :alt (media-alt found)
+                       :loading "lazy" :decoding "async"
+                       :class "h-10 w-10 rounded object-cover"))
+             (hsx (div :class "line-clamp-2 break-all" (format nil "~a (missing)" id)))))))))
+
+(defcomp ~preview-cell (&key field content ref-labels media)
+  (let* ((data (content-data content :draft t))
+         (value (and data (gethash (field-name field) data))))
+    (if (and (eq (field-type field) :media) (stringp value) (plusp (length value)))
+        (hsx (~media-cell :field field :id value :media media))
+        (let ((preview (field-preview field data ref-labels)))
+          (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
+                 (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—"))))))))
 
 (defcomp ~filters (&key space model search-text status sort-key)
   "The search box and the status filter, as a GET form. Submitting drops ?page=
@@ -249,6 +281,7 @@ and keeps the sort."
                     (list-contents space model-name model query :status :all :only-status status)
                  (let* ((fields (model-fields model))
                         (ref-labels (reference-labels space model))
+                        (media (page-media space model contents))
                         (pages (max 1 (ceiling total +page-size+)))
                         (sort-key (and sort-name (if (eq sort-direction :desc) (format nil "-~a" sort-name) sort-name)))
                         (link (lambda (page) (list-url space model-name :search-text search-text :status status
@@ -307,7 +340,7 @@ and keeps the sort."
                                               (td :class "py-2 pr-4 whitespace-nowrap"
                                                 (~status-badge :status (content-status content)))
                                               (loop :for field :in fields :collect
-                                                (hsx (~preview-cell :field field :content content :ref-labels ref-labels)))
+                                                (hsx (~preview-cell :field field :content content :ref-labels ref-labels :media media)))
                                               (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent" "›"))))))))))
                       (when (> pages 1)
                         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"

@@ -112,7 +112,9 @@ straight to its one content -- so that button sits in its editor instead.
 - Every field gets a preview, clamped to two lines: rich text is stripped to
   plain text, a datetime is shown as `YYYY-MM-DD HH:MM UTC`, a reference shows the
   referenced content's label (its model's `label` field, or its id), a `many` field shows its values comma-separated,
-  and an empty field shows `—`. Column widths are bounded per field type, so a
+  a `media` field shows its image as a small thumbnail (the original file, loaded
+  lazily; a media since deleted from the library shows `{id} (missing)`), and an
+  empty field shows `—`. Column widths are bounded per field type, so a
   wide model scrolls sideways rather than squeezing every column thin.
 - A row shows its **draft** data when it has one, so the table reflects what is
   being worked on rather than what is live.

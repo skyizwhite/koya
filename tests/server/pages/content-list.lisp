@@ -5,7 +5,8 @@
   (:import-from #:koya-server/db/contents #:list-contents #:content-status #:content-id #:content-draft-key)
   (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:alexandria #:alist-hash-table)
-  (:import-from #:koya-server/db/contents #:save-draft))
+  (:import-from #:koya-server/db/contents #:save-draft)
+  (:import-from #:koya-server/db/media #:insert-media #:media-id))
 (in-package #:koya-tests/server/pages/content-list)
 
 (setup (setup-pages) (log-in))
@@ -159,6 +160,34 @@
         (ok (search "h-14" body) "every row is the same height")
         (ok (< (search ">status<" body) (search ">title<" body)) "status leads the row"))
       (request :post path :form '(("action" . "delete")) :headers '(("origin" . "http://localhost:3000"))))))
+
+(deftest list-shows-media-as-images
+  (let ((origin '(("origin" . "http://localhost:3000")))
+        (media (insert-media "website" :filename "cover.png" :mime "image/png" :size 10
+                                       :width 1 :height 1 :alt "A red door"))
+        (paths '()))
+    (flet ((save (title cover)
+             (multiple-value-bind (status body headers)
+                 (request :post "/s/website/m/blog/new"
+                          :form `(("action" . "save") ("f-title" . ,title) ("f-cover" . ,cover))
+                          :headers origin)
+               (declare (ignore status body))
+               (push (subseq (location headers) 0 (position #\? (location headers))) paths))))
+      (save "With cover" (media-id media))
+      (save "Lost cover" "01MISSINGMEDIA0000000000000")
+      (save "No cover" "")
+      (multiple-value-bind (status body) (request :get "/s/website/m/blog")
+        (ok (= status 200))
+        (ok (search (format nil "src=\"/media/website/~a.png\"" (media-id media)) body)
+            "a media field is its image, the original file")
+        (ok (search "alt=\"A red door\"" body) "with the media's alt")
+        (ok (search "loading=\"lazy\"" body))
+        (ok (search "01MISSINGMEDIA0000000000000 (missing)" body)
+            "an id no longer in the library says so, not a broken image")
+        (ng (search "src=\"/media/website/01MISSINGMEDIA" body))
+        (ok (search "min-w-24 max-w-36" body) "the media column keeps its bounds"))
+      (dolist (path paths)
+        (request :post path :form '(("action" . "delete")) :headers origin)))))
 
 (deftest bulk-actions-on-the-content-list
   (let ((origin '(("origin" . "http://localhost:3000")))
