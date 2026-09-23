@@ -5,9 +5,7 @@
   (:import-from #:koya/core/json
                 #:json-null)
   (:import-from #:cl-ppcre
-                #:regex-replace-all #:split #:scan #:quote-meta-chars)
-  (:import-from #:koya-server/lib/env
-                #:base-url)
+                #:regex-replace-all #:split #:scan)
   (:import-from #:koya-server/lib/timezone
                 #:iso->local-input #:local-input->iso)
   (:export #:form->data
@@ -16,8 +14,7 @@
            #:form-value
            #:slugify
            #:value->string
-           #:number->string
-           #:normalize-richtext))
+           #:number->string))
 (in-package #:koya-server/lib/forms)
 
 ;;; Conversion between HTML form submissions and content data objects.
@@ -47,21 +44,6 @@
 (defun split-ids (string)
   (remove "" (mapcar (lambda (s) (string-trim " " s)) (split "[,\\s]+" string)) :test #'string=))
 
-(defparameter +block-close-pattern+
-  "(</(?:p|h[1-6]|ul|ol|li|blockquote|pre|table|thead|tbody|tr|figure)>|<hr\\s*/?>)\\s*"
-  "Block-level boundaries after which the stored HTML gets a newline.")
-
-(defun normalize-richtext (html)
-  "Tidy rich text HTML coming from the editor: an empty paragraph becomes a visible
-blank line and every block element ends with a newline, so the stored source
-stays readable and diffs cleanly."
-  (let* ((html (regex-replace-all "<p>\\s*</p>" html "<p><br></p>"))
-         (html (regex-replace-all +block-close-pattern+ html (format nil "\\1~%")))
-         ;; our own media is stored by path; the delivery API makes it absolute again
-         (html (regex-replace-all (format nil "(src|href)=\"~a/media/" (quote-meta-chars (string-right-trim "/" (base-url))))
-                                  html "\\1=\"/media/")))
-    (string-trim '(#\Newline #\Return #\Space) html)))
-
 (defun form->data (model params)
   "Build a content data object from PARAMS for MODEL. Blank inputs are omitted,
 except booleans which are always present (unchecked = false)."
@@ -89,9 +71,12 @@ except booleans which are always present (unchecked = false)."
            ;; datetime-local gives 2026-09-20T10:00 in the display zone; stored as UTC
            (when raw (setf (gethash (field-name field) data) (local-input->iso raw))))
           (:richtext
-           ;; Quill reports an empty document as <p></p> or <p><br></p>.
-           (when (and raw (not (scan "^(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" raw)))
-             (setf (gethash (field-name field) data) (normalize-richtext raw))))
+           ;; stored as the editor sent it (see koya-editor.js), but for the CRLF
+           ;; a form submission turns its line breaks into. Quill reports an
+           ;; empty document as <p></p> or <p><br></p>.
+           (let ((html (and raw (remove #\Return raw))))
+             (when (and html (not (scan "^(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" html)))
+               (setf (gethash (field-name field) data) html))))
           (t
            (when raw (setf (gethash (field-name field) data) raw))))))
     data))

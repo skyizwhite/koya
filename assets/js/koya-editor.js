@@ -1,5 +1,9 @@
 // Rich text fields: a Quill editor per [data-quill-for] holder, writing HTML
-// back into the hidden input just before the form is submitted.
+// back into the hidden input just before the form is submitted -- unless the
+// editor still holds what it was opened with. Quill rewrites HTML it did not
+// write itself (drops ids and figures, adds rel to links...), so writing back
+// an untouched field would record a change nobody made. The server stores the
+// HTML as it arrives, so what the editor writes is tidied here.
 //
 // Two Quill quirks are worked around here:
 // - pasted text has every whitespace character (including U+3000, the
@@ -18,6 +22,18 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll(PLACEHOLDER, IDEOGRAPHIC_SPACE)
       .replace(/(^|[^;&])&nbsp;(?!&nbsp;)/g, "$1 ")
       .replace(/&nbsp;(?=\S)(?!&nbsp;)/g, " ");
+  // an empty paragraph is a blank line the site should show; a line break after
+  // every block keeps the stored source readable; this server's own media is
+  // stored by path, which the delivery API makes absolute again
+  const BLOCK_END = /(<\/(?:p|h[1-6]|ul|ol|li|blockquote|pre|table|thead|tbody|tr|figure)>|<hr\s*\/?>)\s*/g;
+  const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const ownMedia = new RegExp(`(src|href)="${escapeRegExp(location.origin)}/media/`, "g");
+  const tidy = (html) =>
+    html
+      .replace(/<p>\s*<\/p>/g, "<p><br></p>")
+      .replace(BLOCK_END, "$1\n")
+      .replace(ownMedia, '$1="/media/')
+      .trim();
 
   document.querySelectorAll("[data-quill-for]").forEach((holder) => {
     const input = document.getElementById(holder.dataset.quillFor);
@@ -42,13 +58,15 @@ document.addEventListener("DOMContentLoaded", () => {
       },
     });
     if (input.value) quill.clipboard.dangerouslyPasteHTML(protect(input.value));
-    editors.push({ quill, input });
+    editors.push({ quill, input, opened: tidy(restore(quill.getSemanticHTML())) });
   });
 
   document.querySelectorAll("form[data-editor-form]").forEach((form) => {
     form.addEventListener("submit", () => {
-      editors.forEach(({ quill, input }) => {
-        if (form.contains(input)) input.value = restore(quill.getSemanticHTML());
+      editors.forEach(({ quill, input, opened }) => {
+        if (!form.contains(input)) return;
+        const html = tidy(restore(quill.getSemanticHTML()));
+        if (html !== opened) input.value = html;
       });
     });
   });
@@ -179,7 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (target.kind === "quill") {
       const quill = target.quill;
       const range = quill.getSelection(true);
-      quill.insertEmbed(range.index, "image", item.url, "user");
+      quill.insertEmbed(range.index, "image", new URL(item.url, location.href).pathname, "user");
       quill.setSelection(range.index + 1);
     }
     picker.close();

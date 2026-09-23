@@ -6,12 +6,13 @@
   (:import-from #:koya-server/db/contents #:list-contents #:content-status #:content-published #:content-draft #:content-id)
   (:import-from #:koya-server/db/media #:media-id)
   (:import-from #:koya-server/lib/query #:parse-query)
-  (:import-from #:koya-server/lib/forms #:slugify #:normalize-richtext)
+  (:import-from #:koya-server/lib/forms #:slugify)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:jget)
   (:import-from #:koya-server/db/content-revisions #:list-revisions #:count-revisions #:revision-id #:revision-event #:revision-by)
   (:import-from #:koya-server/db/contents #:get-content)
-  (:import-from #:koya-server/db/media #:insert-media #:delete-media))
+  (:import-from #:koya-server/db/media #:insert-media #:delete-media)
+  (:import-from #:koya-server/lib/content-service #:resolve-model #:create))
 (in-package #:koya-tests/server/pages/editor)
 
 (setup (setup-pages) (log-in))
@@ -165,22 +166,24 @@
       (ok (= status 302))
       (ng (search "/new" (location headers)) "now redirects to the existing content"))))
 
-(deftest normalize-richtext-test
-  (ok (string= (normalize-richtext "<p>a</p><p></p><h2>b</h2><ul><li>x</li><li>y</li></ul><hr><p>c<br>d</p>")
-               "<p>a</p>
-<p><br></p>
-<h2>b</h2>
-<ul><li>x</li>
-<li>y</li>
-</ul>
-<hr>
-<p>c<br>d</p>"))
-  (ok (string= (normalize-richtext "<p>x</p>
-") "<p>x</p>") "already formatted input is left alone apart from trailing whitespace")
-  (ok (string= (normalize-richtext "<p>a&nbsp;b</p>") "<p>a&nbsp;b</p>") "entities are not touched server-side")
-  (ok (string= (normalize-richtext "<p><img src=\"http://localhost:3000/media/website/X.png\"></p>")
-               "<p><img src=\"/media/website/X.png\"></p>")
-      "the editor's absolute media URLs are stored as paths"))
+(deftest richtext-is-stored-as-sent
+  (exec "DELETE FROM contents")
+  ;; HTML the API stored, not in the shape the editor writes
+  (let* ((html (format nil "<h2 id=\"intro\">Intro</h2><p>a</p>~%<p>b</p>"))
+         (id (multiple-value-bind (space model) (resolve-model "website" "blog")
+               (content-id (create space model (let ((data (make-hash-table :test 'equal)))
+                                                 (setf (gethash "title" data) "Imported"
+                                                       (gethash "body" data) html)
+                                                 data)
+                                   :publish t))))
+         (path (format nil "/s/website/m/blog/~a" id)))
+    (testing "an untouched field comes back as it was, less the CRLF of the form"
+      (request :post path :form `(("action" . "save") ("f-title" . "Renamed")
+                                  ("f-body" . ,(format nil "<h2 id=\"intro\">Intro</h2><p>a</p>~c~%<p>b</p>" #\Return))))
+      (ok (string= (jget (content-draft (get-content id)) "body") html)))
+    (testing "an edited one is stored as the editor wrote it"
+      (request :post path :form '(("action" . "save") ("f-title" . "Renamed") ("f-body" . "<p>c</p><p>d</p>")))
+      (ok (string= (jget (content-draft (get-content id)) "body") "<p>c</p><p>d</p>")))))
 
 (deftest slugify-test
   (ok (string= (slugify "Hello, World!") "hello-world"))
