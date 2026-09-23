@@ -1,4 +1,6 @@
-<img src="assets/icon.svg" alt="" width="72" height="72">
+<p align="center">
+  <img src="assets/icon.svg" alt="" width="160" height="160">
+</p>
 
 # koya
 
