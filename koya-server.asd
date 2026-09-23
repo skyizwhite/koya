@@ -7,7 +7,7 @@
   :version "0.6.0"
   :description "koya - a small headless CMS in Common Lisp (server)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
-  :license "MIT"
+  :license "AGPL-3.0-or-later"
   :homepage "https://github.com/skyizwhite/koya"
   :source-control (:git "https://github.com/skyizwhite/koya.git")
   :class :package-inferred-system

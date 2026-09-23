@@ -18,5 +18,5 @@
        (script :src (asset-url "js/quill/quill.js") :defer t)
        (script :src (asset-url "js/qrcode.min.js") :defer t)
        (script :src (asset-url "js/koya-editor.js") :defer t))
-     (body :class "min-h-screen bg-base text-fg antialiased"
+     (body :class "flex min-h-screen flex-col bg-base text-fg antialiased"
        children))))

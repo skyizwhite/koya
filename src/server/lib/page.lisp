@@ -40,6 +40,7 @@
            #:caller-name
            #:content-label
            #:~layout
+           #:~footer
            #:~status-badge
            #:~flash
            #:~errors
@@ -243,6 +244,24 @@ post the page the form was on, since the post itself cannot be replayed."
                   (loop :for e :in errors :collect
                     (hsx (li (strong (getf e :field)) " " (getf e :message)))))))))))
 
+;;; The AGPL asks a server that others use over the network to offer them its
+;;; source, so every page links to it. The link is the system's :homepage: a fork
+;;; that points it at its own repository offers its own source.
+
+(defparameter *version* (asdf:component-version (asdf:find-system "koya-server")))
+(defparameter *repository* (asdf:system-homepage (asdf:find-system "koya-server")))
+
+(defcomp ~footer ()
+  (hsx
+   (footer :class "mx-auto w-full max-w-5xl border-t border-line px-4 py-6 text-xs text-muted"
+     (p :class "flex flex-wrap items-center gap-x-3 gap-y-1"
+       (span (format nil "koya ~a" *version*))
+       (a :href *repository* :class "hover:text-fg hover:underline" "Source code")
+       (span "Licensed under the "
+             (a :href "https://www.gnu.org/licenses/agpl-3.0.html" :class "hover:text-fg hover:underline"
+                "GNU AGPL v3.0")
+             " or later")))))
+
 (defcomp ~layout (&key space crumbs children)
   (hsx
    (<>
@@ -264,10 +283,11 @@ post the page the form was on, since the post itself cannot be replayed."
            (a :href "/settings" :class "btn" (~icon :name :settings) "Settings")
            (form :method "post" :action "/logout"
              (button :type "submit" :class "btn" (~icon :name :logout) "Log out")))))
-     (main :class "mx-auto max-w-5xl px-4 py-8"
+     (main :class "mx-auto w-full max-w-5xl flex-1 px-4 py-8"
        (multiple-value-bind (message kind) (take-flash)
          (~flash :message message :kind kind))
-       children))))
+       children)
+     (~footer))))
 
 (defcomp ~status-badge (&key status)
   (let ((class (cond ((string= status "published") "bg-ok/10 text-ok")

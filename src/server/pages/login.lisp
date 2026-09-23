@@ -5,28 +5,30 @@
   (:import-from #:lack/request #:request-remote-addr)
   (:import-from #:koya-server/lib/totp #:totp-enabled-p)
   (:import-from #:koya-server/lib/assets #:asset-url)
-  (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:same-origin-p #:local-path-p #:~icon)
+  (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:same-origin-p #:local-path-p #:~icon #:~footer)
   (:export #:@get #:@post))
 (in-package #:koya-server/pages/login)
 
 (defcomp ~login-form (&key error next)
   (hsx
-   (main :class "mx-auto max-w-sm px-4 py-24"
-     (h1 :class "mb-6 flex items-center gap-3 text-2xl font-bold tracking-tight"
-       (img :src (asset-url "icon.svg") :alt "" :width "32" :height "32" :class "h-8 w-8 rounded-md")
-       "koya")
-     (form :method "post" :action "/login" :class "space-y-4"
-       (when next (hsx (input :type "hidden" :name "next" :value next)))
-       (div
-         (label :for "secret" :class "label" "Owner secret")
-         (input :type "password" :id "secret" :name "secret" :required t :autofocus t :class "input mt-1.5"))
-       (when (totp-enabled-p)
-         (hsx (div
-                (label :for "code" :class "label" "One-time code")
-                (input :type "text" :id "code" :name "code" :inputmode "numeric" :autocomplete "one-time-code"
-                       :pattern "[0-9 ]*" :required t :class "input mt-1.5"))))
-       (when error (hsx (p :class "text-sm text-danger" error)))
-       (button :type "submit" :class "btn btn-primary w-full justify-center" (~icon :name :login) "Log in")))))
+   (<>
+    (main :class "mx-auto w-full max-w-sm flex-1 px-4 py-24"
+      (h1 :class "mb-6 flex items-center gap-3 text-2xl font-bold tracking-tight"
+        (img :src (asset-url "icon.svg") :alt "" :width "32" :height "32" :class "h-8 w-8 rounded-md")
+        "koya")
+      (form :method "post" :action "/login" :class "space-y-4"
+        (when next (hsx (input :type "hidden" :name "next" :value next)))
+        (div
+          (label :for "secret" :class "label" "Owner secret")
+          (input :type "password" :id "secret" :name "secret" :required t :autofocus t :class "input mt-1.5"))
+        (when (totp-enabled-p)
+          (hsx (div
+                 (label :for "code" :class "label" "One-time code")
+                 (input :type "text" :id "code" :name "code" :inputmode "numeric" :autocomplete "one-time-code"
+                        :pattern "[0-9 ]*" :required t :class "input mt-1.5"))))
+        (when error (hsx (p :class "text-sm text-danger" error)))
+        (button :type "submit" :class "btn btn-primary w-full justify-center" (~icon :name :login) "Log in")))
+    (~footer))))
 
 (defun next-path (params)
   "Where the login redirects to: the page that sent the owner here, if it is one of ours."

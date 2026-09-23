@@ -226,6 +226,16 @@ admin API, which the session reaches as well as a management key does."
   (multiple-value-bind (status) (request :get "/s/website/m/blog/01ARZ3NDEKTSV4RRFFQ69G5FAV")
     (ok (= status 404))))
 
+(deftest every-page-offers-the-source
+  (let ((version (asdf:component-version (asdf:find-system "koya-server"))))
+    (flet ((footer-p (body)
+             (and (search (format nil "koya ~a" version) body)
+                  (search "href=\"https://github.com/skyizwhite/koya\"" body)
+                  (search "GNU AGPL v3.0" body))))
+      (ok (footer-p (nth-value 1 (request :get "/s/website"))) "a page behind the session")
+      (let ((*cookie* nil))
+        (ok (footer-p (nth-value 1 (request :get "/login"))) "the login page, before any session")))))
+
 (deftest spaces-page
   (let ((origin '(("origin" . "http://localhost:3000"))))
     (multiple-value-bind (status body) (request :get "/")

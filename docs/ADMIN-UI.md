@@ -11,6 +11,12 @@ builds its lists and forms from it. **Spaces are the other way round**: a space
 owns the contents, media and keys inside it, so it is made and deleted here, and
 a deploy only ever changes the models of a space that already exists.
 
+Every page, the login page included, ends with a footer: the running koya
+version, a link to its source code (the `:homepage` of `koya-server.asd`) and
+the AGPL notice. The server is under the AGPL, which asks whoever runs a
+modified copy for others to offer them its source; a fork keeps its footer
+honest by pointing `:homepage` at its own repository.
+
 - [Logging in](#logging-in)
 - [Spaces](#spaces)
 - [A space](#a-space)

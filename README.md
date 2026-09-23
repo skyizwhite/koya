@@ -109,4 +109,7 @@ Health check: `GET /health` (no auth; the image declares it as `HEALTHCHECK`). M
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+koya is licensed in two parts:
+
+- **The server** (`koya-server`: `koya-server.asd`, `src/server/`, `assets/` and everything else not listed below) is under the [GNU Affero General Public License v3.0 or later](LICENSE). Running a modified server for others means offering them its source; the admin UI's footer links to it.
+- **The library** (`koya`: `koya.asd`, `src/main.lisp`, `src/client.lisp`, `src/config.lisp`, `src/core.lisp` and `src/core/`) is under the [MIT License](LICENSE-MIT), so a site that declares its schema and reads its content with it is not bound by the AGPL.
