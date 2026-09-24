@@ -228,7 +228,9 @@ band."
           :class "pointer-events-none fixed inset-x-4 top-4 z-50 flex justify-center"
        (when message
          (hsx (div :role (if error "alert" "status")
-                   :class (clsx "toast pointer-events-auto w-full rounded-md border bg-panel px-4 py-3 text-sm shadow-lg sm:w-auto sm:max-w-md"
+                   ;; on a phone it spans the top, over the header and the editor's
+                   ;; bar, so taps go through it; the pointer pauses it elsewhere
+                   :class (clsx "toast pointer-events-none w-full rounded-md border bg-panel px-4 py-3 text-sm shadow-lg sm:pointer-events-auto sm:w-auto sm:max-w-md"
                                 (if error "toast-long border-danger/40 text-danger" "border-ok/40 text-ok"))
                 message)))))))
 

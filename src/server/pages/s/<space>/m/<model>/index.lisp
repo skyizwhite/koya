@@ -475,7 +475,7 @@ draft key and break a preview link."
                      (incf done)))
         (error (e) (incf failed) (unless message (setf message (failure-message e))))))))
 
-(defun bulk-toast (action done skipped failed message)
+(defun bulk-message (action done skipped failed message)
   (let ((verb (cond ((equal action "publish") "Published")
                     ((equal action "unpublish") "Unpublished")
                     (t "Deleted")))
@@ -499,7 +499,7 @@ draft key and break a preview link."
                (if (null ids)
                    (values "Nothing was selected." :error)
                    (multiple-value-bind (done skipped failed first) (apply-to-each space model ids op)
-                     (values (bulk-toast op done skipped failed first) (if (plusp failed) :error :ok))))
+                     (values (bulk-message op done skipped failed first) (if (plusp failed) :error :ok))))
              ;; a page emptied by a delete shows the last one there still is
              (answer-list space model (read-state params model) :message message :kind kind))))))
 
