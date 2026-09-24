@@ -2,8 +2,9 @@
   (:use #:cl)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-server/lib/http #:path-param #:read-json-body #:body-field #:fail-api #:ok-status)
-  (:import-from #:koya-server/db/schema-store #:find-space #:space-webhook-secret)
-  (:import-from #:koya-server/db/delivery-keys #:create-delivery-key #:list-delivery-keys)
+  (:import-from #:koya-server/usecases/keys
+                #:space-webhook-secret #:create-delivery-key #:list-delivery-keys)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
   (:export #:@get #:@post))
 (in-package #:koya-server/admin-api/keys/<space>/index)
 

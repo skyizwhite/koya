@@ -2,8 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-width #:media-height #:media-alt)
-  (:import-from #:koya-server/features/media/store
-                #:media-url)
+  (:import-from #:koya-server/usecases/media/delivery #:media-url)
   (:import-from #:koya-server/ui/elements #:~empty-state)
   (:export #:~media-grid
            #:~pick-cards

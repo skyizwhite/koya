@@ -3,14 +3,29 @@
   (:use #:cl)
   (:import-from #:clack)
   (:import-from #:ironclad)
+  ;; infra first: loading the web app calls port functions infra defines
+  (:import-from #:koya-server/infra/env #:db-path #:server-port)
+  (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db)
+  (:import-from #:koya-server/infra/db/migrations #:migrate)
+  (:import-from #:koya-server/infra/db/schema-dump #:write-snapshot)
+  (:import-from #:koya-server/infra/db/contents)
+  (:import-from #:koya-server/infra/db/content-revisions)
+  (:import-from #:koya-server/infra/db/schema-store)
+  (:import-from #:koya-server/infra/db/schema-deploys)
+  (:import-from #:koya-server/infra/db/delivery-keys)
+  (:import-from #:koya-server/infra/db/management-keys)
+  (:import-from #:koya-server/infra/db/media)
+  (:import-from #:koya-server/infra/db/webhook-deliveries)
+  (:import-from #:koya-server/infra/db/settings)
+  (:import-from #:koya-server/infra/db/sessions)
+  (:import-from #:koya-server/infra/media-files)
+  (:import-from #:koya-server/infra/webhook-sender)
   (:import-from #:koya-server/app #:*app* #:install-routes)
-  (:import-from #:koya-server/lib/env #:db-path #:server-port #:dev-mode-p)
-  (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
-  (:import-from #:koya-server/db/migrations #:migrate)
-  (:import-from #:koya-server/db/sessions #:purge-expired-sessions)
-  (:import-from #:koya-server/db/schema-dump #:write-snapshot)
-  (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/lib/assets #:refresh-asset-version)
+  (:import-from #:koya-server/domain/totp #:totp)
+  (:import-from #:koya-server/usecases/ports/config #:dev-mode-p)
+  (:import-from #:koya-server/usecases/ports/sessions #:purge-expired-sessions)
+  (:import-from #:koya-server/usecases/settings/two-factor #:totp-secret)
   (:export #:start
            #:stop
            #:reload
@@ -19,6 +34,10 @@
            #:write-schema-snapshot
            #:totp-code))
 (in-package #:koya-server)
+
+;;; The composition root: the one place that loads infra, whose modules define
+;;; the functions of the ports the use cases call (usecases/ports/store), and
+;;; starts the web app on top.
 
 (defvar *server* nil)
 
@@ -80,6 +99,6 @@ compiling anything, and needs neither Quicklisp nor a C toolchain."
 one: a test fails while the snapshot is stale."
   (write-snapshot))
 
-(defun totp-code (&optional (secret (koya-server/lib/totp:totp-secret)))
+(defun totp-code (&optional (secret (totp-secret)))
   "The one-time code valid right now, for checking a setup from the REPL."
   (totp secret))

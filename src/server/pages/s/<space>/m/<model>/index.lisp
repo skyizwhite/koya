@@ -7,12 +7,11 @@
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
                 #:webhook-covers-p)
   (:import-from #:koya/core/json #:json-null)
-  (:import-from #:koya-server/db/schema-store #:find-space #:find-model #:space-webhooks)
-  (:import-from #:koya-server/db/contents #:count-contents #:find-object-content)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space #:find-model #:space-webhooks)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-data #:+statuses+ #:content-label)
   (:import-from #:koya-server/lib/http #:path-param #:redirect-to #:param #:form-values #:blank-p)
-  (:import-from #:koya-server/lib/paging #:page-number)
+  (:import-from #:koya-server/lib/paging #:+page-size+ #:page-number)
   (:import-from #:koya-server/lib/auth #:with-owner)
   (:import-from #:koya-server/lib/display #:short-time)
   (:import-from #:koya-server/lib/urls #:content-url #:model-url)
@@ -22,13 +21,14 @@
   (:import-from #:koya-server/ui/icon #:~icon)
   (:import-from #:koya-server/ui/toast #:~toast-oob #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/features/contents/listing #:parse-sort #:content-page #:page-media)
-  (:import-from #:koya-server/features/contents/labels #:reference-labels)
-  (:import-from #:koya-server/features/contents/bulk #:bulk-action-p #:apply-to-each)
-  (:import-from #:koya-server/features/contents/forms #:number->string)
+  (:import-from #:koya-server/usecases/contents/listing
+                #:parse-sort #:content-page #:page-media #:count-contents #:find-object-content)
+  (:import-from #:koya-server/usecases/contents/labels #:reference-labels)
+  (:import-from #:koya-server/usecases/contents/bulk #:bulk-action-p #:apply-to-each)
+  (:import-from #:koya-server/lib/forms #:number->string)
+  (:import-from #:koya-server/usecases/media/delivery #:media-url)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
   (:import-from #:koya-server/domain/media #:media-alt)
-  (:import-from #:koya-server/features/media/store #:media-url)
   (:export #:@get #:bulk-contents #:browse-contents))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
 
@@ -212,7 +212,8 @@ Each button is an action on the selection form's boxes."
 
 (defun fetch-page (space model state)
   "(values CONTENTS TOTAL PAGES) of STATE's page."
-  (content-page space model :page (getf state :page) :search-text (getf state :search-text)
+  (content-page space model :page (getf state :page) :page-size +page-size+
+                            :search-text (getf state :search-text)
                             :status (getf state :status)
                             :sort-name (getf state :sort-name) :sort-direction (getf state :sort-direction)))
 

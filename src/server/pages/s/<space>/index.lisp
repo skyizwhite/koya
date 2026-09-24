@@ -4,8 +4,8 @@
   (:import-from #:koya/core/schema
                 #:schema-models #:schema-webhooks #:model-name #:model-kind
                 #:webhook-label #:webhook-url #:webhook-only)
-  (:import-from #:koya-server/db/schema-store #:load-schema)
-  (:import-from #:koya-server/db/contents #:count-contents)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:load-schema)
+  (:import-from #:koya-server/usecases/contents/listing #:count-contents)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/auth #:with-owner)
   (:import-from #:koya-server/lib/urls #:model-url #:space-url)

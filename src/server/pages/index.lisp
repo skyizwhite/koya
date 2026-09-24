@@ -2,7 +2,6 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/db/schema-store #:list-spaces #:find-space #:create-space)
   (:import-from #:koya-server/lib/http #:param)
   (:import-from #:koya-server/lib/urls #:space-url)
   (:import-from #:koya-server/document #:set-title)
@@ -11,9 +10,10 @@
   (:import-from #:koya-server/ui/icon #:~icon)
   (:import-from #:koya-server/ui/toast #:set-toast #:~toast-oob #:action-refusal)
   (:import-from #:lack/request #:request-env)
-  (:import-from #:koya-server/lib/auth #:calling-identity #:with-owner)
-  (:import-from #:koya-server/features/spaces/archive #:import-space-stream)
-  (:import-from #:koya-server/features/spaces/lifecycle #:remove-space)
+  (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/usecases/spaces/archive #:import-space-stream)
+  (:import-from #:koya-server/usecases/spaces/lifecycle
+                #:create-space #:remove-space #:list-spaces #:find-space)
   (:import-from #:koya-server/middlewares #:archive-path)
   (:export #:@get #:@head #:create-space-action #:delete-space-action #:import-space-action))
 (in-package #:koya-server/pages/index)
@@ -126,7 +126,7 @@ the import action as the request body (see IMPORT-SPACE-ACTION)."
   ;; every condition: a bad archive can fail in the zip reader, the schema
   ;; check or the database, and each one's message is what the owner needs
   (handler-case
-      (let ((space (import-space-stream body :by (calling-identity))))
+      (let ((space (import-space-stream body)))
         (set-toast (format nil "Space ~a imported." space))
         (space-url space))
     (error (e)
@@ -156,7 +156,7 @@ the import action as the request body (see IMPORT-SPACE-ACTION)."
              (hsx (<> (~space-list :spaces (list-spaces))
                       (~toast-oob :message (format nil "Space ~a deleted." name))))))))
 
-;;; A space archive from Export, made into a space again (features/spaces/archive).
+;;; A space archive from Export, made into a space again (usecases/spaces/archive).
 ;;;
 ;;; The dialog sends the file itself as an application/zip body (koya-editor.js),
 ;;; not as a multipart form, which lack would hold in memory several times over.

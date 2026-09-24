@@ -6,21 +6,22 @@
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url)
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
-  (:import-from #:koya-server/db/contents #:find-content)
+  (:import-from #:koya-server/usecases/contents/lookup #:find-content #:resolve-model)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
                 #:default-data #:content-label)
-  (:import-from #:koya-server/db/schema-store
-                #:find-space #:find-model #:space-webhooks)
-  (:import-from #:koya-server/features/contents/service
-                #:resolve-model #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space #:find-model #:space-webhooks)
+  (:import-from #:koya-server/usecases/contents/write
+                #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
   (:import-from #:koya-server/lib/http
-                #:path-param #:api-error #:api-error-message #:api-error-status #:param)
-  (:import-from #:koya-server/features/contents/forms #:form->data)
+                #:path-param #:error-status #:param)
+  (:import-from #:koya-server/domain/errors
+                #:koya-error #:koya-error-message #:not-found)
+  (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/usecases/contents/labels #:reference-options)
   (:import-from #:koya-server/lib/display #:short-time)
-  (:import-from #:koya-server/features/contents/labels #:reference-options)
   (:import-from #:koya-server/lib/urls #:expand-url-template #:content-url #:model-url)
   (:import-from #:koya-server/document #:set-title)
   (:import-from #:koya-server/ui/layout #:~layout)
@@ -28,12 +29,11 @@
   (:import-from #:koya-server/ui/icon #:~icon)
   (:import-from #:koya-server/ui/toast #:set-toast #:~toast-oob #:action-refusal)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
+  (:import-from #:koya-server/usecases/media/library #:find-media)
   (:import-from #:koya-server/ui/content/field-input #:~field-input)
+  (:import-from #:koya-server/usecases/contents/revisions #:restore-data #:find-revision)
   (:import-from #:koya-server/ui/media/picker #:~media-picker-dialog)
-  (:import-from #:koya-server/db/media #:find-media)
   (:import-from #:koya-server/domain/revision #:revision-data #:revision-created-at)
-  (:import-from #:koya-server/db/content-revisions #:find-revision)
-  (:import-from #:koya-server/features/contents/revisions #:restore-data)
   (:import-from #:koya-server/pages/s/<space>/m/<model>/<id>/history #:history-url)
   (:export #:@get #:editor-action))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>)
@@ -189,7 +189,7 @@ danger zone. The media picker stays outside it."
              (progn (set-response-status 404)
                     (hsx (~layout :space (path-param ,params :space) (h1 :class "text-xl font-bold" "Content not found"))))
              (progn ,@body)))
-     (api-error ()
+     (not-found ()
        (set-response-status 404)
        (hsx (~layout (h1 :class "text-xl font-bold" "Model not found"))))))
 
@@ -277,4 +277,4 @@ was being read at: what it offered is now saved or left behind."
              (hsx (~editor :space space :model model :content content :data data
                            :errors (validation-error-errors e))))
            ;; refused as things stand, such as a delete while other contents refer to this one
-           (api-error (e) (action-refusal (api-error-message e) (api-error-status e)))))))))
+           (koya-error (e) (action-refusal (koya-error-message e) (error-status e)))))))))

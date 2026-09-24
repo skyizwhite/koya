@@ -17,8 +17,7 @@
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code #:koya-error-message #:koya-error-details
                 #:not-found #:conflict #:invalid-input #:rejected #:too-large)
-  (:import-from #:koya-server/lib/env
-                #:dev-mode-p #:base-url)
+  (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
   (:import-from #:quri
                 #:uri #:uri-scheme #:uri-host #:uri-port)
   (:import-from #:babel
@@ -189,7 +188,7 @@ sandboxed or opaque origins."
         (when (and (plusp n) (string= host suffix :start1 n))
           (return (subseq host 0 n)))))))
 
-(defun origin-allowed-p (origin referer host &optional (base (base-url)))
+(defun origin-allowed-p (origin referer host &optional (base (public-url)))
   "CSRF check for state-changing requests. The Origin header (or Referer when
 Origin is absent) must name the Host or KOYA_BASE_URL. A request with neither
 header is accepted: non-browser clients. A present but unusable Origin such as

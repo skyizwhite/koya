@@ -2,11 +2,12 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle #:context)
-  (:import-from #:koya-server/lib/totp
+  (:import-from #:koya-server/usecases/settings/two-factor
                 #:totp-enabled-p #:totp-code-valid-p #:enable-totp #:disable-totp)
   (:import-from #:koya-server/domain/totp #:generate-totp-secret #:otpauth-uri)
   (:import-from #:koya-server/domain/timezone #:timezone-names #:format-local)
-  (:import-from #:koya-server/lib/timezone #:display-timezone-name #:display-timezone #:set-display-timezone)
+  (:import-from #:koya-server/usecases/settings/timezone
+                #:display-timezone-name #:display-timezone #:set-display-timezone)
   (:import-from #:koya/core/time #:now-iso)
   (:import-from #:koya-server/lib/http #:param)
   (:import-from #:koya-server/lib/auth #:with-owner)

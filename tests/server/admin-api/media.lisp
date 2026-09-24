@@ -1,10 +1,10 @@
 (defpackage #:koya-tests/server/admin-api/media
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/api-support #:request #:admin #:admin-upload #:delivery #:setup-api #:reset-api)
-  (:import-from #:koya-server/db/connection #:disconnect-db)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya/core/json #:jobject #:jget)
   (:import-from #:babel #:string-to-octets)
-  (:import-from #:koya-tests/server/features/media/store #:png-bytes))
+  (:import-from #:koya-tests/server/usecases/media/library #:png-bytes))
 (in-package #:koya-tests/server/admin-api/media)
 
 (setup (setup-api))

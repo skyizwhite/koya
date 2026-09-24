@@ -3,10 +3,11 @@
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/lib/auth
-                #:session-login #:login-locked-p #:note-login-failure #:clear-login-failures
-                #:public-path #:session-owner-p #:local-path-p)
+                #:session-login #:public-path #:session-owner-p #:local-path-p)
+  (:import-from #:koya-server/usecases/auth
+                #:login-locked-p #:note-login-failure #:clear-login-failures)
   (:import-from #:lack/request #:request-remote-addr)
-  (:import-from #:koya-server/lib/totp #:totp-enabled-p)
+  (:import-from #:koya-server/usecases/settings/two-factor #:totp-enabled-p)
   (:import-from #:koya-server/lib/assets #:asset-url)
   (:import-from #:koya-server/lib/http #:redirect-to #:param)
   (:import-from #:koya-server/document #:set-title)

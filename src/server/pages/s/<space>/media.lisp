@@ -3,15 +3,16 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/db/schema-store #:find-space)
-  (:import-from #:koya-server/db/media
-                #:list-media #:count-media #:find-media #:update-media #:media-reference-counts)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
-  (:import-from #:koya-server/features/media/store #:remove-media #:media-url)
-  (:import-from #:koya-server/features/media/library #:store-uploads #:remove-each)
+  (:import-from #:koya-server/usecases/media/delivery #:media-url)
+  (:import-from #:koya-server/usecases/media/library
+                #:remove-media #:store-uploads #:remove-each #:list-media #:count-media
+                #:find-media #:update-media #:media-reference-counts)
   (:import-from #:koya-server/lib/http
-                #:path-param #:uploaded-files #:api-error #:api-error-message #:param #:form-values)
+                #:path-param #:uploaded-files #:param #:form-values)
+  (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/lib/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/lib/auth #:with-owner)
   (:import-from #:koya-server/lib/display #:short-time)
@@ -199,14 +200,14 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
   (handler-case
       (cond ((null files) (values "Choose at least one image." :error))
             (t (values (format nil "Uploaded ~a file~:p." (store-uploads space files)) :ok)))
-    (api-error (e) (values (api-error-message e) :error))))
+    (koya-error (e) (values (koya-error-message e) :error))))
 
 (defun delete-one (space id)
   (let ((media (find-media space id)))
     (handler-case
         (cond ((null media) (values "Media not found." :error))
               (t (remove-media media) (values "Media deleted." :ok)))
-      (api-error (e) (values (api-error-message e) :error)))))
+      (koya-error (e) (values (koya-error-message e) :error)))))
 
 (defun delete-many (space ids)
   (if (null ids)

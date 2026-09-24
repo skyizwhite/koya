@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/pages/support #:edit #:moved-to #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/app #:*app*)
-  (:import-from #:koya-server/db/connection #:disconnect-db)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)

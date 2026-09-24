@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/db/delivery-keys #:delete-delivery-key)
+  (:import-from #:koya-server/usecases/keys #:delete-delivery-key)
   (:export #:@delete))
 (in-package #:koya-server/admin-api/keys/<space>/<id>)
 

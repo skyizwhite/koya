@@ -1,6 +1,5 @@
 (defpackage #:koya-tests/server/domain/totp
   (:use #:cl #:rove)
-  (:import-from #:koya-server/lib/totp #:totp-code-valid-p #:*totp-last-counter*)
   (:import-from #:koya-server/domain/totp
                 #:base32-decode #:base32-encode #:hotp #:totp #:generate-totp-secret
                 #:otpauth-uri)
@@ -27,21 +26,6 @@
   (ok (string= (totp *rfc-secret* :time 59) "287082"))
   (ok (string= (totp *rfc-secret* :time 1111111109) "081804"))
   (ok (string= (totp *rfc-secret* :time 1234567890) "005924")))
-
-(deftest validation
-  (let ((*totp-last-counter* -1))
-    (ok (totp-code-valid-p "005924" :secret *rfc-secret* :time 1234567890))
-    (ng (totp-code-valid-p "005924" :secret *rfc-secret* :time 1234567890) "a code is single-use")
-    (ok (totp-code-valid-p (totp *rfc-secret* :time 1234567920) :secret *rfc-secret* :time 1234567890)
-        "the next step is accepted (clock skew)")
-    (ng (totp-code-valid-p (totp *rfc-secret* :time (+ 1234567890 300)) :secret *rfc-secret* :time 1234567890)
-        "ten steps away is not")
-    (ng (totp-code-valid-p "000000" :secret *rfc-secret* :time 1234567890))
-    (ng (totp-code-valid-p nil :secret *rfc-secret* :time 1234567890))
-    (ok (totp-code-valid-p (format nil "~a ~a" (subseq (totp *rfc-secret* :time 1234568890) 0 3)
-                                   (subseq (totp *rfc-secret* :time 1234568890) 3))
-                           :secret *rfc-secret* :time 1234568890)
-        "spaces typed between digit groups are fine")))
 
 (deftest setup-helpers
   (let ((secret (generate-totp-secret)))

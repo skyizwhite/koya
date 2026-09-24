@@ -1,8 +1,9 @@
 (defpackage #:koya-server/admin-api/contents/<space>/<model>/<id>/publish
   (:use #:cl)
   (:import-from #:koya-server/lib/http #:path-param #:read-json-body #:body-field)
-  (:import-from #:koya-server/features/contents/service #:resolve-model #:publish)
-  (:import-from #:koya-server/features/contents/presenter #:admin-content->jobject)
+  (:import-from #:koya-server/usecases/contents/write #:publish)
+  (:import-from #:koya-server/usecases/contents/lookup #:resolve-model)
+  (:import-from #:koya-server/lib/presenters #:admin-content->jobject)
   (:export #:@post))
 (in-package #:koya-server/admin-api/contents/<space>/<model>/<id>/publish)
 
@@ -12,5 +13,4 @@
     (let* ((body (read-json-body))
            (data (body-field body "data")))
       (admin-content->jobject (publish space model (path-param params :id) (and (hash-table-p data) data)
-                                       :published-at (body-field body "publishedAt"))
-                              model))))
+                                       :published-at (body-field body "publishedAt"))))))

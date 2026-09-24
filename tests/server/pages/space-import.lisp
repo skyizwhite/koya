@@ -1,31 +1,31 @@
 (defpackage #:koya-tests/server/pages/space-import
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/pages/support #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
-  (:import-from #:koya-server/db/connection #:disconnect-db)
-  (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:find-space #:delete-space)
-  (:import-from #:koya-server/db/delivery-keys #:create-delivery-key #:list-delivery-keys)
-  (:import-from #:koya-server/db/management-keys #:create-management-key)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db)
+  (:import-from #:koya-server/usecases/ports/spaces
+                #:save-schema #:find-space #:delete-space #:list-deploys #:load-schema
+                #:space-webhooks #:space-webhook-secret)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
+  (:import-from #:koya-server/usecases/ports/keys
+                #:create-delivery-key #:list-delivery-keys #:create-management-key)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-published #:content-draft #:content-id
                 #:content-draft-key #:content-created-at #:content-published-at)
-  (:import-from #:koya-server/db/delivery-keys #:list-delivery-keys)
-  (:import-from #:koya-server/domain/media #:media-id #:media-filename)
-  (:import-from #:koya-server/db/media #:list-media)
-  (:import-from #:koya-tests/server/features/media/store #:png-bytes)
-  (:import-from #:koya-server/features/webhooks/notify #:*webhook-sender*)
+  (:import-from #:koya-server/usecases/ports/media #:list-media #:media-file-path)
+  (:import-from #:koya-server/domain/media #:media-id #:media-filename #:media-space #:media-mime)
+  (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
+  (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-sender*)
   (:import-from #:koya/core/schema #:make-webhook)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
+  (:import-from #:koya-server/usecases/ports/contents
+                #:list-revisions #:count-revisions #:get-content #:create-content #:save-draft)
   (:import-from #:koya-server/domain/revision #:revision-event)
   (:import-from #:koya/core/json #:jget)
-  (:import-from #:koya-server/db/schema-deploys #:list-deploys)
-  (:import-from #:koya-server/db/content-revisions #:list-revisions #:count-revisions)
-  (:import-from #:koya-server/db/contents #:get-content)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
-  (:import-from #:koya-server/features/media/store #:store-upload #:media-path #:remove-space-media)
-  (:import-from #:koya-server/db/contents #:create-content #:save-draft)
-  (:import-from #:koya-server/db/schema-store #:load-schema #:space-webhooks #:space-webhook-secret)
+  (:import-from #:koya-server/usecases/media/library
+                #:store-upload #:remove-space-media)
   (:import-from #:koya/core/schema #:schema-models #:model-name #:webhook-url)
   (:import-from #:koya-server/pages/index #:import-space-action))
 (in-package #:koya-tests/server/pages/space-import)
@@ -104,8 +104,8 @@
             "and its webhook secret, which the site checks")
         (ok (= sent 0) "and nothing is sent to them"))
       (testing "the site's keys still work"
-        (ok (string= (koya-server/db/delivery-keys:space-for-delivery-key delivery-key) "archive"))
-        (ok (string= (koya-server/db/management-keys:space-for-management-key management-key) "archive"))
+        (ok (string= (koya-server/usecases/ports/keys:space-for-delivery-key delivery-key) "archive"))
+        (ok (string= (koya-server/usecases/ports/keys:space-for-management-key management-key) "archive"))
         (ok (equal (mapcar (lambda (k) (getf k :label)) (list-delivery-keys "archive")) '("site"))))
       (testing "contents keep their ids, state, draft, timestamps and history"
         (let ((tag-content (get-content tag))
@@ -124,7 +124,7 @@
           (ok copy)
           (ok (string= (media-filename copy) "cover.png"))
           (ok (string= (koya-server/domain/media:media-alt copy) "A cover"))
-          (ok (equalp (alexandria:read-file-into-byte-vector (media-path copy)) (png-bytes 4 5)))))
+          (ok (equalp (alexandria:read-file-into-byte-vector (media-file-path (media-space copy) (media-id copy) (media-mime copy))) (png-bytes 4 5)))))
       (testing "the import is in the deploy log, named for whoever made it"
         (ok (equal (mapcar #'deploy-by (list-deploys "archive")) '("owner"))))
       (testing "a space that has models is not imported into"
@@ -135,7 +135,8 @@
         (ok (= (length (list-deploys "archive")) 1) "and nothing changed"))
       (testing "a space whose models went but whose media stayed is not empty"
         (save-schema "archive" (make-schema))
-        (let ((path (media-path (find (media-id media) (list-media "archive") :key #'media-id :test #'string=))))
+        (let ((path (let ((m (find (media-id media) (list-media "archive") :key #'media-id :test #'string=)))
+                      (media-file-path (media-space m) (media-id m) (media-mime m)))))
           (multiple-value-bind (status location) (import-archive octets)
             (ok (= status 200))
             (ok (string= location "/")))

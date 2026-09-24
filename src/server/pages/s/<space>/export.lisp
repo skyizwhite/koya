@@ -1,9 +1,10 @@
 (defpackage #:koya-server/pages/s/<space>/export
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya-server/db/schema-store #:find-space)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
   (:import-from #:koya-server/lib/http #:path-param #:redirect-to)
-  (:import-from #:koya-server/features/spaces/archive #:export-space #:archive-file-name #:archive-error)
+  (:import-from #:koya-server/usecases/spaces/archive
+                #:export-space #:archive-file-name #:archive-error)
   (:import-from #:koya-server/lib/auth #:with-owner)
   (:import-from #:koya-server/lib/urls #:space-url)
   (:import-from #:koya-server/ui/layout #:~layout)
@@ -11,8 +12,8 @@
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/export)
 
-;;; The space as a zip download (features/spaces/archive). The whole archive is built
-;;; in memory before it is sent, so its size is what the process must hold.
+;;; The space as a zip download (usecases/spaces/archive). The whole archive is
+;;; built in memory before it is sent, so its size is what the process must hold.
 ;;;
 ;;; The link to it carries no download attribute: Content-Disposition makes the
 ;;; zip a download on its own, and a failure -- a redirect to the space page with

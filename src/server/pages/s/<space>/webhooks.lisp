@@ -3,12 +3,12 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/db/schema-store #:load-schema)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:load-schema)
   (:import-from #:koya/core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
-  (:import-from #:koya-server/db/webhook-deliveries
-                #:list-deliveries #:count-deliveries #:+keep-per-space+ #:delivery-labels
-                #:delivery-models)
+  (:import-from #:koya-server/usecases/webhooks/log
+                #:list-deliveries #:count-deliveries #:delivery-labels #:delivery-models
+                #:+deliveries-kept+)
   (:import-from #:koya-server/domain/webhook-delivery
                 #:delivery-label #:delivery-url #:delivery-model #:delivery-event
                 #:delivery-content-id #:delivery-ok #:delivery-status #:delivery-response
@@ -26,7 +26,7 @@
   (:export #:@get #:webhook-log-url #:browse-deliveries))
 (in-package #:koya-server/pages/s/<space>/webhooks)
 
-;;; One log per space: the last +KEEP-PER-SPACE+ calls it made and what came
+;;; One log per space: the last +DELIVERIES-KEPT+ calls it made and what came
 ;;; back. ?label= narrows it to one webhook, ?model= to the calls one model set
 ;;; off -- which includes the space's own hooks, since they fire for every model.
 ;;; Filtering and paging are an action that draws #deliveries again in place and
@@ -161,7 +161,7 @@ option it silently replaces with the first one, which here reads \"All\"."
                    (cond ((not (filtered-p label model)) "")
                          ((= total 1) " matches")
                          (t " match"))
-                   +keep-per-space+)))))
+                   +deliveries-kept+)))))
 
 (defcomp ~deliveries (&key space label model page)
   "What a filter or a page draws again: the calls and their pager."

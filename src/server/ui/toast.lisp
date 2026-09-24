@@ -17,7 +17,7 @@
 ;;; band (~TOAST-OOB); one that sends the browser to another page leaves it in
 ;;; the session (SET-TOAST) for that page's layout to take.
 
-;;; A session is stored as JSON (see db/sessions), so the message travels as a
+;;; A session is stored as JSON (see infra/db/sessions), so the message travels as a
 ;;; pair of strings rather than as a list holding a keyword.
 
 (defun set-toast (message &optional (kind :ok))

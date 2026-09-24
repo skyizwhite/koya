@@ -3,8 +3,9 @@
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-server/lib/http #:path-param #:read-json-body #:body-field #:fail-api)
   (:import-from #:koya-server/admin-api/media/<space>/index #:require-space)
-  (:import-from #:koya-server/db/media #:find-media #:update-media #:media-references)
-  (:import-from #:koya-server/features/media/store #:remove-media #:media->jobject)
+  (:import-from #:koya-server/usecases/media/delivery #:media->jobject)
+  (:import-from #:koya-server/usecases/media/library
+                #:remove-media #:find-media #:update-media #:media-references)
   (:export #:@get #:@patch #:@delete))
 (in-package #:koya-server/admin-api/media/<space>/<id>)
 

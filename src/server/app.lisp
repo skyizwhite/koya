@@ -18,18 +18,15 @@
                 #:with-args #:*trim-trailing-slash*)
   (:import-from #:clack-errors
                 #:*clack-error-middleware*)
-  (:import-from #:koya-server/lib/env
-                #:dev-mode-p #:base-url)
-  (:import-from #:koya-server/features/media/store
-                #:*media-middleware*)
+  (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
+  (:import-from #:koya-server/lib/media #:*media-middleware*)
   (:import-from #:koya-server/lib/http
                 #:make-json-app)
   (:import-from #:koya-server/middlewares
                 #:*body-limit-middleware* #:*cache-control-middleware* #:*delivery-cors-middleware*)
+  (:import-from #:koya-server/usecases/auth #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/lib/auth
                 #:*admin-auth-middleware* #:*actions-auth-middleware*)
-  (:import-from #:koya-server/db/sessions
-                #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/document
                 #:~document #:page-title)
   (:export #:*app*
@@ -80,7 +77,7 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
                      :httponly t
                      :samesite :lax
                      :expires +session-seconds+
-                     :secure (and (>= (length (base-url)) 8) (string-equal "https://" (base-url) :end2 8))))
+                     :secure (and (>= (length (public-url)) 8) (string-equal "https://" (public-url) :end2 8))))
 
 (defun build-app ()
   (clear-middlewares *page-app*)

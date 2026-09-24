@@ -3,17 +3,17 @@
   (:import-from #:koya-tests/server/pages/support
                 #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:request-url #:call-action #:setup-pages #:log-in)
-  (:import-from #:koya-server/db/connection #:disconnect-db)
-  (:import-from #:koya-server/db/contents #:list-contents)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db)
+  (:import-from #:koya-server/usecases/ports/contents #:list-contents)
   (:import-from #:koya-server/domain/content #:content-id)
+  (:import-from #:koya-server/usecases/ports/media #:list-media #:count-media)
   (:import-from #:koya-server/domain/media #:media-id #:media-filename)
-  (:import-from #:koya-server/db/media #:list-media #:count-media)
   (:import-from #:koya-server/ui/media/picker #:media-picker #:media-picker-more #:media-picker-upload)
   (:import-from #:koya-server/pages/s/<space>/media
                 #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt)
-  (:import-from #:koya-tests/server/features/media/store #:png-bytes)
+  (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
   (:import-from #:koya-server/domain/query #:parse-query)
-  (:import-from #:koya-server/features/media/store #:store-upload)
+  (:import-from #:koya-server/usecases/media/library #:store-upload)
   (:import-from #:babel #:string-to-octets))
 (in-package #:koya-tests/server/pages/media)
 

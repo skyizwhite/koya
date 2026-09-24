@@ -3,8 +3,8 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/db/schema-store #:find-space)
-  (:import-from #:koya-server/db/schema-deploys #:list-deploys #:count-deploys #:+keep-per-space+)
+  (:import-from #:koya-server/usecases/schema/deploy #:list-deploys #:count-deploys #:+deploys-kept+)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
   (:import-from #:koya-server/domain/deploy
                 #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by
                 #:deploy-created-at #:change-op #:change-destructive #:change-description)
@@ -89,7 +89,7 @@
    (~layout :space space :crumbs (list (cons "Schema Deploys" nil))
      (h1 :class "mb-2 text-2xl font-bold" "Schema Deploys")
      (p :class "mb-4 text-sm text-muted"
-       (format nil "~a deploy~:p, the newest ~a kept." (count-deploys space) +keep-per-space+))
+       (format nil "~a deploy~:p, the newest ~a kept." (count-deploys space) +deploys-kept+))
      (~deploys :space space :page page))))
 
 ;; paging is answered in place, with the page put back in the URL

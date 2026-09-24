@@ -1,7 +1,7 @@
 (defpackage #:koya-server/lib/display
   (:use #:cl)
   (:import-from #:koya-server/domain/timezone #:format-local)
-  (:import-from #:koya-server/lib/timezone #:display-timezone)
+  (:import-from #:koya-server/usecases/settings/timezone #:display-timezone)
   (:export #:short-time
            #:caller-name))
 (in-package #:koya-server/lib/display)

@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/server/admin-api/schema
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/api-support #:*management-key* #:test-schema #:request #:admin #:setup-api #:reset-api)
-  (:import-from #:koya-server/db/connection #:disconnect-db)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema->jobject)
   (:import-from #:koya/core/json #:jobject #:jget))
 (in-package #:koya-tests/server/admin-api/schema)

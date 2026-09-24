@@ -1,17 +1,16 @@
 (defpackage #:koya-tests/server/pages/content-list
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/pages/support #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request #:location #:setup-pages #:log-in)
-  (:import-from #:koya-server/db/connection #:disconnect-db #:exec)
-  (:import-from #:koya-server/db/contents #:list-contents)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
+  (:import-from #:koya-server/usecases/ports/contents #:list-contents #:save-draft #:get-content)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-id #:content-draft-key #:content-published)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:koya-server/domain/media #:media-id)
-  (:import-from #:koya-server/db/contents #:save-draft)
-  (:import-from #:koya-server/db/media #:insert-media)
-  (:import-from #:koya-server/db/contents #:get-content)
-  (:import-from #:koya-server/features/contents/service #:resolve-model #:create)
+  (:import-from #:koya-server/usecases/ports/media #:insert-media)
+  (:import-from #:koya-server/usecases/contents/write #:create)
+  (:import-from #:koya-server/usecases/contents/lookup #:resolve-model)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-tests/server/pages/support #:call-action)
   (:import-from #:koya-server/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents))
@@ -276,7 +275,7 @@
             (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
           ;; a title is required, so a draft saved without one cannot be published
-          (koya-server/db/contents:save-draft three (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal))
+          (koya-server/usecases/ports/contents:save-draft three (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal))
           (let ((body (nth-value 1 (bulk "publish" (list one three)))))
             (ok (search "Published 1 content. 1 could not be: title is required." body)
                 "the field that stopped it, not the condition's own report"))

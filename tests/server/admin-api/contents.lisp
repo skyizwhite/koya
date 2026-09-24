@@ -1,9 +1,9 @@
 (defpackage #:koya-tests/server/admin-api/contents
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/api-support #:*webhooks* #:admin #:delivery #:webhook-events #:setup-api #:reset-api #:test-schema)
-  (:import-from #:koya-server/db/schema-store #:save-schema)
+  (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya-server/db/connection #:disconnect-db)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya/core/json #:jobject #:jget #:json-null))
 (in-package #:koya-tests/server/admin-api/contents)
 

@@ -2,11 +2,11 @@
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/pages/support #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/pages/index #:create-space-action #:delete-space-action)
-  (:import-from #:koya-server/db/connection #:disconnect-db)
-  (:import-from #:koya-server/db/schema-store #:find-space)
-  (:import-from #:koya-server/db/delivery-keys #:create-delivery-key #:list-delivery-keys)
-  (:import-from #:koya-server/db/management-keys #:create-management-key #:list-management-keys)
-  (:import-from #:koya-server/db/delivery-keys #:list-delivery-keys))
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db)
+  (:import-from #:koya-server/usecases/ports/spaces #:find-space)
+  (:import-from #:koya-server/usecases/ports/keys
+                #:create-delivery-key #:list-delivery-keys #:create-management-key
+                #:list-management-keys))
 (in-package #:koya-tests/server/pages/index)
 
 (setup (setup-pages) (log-in))

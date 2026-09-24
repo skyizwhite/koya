@@ -2,9 +2,10 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/pages/s/<space>/m/<model>/<id>/history #:browse-history)
   (:import-from #:koya-tests/server/pages/support #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages #:log-in)
-  (:import-from #:koya-server/db/connection #:disconnect-db #:exec)
-  (:import-from #:koya-server/db/schema-store #:save-schema)
-  (:import-from #:koya-server/db/contents #:list-contents)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
+  (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
+  (:import-from #:koya-server/usecases/ports/contents
+                #:list-contents #:list-revisions #:count-revisions #:get-content)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-published #:content-draft #:content-id #:slugify)
   (:import-from #:koya-server/domain/media #:media-id)
@@ -12,10 +13,9 @@
   (:import-from #:koya-server/domain/revision #:revision-id #:revision-event #:revision-by)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:jget)
-  (:import-from #:koya-server/db/content-revisions #:list-revisions #:count-revisions)
-  (:import-from #:koya-server/db/contents #:get-content)
-  (:import-from #:koya-server/db/media #:insert-media #:delete-media)
-  (:import-from #:koya-server/features/contents/service #:resolve-model #:create))
+  (:import-from #:koya-server/usecases/ports/media #:insert-media #:delete-media)
+  (:import-from #:koya-server/usecases/contents/write #:create)
+  (:import-from #:koya-server/usecases/contents/lookup #:resolve-model))
 (in-package #:koya-tests/server/pages/editor)
 
 (setup (setup-pages) (log-in))
@@ -258,8 +258,8 @@
     ;; the media is gone, an option and a field are taken out of the schema. The
     ;; two contents go past the guard that keeps a referenced content: this one
     ;; still refers to them, and a revision is what outlives that
-    (koya-server/db/contents:unpublish-content unpublished)
-    (koya-server/db/contents:delete-content deleted)
+    (koya-server/usecases/ports/contents:unpublish-content unpublished)
+    (koya-server/usecases/ports/contents:delete-content deleted)
     (delete-media "website" media)
     (save-schema "website"
                  (make-schema :models (list (make-model "blog" :list

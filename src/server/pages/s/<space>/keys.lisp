@@ -1,12 +1,11 @@
 (defpackage #:koya-server/pages/s/<space>/keys
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya-server/db/schema-store
-                #:find-space #:space-webhook-secret #:rotate-webhook-secret)
-  (:import-from #:koya-server/db/delivery-keys
-                #:create-delivery-key #:list-delivery-keys #:delete-delivery-key)
-  (:import-from #:koya-server/db/management-keys
-                #:create-management-key #:list-management-keys #:delete-management-key)
+  (:import-from #:koya-server/usecases/keys
+                #:space-webhook-secret #:rotate-webhook-secret #:create-delivery-key
+                #:list-delivery-keys #:delete-delivery-key #:create-management-key
+                #:list-management-keys #:delete-management-key)
+  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
   (:import-from #:koya-server/lib/http #:path-param #:param)
   (:import-from #:koya-server/lib/auth #:with-owner)
   (:import-from #:koya-server/lib/display #:short-time)

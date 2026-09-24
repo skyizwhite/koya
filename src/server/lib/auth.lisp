@@ -1,29 +1,17 @@
 (defpackage #:koya-server/lib/auth
   (:use #:cl)
-  (:import-from #:koya-server/lib/env
-                #:koya-secret)
   (:import-from #:koya-server/lib/http
                 #:fail-api #:header #:json-response #:error-object #:origin-allowed-p #:redirect-to)
-  (:import-from #:koya-server/db/delivery-keys
-                #:space-for-delivery-key)
-  (:import-from #:koya-server/db/management-keys
-                #:space-for-management-key #:management-key-label)
-  (:import-from #:ironclad
-                #:constant-time-equal)
-  (:import-from #:babel
-                #:string-to-octets)
+  (:import-from #:koya-server/usecases/keys
+                #:space-for-delivery-key #:space-for-management-key #:management-key-label)
+  (:import-from #:koya-server/usecases/auth
+                #:check-login)
+  (:import-from #:koya-server/usecases/actor
+                #:*actor*)
   (:import-from #:lack/request
                 #:request-env #:request-uri)
-  (:import-from #:bordeaux-threads-2)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri)
-  (:import-from #:koya-server/lib/totp
-                #:totp-enabled-p #:totp-code-valid-p)
-  (:export #:secure-string=
-           #:login-locked-p
-           #:note-login-failure
-           #:clear-login-failures
-           #:calling-space
-           #:calling-identity
+  (:export #:calling-space
            #:*admin-auth-middleware*
            #:*actions-auth-middleware*
            #:require-delivery-key
@@ -35,19 +23,16 @@
            #:session-owner-p))
 (in-package #:koya-server/lib/auth)
 
-;;; Four keys, three kinds of callers:
-;;;  - the owner secret (KOYA_SECRET) logs into the admin UI; the session cookie
-;;;    then carries the owner through the UI and the admin API
+;;; Who a request comes from, and what it may reach (usecases/keys has the
+;;; kinds of key):
+;;;  - the owner logs into the admin UI; the session cookie then carries the owner
+;;;    through the UI and the admin API
 ;;;  - a management key (Bearer, made on a space's keys page) drives the admin API
-;;;    without a session: schema deploys, imports, content management from a REPL.
-;;;    It belongs to one space and reaches nothing outside it
+;;;    without a session: schema deploys, imports, content management from a REPL
 ;;;  - a delivery key (X-KOYA-DELIVERY-KEY, made per space) reads the delivery API
-;;;  - the webhook secret is the one koya sends, not one it checks (see features/webhooks/notify)
-
-(defun secure-string= (a b)
-  (and (stringp a) (stringp b)
-       (= (length a) (length b))
-       (constant-time-equal (string-to-octets a :encoding :utf-8) (string-to-octets b :encoding :utf-8))))
+;;;
+;;; The guards bind *ACTOR* to whoever is let through, so what a request changes
+;;; names them.
 
 (defun bearer-token (env)
   (let ((auth (gethash "authorization" (getf env :headers))))
@@ -57,45 +42,13 @@
 (defun session-owner-p (&optional (session (ningle:context :session)))
   (and session (gethash "owner" session) t))
 
-;;; Failed logins are counted per client address; after +LOGIN-ATTEMPTS+ failures
-;;; within +LOGIN-WINDOW-SECONDS+ the address has to wait. Kept in memory: one
-;;; process, and a restart clearing it is fine.
-
-(defparameter +login-attempts+ 5)
-(defparameter +login-window-seconds+ 300)
-(defvar *login-failures* (make-hash-table :test 'equal))
-(defvar *login-failures-lock* (bordeaux-threads-2:make-lock :name "koya-login-failures"))
-
-(defun login-locked-p (address)
-  "True when ADDRESS has failed too often recently."
-  (bordeaux-threads-2:with-lock-held (*login-failures-lock*)
-    (let ((entry (gethash address *login-failures*)))
-      (and entry
-           (>= (car entry) +login-attempts+)
-           (< (- (get-universal-time) (cdr entry)) +login-window-seconds+)))))
-
-(defun note-login-failure (address)
-  (bordeaux-threads-2:with-lock-held (*login-failures-lock*)
-    (let ((entry (gethash address *login-failures*))
-          (now (get-universal-time)))
-      (setf (gethash address *login-failures*)
-            (if (and entry (< (- now (cdr entry)) +login-window-seconds+))
-                (cons (1+ (car entry)) now)
-                (cons 1 now))))))
-
-(defun clear-login-failures (address)
-  (bordeaux-threads-2:with-lock-held (*login-failures-lock*)
-    (remhash address *login-failures*)))
-
 (defun session-login (secret &optional code)
-  "Mark the current session as the owner when SECRET is right and, with TOTP
-enabled, CODE is the current one-time code. Returns T on success, :code when only
-the code is wrong or missing, NIL otherwise. The secret is checked first so a
-wrong secret never learns whether a code would have been accepted."
-  (cond ((not (secure-string= secret (koya-secret))) nil)
-        ((and (totp-enabled-p) (not (totp-code-valid-p code))) :code)
-        (t (setf (gethash "owner" (ningle:context :session)) t)
-           t)))
+  "Mark the current session as the owner when CHECK-LOGIN lets SECRET and CODE
+in. Returns what CHECK-LOGIN does."
+  (let ((result (check-login secret code)))
+    (when (eq result t)
+      (setf (gethash "owner" (ningle:context :session)) t))
+    result))
 
 (defun session-logout ()
   (remhash "owner" (ningle:context :session)))
@@ -123,19 +76,17 @@ one is refused rather than guessed at."
 session, which reaches every space."
   (space-for-management-key (bearer-token (request-env ningle:*request*))))
 
-(defun calling-identity ()
-  "Who is making this request, to store: \"owner\" or \"key:<label>\". The wording a
-page puts around it is the page's, so it can be changed later.
+(defun calling-identity (env)
+  "Who ENV comes from, as *ACTOR* holds it: \"owner\" or \"key:<label>\". The
+wording a page puts around it is the page's, so it can be changed later.
 
 The owner comes first, as *ADMIN-AUTH-MIDDLEWARE* does it: a request carrying
-both a session and a key is authorised as the owner. Outside a request -- a
-write from the REPL -- it is \"\", the way a deploy from the REPL names nobody."
-  (let ((env (and ningle:*request* (request-env ningle:*request*))))
-    (cond ((null env) "")
-          ((session-env-owner-p env) "owner")
-          (t (let ((label (management-key-label (bearer-token env))))
-               ;; nothing without one or the other gets past the middleware
-               (if label (format nil "key:~a" label) "unknown"))))))
+both a session and a key is authorised as the owner."
+  (if (session-env-owner-p env)
+      "owner"
+      (let ((label (management-key-label (bearer-token env))))
+        ;; nothing without one or the other gets past the middleware
+        (if label (format nil "key:~a" label) "unknown"))))
 
 (defun cross-origin-write-p (env)
   "A state-changing request whose Origin/Referer does not match this server. The
@@ -158,7 +109,8 @@ session cookie would otherwise let a page on another site drive the admin API."
                                                 (format nil "This management key only reaches space ~a" space))))
               ((cross-origin-write-p env)
                (json-response 403 (error-object "forbidden" "Cross-origin request rejected")))
-              (t (funcall app env))))))
+              (t (let ((*actor* (calling-identity env)))
+                   (funcall app env)))))))
   "Lack middleware guarding the admin API: the owner's session reaches every space,
 a Bearer management key only its own, and no request writes cross-origin.")
 
@@ -211,7 +163,8 @@ the page htmx says it was sent from. The login page checks NEXT is a local path.
              (list 401 (list :content-type "text/html; charset=utf-8" :hx-redirect (login-location env))
                    (list "<p class=\"text-sm text-danger\">Log in again to continue.</p>")))
             ((cross-origin-write-p env) (html-forbidden "Cross-origin request rejected."))
-            (t (funcall app env)))))
+            (t (let ((*actor* (if (session-env-owner-p env) "owner" "")))
+                 (funcall app env))))))
   "Lack middleware guarding every ningle-actions endpoint: htmx requests only, owner
 session only (but for a PUBLIC-PATH), no cross-origin writes. Installed just
 outside *ACTIONS-MIDDLEWARE*, so an action defined later is covered without

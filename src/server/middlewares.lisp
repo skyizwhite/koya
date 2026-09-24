@@ -1,8 +1,7 @@
 (defpackage #:koya-server/middlewares
   (:use #:cl)
   (:import-from #:koya-server/domain/media #:+max-upload-bytes+)
-  (:import-from #:koya-server/features/spaces/archive
-                #:+max-archive-bytes+)
+  (:import-from #:koya-server/usecases/spaces/archive #:+max-archive-bytes+)
   (:export #:archive-path
            #:*cache-control-middleware*
            #:*delivery-cors-middleware*
@@ -11,7 +10,7 @@
 
 ;;; The Lack middlewares app.lisp installs. Two stay with what they are built from:
 ;;; the auth guards in lib/auth, which share its key and session checks, and
-;;; *media-middleware* in features/media/store, which serves the layout it writes.
+;;; *media-middleware* in lib/media, which serves the library's files.
 
 (defun prefix-p (prefix path)
   (and (>= (length path) (length prefix)) (string= prefix path :end2 (length prefix))))
