@@ -180,10 +180,9 @@
          (path (format nil "/s/website/m/blog/~a" id)))
     (testing "the editor carries the HTML whole, its line breaks included"
       (let ((body (nth-value 1 (request :get path))))
-        (ok (search (format nil "<textarea id=\"f-body\" name=\"f-body\" hidden>~%&lt;h2" ) body)
-            "as the text of a hidden textarea, after the newline the parser drops")
-        (ok (search (format nil "a&lt;&#x2F;p&gt;~%&lt;p&gt;b") body)
-            "an attribute value would have had its line break collapsed to a space")))
+        (ok (search (format nil "id=\"f-body\" name=\"f-body\" value=\"<h2 id=&quot;intro&quot;>Intro</h2><p>a</p>~%<p>b</p>\"")
+                    body)
+            "an untouched field is sent back as it is here: hsx keeps an attribute value's line breaks")))
     (testing "an untouched field comes back as it was, less the CRLF of the form"
       (edit path :form `(("action" . "save") ("f-title" . "Renamed")
                                   ("f-body" . ,(format nil "<h2 id=\"intro\">Intro</h2><p>a</p>~c~%<p>b</p>" #\Return))))
