@@ -1,7 +1,7 @@
 (defpackage #:koya-server/usecases/spaces/archive
   (:use #:cl)
   (:import-from #:koya-server/domain/errors
-                #:invalid-input)
+                #:invalid-input #:too-large)
   (:import-from #:koya-server/usecases/ports/store
                 #:with-transaction)
   (:import-from #:koya-server/usecases/actor
@@ -334,7 +334,8 @@ Content-Length for the middleware to check."
             :for total := n :then (+ total n)
             :while (plusp n)
             :do (when (> total +max-archive-bytes+)
-                  (error "The archive is larger than ~a MB" (floor +max-archive-bytes+ (* 1024 1024))))
+                  (error 'too-large :message (format nil "The archive is larger than ~a MB"
+                                                     (floor +max-archive-bytes+ (* 1024 1024)))))
                 (write-sequence buffer out :end n)))))
 
 (defun import-space-stream (in &key (by *actor*))

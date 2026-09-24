@@ -1,6 +1,8 @@
 (defpackage #:koya-server/domain/totp
   (:use #:cl)
   (:import-from #:quri #:make-uri #:render-uri #:url-encode)
+  (:import-from #:koya-server/domain/errors
+                #:fail #:invalid-input)
   (:import-from #:ironclad
                 #:make-hmac #:update-hmac #:hmac-digest #:random-data)
   (:export #:base32-decode
@@ -31,7 +33,7 @@
                          (decf nbits 8)
                          (setf bits (ldb (byte nbits 0) bits))))
                     ((member c '(#\= #\Space #\-)) nil)
-                    (t (error "not a Base32 character: ~s" c))))
+                    (t (fail 'invalid-input (format nil "not a Base32 character: ~s" c)))))
     (coerce (nreverse out) '(vector (unsigned-byte 8)))))
 
 (defun base32-encode (octets)

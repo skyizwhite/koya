@@ -3,6 +3,8 @@
   (:import-from #:koya-server/infra/db/connection
                 #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
   (:import-from #:koya-server/infra/db/content-query #:build-where #:build-order-by)
+  (:import-from #:koya-server/domain/errors
+                #:fail #:not-found #:conflict)
   (:import-from #:koya-server/domain/query
                 #:query-limit #:query-offset #:query-orders #:query-filters)
   (:import-from #:koya-server/domain/content
@@ -41,6 +43,9 @@
                   :created-at (col row "created_at") :updated-at (col row "updated_at")
                   :published-at (col row "published_at") :revised-at (col row "revised_at"))))
 
+(defun missing (id)
+  (fail 'not-found (format nil "Content ~a does not exist" id)))
+
 (defun new-draft-key ()
   (byte-array-to-hex-string (random-data 16)))
 
@@ -77,7 +82,7 @@
     (get-content id)))
 
 (defmethod save-draft (id data &key by)
-  (let ((content (or (get-content id) (error "content ~a not found" id))))
+  (let ((content (or (get-content id) (missing id))))
     (with-db-transaction
       (exec "UPDATE contents SET draft = ?, draft_key = ?, status = ?, updated_at = ? WHERE id = ?"
             (to-json data) (new-draft-key) (status-of (content-published content) t) (now-iso) id)
@@ -85,7 +90,7 @@
     (get-content id)))
 
 (defmethod publish-content (id &optional data &key published-at by)
-  (let* ((content (or (get-content id) (error "content ~a not found" id)))
+  (let* ((content (or (get-content id) (missing id)))
          (data (or data (content-draft content) (content-published content)))
          (now (now-iso)))
     (with-db-transaction
@@ -96,7 +101,7 @@
     (get-content id)))
 
 (defmethod unpublish-content (id &key by)
-  (let* ((content (or (get-content id) (error "content ~a not found" id)))
+  (let* ((content (or (get-content id) (missing id)))
          (data (or (content-draft content) (content-published content))))
     (with-db-transaction
       (exec "UPDATE contents SET published = NULL, draft = ?, draft_key = ?, status = 'draft', updated_at = ?, published_at = NULL WHERE id = ?"
@@ -107,8 +112,10 @@
     (get-content id)))
 
 (defmethod discard-draft (id &key by)
-  (let ((content (or (get-content id) (error "content ~a not found" id))))
-    (unless (content-published content) (error "content ~a is not published; delete it instead" id))
+  (let ((content (or (get-content id) (missing id))))
+    (unless (content-published content)
+      (fail 'conflict "Only a published content has a draft to discard; delete it instead"
+            :code "not_published"))
     (with-db-transaction
       (exec "UPDATE contents SET draft = NULL, draft_key = NULL, status = 'published', updated_at = ? WHERE id = ?"
             (now-iso) id)
@@ -129,7 +136,7 @@
                                (let ((like (format nil "%~a%" needle))) (list like like))))))
 
 (defmethod ensure-draft-key (id)
-  (let ((content (or (get-content id) (error "content ~a not found" id))))
+  (let ((content (or (get-content id) (missing id))))
     (or (content-draft-key content)
         (let ((key (new-draft-key)))
           (exec "UPDATE contents SET draft_key = ? WHERE id = ?" key id)
