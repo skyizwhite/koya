@@ -199,6 +199,20 @@
       (dolist (path paths)
         (edit path :form '(("action" . "delete")) :headers origin)))))
 
+(deftest list-shows-references-by-label
+  (exec "DELETE FROM contents")
+  (multiple-value-bind (space model) (resolve-model "website" "blog")
+    (flet ((make (title &rest data)
+             (content-id (create space model (apply #'jobject "title" title data) :publish t))))
+      (let ((alpha (make "Alpha target"))
+            (beta (make "Beta target")))
+        (make "Refers" "related" (vector alpha beta))
+        (multiple-value-bind (status body) (request :get "/s/website/m/blog")
+          (ok (= status 200))
+          (ok (search "Alpha target, Beta target" body)
+              "a reference reads as the label of what it points at, looked up for the page's rows")))))
+  (exec "DELETE FROM contents"))
+
 (deftest bulk-actions-on-the-content-list
   (let ((origin '(("origin" . "http://localhost:3000")))
         (query '(("orders" . "-createdAt"))))

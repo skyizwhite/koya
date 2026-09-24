@@ -6,7 +6,7 @@
   (:import-from #:koya-server/db/schema-store
                 #:find-model)
   (:import-from #:koya-server/db/contents
-                #:list-contents #:content-id #:content-data)
+                #:list-contents #:find-contents-by-ids #:content-id #:content-data)
   (:import-from #:koya-server/lib/query
                 #:make-query)
   (:export #:content-label
@@ -27,28 +27,34 @@ first text field of one model is another's subtitle."
         value
         (content-id content))))
 
-(defun target-contents (space field)
-  "(values CONTENTS MODEL) of the model a :reference FIELD points at, drafts
-included: a reference may be set to one before it is published."
-  (let ((target (find-model space (field-option field :model))))
-    (when target
-      (values (list-contents space (model-name target) target (make-query :limit 1000) :status :all)
-              target))))
-
 (defun reference-options (space field)
-  "Selectable contents of FIELD's target model as (id . label), sorted by label."
+  "Every content of FIELD's target model as (id . label), sorted by label, drafts
+included: a reference may be set to one before it is published. Every one, so a
+selected id is never taken for missing."
   (when (eq (field-type field) :reference)
-    (multiple-value-bind (contents target) (target-contents space field)
-      (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target))) contents)
-            #'string-lessp :key #'cdr))))
+    (let ((target (find-model space (field-option field :model))))
+      (when target
+        (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target)))
+                      (list-contents space (model-name target) target (make-query :limit nil) :status :all))
+              #'string-lessp :key #'cdr)))))
 
-(defun reference-labels (space model)
-  "Field name -> hash of referenced id -> label, for every reference field of MODEL."
+(defun referenced-ids (field contents)
+  "The ids FIELD holds across CONTENTS, one or an array each."
+  (loop :for content :in contents
+        :for data := (content-data content :draft t)
+        :for value := (and data (gethash (field-name field) data))
+        :nconc (cond ((stringp value) (list value))
+                     ((vectorp value) (remove-if-not #'stringp (coerce value 'list))))))
+
+(defun reference-labels (space model contents)
+  "Field name -> hash of referenced id -> label, for every reference field of MODEL,
+covering the ids CONTENTS hold. An id missing from it no longer resolves."
   (let ((table (make-hash-table :test 'equal)))
     (dolist (field (model-fields model) table)
       (when (eq (field-type field) :reference)
-        (let ((targets (make-hash-table :test 'equal)))
-          (multiple-value-bind (contents target) (target-contents space field)
-            (dolist (content contents)
-              (setf (gethash (content-id content) targets) (content-label content target))))
-          (setf (gethash (field-name field) table) targets))))))
+        (let ((target (find-model space (field-option field :model)))
+              (labels (make-hash-table :test 'equal)))
+          (when target
+            (maphash (lambda (id content) (setf (gethash id labels) (content-label content target)))
+                     (find-contents-by-ids space (model-name target) (referenced-ids field contents))))
+          (setf (gethash (field-name field) table) labels))))))

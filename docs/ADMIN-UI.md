@@ -205,7 +205,7 @@ names the content by its model's `label` field, or by its id.
 
 Notes on the generated controls:
 
-- A reference dropdown lists up to 1000 contents of the target model, drafts
+- A reference dropdown lists every content of the target model, drafts
   included, labelled by the field the target model names as its `label` and
   otherwise by the id. An id that no longer resolves is kept and shown as
   `{id} (missing)`, so a save never drops it silently.
@@ -474,7 +474,6 @@ on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key = 'totp
 | Thing | Value |
 |---|---|
 | Rows per page: contents, media, deliveries, deploys, revisions | 20 |
-| Contents offered in a reference field | 1000 |
 | Media per picker page | 24 |
 | Webhook deliveries kept | the newest 200 per space |
 | Schema deploys kept | the newest 100 per space |

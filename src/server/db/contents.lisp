@@ -31,6 +31,7 @@
            #:delete-content
            #:get-content
            #:find-content
+           #:find-contents-by-ids
            #:list-contents
            #:count-contents
            #:ensure-draft-key
@@ -76,6 +77,17 @@
 (defun get-content (id)
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ?" id)))
     (and row (row->content row))))
+
+(defun find-contents-by-ids (space model ids)
+  "Hash of id -> content for those of IDS that are contents of MODEL in SPACE."
+  (let ((table (make-hash-table :test 'equal))
+        (ids (remove-duplicates ids :test #'equal)))
+    (when ids
+      (dolist (row (apply #'fetch (format nil "SELECT * FROM contents WHERE space = ? AND model = ? AND id IN (~{~*?~^, ~})" ids)
+                          space model ids))
+        (let ((content (row->content row)))
+          (setf (gethash (content-id content) table) content))))
+    table))
 
 (defun find-content (space model id)
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ? AND space = ? AND model = ?" id space model)))
@@ -217,7 +229,8 @@ content ID of MODEL through a :reference field of the current schema."
 published data (delivery API); :all lists everything using draft data when present (admin).
 ONLY-STATUS narrows to one value of the status column -- \"draft\", \"published\" or
 \"published+draft\" -- which is the admin list's status filter; it is the badge the
-list shows, so the three choices are the three badges."
+list shows, so the three choices are the three badges. A QUERY-LIMIT of NIL lists
+every row."
   (let ((column (data-column status)))
     (multiple-value-bind (where-sql where-params) (build-where (query-filters query) schema-model column)
       (let* ((base (format nil "FROM contents WHERE space = ? AND model = ? AND ~a~@[~a~]~@[ AND ~a~]"
@@ -227,7 +240,8 @@ list shows, so the three choices are the three badges."
              (rows (apply #'fetch
                           (format nil "SELECT * ~a ORDER BY ~a LIMIT ? OFFSET ?"
                                   base (build-order-by (query-orders query) schema-model column))
-                          (append params (list (query-limit query) (query-offset query))))))
+                          ;; SQLite reads a negative LIMIT as none
+                          (append params (list (or (query-limit query) -1) (query-offset query))))))
         (values (mapcar #'row->content rows) total)))))
 
 (defun count-contents (space model)

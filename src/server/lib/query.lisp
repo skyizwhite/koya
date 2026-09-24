@@ -28,7 +28,7 @@
 (defparameter +max-limit+ 100)
 
 (defstruct query
-  (limit +default-limit+)
+  (limit +default-limit+)  ; NIL for every row
   (offset 0)
   orders    ; list of (name . :asc/:desc)
   filters   ; list of groups, each group a list of (name op value); groups are OR'ed, terms AND'ed

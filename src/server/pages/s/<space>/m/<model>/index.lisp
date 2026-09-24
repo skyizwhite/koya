@@ -228,7 +228,7 @@ Each button is an action on the selection form's boxes."
   "What a search, a sort, a page or a bulk action draws again: the table and its pager."
   (let* ((model-name (model-name model))
          (fields (model-fields model))
-         (ref-labels (reference-labels space model))
+         (ref-labels (reference-labels space model contents))
          (media (page-media space model contents))
          (page (getf state :page))
          (search-text (getf state :search-text))

@@ -17,7 +17,8 @@
   (:import-from #:koya-server/db/delivery-keys
                 #:create-delivery-key #:list-delivery-keys #:delete-delivery-key #:space-for-delivery-key)
   (:import-from #:koya-server/lib/query
-                #:parse-query #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
+                #:parse-query #:make-query
+                #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
                 #:query-error)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:parse-json #:jget))
@@ -185,6 +186,16 @@
       (ok (signals (list-contents "website" "blog" model (q "filters" "title[weird]1")) 'query-error))
       (ok (signals (list-contents "website" "blog" model (q "orders" "nope")) 'query-error))
       (ok (signals (q "limit" "abc") 'query-error)))))
+
+(deftest listing-without-a-limit
+  (dotimes (i 12)
+    (create-content "website" "blog" (data (format nil "{\"title\": \"Post ~a\"}" i))))
+  (let ((model (find-model "website" "blog")))
+    (multiple-value-bind (contents total) (list-contents "website" "blog" model (make-query :limit nil) :status :all)
+      (ok (= total 12))
+      (ok (= (length contents) 12) "a query whose limit is NIL lists every row"))
+    (ok (= (length (list-contents "website" "blog" model (make-query) :status :all)) 10)
+        "one made without a limit keeps the default")))
 
 (deftest listing-by-status
   (create-content "website" "blog" (data "{\"title\": \"Live\"}") :publish t)
