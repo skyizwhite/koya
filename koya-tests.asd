@@ -25,6 +25,7 @@
                "koya-tests/server/web/admin-api/keys"
                "koya-tests/server/web/app"
                "koya-tests/server/web/auth"
+               "koya-tests/server/web/middlewares"
                "koya-tests/server/web/pages/login"
                "koya-tests/server/web/pages/index"
                "koya-tests/server/web/pages/settings"

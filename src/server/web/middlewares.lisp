@@ -2,7 +2,9 @@
   (:use #:cl)
   (:import-from #:koya-server/domain/media #:+max-upload-bytes+)
   (:import-from #:koya-server/usecases/spaces/archive #:+max-archive-bytes+)
+  (:import-from #:smart-buffer)
   (:export #:archive-path
+           #:*body-file-middleware*
            #:*cache-control-middleware*
            #:*delivery-cors-middleware*
            #:*body-limit-middleware*))
@@ -14,6 +16,44 @@
 
 (defun prefix-p (prefix path)
   (and (>= (length path) (length prefix)) (string= prefix path :end2 (length prefix))))
+
+;;; Woo reads a request's whole body before the app sees it, and one past a
+;;; megabyte goes to a file under smart-buffer's temporary directory. It hands
+;;; the app that file open and neither closes nor deletes it: left alone, every
+;;; large body -- a media upload, or anything anyone posts -- stays on the disk.
+
+(defun body-file (stream)
+  "The file Woo left a body in, when STREAM reads one, or NIL for a body held in
+memory, or read from the socket as Hunchentoot does."
+  (let ((path (and (typep stream 'file-stream) (ignore-errors (pathname stream))))
+        (directory (namestring smart-buffer::*temporary-directory*)))
+    (and path (prefix-p directory (namestring path)) path)))
+
+(defun remove-body-file (stream)
+  (let ((path (body-file stream)))
+    (when path
+      (close stream)
+      (uiop:delete-file-if-exists path))))
+
+(defparameter *body-file-middleware*
+  (lambda (app)
+    (lambda (env)
+      ;; taken now: lack wraps the body in a stream of its own, in ENV itself
+      (let ((body (getf env :raw-body))
+            (response nil))
+        (unwind-protect
+             (setf response
+                   (let ((answer (funcall app env)))
+                     (if (functionp answer)
+                         ;; a delayed answer may read the body until it is done
+                         (lambda (responder)
+                           (unwind-protect (funcall answer responder)
+                             (remove-body-file body)))
+                         answer)))
+          (unless (functionp response)
+            (remove-body-file body))))))
+  "Deletes the file Woo buffered a request's body in, once the request is answered.
+Installed outermost, so it runs whatever answered.")
 
 (defparameter *cache-control-middleware*
   (lambda (app)

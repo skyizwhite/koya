@@ -145,7 +145,10 @@ actions and the pages are each guarded where they are mounted
 so a route added later is covered without checking for itself. A page asked for
 without the owner's session is a redirect to the login page, which comes back to
 it; so is a path that is no page. The delivery API is mounted behind
-`*delivery-cors-middleware*`, which answers any origin; nothing else is.
+`*delivery-cors-middleware*`, which answers any origin; nothing else is. Woo reads a whole request
+body before any of this sees it, and writes one past a megabyte to a temporary
+file it never deletes; `*body-file-middleware*`, outermost, deletes that file once
+the request is answered.
 
 A page route answers GET and draws a page; everything done on it is an action
 (`defaction`), defined beside the page that calls it, or with the `ui/`
