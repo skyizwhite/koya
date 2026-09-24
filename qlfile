@@ -8,7 +8,6 @@ git lack-mw https://github.com/skyizwhite/lack-mw.git
 ql clack-errors
 ql cl-dotenv
 ql cl-dbi
-ql sxql
 ql jzon
 ql kebab
 ql dexador

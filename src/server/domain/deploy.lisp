@@ -5,7 +5,7 @@
   (:export #:deploy #:make-deploy
            #:deploy-id #:deploy-space #:deploy-changes #:deploy-change-count
            #:deploy-destructive #:deploy-by #:deploy-created-at
-           #:change-op #:change-path #:change-destructive #:change-description))
+           #:change-op #:change-destructive #:change-description))
 (in-package #:koya-server/domain/deploy)
 
 ;;; A deploy that changed something: its CHANGES in the wire format (core/diff's
@@ -16,6 +16,5 @@
   id space changes change-count destructive by created-at)
 
 (defun change-op (change) (jget change "op"))
-(defun change-path (change) (jget change "path"))
 (defun change-destructive (change) (and (jget change "destructive") t))
 (defun change-description (change) (jget change "description"))

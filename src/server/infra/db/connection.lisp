@@ -8,8 +8,6 @@
                 #:fetch-all
                 #:do-sql
                 #:with-transaction)
-  (:import-from #:sxql
-                #:yield)
   (:import-from #:bordeaux-threads-2
                 #:make-recursive-lock
                 #:with-recursive-lock-held)
@@ -23,9 +21,6 @@
            #:exec
            #:fetch
            #:fetch-one
-           #:run
-           #:query
-           #:query-one
            #:col))
 (in-package #:koya-server/infra/db/connection)
 
@@ -75,19 +70,6 @@
 
 (defun fetch-one (sql &rest params)
   (first (apply #'fetch sql params)))
-
-(defun run (statement)
-  "Execute an SxQL statement that returns no rows."
-  (multiple-value-bind (sql params) (yield statement)
-    (apply #'exec sql params)))
-
-(defun query (statement)
-  "Execute an SxQL statement and return rows."
-  (multiple-value-bind (sql params) (yield statement)
-    (apply #'fetch sql params)))
-
-(defun query-one (statement)
-  (first (query statement)))
 
 (defun col (row name)
   "Column NAME (a string) of ROW."

@@ -131,7 +131,7 @@ SBCL with package-inferred systems — a file under `src/` is a package — and
 | HTTP | Clack / Lack; Hunchentoot in development, Woo in production |
 | Router | jingle (a ningle extension) + ningle-fbr |
 | Templates | hsx; ningle-actions + HTMX for everything done on a page |
-| DB | cl-dbi + dbd-sqlite3 + sxql |
+| DB | cl-dbi + dbd-sqlite3 |
 | JSON | jzon, with kebab/camel conversion in `core/case` |
 | Client | dexador |
 | Archives | zippy (a space's export and import) |
