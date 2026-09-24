@@ -19,7 +19,9 @@
   (:import-from #:koya-server/usecases/ports/contents
                 #:create-content #:save-draft #:publish-content #:unpublish-content
                 #:delete-content #:discard-draft #:find-object-content
-                #:unique-value-taken-p #:get-content #:content-references #:ensure-draft-key)
+                #:unique-value-taken-p #:get-content #:ensure-draft-key)
+  (:import-from #:koya-server/usecases/contents/references
+                #:content-references)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-published #:content-data
                 #:merge-data #:fill-defaults #:fill-slugs)

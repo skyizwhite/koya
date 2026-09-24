@@ -8,9 +8,15 @@
                 #:media-id #:media-space #:media-filename #:media-mime #:safe-filename
                 #:+max-upload-bytes+)
   (:import-from #:koya-server/usecases/ports/media
-                #:insert-media #:delete-media #:media-references #:find-media #:list-media
-                #:count-media #:update-media #:space-media #:media-reference-counts
+                #:insert-media #:delete-media #:find-media #:list-media
+                #:count-media #:update-media #:space-media
                 #:write-media-file #:delete-media-file #:delete-space-media-files)
+  (:import-from #:koya-server/domain/references
+                #:media-fields #:mentioned-ids)
+  (:import-from #:koya-server/usecases/ports/spaces
+                #:load-schema)
+  (:import-from #:koya-server/usecases/ports/contents
+                #:contents-mentioning #:space-contents)
   (:import-from #:koya/core/ulid
                 #:make-ulid)
   (:export #:store-upload
@@ -29,6 +35,26 @@
 
 ;;; A space's library: a file is stored with its metadata, and taken away only
 ;;; while nothing uses it.
+
+(defun media-reference-counts (space ids)
+  "Hash of id -> number of contents in SPACE whose published or draft data mentions
+it in a :media or :richtext field of the current schema, for all IDS in one pass
+over the space's contents: a page of the library asks for all its cards at once."
+  (let ((counts (make-hash-table :test 'equal))
+        (fields (media-fields (load-schema space))))
+    (dolist (id ids) (setf (gethash id counts) 0))
+    (when ids
+      (dolist (content (space-contents space))
+        (dolist (id (mentioned-ids content fields ids))
+          (incf (gethash id counts)))))
+    counts))
+
+(defun media-references (space id)
+  "Number of contents in SPACE that mention ID (see MEDIA-REFERENCE-COUNTS). Only
+the contents whose data holds the id are read."
+  (let ((fields (media-fields (load-schema space))))
+    (count-if (lambda (content) (mentioned-ids content fields (list id)))
+              (contents-mentioning space id))))
 
 (defun store-upload (space bytes &key filename (alt ""))
   "Accept BYTES as a new media of SPACE: sniff the type, write the file, insert the

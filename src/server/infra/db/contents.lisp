@@ -15,11 +15,8 @@
   (:import-from #:koya/core/time
                 #:now-iso)
   (:import-from #:koya-server/infra/db/content-revisions #:record-revision)
-  (:import-from #:koya-server/usecases/ports/spaces #:load-schema)
   (:import-from #:koya/core/json
                 #:parse-json #:to-json)
-  (:import-from #:koya/core/schema
-                #:schema-models #:model-name #:model-fields #:field-name #:field-type #:field-option)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
   (:import-from #:koya-server/usecases/ports/contents
@@ -27,7 +24,7 @@
                 #:discard-draft #:delete-content #:get-content #:find-content
                 #:find-contents-by-ids #:list-contents #:count-contents #:ensure-draft-key
                 #:find-object-content #:unique-value-taken-p #:space-contents #:import-content
-                #:content-references))
+                #:contents-mentioning))
 (in-package #:koya-server/infra/db/contents)
 
 ;;; Content rows, the published and draft data stored as JSON.
@@ -135,44 +132,17 @@ Errors when the content has no published version: there would be nothing left."
   ;; its revisions go with it, ON DELETE CASCADE
   (exec "DELETE FROM contents WHERE id = ?" id))
 
-(defun reference-fields (space target)
-  "Hash of model name -> its :reference fields in SPACE's current schema that point at TARGET."
-  (let ((table (make-hash-table :test 'equal))
-        (schema (load-schema space)))
-    (dolist (model (and schema (schema-models schema)) table)
-      (let ((fields (remove-if-not (lambda (f) (and (eq (field-type f) :reference)
-                                                    (equal (field-option f :model) target)))
-                                   (model-fields model))))
-        (when fields (setf (gethash (model-name model) table) fields))))))
-
-(defun refers-p (fields json id)
-  (let ((data (and json (parse-json json))))
-    (and (hash-table-p data)
-         (some (lambda (field)
-                 (let ((value (gethash (field-name field) data)))
-                   (typecase value
-                     (string (string= value id))
-                     (vector (find id value :test #'equal)))))
-               fields))))
-
-;; Only the fields in the schema count, as for media (see media): a deploy that
-;; removes a reference field leaves its ids in the stored JSON, unread.
-(defun content-references (space model id)
-  "Number of other contents in SPACE whose published or draft data refers to
-content ID of MODEL through a :reference field of the current schema."
-  (let ((fields (reference-fields space model))
-        (needle (format nil "%~a%" id)))
-    (if (zerop (hash-table-count fields))
-        0
-        ;; LIKE only skips the contents that cannot refer to it; the fields decide
-        (count-if (lambda (row)
-                    (let ((fields (gethash (col row "model") fields)))
-                      (and fields
-                           (or (refers-p fields (col row "published") id)
-                               (refers-p fields (col row "draft") id)))))
-                  (fetch "SELECT model, published, draft FROM contents
-                          WHERE space = ? AND id <> ? AND (published LIKE ? OR draft LIKE ?)"
-                         space id needle needle)))))
+(defun contents-mentioning (space needle &key exclude-id)
+  "The contents of SPACE, but for EXCLUDE-ID, whose published or draft JSON holds
+the string NEEDLE anywhere: every content that can refer to it, and possibly
+some that do not (NEEDLE may appear in any field, and _ in it matches any
+character). What they refer to is domain/references's to say."
+  (mapcar #'row->content
+          (apply #'fetch (format nil "SELECT * FROM contents WHERE space = ?~:[~; AND id <> ?~]
+                                        AND (published LIKE ? OR draft LIKE ?)"
+                                 exclude-id)
+                 space (append (and exclude-id (list exclude-id))
+                               (let ((like (format nil "%~a%" needle))) (list like like))))))
 
 (defun ensure-draft-key (id)
   "Return the draft key of content ID, generating one on first use."

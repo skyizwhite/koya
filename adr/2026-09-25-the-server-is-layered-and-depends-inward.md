@@ -1,5 +1,7 @@
 # The server is layered, and each layer depends only on the ones inside it
 
+Superseded by adr/2026-09-25-what-refers-to-what-is-decided-in-the-domain.md (where references are counted)
+
 *2026-09-25*
 
 ## Context

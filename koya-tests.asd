@@ -12,6 +12,7 @@
                "koya-tests/config"
                "koya-tests/server/domain/totp"
                "koya-tests/server/domain/timezone"
+               "koya-tests/server/domain/references"
                "koya-tests/server/usecases/settings/two-factor"
                "koya-tests/server/infra/db"
                "koya-tests/server/usecases/contents/write"

@@ -16,7 +16,7 @@
            #:import-content
            #:ensure-draft-key
            #:unique-value-taken-p
-           #:content-references
+           #:contents-mentioning
            #:list-revisions
            #:count-revisions
            #:find-revision
@@ -32,5 +32,5 @@
                 list-contents count-contents space-contents
                 create-content save-draft publish-content unpublish-content discard-draft
                 delete-content import-content ensure-draft-key
-                unique-value-taken-p content-references
+                unique-value-taken-p contents-mentioning
                 list-revisions count-revisions find-revision content-history import-revision))

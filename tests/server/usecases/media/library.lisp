@@ -6,12 +6,12 @@
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/contents #:create-content)
   (:import-from #:koya-server/usecases/ports/media
-                #:find-media #:list-media #:count-media #:update-media #:media-references
-                #:media-reference-counts #:media-file-path)
+                #:find-media #:list-media #:count-media #:update-media #:media-file-path)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-server/usecases/media/delivery #:media-url #:media->jobject)
   (:import-from #:koya-server/usecases/media/library
-                #:store-upload #:remove-media #:remove-space-media)
+                #:store-upload #:remove-media #:remove-space-media #:media-references
+                #:media-reference-counts)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-space #:media-filename #:media-mime #:media-width #:media-height
                 #:media-alt)

@@ -29,9 +29,11 @@ src/
   server/
     main.lisp         ; the composition root: loads infra/, then web/
     domain/           ; what koya is made of: content, media, revision, deploy,
-                      ; webhook-delivery, query, errors, image, totp, timezone
+                      ; webhook-delivery, references, query, errors, image,
+                      ; totp, timezone
     usecases/         ; what koya does, knowing neither HTTP nor SQL:
-      contents/       ;   write, delivery, listing, labels, revisions, bulk, lookup
+      contents/       ;   write, delivery, listing, labels, revisions, bulk, lookup,
+                      ;   references
       media/          ;   library, delivery
       spaces/         ;   lifecycle, archive
       schema/         ;   deploy

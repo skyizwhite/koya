@@ -8,8 +8,6 @@
            #:count-media
            #:update-media
            #:delete-media
-           #:media-references
-           #:media-reference-counts
            #:media-file-path
            #:write-media-file
            #:delete-media-file
@@ -20,5 +18,5 @@
 ;;; itself, kept apart from it. See ports/store for what a port is.
 
 (declaim (ftype function insert-media find-media find-media-by-ids list-media space-media
-                count-media update-media delete-media media-references media-reference-counts
+                count-media update-media delete-media
                 media-file-path write-media-file delete-media-file delete-space-media-files))
