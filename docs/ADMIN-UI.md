@@ -50,6 +50,10 @@ no user accounts: whoever knows the secret is the owner.
   server.
 - Every page has **Log out** in the header; form submissions from another origin
   are rejected.
+- The UI works down to a phone's width (375px): the page itself never scrolls
+  sideways, though a wide table scrolls inside its own box. On a narrow screen
+  the header's **Settings** and **Log out** are icons, its crumbs wrap, and the
+  media library and picker dialogs fill the screen.
 
 ## Spaces
 
@@ -292,8 +296,8 @@ into it.
 ## The webhook delivery log
 
 `/s/{space}/webhooks` is the last 200 calls the space made, newest first, 20 to
-a page; **View log →** on the space page opens it. A row names the event, the model and the webhook's label, and carries
-the outcome as a badge:
+a page; **View log →** on the space page opens it. A row names the webhook's
+label and the model, and carries the outcome as a badge:
 
 | Badge | Meaning |
 |---|---|
@@ -301,7 +305,7 @@ the outcome as a badge:
 | any other status, red | it answered, and refused |
 | *no response*, amber | the call never arrived: DNS, a refused connection, a timeout |
 
-Opening a row shows the URL it posted to, a link to the content that changed,
+Opening a row shows the event, the URL it posted to, a link to the content that changed,
 how long the call took, the error when there was one, and **the response body**
 as the receiver sent it — the first 4000 characters of it, which is where a
 revalidation hook's own error message usually is.

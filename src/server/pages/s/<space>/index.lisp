@@ -25,9 +25,9 @@
              (set-title (format nil "~a · koya" name))
              (hsx
               (~layout :space name
-                (div :class "mb-6 flex items-center justify-between"
+                (div :class "mb-6 flex flex-wrap items-center justify-between gap-3"
                   (h1 :class "text-2xl font-bold" name)
-                  (div :class "flex gap-2"
+                  (div :class "flex flex-wrap gap-2"
                     (a :href (deploys-url name) :class "btn" (~icon :name :history) "Schema Deploys")
                     (a :href (format nil "~a/media" (space-url name)) :class "btn" (~icon :name :media) "Media")
                     (a :href (format nil "~a/keys" (space-url name)) :class "btn" (~icon :name :key) "Keys")

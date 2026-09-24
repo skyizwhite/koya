@@ -291,7 +291,7 @@ and keeps the sort."
                        (redirect-to (funcall link pages) 302)
                    (hsx
                     (~layout :space space :crumbs (list (cons model-name nil))
-                      (div :class "mb-6 flex items-center justify-between"
+                      (div :class "mb-6 flex flex-wrap items-center justify-between gap-3"
                         (h1 :class "text-2xl font-bold" model-name
                           (span :class "ml-3 text-base font-normal text-muted"
                             (if filtered

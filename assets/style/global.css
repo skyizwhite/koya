@@ -73,6 +73,12 @@ dialog.koya-dialog {
 dialog.koya-dialog[open] {
   @apply m-auto;
 }
+/* A library-sized dialog takes the whole of a phone's screen rather than a sliver of it. */
+@media (width < 40rem) {
+  dialog.koya-dialog-wide[open] {
+    @apply m-0 h-dvh max-h-none w-screen max-w-none overflow-y-auto rounded-none border-0;
+  }
+}
 dialog.koya-dialog::backdrop {
   background: rgb(31 29 26 / 0.4);
 }

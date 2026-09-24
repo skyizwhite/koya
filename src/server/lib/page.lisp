@@ -264,27 +264,34 @@ post the page the form was on, since the post itself cannot be replayed."
                 "GNU AGPL v3.0")
              " or later")))))
 
+(defcomp ~crumb (&key href label)
+  (hsx (span :class "flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap"
+         (span :class "text-muted" "/")
+         (if href
+             (hsx (a :href href :class "max-w-48 truncate text-fg hover:underline sm:max-w-xs" :title label label))
+             (hsx (span :class "max-w-48 truncate text-muted sm:max-w-xs" :title label label))))))
+
 (defcomp ~layout (&key space crumbs children)
   (hsx
    (<>
      (header :class "border-b border-line bg-panel"
        (div :class "mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3"
-         (nav :class "flex items-center gap-2 text-sm"
-           (a :href "/" :class "inline-flex items-center gap-2 font-bold tracking-tight text-fg"
+         ;; on a narrow screen the crumbs wrap, each with its slash, and a long one
+         ;; (a content's label) is cut short; the buttons keep their size
+         (nav :class "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+           (a :href "/" :class "inline-flex shrink-0 items-center gap-2 font-bold tracking-tight text-fg"
               (img :src (asset-url "icon.svg") :alt "" :width "20" :height "20" :class "h-5 w-5 rounded")
               "koya")
            (when space
-             (hsx (<> (span :class "text-muted" "/")
-                      (a :href (space-url space) :class "text-fg hover:underline" space))))
+             (hsx (~crumb :href (space-url space) :label space)))
            (loop :for (label . href) :in crumbs :collect
-             (hsx (<> (span :class "text-muted" "/")
-                      (if href
-                          (hsx (a :href href :class "text-fg hover:underline" label))
-                          (hsx (span :class "text-muted" label)))))))
-         (div :class "flex items-center gap-2"
-           (a :href "/settings" :class "btn" (~icon :name :settings) "Settings")
+             (hsx (~crumb :href href :label label))))
+         (div :class "flex shrink-0 items-center gap-2"
+           (a :href "/settings" :class "btn" :aria-label "Settings"
+              (~icon :name :settings) (span :class "hidden sm:inline" "Settings"))
            (form :method "post" :action "/logout"
-             (button :type "submit" :class "btn" (~icon :name :logout) "Log out")))))
+             (button :type "submit" :class "btn" :aria-label "Log out"
+                     (~icon :name :logout) (span :class "hidden sm:inline" "Log out"))))))
      (main :class "mx-auto w-full max-w-5xl flex-1 px-4 py-8"
        (multiple-value-bind (message kind) (take-flash)
          (~flash :message message :kind kind))

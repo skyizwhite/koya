@@ -308,7 +308,7 @@
          (pointer (new-blog `(("action" . "save") ("f-title" . "Pointer") ("f-related" . ,target)))))
     (flet ((list-body () (nth-value 1 (request :get "/s/website/m/blog"))))
       (ok (search "Named target" (list-body)) "the declared field names the reference")
-      (ok (search "<span class=\"text-muted\">Pointer</span>"
+      (ok (search "title=\"Pointer\">Pointer</span>"
                   (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" pointer))))
           "and the editor's crumb")
       (ok (search ">Pointer</a>"
@@ -325,7 +325,7 @@
                (ok (= status 200))
                (ok (search (format nil "value=\"~a\" selected>~a<" target target) editor)
                    "and so is the option that picks it")
-               (ok (search (format nil "<span class=\"text-muted\">~a</span>" pointer) editor)
+               (ok (search (format nil "title=\"~a\">~a</span>" pointer pointer) editor)
                    "and the crumb")))
         (save-schema "website"
                      (make-schema :models (list (blog-model)

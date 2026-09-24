@@ -107,7 +107,7 @@ is how many contents mention the file, shown in the confirmation."
   "One dialog per page; [data-preview-src] buttons fill and open it
 (koya-editor.js). Its forms post to the media library."
   (hsx
-   (dialog :id "media-preview" :class "koya-dialog max-w-3xl"
+   (dialog :id "media-preview" :class "koya-dialog koya-dialog-wide max-w-3xl"
      (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
        (div :class "min-w-0"
          (div :class "truncate font-semibold" :data-preview-title t "")

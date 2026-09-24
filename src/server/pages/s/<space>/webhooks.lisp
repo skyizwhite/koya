@@ -126,14 +126,18 @@ option it silently replaces with the first one, which here reads \"All\"."
          ;; the chevron turns down when the row is open
          (span :class "text-muted transition-transform group-open:rotate-90" (~icon :name :next))
          (~outcome :delivery delivery)
+         ;; on a narrow screen the model goes under the webhook
          (span :class "min-w-0"
-           (span :class "font-medium" (delivery-event delivery))
-           (span :class "text-muted" " · ")
-           (span (delivery-model delivery))
-           (code :class "ml-2 truncate text-xs text-muted" (delivery-label delivery))))
-       (span :class "shrink-0 whitespace-nowrap text-sm text-muted"
-         (short-time (delivery-created-at delivery))))
+           (span :class "font-medium" (delivery-label delivery))
+           (code :class "block truncate text-xs text-muted sm:ml-2 sm:inline" (delivery-model delivery))))
+       ;; "2026-09-20 14:04 JST": on a narrow screen the date above the time and zone
+       (let* ((time (short-time (delivery-created-at delivery)))
+              (space-at (position #\Space time)))
+         (hsx (span :class "shrink-0 whitespace-nowrap text-right text-sm text-muted"
+                (span :class "block sm:inline" (subseq time 0 space-at))
+                (span :class "block sm:ml-1 sm:inline" (if space-at (subseq time (1+ space-at)) ""))))))
      (div :class "space-y-2 border-t border-line bg-base/50 px-4 py-3 text-sm"
+       (~field :label "event" (delivery-event delivery))
        (~field :label "POST" (code :class "text-xs" (delivery-url delivery)))
        (~field :label "content"
          (a :href (content-url space (delivery-model delivery) (delivery-content-id delivery))

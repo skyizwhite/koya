@@ -77,9 +77,9 @@ taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
 (defcomp ~spaces-page (&key spaces)
   (hsx
    (~layout
-     (div :class "mb-6 flex items-center justify-between gap-4"
+     (div :class "mb-6 flex flex-wrap items-center justify-between gap-3"
        (h1 :class "text-2xl font-bold" "Spaces")
-       (div :class "flex gap-2"
+       (div :class "flex flex-wrap gap-2"
          (button :type "button" :class "btn" :data-dialog-open "import-space"
            (~icon :name :import) "Import")
          (button :type "button" :class "btn btn-primary" :data-dialog-open "new-space"
