@@ -95,9 +95,9 @@ A page route answers GET and draws a page; everything done on it is an action
 (`defaction`), defined beside the page that calls it. The actions middleware lets
 through htmx requests only, from the owner's session and this origin, and sends a
 request that has lost its session to the login page with `HX-Redirect`. An action
-answers the part of the page it changed, under that part's id, and the flash out
-of band into the layout's `#flash`; a result on another page is an `HX-Redirect`
-with the flash in the session. A path declared with `public-path` (`lib/auth`)
+answers the part of the page it changed, under that part's id, and the toast out
+of band into the layout's `#toast`; a result on another page is an `HX-Redirect`
+with the toast in the session. A path declared with `public-path` (`lib/auth`)
 needs no session; logging in is the only one. Searching, filtering, sorting and
 paging a list are actions as well, answered with `HX-Replace-Url` so the page's
 URL still carries that state for its GET to draw. See

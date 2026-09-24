@@ -292,7 +292,7 @@ onEach("iframe[data-fit-content]", (frame) => {
 // body itself, not as a multipart form, so the server can copy it to disk instead
 // of holding it in memory. htmx sends forms only, so this is a fetch that says it
 // is htmx, as an action requires. The answer names the page to go to in
-// HX-Redirect, where the result waits as a flash.
+// HX-Redirect, where the result waits as a toast.
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("form[data-import]").forEach((form) => {
     const error = form.querySelector("[data-import-error]");

@@ -42,7 +42,7 @@
       (multiple-value-bind (status body)
           (call-action :post (enable-two-factor-action) :form `(("code" . ,(totp secret))))
         (ok (= status 200))
-        (ok (search "Two-factor login is on" body) "flash"))
+        (ok (search "Two-factor login is on" body) "toast"))
       (ok (totp-enabled-p))
       (multiple-value-bind (status body) (request :get "/settings")
         (ok (= status 200))
@@ -84,7 +84,7 @@
         (progn
           (multiple-value-bind (status body) (call-action :post (save-timezone-action) :form '(("timezone" . "Asia/Tokyo")))
             (ok (= status 200))
-            (ok (search "Times are now shown in Asia&#x2F;Tokyo" body) "flash (text is escaped, attributes are not)")
+            (ok (search "Times are now shown in Asia&#x2F;Tokyo" body) "toast (text is escaped, attributes are not)")
             (ok (search "value=\"Asia/Tokyo\"" body)))
           (ok (string= (display-timezone-name) "Asia/Tokyo"))
           (testing "the editor takes and shows datetimes in that zone"
@@ -120,7 +120,7 @@
       (ok (= status 200))
       (ok (search "id=\"time-zone\"" body))
       (ok (search "Times are now shown in Asia&#x2F;Tokyo." body))
-      (ok (search "hx-swap-oob" body) "the flash goes out of band")
+      (ok (search "hx-swap-oob" body) "the toast goes out of band")
       (ng (search "<html" body)))
     (multiple-value-bind (status body) (call-action :post (save-timezone-action) :form '(("timezone" . "Mars/Olympus")))
       (ok (= status 422))

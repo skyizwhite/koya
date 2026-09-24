@@ -11,7 +11,7 @@
   (:import-from #:koya-server/lib/http #:path-param #:uploaded-files #:api-error #:api-error-message)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:param #:short-time
-                #:~layout #:~icon #:~empty-state #:~flash-oob #:action-refusal #:space-url)
+                #:~layout #:~icon #:~empty-state #:~toast-oob #:action-refusal #:space-url)
   (:import-from #:koya-server/components/media-grid #:~thumb #:dimensions #:human-size)
   (:import-from #:koya-server/lib/forms #:form-values)
   (:export #:@get #:media-page-url
@@ -183,11 +183,11 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
               (input :type "text" :name "alt" :value (media-alt media) :placeholder "alt text"
                      :class "input" :aria-label "alt text")
               (button :type "submit" :class "btn btn-icon" :aria-label "Save alt text" (~icon :name :check))
-              ;; the flash would be behind the dialog, so the answer is shown here
+              ;; the toast would be behind the dialog, so the answer is shown here
               (span :id "alt-saved" :class "shrink-0 text-sm text-ok")))))))))
 
 ;;; --- The work ------------------------------------------------------------------
-;;; Each returns (values MESSAGE KIND) for the flash.
+;;; Each returns (values MESSAGE KIND) for the toast.
 
 (defun upload (space files)
   (handler-case
@@ -237,7 +237,7 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
 
 (defun answer (params space &key message kind close-preview)
   "#library and the count at the search and page it was read at (the last page,
-when that one has emptied), the URL it is now read at, and MESSAGE as the flash.
+when that one has emptied), the URL it is now read at, and MESSAGE as the toast.
 CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
   (let* ((search (param params "q"))
          (pages (max 1 (ceiling (count-media space :search search) +page-size+)))
@@ -245,10 +245,10 @@ CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
     (set-response-header :hx-replace-url (library-url space :search search :page page))
     (let ((library (hsx (~library :space space :search search :page page)))
           (count (hsx (~media-count :space space :search search :oob t)))
-          (flash (if message (hsx (~flash-oob :message message :kind kind)) (hsx (<>)))))
+          (toast (if message (hsx (~toast-oob :message message :kind kind)) (hsx (<>)))))
       (if close-preview
-          (hsx (<> library count (~media-preview-dialog :oob t) flash))
-          (hsx (<> library count flash))))))
+          (hsx (<> library count (~media-preview-dialog :oob t) toast))
+          (hsx (<> library count toast))))))
 
 (defaction upload-media :post (params)
   (let ((space (action-space params)))

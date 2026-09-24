@@ -54,7 +54,7 @@
           (call-action :post (upload-media :space "website" :q "" :page 1)
                        :multipart (list (list "file" "notes.txt" "text/plain" (babel:string-to-octets "hi"))))
         (ok (= status 200))
-        (ok (search "Only PNG, JPEG, GIF and WebP" body) "rejection shows as a flash")))
+        (ok (search "Only PNG, JPEG, GIF and WebP" body) "rejection shows as a toast")))
     (testing "editor offers the picker for a :media field"
       (multiple-value-bind (status body) (request :get "/s/website/m/blog/new")
         (ok (= status 200))

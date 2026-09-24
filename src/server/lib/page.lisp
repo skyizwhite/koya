@@ -31,8 +31,8 @@
            #:redirect-to
            #:local-path-p
            #:param
-           #:set-flash
-           #:take-flash
+           #:set-toast
+           #:take-toast
            #:expand-url-template
            #:short-time
            #:caller-name
@@ -40,8 +40,8 @@
            #:~layout
            #:~footer
            #:~status-badge
-           #:~flash
-           #:~flash-oob
+           #:~toast
+           #:~toast-oob
            #:logout
            #:action-refusal
            #:~errors
@@ -67,17 +67,17 @@
 ;;; stored as JSON (see db/sessions), so the message travels as a pair of
 ;;; strings rather than as a list holding a keyword.
 
-(defun set-flash (message &optional (kind :ok))
+(defun set-toast (message &optional (kind :ok))
   (let ((session (context :session)))
-    (when session (setf (gethash "flash" session) (json-array message (string-downcase kind))))))
+    (when session (setf (gethash "toast" session) (json-array message (string-downcase kind))))))
 
-(defun take-flash ()
+(defun take-toast ()
   "Return (values message kind) once, then forget it."
   (let* ((session (context :session))
-         (flash (and session (gethash "flash" session))))
-    (when (and flash (= (length flash) 2))
-      (remhash "flash" session)
-      (values (aref flash 0) (if (equal (aref flash 1) "error") :error :ok)))))
+         (toast (and session (gethash "toast" session))))
+    (when (and toast (= (length toast) 2))
+      (remhash "toast" session)
+      (values (aref toast 0) (if (equal (aref toast 1) "error") :error :ok)))))
 
 (defun short-time (iso)
   "2026-09-20T05:04:03.123Z -> 2026-09-20 14:04 JST, in the zone chosen on the settings page."
@@ -217,24 +217,32 @@ only; an action that finds no session sends its own way back (lib/auth)."
 ;;; nothing as a child, but a component's own value is rendered, and a NIL there
 ;;; comes out as the word NIL.
 
-(defcomp ~flash (&key message (kind :ok))
-  (hsx
-   (<> (when message
-         (hsx (div :class (clsx "mb-6 rounded-md border px-4 py-3 text-sm"
-                                (if (eq kind :error) "border-danger/40 bg-danger/5 text-danger" "border-ok/40 bg-ok/5 text-ok"))
-                message))))))
+(defcomp ~toast (&key message (kind :ok) oob)
+  "What came of what was done, at the top of the screen, going by itself (.toast in
+global.css): a success after a few seconds, an error after long enough to read it.
+#toast is always there, empty or not, so an action's answer can put one in out of
+band."
+  (let ((error (eq kind :error)))
+    (hsx
+     (div :id "toast" :hx-swap-oob (and oob "true")
+          :class "pointer-events-none fixed inset-x-4 top-4 z-50 flex justify-center"
+       (when message
+         (hsx (div :role (if error "alert" "status")
+                   :class (clsx "toast pointer-events-auto w-full rounded-md border bg-panel px-4 py-3 text-sm shadow-lg sm:w-auto sm:max-w-md"
+                                (if error "toast-long border-danger/40 text-danger" "border-ok/40 text-ok"))
+                message)))))))
 
-(defcomp ~flash-oob (&key message (kind :ok))
-  "The flash for an action's answer: the session's flash waits for the next page,
-which a swap never renders, so the message goes out of band into the layout's #flash."
-  (hsx (div :id "flash" :hx-swap-oob "true" (~flash :message message :kind kind))))
+(defcomp ~toast-oob (&key message (kind :ok))
+  "The toast for an action's answer: the session's toast waits for the next page,
+which a swap never renders, so the message goes out of band into the layout's #toast."
+  (hsx (~toast :message message :kind kind :oob t)))
 
 (defun action-refusal (message &optional (status 400))
   "An action's answer when it cannot do what was asked: the page stays as it is and
-MESSAGE shows as the flash. htmx 4 swaps an error response in, so the reswap says not to."
+MESSAGE shows as the toast. htmx 4 swaps an error response in, so the reswap says not to."
   (set-response-status status)
   (set-response-header :hx-reswap "none")
-  (hsx (~flash-oob :message message :kind :error)))
+  (hsx (~toast-oob :message message :kind :error)))
 
 (defcomp ~errors (&key errors)
   (hsx
@@ -298,8 +306,8 @@ MESSAGE shows as the flash. htmx 4 swaps an error response in, so the reswap say
              (button :type "submit" :class "btn" :aria-label "Log out"
                      (~icon :name :logout) (span :class "hidden sm:inline" "Log out"))))))
      (main :class "mx-auto w-full max-w-5xl flex-1 px-4 py-8"
-       (multiple-value-bind (message kind) (take-flash)
-         (hsx (div :id "flash" (~flash :message message :kind kind))))
+       (multiple-value-bind (message kind) (take-toast)
+         (hsx (~toast :message message :kind kind)))
        children)
      (~footer))))
 

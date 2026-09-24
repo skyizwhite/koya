@@ -49,7 +49,7 @@
       (ok (= status 200))
       (ok (search "commandfor=\"new-space\" command=\"show-modal\"" body))
       (ok (search "<dialog id=\"new-space\" closedby=\"any\"" body))))
-  (testing "a space made answers a closed dialog, the list and a flash"
+  (testing "a space made answers a closed dialog, the list and a toast"
     (multiple-value-bind (status body) (call-action :post (create-space-action) :form '(("name" . "blog")))
       (ok (= status 200))
       (ok (search "<dialog id=\"new-space\"" body))

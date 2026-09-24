@@ -5,7 +5,7 @@
   (:import-from #:lack/request #:request-env)
   (:import-from #:koya-server/lib/auth #:calling-identity)
   (:import-from #:koya-server/lib/space-archive #:import-space #:+max-archive-bytes+)
-  (:import-from #:koya-server/lib/page #:set-flash #:space-url)
+  (:import-from #:koya-server/lib/page #:set-toast #:space-url)
   (:export #:import-space-action
            #:import-path))
 (in-package #:koya-server/actions/space-import)
@@ -19,7 +19,7 @@
 ;;; the owner is known, and read from there. That is why this action is here and
 ;;; not with the page: the middleware is loaded before any page is.
 ;;;
-;;; The answer is where to go next, in HX-Redirect; the flash waits there.
+;;; The answer is where to go next, in HX-Redirect; the toast waits there.
 
 (defun copy-to-file (in path)
   "Copy IN to PATH, refusing more than the import limit: a chunked body has no
@@ -42,10 +42,10 @@ Content-Length for the middleware to check."
         (progn
           (copy-to-file body path)
           (let ((space (import-space path :by (calling-identity))))
-            (set-flash (format nil "Space ~a imported." space))
+            (set-toast (format nil "Space ~a imported." space))
             (space-url space)))
       (error (e)
-        (set-flash (format nil "Import failed: ~a" e) :error)
+        (set-toast (format nil "Import failed: ~a" e) :error)
         "/"))))
 
 (defaction import-space-action :post (params)
@@ -54,7 +54,7 @@ Content-Length for the middleware to check."
     (set-response-header :hx-redirect
                          (if body
                              (import-archive body)
-                             (progn (set-flash "Choose an archive to import." :error) "/")))
+                             (progn (set-toast "Choose an archive to import." :error) "/")))
     (hsx (<>))))
 
 (defun import-path ()

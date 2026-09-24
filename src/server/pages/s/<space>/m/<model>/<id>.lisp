@@ -18,8 +18,8 @@
   (:import-from #:koya-server/lib/http #:path-param #:api-error #:api-error-message #:api-error-status)
   (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:param #:set-flash #:expand-url-template
-                #:short-time #:content-label #:~layout #:~status-badge #:~errors #:~icon #:~flash-oob #:action-refusal
+                #:with-owner #:set-title #:param #:set-toast #:expand-url-template
+                #:short-time #:content-label #:~layout #:~status-badge #:~errors #:~icon #:~toast-oob #:action-refusal
                 #:content-url #:model-url)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
   (:import-from #:koya-server/components/field-input #:~field-input)
@@ -226,19 +226,19 @@ named that this content does not have."
              (hsx (~editor-page :space space :model model :content content :data current)))))))))
 
 ;;; --- The action ---------------------------------------------------------------
-;;; What stays on this content answers #editor drawn again, with the flash out of
+;;; What stays on this content answers #editor drawn again, with the toast out of
 ;;; band; what moves to another page -- a content just made, one deleted -- goes
-;;; there with HX-Redirect, and the flash waits in the session.
+;;; there with HX-Redirect, and the toast waits in the session.
 
 (defun done (space model content message)
   "#editor for CONTENT as it is now stored. The URL loses a ?revision= a restore
 was being read at: what it offered is now saved or left behind."
   (set-response-header :hx-replace-url (content-url space (model-name model) (content-id content)))
   (hsx (<> (~editor :space space :model model :content content :data (content-data content :draft t))
-           (~flash-oob :message message))))
+           (~toast-oob :message message))))
 
 (defun move-on (url message)
-  (set-flash message)
+  (set-toast message)
   (set-response-header :hx-redirect url)
   (hsx (<>)))
 

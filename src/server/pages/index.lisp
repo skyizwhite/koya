@@ -7,7 +7,7 @@
   (:import-from #:koya-server/lib/media-store #:remove-space-media)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:param
-                #:~layout #:~empty-state #:~icon #:~flash-oob #:action-refusal #:space-url)
+                #:~layout #:~empty-state #:~icon #:~toast-oob #:action-refusal #:space-url)
   (:import-from #:koya-server/actions/space-import #:import-space-action)
   (:export #:@get #:@head #:create-space-action #:delete-space-action))
 (in-package #:koya-server/pages/index)
@@ -135,14 +135,14 @@ the import action as the request body (see actions/space-import)."
            ;; a fresh dialog in place of the open one closes it and clears the name
            (hsx (<> (~new-space-dialog)
                     (~space-list :spaces (list-spaces) :oob t)
-                    (~flash-oob :message message)))))))
+                    (~toast-oob :message message)))))))
 
 (defaction delete-space-action :post (params)
   (let ((name (param params "name")))
     (cond ((null (and name (find-space name))) (action-refusal "Space not found." 404))
           (t (remove-space name)
              (hsx (<> (~space-list :spaces (list-spaces))
-                      (~flash-oob :message (format nil "Space ~a deleted." name))))))))
+                      (~toast-oob :message (format nil "Space ~a deleted." name))))))))
 
 ;;; --- Page ---------------------------------------------------------------------
 

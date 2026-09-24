@@ -4,7 +4,7 @@
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/space-archive #:export-space #:archive-file-name #:archive-error)
-  (:import-from #:koya-server/lib/page #:with-owner #:set-flash #:redirect-to #:space-url #:~layout)
+  (:import-from #:koya-server/lib/page #:with-owner #:set-toast #:redirect-to #:space-url #:~layout)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/export)
 
@@ -13,7 +13,7 @@
 ;;;
 ;;; The link to it carries no download attribute: Content-Disposition makes the
 ;;; zip a download on its own, and a failure -- a redirect to the space page with
-;;; the flash, or to the login page -- has to be shown, not saved as a file.
+;;; the toast, or to the login page -- has to be shown, not saved as a file.
 
 (defun @get (params)
   (with-owner
@@ -28,5 +28,5 @@
                                 :content-disposition (format nil "attachment; filename=\"~a\"" (archive-file-name name)))
                       octets))
             (archive-error (e)
-              (set-flash (princ-to-string e) :error)
+              (set-toast (princ-to-string e) :error)
               (redirect-to (space-url name))))))))

@@ -50,13 +50,13 @@
       (ok (search "koya_" body))
       (ng (search "<html" body) "a fragment, not a page"))
     (ok (= (length (list-delivery-keys "website")) 1)))
-  (testing "deleting answers the section and a flash out of band"
+  (testing "deleting answers the section and a toast out of band"
     (let ((id (getf (first (list-delivery-keys "website")) :id)))
       (multiple-value-bind (status body) (call-action :post (delete-key :space "website" :kind "delivery")
                                                       :form `(("id" . ,id)))
         (ok (= status 200))
         (ok (search "No keys yet." body))
-        (ok (search "id=\"flash\" hx-swap-oob=\"true\"" body))
+        (ok (search "id=\"toast\" hx-swap-oob=\"true\"" body))
         (ok (search "Key deleted." body)))
       (ok (null (list-delivery-keys "website")))))
   (testing "rotating answers the secret's section"

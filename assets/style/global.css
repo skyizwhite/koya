@@ -31,7 +31,7 @@ body {
 }
 
 .btn {
-  @apply inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm font-medium text-fg hover:bg-base disabled:cursor-default disabled:opacity-50;
+  @apply inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm font-medium text-fg hover:bg-base disabled:cursor-not-allowed disabled:opacity-50;
 }
 .btn-primary {
   @apply border-accent bg-accent text-accent-fg hover:bg-accent/90;
@@ -81,6 +81,33 @@ dialog.koya-dialog[open] {
 }
 dialog.koya-dialog::backdrop {
   background: rgb(31 29 26 / 0.4);
+}
+
+/* A toast (~toast) comes up, stays a while and goes by itself, and waits while
+   the pointer is on it. It stays in the page, invisible, until the next one takes
+   its place. */
+.toast {
+  animation: toast 5s ease forwards;
+}
+.toast-long {
+  animation-duration: 10s;
+}
+.toast:hover {
+  animation-play-state: paused;
+}
+@keyframes toast {
+  0% { opacity: 0; translate: 0 -0.5rem; }
+  6% { opacity: 1; translate: 0 0; }
+  92% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+@keyframes toast-still {
+  0% { opacity: 0; }
+  6%, 92% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation-name: toast-still; }
 }
 
 /* Quill */

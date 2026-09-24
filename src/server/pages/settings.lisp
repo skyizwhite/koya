@@ -10,7 +10,7 @@
   (:import-from #:koya/core/time #:now-iso)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:param
-                #:~layout #:~icon #:~flash-oob)
+                #:~layout #:~icon #:~toast-oob)
   (:import-from #:ningle-actions #:defaction)
   (:export #:@get
            #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
@@ -105,7 +105,7 @@
            (~two-factor :pending pending)))))
 
 ;;; --- The work ------------------------------------------------------------------
-;;; Each returns (values MESSAGE ERROR): a flash for success, or what went wrong.
+;;; Each returns (values MESSAGE ERROR): a toast for success, or what went wrong.
 
 (defun save-timezone (params)
   (let ((name (string-trim " " (or (param params "timezone") ""))))
@@ -132,10 +132,10 @@
 ;;; --- Actions ------------------------------------------------------------------
 
 (defun answer (card message error)
-  "The card drawn again, with MESSAGE as the flash or ERROR inside it (422)."
+  "The card drawn again, with MESSAGE as the toast or ERROR inside it (422)."
   (when error (set-response-status 422))
   (if message
-      (hsx (<> card (~flash-oob :message message)))
+      (hsx (<> card (~toast-oob :message message)))
       card))
 
 (defaction save-timezone-action :post (params)

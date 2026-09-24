@@ -58,7 +58,7 @@
           (ok (= (jget draft "count") 2.5))
           (ok (string= (jget draft "when") "2026-09-20T10:00:00.000Z") "datetime-local value stored as UTC in the canonical form")
           (ok (equalp (jget draft "related") #("x1" "x2")) "a multiple select repeats the name"))))
-    (testing "editor shows the draft and the flash exactly once"
+    (testing "editor shows the draft and the toast exactly once"
       (multiple-value-bind (status body) (request :get (format nil "/s/website/m/blog/~a" id))
         (ok (= status 200))
         (ok (search "value=\"Hello World\"" body))
@@ -74,7 +74,7 @@
         (ng (search "NIL" body) "no stray NILs in the page"))
       (multiple-value-bind (status body) (request :get (format nil "/s/website/m/blog/~a" id))
         (ok (= status 200))
-        (ng (search "Draft saved" body) "flash is gone on the next request")))
+        (ng (search "Draft saved" body) "toast is gone on the next request")))
     (testing "text with a literal entity survives the editor"
       (multiple-value-bind (status body headers)
           (edit "/s/website/m/blog/new"
@@ -123,7 +123,7 @@
           (ok (= status 200))
           (ok (string= (moved-to headers) (format nil "/s/website/m/blog/~a" id)))
           (ok (search "id=\"editor\"" body) "the editor is drawn again")
-          (ok (search "Draft discarded." body) "with the flash out of band")
+          (ok (search "Draft discarded." body) "with the toast out of band")
           (ok (search "value=\"Hello World\"" body) "and the published data back in it"))
         (multiple-value-bind (status body) (request :get (format nil "/s/website/m/blog/~a" id))
           (ok (= status 200))
@@ -135,7 +135,7 @@
           (edit (format nil "/s/website/m/blog/~a" id)
                     :form '(("action" . "publish") ("f-title" . "Hello World") ("f-slug" . "hello-world") ("f-body" . "# Hi")))
         (ok (= status 200))
-        (ok (search "Published." body) "flash after publish")
+        (ok (search "Published." body) "toast after publish")
         (ok (string= (moved-to headers) (format nil "/s/website/m/blog/~a" id)) "the URL loses any query noise"))
       (let ((content (first (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))
         (ok (string= (content-status content) "published"))
@@ -352,7 +352,7 @@
         (ok (= status 409))
         (ok (equal (getf headers :hx-reswap) "none") "the editor stays as it is")
         (ok (null (moved-to headers)) "and on this content, not the list")
-        (ok (search "referenced by 1 other content" body) "the flash says why")
+        (ok (search "referenced by 1 other content" body) "the toast says why")
         (ok (get-content target) "it is still there")))))
 
 (deftest history-is-read-in-place

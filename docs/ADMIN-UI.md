@@ -53,6 +53,9 @@ no user accounts: whoever knows the secret is the owner.
 - The admin UI needs JavaScript. What is done on a page — saving, publishing,
   uploading, deleting, making a key — is sent with htmx and answered in place,
   so the page does not reload; moving between pages is ordinary navigation.
+  What came of it shows in a toast at the top of the screen that goes by itself
+  — after a few seconds, or twice as long for an error — and waits while the
+  pointer is on it.
   Searching, filtering, sorting and paging a list are answered in place too, and
   the URL is replaced with them, so a reload, a bookmark or the back button from
   another page comes back to the list as it was left. The steps in between are

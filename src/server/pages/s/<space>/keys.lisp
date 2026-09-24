@@ -8,7 +8,7 @@
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:param #:short-time
-                #:~layout #:~empty-state #:~icon #:~flash-oob #:action-refusal)
+                #:~layout #:~empty-state #:~icon #:~toast-oob #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
   (:export #:@get #:create-key #:delete-key #:rotate-secret))
 (in-package #:koya-server/pages/s/<space>/keys)
@@ -126,7 +126,7 @@
     (if (and space kind)
         (progn (funcall (getf (key-kind kind) :delete) space (or (param params "id") ""))
                (hsx (<> (~key-section :space space :kind kind)
-                        (~flash-oob :message "Key deleted."))))
+                        (~toast-oob :message "Key deleted."))))
         (action-refusal "Unknown space or kind of key." 404))))
 
 (defaction rotate-secret :post (params)
@@ -134,7 +134,7 @@
     (if space
         (progn (rotate-webhook-secret space)
                (hsx (<> (~webhook-secret :space space)
-                        (~flash-oob :message "Webhook secret rotated."))))
+                        (~toast-oob :message "Webhook secret rotated."))))
         (action-refusal "Unknown space." 404))))
 
 ;;; --- Page ---------------------------------------------------------------------

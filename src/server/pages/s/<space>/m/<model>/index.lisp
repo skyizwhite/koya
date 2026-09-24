@@ -17,7 +17,7 @@
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:redirect-to
                 #:param #:short-time #:content-label
-                #:~layout #:~status-badge #:~empty-state #:~icon #:~flash-oob #:action-refusal
+                #:~layout #:~status-badge #:~empty-state #:~icon #:~toast-oob #:action-refusal
                 #:content-url #:model-url)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/lib/content-service
@@ -404,7 +404,7 @@ count, the sort the filters send, and the URL the list is now read at."
                (if clear
                    (hsx (~filters :space space :model model-name :sort-key (getf state :sort-key) :oob t))
                    (hsx (~sort-input :sort-key (getf state :sort-key) :oob t)))
-               (if message (hsx (~flash-oob :message message :kind kind)) (hsx (<>))))))))
+               (if message (hsx (~toast-oob :message message :kind kind)) (hsx (<>))))))))
 
 (defun @get (params)
   (with-owner
@@ -475,7 +475,7 @@ draft key and break a preview link."
                      (incf done)))
         (error (e) (incf failed) (unless message (setf message (failure-message e))))))))
 
-(defun bulk-flash (action done skipped failed message)
+(defun bulk-toast (action done skipped failed message)
   (let ((verb (cond ((equal action "publish") "Published")
                     ((equal action "unpublish") "Unpublished")
                     (t "Deleted")))
@@ -499,7 +499,7 @@ draft key and break a preview link."
                (if (null ids)
                    (values "Nothing was selected." :error)
                    (multiple-value-bind (done skipped failed first) (apply-to-each space model ids op)
-                     (values (bulk-flash op done skipped failed first) (if (plusp failed) :error :ok))))
+                     (values (bulk-toast op done skipped failed first) (if (plusp failed) :error :ok))))
              ;; a page emptied by a delete shows the last one there still is
              (answer-list space model (read-state params model) :message message :kind kind))))))
 

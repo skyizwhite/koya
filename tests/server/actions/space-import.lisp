@@ -73,7 +73,7 @@
     (testing "the space page offers the export"
       (let ((body (nth-value 1 (request :get "/s/archive"))))
         (ok (search "href=\"/s/archive/export\"" body))
-        (ng (search "download" body) "a failed export must show its flash, not be saved as a file")))
+        (ng (search "download" body) "a failed export must show its toast, not be saved as a file")))
     (testing "export is a zip download"
       (multiple-value-bind (status body headers) (request :get "/s/archive/export")
         (ok (= status 200))
