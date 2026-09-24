@@ -1,4 +1,4 @@
-(defpackage #:koya-server/lib/webhook
+(defpackage #:koya-server/features/webhooks/notify
   (:use #:cl)
   (:import-from #:koya/core/json
                 #:jobject #:to-json #:json-null)
@@ -18,7 +18,7 @@
            #:*webhook-sender*
            #:*webhook-async*
            #:*webhook-log*))
-(in-package #:koya-server/lib/webhook)
+(in-package #:koya-server/features/webhooks/notify)
 
 ;;; Content change notifications:
 ;;; {"space": SPACE, "model": MODEL, "id": ID, "event": "publish"|"unpublish"|"delete"|"draft",

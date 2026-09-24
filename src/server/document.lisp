@@ -1,8 +1,17 @@
 (defpackage #:koya-server/document
   (:use #:cl #:hsx)
+  (:import-from #:ningle #:context)
   (:import-from #:koya-server/lib/assets #:asset-url)
-  (:export #:~document))
+  (:export #:~document
+           #:set-title
+           #:page-title))
 (in-package #:koya-server/document)
+
+;;; The HTML around every page app.lisp answers. A page names its <title> with
+;;; SET-TITLE while it runs; the document is drawn after it returns.
+
+(defun set-title (title) (setf (context :title) title))
+(defun page-title () (context :title))
 
 (defcomp ~document (&key title children)
   (hsx

@@ -4,81 +4,32 @@
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-name #:model-fields #:model-field
-                #:field-name #:field-type #:field-option
-                #:webhook-covers-p #:+system-fields+)
+                #:model-kind #:model-name #:model-fields #:field-name #:field-type
+                #:webhook-covers-p)
   (:import-from #:koya/core/json #:json-null)
   (:import-from #:koya-server/db/schema-store #:find-space #:find-model #:space-webhooks)
   (:import-from #:koya-server/db/contents
-                #:list-contents #:count-contents #:find-object-content
-                #:content-id #:content-status #:content-data)
-  (:import-from #:koya-server/lib/query #:make-query)
-  (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:redirect-to
-                #:param #:short-time #:content-label
-                #:~layout #:~status-badge #:~empty-state #:~icon #:~toast-oob #:action-refusal
-                #:content-url #:model-url)
+                #:count-contents #:find-object-content #:content-id #:content-status #:content-data)
+  (:import-from #:koya-server/lib/http #:path-param #:redirect-to #:param #:form-values #:blank-p)
+  (:import-from #:koya-server/lib/paging #:page-number)
+  (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/lib/display #:short-time)
+  (:import-from #:koya-server/lib/urls #:content-url #:model-url)
+  (:import-from #:koya-server/document #:set-title)
+  (:import-from #:koya-server/ui/layout #:~layout)
+  (:import-from #:koya-server/ui/elements #:~status-badge #:~empty-state)
+  (:import-from #:koya-server/ui/icon #:~icon)
+  (:import-from #:koya-server/ui/toast #:~toast-oob #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/lib/content-service
-                #:publish #:unpublish #:destroy)
-  (:import-from #:koya-server/lib/forms #:number->string #:form-values)
-  (:import-from #:koya-server/lib/http #:api-error #:api-error-message)
-  (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
-  (:import-from #:koya-server/db/contents #:find-content #:content-published #:content-draft)
+  (:import-from #:koya-server/features/contents/listing #:+statuses+ #:parse-sort #:content-page #:page-media)
+  (:import-from #:koya-server/features/contents/labels #:content-label #:reference-labels)
+  (:import-from #:koya-server/features/contents/bulk #:bulk-action-p #:apply-to-each)
+  (:import-from #:koya-server/features/contents/forms #:number->string)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
-  (:import-from #:koya-server/db/media #:find-media-by-ids #:media-alt)
-  (:import-from #:koya-server/lib/media-store #:media-url)
+  (:import-from #:koya-server/db/media #:media-alt)
+  (:import-from #:koya-server/features/media/store #:media-url)
   (:export #:@get #:bulk-contents #:browse-contents))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
-
-(defparameter +page-size+ 20
-  "Rows per page, the same everywhere in the admin UI: a page is what fits on a
-screen without scrolling past it, and the search and the filters are how a
-particular content is found.")
-
-(defun page-number (params)
-  (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
-
-;;; Search, status and sort live in the query string, so a list as it is being
-;;; read is a link. All three go through lib/query, the delivery API's own
-;;; machinery for a WHERE and an ORDER BY over the JSON.
-
-(defparameter +searchable-types+ '(:text :textarea :slug :richtext)
-  "Field types a search looks inside. :RICHTEXT is searched as the HTML it is
-stored as, so a query that reads like markup can match a tag.")
-
-(defparameter +statuses+ '("draft" "published" "published+draft")
-  "The status filter's choices: the three badges the list shows.")
-
-(defun blank-p (value) (or (null value) (zerop (length value))))
-
-(defun search-filters (model search-text)
-  "Filter groups matching SEARCH-TEXT against every searchable field of MODEL and
-against its id whole, OR'ed together by BUILD-WHERE. Whole, because ids made in
-the same period share a prefix and a short query would match them all."
-  (let ((text-fields (loop :for field :in (model-fields model)
-                           :when (member (field-type field) +searchable-types+)
-                             :collect (field-name field))))
-    (cons (list (list "id" "equals" search-text))
-          (mapcar (lambda (name) (list (list name "contains" search-text))) text-fields))))
-
-(defun sortable-p (model name)
-  (and (not (blank-p name))
-       (or (model-field model name)
-           (member name +system-fields+ :test #'string=))))
-
-(defun parse-sort (raw model)
-  "(values NAME DIRECTION) for ?sort=, or NIL when it names nothing sortable: a
-stale link falls back to the default order."
-  (let* ((desc (and (not (blank-p raw)) (char= (char raw 0) #\-)))
-         (name (and (not (blank-p raw)) (if desc (subseq raw 1) raw))))
-    (when (sortable-p model name)
-      (values name (if desc :desc :asc)))))
-
-(defun sort-orders (name direction)
-  "ORDERS for the query. Without a sort the list is newest created first."
-  (if name (list (cons name direction)) (list (cons "createdAt" :desc))))
 
 (defun list-url (space model &key search-text status sort-key (page 1))
   "This model's list with the search, filter, sort and page it is being read at."
@@ -116,35 +67,9 @@ taking the whole width.")
   "Two text-sm lines plus padding. On the row, not the cell, so that a shorter
 preview is centred with the badge and the chevron.")
 
-(defun reference-labels (space model)
-  "Field name -> hash of referenced id -> label, for every reference field of
-MODEL. Passed explicitly: components render lazily."
-  (let ((table (make-hash-table :test 'equal)))
-    (dolist (field (model-fields model) table)
-      (when (eq (field-type field) :reference)
-        (let ((target (find-model space (field-option field :model)))
-              (targets (make-hash-table :test 'equal)))
-          (when target
-            (dolist (content (list-contents space (model-name target) target
-                                            (make-query :limit 1000) :status :all))
-              (setf (gethash (content-id content) targets) (content-label content target))))
-          (setf (gethash (field-name field) table) targets))))))
-
 (defun reference-label (field id ref-labels)
   (let ((table (and ref-labels (gethash (field-name field) ref-labels))))
     (or (and table (stringp id) (gethash id table)) id)))
-
-(defun page-media (space model contents)
-  "Hash of media id -> media for every media field of CONTENTS, the page's rows.
-An id missing from it is no longer in the library."
-  (find-media-by-ids
-   space
-   (loop :for content :in contents
-         :for data := (content-data content :draft t)
-         :nconc (loop :for field :in (model-fields model)
-                      :for value := (and data (gethash (field-name field) data))
-                      :when (and (eq (field-type field) :media) (stringp value) (plusp (length value)))
-                        :collect value))))
 
 (defun collapse-whitespace (string)
   (string-trim " " (regex-replace-all "\\s+" string " ")))
@@ -286,14 +211,9 @@ Each button is an action on the selection form's boxes."
 
 (defun fetch-page (space model state)
   "(values CONTENTS TOTAL PAGES) of STATE's page."
-  (let ((query (make-query :limit +page-size+
-                           :offset (* (1- (getf state :page)) +page-size+)
-                           :orders (sort-orders (getf state :sort-name) (getf state :sort-direction))
-                           :filters (let ((text (getf state :search-text)))
-                                      (unless (blank-p text) (search-filters model text))))))
-    (multiple-value-bind (contents total)
-        (list-contents space (model-name model) model query :status :all :only-status (getf state :status))
-      (values contents total (max 1 (ceiling total +page-size+))))))
+  (content-page space model :page (getf state :page) :search-text (getf state :search-text)
+                            :status (getf state :status)
+                            :sort-name (getf state :sort-name) :sort-direction (getf state :sort-direction)))
 
 (defun filtered-p (state)
   (not (and (blank-p (getf state :search-text)) (blank-p (getf state :status)))))
@@ -430,51 +350,6 @@ count, the sort the filters send, and the URL the list is now read at."
                      (hsx (~list-page :space space :model model :state state
                                       :contents contents :total total :pages pages))))))))))
 
-;;; Bulk actions: one content at a time through content-service, so validation,
-;;; timestamps and webhooks behave as they do for a single one. One that fails
-;;; leaves the rest to go through.
-
-(defun bulk-action-function (action)
-  (cond ((equal action "publish") #'publish)
-        ((equal action "unpublish") #'unpublish)
-        ((equal action "delete") #'destroy)))
-
-(defun nothing-to-do-p (action content)
-  "True when ACTION would change nothing. A selection is a tick of the header box,
-so it holds published and draft alike: publishing what is published again would
-move revisedAt and fire a webhook, and unpublishing a draft would reissue its
-draft key and break a preview link."
-  (and content
-       (cond ((equal action "publish") (and (content-published content) (null (content-draft content))))
-             ((equal action "unpublish") (null (content-published content)))
-             (t nil))))
-
-(defun failure-message (condition)
-  "A validation failure as the field that stopped it, not the condition's report."
-  (typecase condition
-    (validation-error
-     (format nil "~{~a~^, ~}"
-             (mapcar (lambda (e) (format nil "~a ~a" (getf e :field) (getf e :message)))
-                     (validation-error-errors condition))))
-    (api-error (api-error-message condition))
-    (t (princ-to-string condition))))
-
-(defun apply-to-each (space model ids action)
-  "Do ACTION to each of IDS. Returns (values DONE SKIPPED FAILED FIRST-MESSAGE)."
-  (let ((function (bulk-action-function action))
-        (model-name (model-name model))
-        (done 0)
-        (skipped 0)
-        (failed 0)
-        (message nil))
-    (dolist (id ids (values done skipped failed message))
-      (handler-case
-          (if (nothing-to-do-p action (find-content space model-name id))
-              (incf skipped)
-              (progn (funcall function space model id)
-                     (incf done)))
-        (error (e) (incf failed) (unless message (setf message (failure-message e))))))))
-
 (defun bulk-message (action done skipped failed message)
   (let ((verb (cond ((equal action "publish") "Published")
                     ((equal action "unpublish") "Unpublished")
@@ -492,7 +367,7 @@ draft key and break a preview link."
          (model (and space (find-space space) (find-model space (or (param params "model") ""))))
          (op (param params "op"))
          (ids (form-values params "id")))
-    (cond ((or (null model) (null (bulk-action-function op)))
+    (cond ((or (null model) (not (bulk-action-p op)))
            (action-refusal "Unknown model or action." 404))
           (t
            (multiple-value-bind (message kind)

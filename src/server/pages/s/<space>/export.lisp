@@ -2,13 +2,16 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/db/schema-store #:find-space)
-  (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/lib/space-archive #:export-space #:archive-file-name #:archive-error)
-  (:import-from #:koya-server/lib/page #:with-owner #:set-toast #:redirect-to #:space-url #:~layout)
+  (:import-from #:koya-server/lib/http #:path-param #:redirect-to)
+  (:import-from #:koya-server/features/spaces/archive #:export-space #:archive-file-name #:archive-error)
+  (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/lib/urls #:space-url)
+  (:import-from #:koya-server/ui/layout #:~layout)
+  (:import-from #:koya-server/ui/toast #:set-toast)
   (:export #:@get))
 (in-package #:koya-server/pages/s/<space>/export)
 
-;;; The space as a zip download (lib/space-archive). The whole archive is built
+;;; The space as a zip download (features/spaces/archive). The whole archive is built
 ;;; in memory before it is sent, so its size is what the process must hold.
 ;;;
 ;;; The link to it carries no download attribute: Content-Disposition makes the

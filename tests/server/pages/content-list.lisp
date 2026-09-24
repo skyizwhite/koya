@@ -8,7 +8,7 @@
   (:import-from #:koya-server/db/contents #:save-draft)
   (:import-from #:koya-server/db/media #:insert-media #:media-id)
   (:import-from #:koya-server/db/contents #:get-content #:content-published)
-  (:import-from #:koya-server/lib/content-service #:resolve-model #:create)
+  (:import-from #:koya-server/features/contents/service #:resolve-model #:create)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-tests/server/pages/support #:call-action)
   (:import-from #:koya-server/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents))

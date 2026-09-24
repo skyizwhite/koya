@@ -1,17 +1,17 @@
-(defpackage #:koya-server/actions/media-picker
+(defpackage #:koya-server/ui/media/picker
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/media #:list-media)
-  (:import-from #:koya-server/lib/media-store #:store-upload)
-  (:import-from #:koya-server/lib/http #:uploaded-files #:api-error #:api-error-message)
-  (:import-from #:koya-server/lib/page #:param #:~icon)
-  (:import-from #:koya-server/components/media-grid #:~media-grid)
+  (:import-from #:koya-server/features/media/library #:store-uploads)
+  (:import-from #:koya-server/lib/http #:uploaded-files #:api-error #:api-error-message #:param)
+  (:import-from #:koya-server/ui/icon #:~icon)
+  (:import-from #:koya-server/ui/media/grid #:~media-grid)
   (:export #:media-picker
            #:media-picker-upload
            #:~media-picker-dialog))
-(in-package #:koya-server/actions/media-picker)
+(in-package #:koya-server/ui/media/picker)
 
 ;;; The media picker: a <dialog> on the editor page whose body is fetched from
 ;;; these actions with HTMX, so the same grid serves :media fields and Quill's
@@ -54,10 +54,8 @@
         (t (let ((space (picker-space params))
                  (files (uploaded-files params "file")))
              (handler-case
-                 (progn
-                   (dolist (file files)
-                     (store-upload space (first file) :filename (second file)))
-                   (hsx (~picker-body :space space)))
+                 (progn (store-uploads space files)
+                        (hsx (~picker-body :space space)))
                (api-error (e)
                  (hsx (~picker-body :space space :error (api-error-message e)))))))))
 

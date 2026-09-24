@@ -1,15 +1,15 @@
-(defpackage #:koya-server/lib/media-store
+(defpackage #:koya-server/features/media/store
   (:use #:cl)
   (:import-from #:koya-server/lib/env
                 #:media-dir #:base-url)
-  (:import-from #:koya-server/lib/image
+  (:import-from #:koya-server/features/media/image
                 #:sniff-image #:image-extension #:+image-types+)
   (:import-from #:koya-server/lib/http
                 #:fail-api)
   (:import-from #:koya-server/db/media
-                #:insert-media #:find-media #:delete-media #:media-references
-                #:media-id #:media-space #:media-filename #:media-mime #:media-size
-                #:media-width #:media-height #:media-alt #:media-created-at)
+                #:insert-media #:delete-media #:media-references #:media-id #:media-space
+                #:media-filename #:media-mime #:media-size #:media-width #:media-height #:media-alt
+                #:media-created-at)
   (:import-from #:koya/core/json
                 #:jobject #:json-null)
   (:import-from #:cl-ppcre
@@ -23,7 +23,7 @@
            #:media-url
            #:media->jobject
            #:+max-upload-bytes+))
-(in-package #:koya-server/lib/media-store)
+(in-package #:koya-server/features/media/store)
 
 ;;; Files on disk plus the metadata row. Layout: {KOYA_MEDIA_DIR}/{space}/{id}.{ext},
 ;;; served by the app itself at /media/{space}/{id}.{ext}.

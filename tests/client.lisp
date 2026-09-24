@@ -3,7 +3,7 @@
   (:import-from #:koya-server #:start #:stop)
   (:import-from #:koya-server/db/delivery-keys #:create-delivery-key)
   (:import-from #:koya-server/db/management-keys #:create-management-key)
-  (:import-from #:koya-server/lib/webhook #:*webhook-sender* #:*webhook-async*)
+  (:import-from #:koya-server/features/webhooks/notify #:*webhook-sender* #:*webhook-async*)
   (:import-from #:koya-server/db/schema-store #:create-space)
   (:import-from #:koya/config #:defmodel #:clear-schema #:current-schema)
   (:import-from #:koya/core/schema #:schema-models #:model-name)
@@ -14,7 +14,7 @@
                 #:publish-content #:unpublish-content #:discard-draft #:delete-content #:draft-key
                 #:list-delivery-keys #:delete-delivery-key #:webhook-secret
                 #:list-media #:get-media #:upload-media #:update-media #:delete-media)
-  (:import-from #:koya-tests/server/media #:png-bytes #:*media-root*))
+  (:import-from #:koya-tests/server/features/media/store #:png-bytes #:*media-root*))
 (in-package #:koya-tests/client)
 
 (defparameter *port* 3987)

@@ -1,19 +1,18 @@
 (defpackage #:koya-server/middlewares
   (:use #:cl)
-  (:import-from #:koya-server/lib/media-store
+  (:import-from #:koya-server/features/media/store
                 #:+max-upload-bytes+)
-  (:import-from #:koya-server/lib/space-archive
+  (:import-from #:koya-server/features/spaces/archive
                 #:+max-archive-bytes+)
-  (:import-from #:koya-server/actions/space-import
-                #:import-path)
-  (:export #:*cache-control-middleware*
+  (:export #:archive-path
+           #:*cache-control-middleware*
            #:*delivery-cors-middleware*
            #:*body-limit-middleware*))
 (in-package #:koya-server/middlewares)
 
 ;;; The Lack middlewares app.lisp installs. Two stay with what they are built from:
 ;;; the auth guards in lib/auth, which share its key and session checks, and
-;;; *media-middleware* in lib/media-store, which serves the layout it writes.
+;;; *media-middleware* in features/media/store, which serves the layout it writes.
 
 (defun prefix-p (prefix path)
   (and (>= (length path) (length prefix)) (string= prefix path :end2 (length prefix))))
@@ -58,9 +57,21 @@ X-KOYA-DELIVERY-KEY, and lets the page read every answer, errors included.")
 (defparameter +max-body-bytes+ (+ +max-upload-bytes+ (* 1024 1024))
   "Largest request body accepted: the media upload limit plus room for the other parts.")
 
+;;; Paths whose body is a space archive: larger than any other, and set aside
+;;; unread for the action to copy to a file. The action is on a page, and pages
+;;; load after this, so it names its path here where it is defined, as a public
+;;; path is named in lib/auth.
+
+(defvar *archive-paths* (make-hash-table :test 'equal))
+
+(defun archive-path (url)
+  "Take a space archive as the body of a POST to URL's path (its query dropped). Returns URL."
+  (setf (gethash (subseq url 0 (position #\? url)) *archive-paths*) t)
+  url)
+
 (defun import-body-p (env)
   (and (eq (getf env :request-method) :post)
-       (string= (getf env :path-info) (import-path))
+       (gethash (getf env :path-info) *archive-paths*)
        (prefix-p "application/zip" (or (getf env :content-type) ""))))
 
 (defparameter *body-limit-middleware*
@@ -80,7 +91,7 @@ X-KOYA-DELIVERY-KEY, and lets the page read every answer, errors included.")
                      (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")
                            (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message))))))
               (import-p
-               ;; a space archive is set aside unread for actions/space-import, which
+               ;; a space archive is set aside unread for the import action, which
                ;; copies it to a file once the owner is known. Left as the raw
                ;; body, lack would wrap it in a stream that keeps whatever is read
                ;; in memory.

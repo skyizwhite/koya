@@ -1,7 +1,7 @@
 (defpackage #:koya-server/lib/http
   (:use #:cl)
   (:import-from #:jingle
-                #:set-response-header #:set-response-status #:get-request-header)
+                #:set-response-header #:set-response-status #:get-request-header #:redirect)
   (:import-from #:ningle
                 #:*request* #:*response* #:process-response)
   (:import-from #:lack/request
@@ -31,9 +31,12 @@
            #:fail-api
            #:read-json-body
            #:path-param
-           #:query-param
+           #:param
+           #:blank-p
+           #:redirect-to
            #:body-field
            #:form-field
+           #:form-values
            #:uploaded-files
            #:header
            #:origin-allowed-p
@@ -114,9 +117,15 @@ vectors, strings...) and whose errors become JSON error responses."))
 (defun path-param (params key)
   (cdr (assoc key params)))
 
-(defun query-param (params name)
+(defun blank-p (value) (or (null value) (zerop (length value))))
+
+(defun param (params name)
+  "A query or form parameter, or NIL when absent or blank."
   (let ((v (cdr (assoc name params :test #'equal))))
-    (if (and (stringp v) (string= v "")) nil v)))
+    (if (and (stringp v) (blank-p v)) nil v)))
+
+(defun redirect-to (path &optional (status 303))
+  (redirect path status))
 
 (defun body-field (body name &optional default)
   (multiple-value-bind (v found) (gethash name body)
@@ -126,6 +135,11 @@ vectors, strings...) and whose errors become JSON error responses."))
   "A plain (non-file) form field, or NIL when absent or blank."
   (let ((v (cdr (assoc name params :test #'equal))))
     (and (stringp v) (plusp (length (string-trim " " v))) (string-trim " " v))))
+
+(defun form-values (params name)
+  "All values submitted under NAME (checkbox groups and a selection repeat the name)."
+  (loop :for (k . v) :in params
+        :when (and (stringp k) (string= k name)) :collect v))
 
 (defun uploaded-files (params name)
   "Files posted under NAME as a list of (octets filename content-type). A multipart

@@ -20,7 +20,7 @@
                 #:*clack-error-middleware*)
   (:import-from #:koya-server/lib/env
                 #:dev-mode-p #:base-url)
-  (:import-from #:koya-server/lib/media-store
+  (:import-from #:koya-server/features/media/store
                 #:*media-middleware*)
   (:import-from #:koya-server/lib/http
                 #:make-json-app)
@@ -31,7 +31,7 @@
   (:import-from #:koya-server/db/sessions
                 #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/document
-                #:~document)
+                #:~document #:page-title)
   (:export #:*app*
            #:*api-app*
            #:*admin-api-app*
@@ -65,7 +65,7 @@ of this system, so loading it again leaves an edited route stale; RELOAD calls t
       (progn
         (set-response-header :content-type "text/html; charset=utf-8")
         (call-next-method app (and result (hsx:render-to-string
-                                           (hsx:hsx (~document :title (ningle:context :title) result))))))))
+                                           (hsx:hsx (~document :title (page-title) result))))))))
 
 (defmethod process-response :around ((app (eql *actions-app*)) result)
   (set-response-header :content-type "text/html; charset=utf-8")

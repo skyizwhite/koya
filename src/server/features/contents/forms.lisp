@@ -1,31 +1,26 @@
-(defpackage #:koya-server/lib/forms
+(defpackage #:koya-server/features/contents/forms
   (:use #:cl)
-  (:import-from #:koya/core/schema
-                #:model-fields #:field-name #:field-type #:field-option #:field-many-p)
+  (:import-from #:koya/core/schema #:model-fields #:field-name #:field-type #:field-many-p)
   (:import-from #:koya/core/json
                 #:json-null)
   (:import-from #:cl-ppcre
                 #:regex-replace-all #:split #:scan)
   (:import-from #:koya-server/lib/timezone
                 #:iso->local-input #:local-input->iso)
+  (:import-from #:koya-server/lib/http
+                #:form-values)
   (:export #:form->data
            #:field-param-name
-           #:form-values
            #:form-value
            #:slugify
            #:value->string
            #:number->string))
-(in-package #:koya-server/lib/forms)
+(in-package #:koya-server/features/contents/forms)
 
 ;;; Conversion between HTML form submissions and content data objects.
 
 (defun field-param-name (field)
   (format nil "f-~a" (field-name field)))
-
-(defun form-values (params name)
-  "All values submitted under NAME (checkbox groups repeat the name)."
-  (loop :for (k . v) :in params
-        :when (and (stringp k) (string= k name)) :collect v))
 
 (defun form-value (params name)
   (let ((v (first (form-values params name))))

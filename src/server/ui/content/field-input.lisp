@@ -1,21 +1,20 @@
-(defpackage #:koya-server/components/field-input
+(defpackage #:koya-server/ui/content/field-input
   (:use #:cl #:hsx)
   (:import-from #:koya/core/schema
                 #:field-name #:field-type #:field-option #:field-required-p #:field-many-p)
   (:import-from #:koya/core/json
                 #:json-null)
-  (:import-from #:koya-server/lib/forms
+  (:import-from #:koya-server/features/contents/forms
                 #:field-param-name #:value->string)
   (:import-from #:koya-server/db/media
                 #:media-filename #:media-alt)
-  (:import-from #:koya-server/lib/media-store
+  (:import-from #:koya-server/features/media/store
                 #:media-url)
-  (:import-from #:koya-server/lib/page
-                #:~icon)
+  (:import-from #:koya-server/ui/icon #:~icon)
   (:import-from #:koya-server/lib/timezone
                 #:display-timezone-name)
   (:export #:~field-input))
-(in-package #:koya-server/components/field-input)
+(in-package #:koya-server/ui/content/field-input)
 
 ;;; One form control per field type.
 

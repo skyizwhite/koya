@@ -212,7 +212,7 @@ stored."
 ;;; ---------------------------------------------------------------------------
 ;;; Webhooks: plists (:label L :url U :only (M...)), so EQUAL compares them. They
 ;;; belong to the space and fire for every model unless :ONLY narrows them; every
-;;; one is sent every event (see lib/webhook).
+;;; one is sent every event (see features/webhooks/notify).
 
 (defun webhook-label (webhook) (getf webhook :label))
 (defun webhook-url (webhook) (getf webhook :url))

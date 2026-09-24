@@ -1,16 +1,15 @@
-(defpackage #:koya-server/components/media-grid
+(defpackage #:koya-server/ui/media/grid
   (:use #:cl #:hsx)
   (:import-from #:koya-server/db/media
                 #:media-id #:media-filename #:media-width #:media-height #:media-alt)
-  (:import-from #:koya-server/lib/media-store
+  (:import-from #:koya-server/features/media/store
                 #:media-url)
-  (:import-from #:koya-server/lib/page
-                #:~empty-state)
+  (:import-from #:koya-server/ui/elements #:~empty-state)
   (:export #:~media-grid
            #:~thumb
            #:dimensions
            #:human-size))
-(in-package #:koya-server/components/media-grid)
+(in-package #:koya-server/ui/media/grid)
 
 ;;; What the library page and the picker share: a thumbnail, its size in words,
 ;;; and the picker's grid. The library's own cards and preview are on its page.

@@ -1,8 +1,8 @@
 (defpackage #:koya-server/admin-api/contents/<space>/<model>/<id>/discard-draft
   (:use #:cl)
   (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/lib/content-service #:resolve-model #:discard)
-  (:import-from #:koya-server/lib/presenter #:admin-content->jobject)
+  (:import-from #:koya-server/features/contents/service #:resolve-model #:discard)
+  (:import-from #:koya-server/features/contents/presenter #:admin-content->jobject)
   (:export #:@post))
 (in-package #:koya-server/admin-api/contents/<space>/<model>/<id>/discard-draft)
 

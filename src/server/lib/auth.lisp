@@ -3,7 +3,7 @@
   (:import-from #:koya-server/lib/env
                 #:koya-secret)
   (:import-from #:koya-server/lib/http
-                #:fail-api #:header #:json-response #:error-object #:origin-allowed-p)
+                #:fail-api #:header #:json-response #:error-object #:origin-allowed-p #:redirect-to)
   (:import-from #:koya-server/db/delivery-keys
                 #:space-for-delivery-key)
   (:import-from #:koya-server/db/management-keys
@@ -13,7 +13,7 @@
   (:import-from #:babel
                 #:string-to-octets)
   (:import-from #:lack/request
-                #:request-env)
+                #:request-env #:request-uri)
   (:import-from #:bordeaux-threads-2)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri)
   (:import-from #:koya-server/lib/totp
@@ -28,6 +28,8 @@
            #:*actions-auth-middleware*
            #:require-delivery-key
            #:public-path
+           #:with-owner
+           #:local-path-p
            #:session-login
            #:session-logout
            #:session-owner-p))
@@ -40,7 +42,7 @@
 ;;;    without a session: schema deploys, imports, content management from a REPL.
 ;;;    It belongs to one space and reaches nothing outside it
 ;;;  - a delivery key (X-KOYA-DELIVERY-KEY, made per space) reads the delivery API
-;;;  - the webhook secret is the one koya sends, not one it checks (see lib/webhook)
+;;;  - the webhook secret is the one koya sends, not one it checks (see features/webhooks/notify)
 
 (defun secure-string= (a b)
   (and (stringp a) (stringp b)
@@ -223,3 +225,39 @@ checking for itself.")
           ((null key-space) (fail-api 401 "unauthorized" "Invalid delivery key"))
           ((string/= key-space space) (fail-api 403 "forbidden" "Delivery key does not belong to this space"))
           (t t))))
+
+;;; Pages are not behind a guard: a page that finds no owner sends the browser to
+;;; log in, and back to itself afterwards.
+
+(defun local-path-p (path)
+  "True for a path on this server. What the login page redirects to comes from the
+URL, so anything that a browser could read as another host (//evil, /\\evil) is out."
+  (and (stringp path)
+       (plusp (length path))
+       (char= (char path 0) #\/)
+       (not (and (> (length path) 1) (char= (char path 1) #\/)))
+       (notany (lambda (c) (or (char< c #\Space) (char= c #\\))) path)))
+
+(defun path-and-query (url)
+  (let ((uri (uri url)))
+    (render-uri (make-uri :path (or (uri-path uri) "/") :query (uri-query uri)))))
+
+(defun return-path ()
+  "The page to come back to after logging in: the one requested. Pages answer GET
+only; an action that finds no session is sent back by LOGIN-LOCATION."
+  (ignore-errors
+   ;; the raw request line: path-info is decoded, and an encoded ? or / would change meaning
+   (path-and-query (request-uri ningle:*request*))))
+
+(defun redirect-to-login ()
+  (let ((next (return-path)))
+    (redirect-to (if (and (local-path-p next) (string/= next "/"))
+                     (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
+                     "/login")
+                 302)))
+
+(defmacro with-owner (&body body)
+  "Run BODY for the logged-in owner, otherwise redirect to the login page."
+  `(if (session-owner-p)
+       (progn ,@body)
+       (redirect-to-login)))

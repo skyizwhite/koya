@@ -7,13 +7,20 @@
   (:import-from #:koya-server/db/media
                 #:list-media #:count-media #:find-media #:update-media #:media-reference-counts
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
-  (:import-from #:koya-server/lib/media-store #:store-upload #:remove-media #:media-url)
-  (:import-from #:koya-server/lib/http #:path-param #:uploaded-files #:api-error #:api-error-message)
-  (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:param #:short-time
-                #:~layout #:~icon #:~empty-state #:~toast-oob #:action-refusal #:space-url)
-  (:import-from #:koya-server/components/media-grid #:~thumb #:dimensions #:human-size)
-  (:import-from #:koya-server/lib/forms #:form-values)
+  (:import-from #:koya-server/features/media/store #:remove-media #:media-url)
+  (:import-from #:koya-server/features/media/library #:store-uploads #:remove-each)
+  (:import-from #:koya-server/lib/http
+                #:path-param #:uploaded-files #:api-error #:api-error-message #:param #:form-values)
+  (:import-from #:koya-server/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
+  (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/lib/display #:short-time)
+  (:import-from #:koya-server/lib/urls #:space-url)
+  (:import-from #:koya-server/document #:set-title)
+  (:import-from #:koya-server/ui/layout #:~layout)
+  (:import-from #:koya-server/ui/elements #:~empty-state)
+  (:import-from #:koya-server/ui/icon #:~icon)
+  (:import-from #:koya-server/ui/toast #:~toast-oob #:action-refusal)
+  (:import-from #:koya-server/ui/media/grid #:~thumb #:dimensions #:human-size)
   (:export #:@get #:media-page-url
            #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt))
 (in-package #:koya-server/pages/s/<space>/media)
@@ -23,8 +30,6 @@
 ;;; and the pager -- is drawn again, with the count out of band, and the URL is
 ;;; replaced with the search and page, so a reload or a link comes back to them.
 ;;; The preview dialog is drawn by the server for the file it opens.
-
-(defparameter +page-size+ 20)
 
 (defun media-page-url (space) (format nil "~a/media" (space-url space)))
 
@@ -37,9 +42,6 @@
 (defparameter +bulk-form+ "media-bulk"
   "The selection form's id: the boxes are on the cards and join it by their form
 attribute, because the card already holds a form and forms do not nest.")
-
-(defun page-number (params)
-  (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
 
 (defun delete-confirmation (media references)
   "What is asked before a file goes; with REFERENCES it cannot go, so the question
@@ -79,15 +81,15 @@ joins the selection form."
 
 (defcomp ~library (&key space search page)
   (let* ((total (count-media space :search search))
-         (pages (max 1 (ceiling total +page-size+)))
+         (pages (last-page total))
          (page (min page pages))
-         (items (list-media space :search search :limit +page-size+ :offset (* (1- page) +page-size+)))
+         (items (list-media space :search search :limit +page-size+ :offset (page-offset page)))
          (references (media-reference-counts space (mapcar #'media-id items)))
          (q (or search "")))
     (hsx
      (div :id "library"
        ;; the files go up as soon as they are chosen, as in the picker
-       ;; (actions/media-picker); alt text is written afterwards, in the preview
+       ;; (ui/media/picker); alt text is written afterwards, in the preview
        (form :hx-post (upload-media :space space :q q :page page)
              :hx-target "#library" :hx-swap "outerHTML"
              :hx-encoding "multipart/form-data" :hx-trigger "change from:'find input[type=file]'"
@@ -192,9 +194,7 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
 (defun upload (space files)
   (handler-case
       (cond ((null files) (values "Choose at least one image." :error))
-            (t (dolist (file files)
-                 (store-upload space (first file) :filename (second file)))
-               (values (format nil "Uploaded ~a file~:p." (length files)) :ok)))
+            (t (values (format nil "Uploaded ~a file~:p." (store-uploads space files)) :ok)))
     (api-error (e) (values (api-error-message e) :error))))
 
 (defun delete-one (space id)
@@ -205,25 +205,9 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
       (api-error (e) (values (api-error-message e) :error)))))
 
 (defun delete-many (space ids)
-  "One at a time: a file in use is refused, the rest still go."
   (if (null ids)
       (values "Nothing was selected." :error)
-      (let ((done 0) (failed 0) (message nil))
-        (dolist (id ids)
-          (handler-case
-              (let ((media (find-media space id)))
-                (cond ((null media)
-                       (incf failed)
-                       (unless message (setf message "one was gone already")))
-                      (t (remove-media media) (incf done))))
-            ;; every condition, not only the store's own: a file that will not
-            ;; leave the disk must not take the selection down with it
-            (api-error (e)
-              (incf failed)
-              (unless message (setf message (api-error-message e))))
-            (error (e)
-              (incf failed)
-              (unless message (setf message (princ-to-string e))))))
+      (multiple-value-bind (done failed message) (remove-each space ids)
         (if (zerop failed)
             (values (format nil "Deleted ~a file~:p." done) :ok)
             (values (format nil "Deleted ~a of ~a; ~a could not be~@[: ~a~]" done (+ done failed) failed message)
@@ -240,7 +224,7 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
 when that one has emptied), the URL it is now read at, and MESSAGE as the toast.
 CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
   (let* ((search (param params "q"))
-         (pages (max 1 (ceiling (count-media space :search search) +page-size+)))
+         (pages (last-page (count-media space :search search)))
          (page (min (page-number params) pages)))
     (set-response-header :hx-replace-url (library-url space :search search :page page))
     (let ((library (hsx (~library :space space :search search :page page)))

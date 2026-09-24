@@ -1,4 +1,4 @@
-(defpackage #:koya-tests/server/contents
+(defpackage #:koya-tests/server/features/contents/service
   (:use #:cl #:rove)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
@@ -21,7 +21,7 @@
                 #:query-error)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:parse-json #:jget))
-(in-package #:koya-tests/server/contents)
+(in-package #:koya-tests/server/features/contents/service)
 
 (defun blog-model ()
   (make-model "blog" :list (list (make-field :title :text :required t :unique t)
@@ -178,7 +178,7 @@
       (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]1 2")) 'query-error) "trailing garbage")
       (let ((*read-eval-probe* nil))
         (ok (signals (list-contents "website" "blog" model
-                                    (q "filters" "count[equals]#.(setf koya-tests/server/contents::*read-eval-probe* t)"))
+                                    (q "filters" "count[equals]#.(setf koya-tests/server/features/contents/service::*read-eval-probe* t)"))
                      'query-error)
             "reader macros in a number filter are rejected")
         (ok (null *read-eval-probe*) "and never evaluated"))

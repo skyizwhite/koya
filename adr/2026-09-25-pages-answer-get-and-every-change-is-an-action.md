@@ -1,6 +1,7 @@
 # Pages answer GET, and every change is an action
 
 Superseded by adr/2026-09-25-lists-are-read-in-place-and-the-url-follows.md (what lives in the query string)
+Superseded by adr/2026-09-25-shared-components-live-in-ui.md (where the media picker and the space import live)
 
 *2026-09-25*
 

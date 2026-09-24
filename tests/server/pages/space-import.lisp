@@ -1,4 +1,4 @@
-(defpackage #:koya-tests/server/actions/space-import
+(defpackage #:koya-tests/server/pages/space-import
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/pages/support #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/db/connection #:disconnect-db)
@@ -8,8 +8,8 @@
   (:import-from #:koya-server/db/contents #:content-status #:content-published #:content-draft #:content-id #:content-draft-key)
   (:import-from #:koya-server/db/delivery-keys #:list-delivery-keys)
   (:import-from #:koya-server/db/media #:list-media #:media-id #:media-filename)
-  (:import-from #:koya-tests/server/media #:png-bytes)
-  (:import-from #:koya-server/lib/webhook #:*webhook-sender*)
+  (:import-from #:koya-tests/server/features/media/store #:png-bytes)
+  (:import-from #:koya-server/features/webhooks/notify #:*webhook-sender*)
   (:import-from #:koya/core/schema #:make-webhook)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:jget)
@@ -18,12 +18,12 @@
   (:import-from #:koya-server/db/contents #:get-content)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
-  (:import-from #:koya-server/lib/media-store #:store-upload #:media-path #:remove-space-media)
+  (:import-from #:koya-server/features/media/store #:store-upload #:media-path #:remove-space-media)
   (:import-from #:koya-server/db/contents #:create-content #:save-draft #:content-created-at #:content-published-at)
   (:import-from #:koya-server/db/schema-store #:load-schema #:space-webhooks #:space-webhook-secret)
   (:import-from #:koya/core/schema #:schema-models #:model-name #:webhook-url)
-  (:import-from #:koya-server/actions/space-import #:import-path))
-(in-package #:koya-tests/server/actions/space-import)
+  (:import-from #:koya-server/pages/index #:import-space-action))
+(in-package #:koya-tests/server/pages/space-import)
 
 (setup (setup-pages) (log-in))
 
@@ -44,7 +44,7 @@
 (defun import-archive (octets)
   "Send OCTETS to the import action as the import dialog does; (values status next-location)."
   (multiple-value-bind (status body headers)
-      (request :post (import-path) :headers +as-htmx+ :body octets :content-type "application/zip")
+      (request :post (import-space-action) :headers +as-htmx+ :body octets :content-type "application/zip")
     (declare (ignore body))
     (values status (getf headers :hx-redirect))))
 
@@ -163,19 +163,19 @@
       (ok (search "not a zip archive" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive")))
     (testing "a multipart post is not an import"
-      (ok (string= (getf (nth-value 2 (request :post (import-path) :headers +as-htmx+
+      (ok (string= (getf (nth-value 2 (request :post (import-space-action) :headers +as-htmx+
                                                :multipart (list (list "file" "a.zip" "application/zip" octets))))
                          :hx-redirect)
                    "/"))
       (ok (search "Choose an archive" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive")))
     (testing "an import from another site is refused"
-      (ok (= 403 (request :post (import-path) :headers '(("origin" . "https://evil.test") ("hx-request" . "true"))
+      (ok (= 403 (request :post (import-space-action) :headers '(("origin" . "https://evil.test") ("hx-request" . "true"))
                                            :body octets :content-type "application/zip")))
       (ng (find-space "archive"))
-      (ok (= 400 (request :post (import-path) :headers '(("origin" . "http://localhost:3000"))
+      (ok (= 400 (request :post (import-space-action) :headers '(("origin" . "http://localhost:3000"))
                                            :body octets :content-type "application/zip"))
           "nor is a plain post: an action answers htmx only")
       (ng (find-space "archive")))
     (testing "the import dialog is on the spaces page"
-      (ok (search (format nil "data-import=\"~a\"" (import-path)) (nth-value 1 (request :get "/")))))))
+      (ok (search (format nil "data-import=\"~a\"" (import-space-action)) (nth-value 1 (request :get "/")))))))

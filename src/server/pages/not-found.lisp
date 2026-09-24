@@ -1,6 +1,6 @@
 (defpackage #:koya-server/pages/not-found
   (:use #:cl #:hsx)
-  (:import-from #:koya-server/lib/page #:~icon)
+  (:import-from #:koya-server/ui/icon #:~icon)
   (:export #:@not-found))
 (in-package #:koya-server/pages/not-found)
 

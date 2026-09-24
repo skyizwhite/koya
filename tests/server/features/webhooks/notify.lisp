@@ -1,13 +1,13 @@
-(defpackage #:koya-tests/server/webhook
+(defpackage #:koya-tests/server/features/webhooks/notify
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/api-support #:*webhooks* #:test-schema #:admin #:webhook-events #:setup-api #:reset-api)
   (:import-from #:koya-server/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/db/schema-store #:save-schema)
-  (:import-from #:koya-server/lib/webhook #:*webhook-sender*)
+  (:import-from #:koya-server/features/webhooks/notify #:*webhook-sender*)
   (:import-from #:koya-server/db/webhook-deliveries #:list-deliveries #:count-deliveries #:+keep-per-space+ #:+max-response-chars+ #:delivery-ok #:delivery-status #:delivery-response #:delivery-error #:delivery-event #:delivery-model #:delivery-label #:delivery-url #:delivery-content-id #:delivery-duration-ms)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema #:make-webhook)
   (:import-from #:koya/core/json #:jobject #:jget #:json-null))
-(in-package #:koya-tests/server/webhook)
+(in-package #:koya-tests/server/features/webhooks/notify)
 
 (setup (setup-api))
 

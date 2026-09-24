@@ -3,11 +3,15 @@
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/lib/auth
-                #:session-login #:login-locked-p #:note-login-failure #:clear-login-failures #:public-path)
+                #:session-login #:login-locked-p #:note-login-failure #:clear-login-failures
+                #:public-path #:session-owner-p #:local-path-p)
   (:import-from #:lack/request #:request-remote-addr)
   (:import-from #:koya-server/lib/totp #:totp-enabled-p)
   (:import-from #:koya-server/lib/assets #:asset-url)
-  (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:local-path-p #:~icon #:~footer)
+  (:import-from #:koya-server/lib/http #:redirect-to #:param)
+  (:import-from #:koya-server/document #:set-title)
+  (:import-from #:koya-server/ui/layout #:~footer)
+  (:import-from #:koya-server/ui/icon #:~icon)
   (:export #:@get #:log-in))
 (in-package #:koya-server/pages/login)
 
@@ -45,7 +49,7 @@
 
 (defun @get (params)
   (set-title "Log in · koya")
-  (if (owner-p)
+  (if (session-owner-p)
       (redirect-to (or (next-path params) "/") 302)
       (hsx (~login-page :next (next-path params)))))
 
@@ -61,7 +65,7 @@
            (go-on ()
              (set-response-header :hx-redirect (or next "/"))
              (hsx (<>))))
-      (cond ((owner-p) (go-on))
+      (cond ((session-owner-p) (go-on))
             ;; 403, not 429: Woo has no status line for 429 and fails to write the response
             ((login-locked-p address) (refuse 403 "Too many attempts. Wait a few minutes and try again."))
             ((eq (session-login (or (param params "secret") "") (param params "code")) t)

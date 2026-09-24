@@ -9,10 +9,16 @@
                 #:deploy-changes #:deploy-change-count #:deploy-destructive
                 #:deploy-by #:deploy-created-at
                 #:change-op #:change-destructive #:change-description)
-  (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:param #:short-time #:caller-name
-                #:~layout #:~empty-state #:~icon #:action-refusal #:space-url)
+  (:import-from #:koya-server/lib/http #:path-param #:param #:blank-p)
+  (:import-from #:koya-server/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
+  (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/lib/display #:short-time #:caller-name)
+  (:import-from #:koya-server/lib/urls #:space-url)
+  (:import-from #:koya-server/document #:set-title)
+  (:import-from #:koya-server/ui/layout #:~layout)
+  (:import-from #:koya-server/ui/elements #:~empty-state)
+  (:import-from #:koya-server/ui/icon #:~icon)
+  (:import-from #:koya-server/ui/toast #:action-refusal)
   (:export #:@get #:deploys-url #:browse-deploys))
 (in-package #:koya-server/pages/s/<space>/deploys)
 
@@ -21,16 +27,9 @@
 ;;;
 ;;; Each change is drawn as the line PLAN prints for it.
 
-(defparameter +page-size+ 20)
-
 (defun deploys-url (space &key page)
   (render-uri (make-uri :path (format nil "~a/deploys" (space-url space))
                         :query (when (and page (> page 1)) `(("page" . ,page))))))
-
-(defun page-number (params)
-  (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
-
-(defun blank-p (value) (or (null value) (zerop (length value))))
 
 (defun deployed-by (deploy) (caller-name (deploy-by deploy)))
 
@@ -63,9 +62,9 @@
 
 (defcomp ~deploys (&key space page)
   "What paging draws again: the deploys and their pager."
-  (let* ((pages (max 1 (ceiling (count-deploys space) +page-size+)))
+  (let* ((pages (last-page (count-deploys space)))
          (page (min page pages))
-         (items (list-deploys space :limit +page-size+ :offset (* (1- page) +page-size+))))
+         (items (list-deploys space :limit +page-size+ :offset (page-offset page))))
     (flet ((page-link (n)
              (hsx (a :href (deploys-url space :page n)
                      :hx-get (browse-deploys :space space :page n) :hx-target "#deploys" :hx-swap "outerHTML"
@@ -98,7 +97,7 @@
 (defaction browse-deploys :get (params)
   (let ((space (param params "space")))
     (cond ((not (and space (find-space space))) (action-refusal "Space not found." 404))
-          (t (let ((page (min (page-number params) (max 1 (ceiling (count-deploys space) +page-size+)))))
+          (t (let ((page (min (page-number params) (last-page (count-deploys space)))))
                (set-response-header :hx-replace-url (deploys-url space :page page))
                (hsx (~deploys :space space :page page)))))))
 

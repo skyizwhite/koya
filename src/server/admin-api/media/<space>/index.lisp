@@ -2,11 +2,11 @@
   (:use #:cl)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-server/lib/http
-                #:path-param #:query-param #:fail-api #:ok-status #:uploaded-files #:form-field)
+                #:path-param #:param #:fail-api #:ok-status #:uploaded-files #:form-field)
   (:import-from #:koya-server/lib/query #:parse-query #:query-limit #:query-offset)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/media #:list-media #:count-media)
-  (:import-from #:koya-server/lib/media-store #:store-upload #:media->jobject)
+  (:import-from #:koya-server/features/media/store #:store-upload #:media->jobject)
   (:export #:@get #:@post #:require-space))
 (in-package #:koya-server/admin-api/media/<space>/index)
 
@@ -19,7 +19,7 @@
   "List media, newest first: ?q= filters by file name, limit/offset page."
   (let* ((space (require-space params))
          (query (parse-query params))
-         (search (query-param params "q")))
+         (search (param params "q")))
     (jobject "media" (map 'vector #'media->jobject
                           (list-media space :search search :limit (query-limit query) :offset (query-offset query)))
              "totalCount" (count-media space :search search)

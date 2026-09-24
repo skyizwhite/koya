@@ -2,14 +2,20 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/db/schema-store
-                #:list-spaces #:find-space #:create-space #:delete-space)
-  (:import-from #:koya-server/lib/media-store #:remove-space-media)
-  (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:param
-                #:~layout #:~empty-state #:~icon #:~toast-oob #:action-refusal #:space-url)
-  (:import-from #:koya-server/actions/space-import #:import-space-action)
-  (:export #:@get #:@head #:create-space-action #:delete-space-action))
+  (:import-from #:koya-server/db/schema-store #:list-spaces #:find-space #:create-space)
+  (:import-from #:koya-server/lib/http #:param)
+  (:import-from #:koya-server/lib/urls #:space-url)
+  (:import-from #:koya-server/document #:set-title)
+  (:import-from #:koya-server/ui/layout #:~layout)
+  (:import-from #:koya-server/ui/elements #:~empty-state)
+  (:import-from #:koya-server/ui/icon #:~icon)
+  (:import-from #:koya-server/ui/toast #:set-toast #:~toast-oob #:action-refusal)
+  (:import-from #:lack/request #:request-env)
+  (:import-from #:koya-server/lib/auth #:calling-identity #:with-owner)
+  (:import-from #:koya-server/features/spaces/archive #:import-space-stream)
+  (:import-from #:koya-server/features/spaces/lifecycle #:remove-space)
+  (:import-from #:koya-server/middlewares #:archive-path)
+  (:export #:@get #:@head #:create-space-action #:delete-space-action #:import-space-action))
 (in-package #:koya-server/pages/index)
 
 ;;; The spaces. A space owns the contents, media, keys and webhook secret, so it
@@ -73,7 +79,7 @@ taking up the page."
 
 (defcomp ~import-space-dialog ()
   "A space archive from a space's Export. koya-editor.js sends the chosen file to
-the import action as the request body (see actions/space-import)."
+the import action as the request body (see IMPORT-SPACE-ACTION)."
   (hsx
    (dialog :id "import-space" :closedby "any" :class "koya-dialog max-w-sm"
      (form :data-import (import-space-action)
@@ -115,11 +121,17 @@ the import action as the request body (see actions/space-import)."
   (handler-case (values (format nil "Space ~a created." (create-space (or (param params "name") ""))) nil)
     (error (e) (values nil (princ-to-string e)))))
 
-(defun remove-space (name)
-  ;; the rows go first: the cascade takes the media rows with the space, and
-  ;; only then is there nothing left pointing at the files
-  (delete-space name)
-  (remove-space-media name))
+(defun import-archive (body)
+  "The location to go to after importing the archive in the stream BODY."
+  ;; every condition: a bad archive can fail in the zip reader, the schema
+  ;; check or the database, and each one's message is what the owner needs
+  (handler-case
+      (let ((space (import-space-stream body :by (calling-identity))))
+        (set-toast (format nil "Space ~a imported." space))
+        (space-url space))
+    (error (e)
+      (set-toast (format nil "Import failed: ~a" e) :error)
+      "/")))
 
 ;;; --- Actions ------------------------------------------------------------------
 
@@ -143,6 +155,26 @@ the import action as the request body (see actions/space-import)."
           (t (remove-space name)
              (hsx (<> (~space-list :spaces (list-spaces))
                       (~toast-oob :message (format nil "Space ~a deleted." name))))))))
+
+;;; A space archive from Export, made into a space again (features/spaces/archive).
+;;;
+;;; The dialog sends the file itself as an application/zip body (koya-editor.js),
+;;; not as a multipart form, which lack would hold in memory several times over.
+;;; ARCHIVE-PATH has *BODY-LIMIT-MIDDLEWARE* set that body aside unread; it is
+;;; copied to a file here, once the owner is known, and read from there.
+;;;
+;;; The answer is where to go next, in HX-Redirect; the toast waits there.
+
+(defaction import-space-action :post (params)
+  (declare (ignore params))
+  (let ((body (getf (request-env ningle:*request*) :koya.import-body)))
+    (set-response-header :hx-redirect
+                         (if body
+                             (import-archive body)
+                             (progn (set-toast "Choose an archive to import." :error) "/")))
+    (hsx (<>))))
+
+(archive-path (import-space-action))
 
 ;;; --- Page ---------------------------------------------------------------------
 

@@ -1,7 +1,9 @@
 (defpackage #:koya-tests/server/pages/login
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/pages/support #:post-login #:moved-to #:*secret* #:*cookie* #:*set-cookie* #:request #:request-url #:location #:call-action #:setup-pages #:log-in)
-  (:import-from #:koya-server/lib/page #:logout)
+  (:import-from #:koya-tests/server/pages/support
+                #:post-login #:moved-to #:*secret* #:*cookie* #:*set-cookie* #:request
+                #:request-url #:location #:call-action #:setup-pages #:log-in)
+  (:import-from #:koya-server/ui/layout #:logout)
   (:import-from #:koya-server/pages/s/<space>/keys #:create-key)
   (:import-from #:koya-server/db/connection #:disconnect-db #:fetch-one #:col)
   (:import-from #:koya-server/db/delivery-keys #:list-delivery-keys)

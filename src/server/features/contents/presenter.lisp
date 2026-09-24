@@ -1,16 +1,15 @@
-(defpackage #:koya-server/lib/presenter
+(defpackage #:koya-server/features/contents/presenter
   (:use #:cl)
   (:import-from #:koya/core/schema
                 #:model-fields #:field-name #:field-type #:field-option #:field-many-p)
-  (:import-from #:koya/core/json
-                #:jobject #:json-array-p #:json-null)
+  (:import-from #:koya/core/json #:jobject #:json-null)
   (:import-from #:koya-server/lib/query
                 #:query-error)
   (:import-from #:koya-server/db/schema-store
                 #:find-model)
   (:import-from #:koya-server/db/media
                 #:find-media)
-  (:import-from #:koya-server/lib/media-store
+  (:import-from #:koya-server/features/media/store
                 #:media->jobject)
   (:import-from #:koya-server/lib/env
                 #:base-url)
@@ -22,7 +21,7 @@
                 #:content-data #:find-content)
   (:export #:content->jobject
            #:admin-content->jobject))
-(in-package #:koya-server/lib/presenter)
+(in-package #:koya-server/features/contents/presenter)
 
 ;;; Shapes content rows for the two APIs.
 

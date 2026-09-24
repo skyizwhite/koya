@@ -7,15 +7,20 @@
   (:import-from #:koya/core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
   (:import-from #:koya-server/db/webhook-deliveries
-                #:list-deliveries #:count-deliveries #:+keep-per-space+
-                #:delivery-labels #:delivery-models
-                #:delivery-id #:delivery-label #:delivery-url #:delivery-model #:delivery-event
+                #:list-deliveries #:count-deliveries #:+keep-per-space+ #:delivery-labels
+                #:delivery-models #:delivery-label #:delivery-url #:delivery-model #:delivery-event
                 #:delivery-content-id #:delivery-ok #:delivery-status #:delivery-response
                 #:delivery-error #:delivery-duration-ms #:delivery-created-at)
-  (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:param #:short-time
-                #:~layout #:~empty-state #:~icon #:action-refusal #:space-url #:content-url)
+  (:import-from #:koya-server/lib/http #:path-param #:param #:blank-p)
+  (:import-from #:koya-server/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
+  (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/lib/display #:short-time)
+  (:import-from #:koya-server/lib/urls #:space-url #:content-url)
+  (:import-from #:koya-server/document #:set-title)
+  (:import-from #:koya-server/ui/layout #:~layout)
+  (:import-from #:koya-server/ui/elements #:~empty-state)
+  (:import-from #:koya-server/ui/icon #:~icon)
+  (:import-from #:koya-server/ui/toast #:action-refusal)
   (:export #:@get #:webhook-log-url #:browse-deliveries))
 (in-package #:koya-server/pages/s/<space>/webhooks)
 
@@ -25,10 +30,6 @@
 ;;; Filtering and paging are an action that draws #deliveries again in place and
 ;;; puts the filters and page back in the URL.
 
-(defparameter +page-size+ 20)
-
-(defun blank-p (value) (or (null value) (zerop (length value))))
-
 (defun filtered-p (label model) (not (and (blank-p label) (blank-p model))))
 
 (defun webhook-log-url (space &key label model page)
@@ -37,9 +38,6 @@
                         :query (append (unless (blank-p label) `(("label" . ,label)))
                                        (unless (blank-p model) `(("model" . ,model)))
                                        (when (and page (> page 1)) `(("page" . ,page)))))))
-
-(defun page-number (params)
-  (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
 
 (defcomp ~outcome (&key delivery)
   (let* ((status (delivery-status delivery))
@@ -166,10 +164,10 @@ option it silently replaces with the first one, which here reads \"All\"."
 (defcomp ~deliveries (&key space label model page)
   "What a filter or a page draws again: the calls and their pager."
   (let* ((total (count-deliveries space :label label :model model))
-         (pages (max 1 (ceiling total +page-size+)))
+         (pages (last-page total))
          (page (min page pages))
          (items (list-deliveries space :label label :model model
-                                       :limit +page-size+ :offset (* (1- page) +page-size+))))
+                                       :limit +page-size+ :offset (page-offset page))))
     (flet ((page-link (n)
              (hsx (a :href (webhook-log-url space :label label :model model :page n)
                      :hx-get (browse-deliveries :space space :label (or label "") :model (or model "") :page n)
@@ -212,7 +210,7 @@ option it silently replaces with the first one, which here reads \"All\"."
          (clear (equal (param params "clear") "1"))
          (label (and (not clear) (param params "label")))
          (model (and (not clear) (param params "model")))
-         (pages (and schema (max 1 (ceiling (count-deliveries space :label label :model model) +page-size+))))
+         (pages (and schema (last-page (count-deliveries space :label label :model model))))
          (page (and schema (min (page-number params) pages))))
     (cond ((null schema) (action-refusal "Space not found." 404))
           (t

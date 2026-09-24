@@ -4,9 +4,8 @@
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-name #:model-fields #:model-field
-                #:field-name #:field-type #:field-option)
-  (:import-from #:koya/core/json #:json-array-p #:json-equal #:jkeys)
+                #:model-kind #:model-name #:model-field #:field-type #:field-option)
+  (:import-from #:koya/core/json #:json-array-p)
   (:import-from #:koya/core/validate #:blank-value-p)
   (:import-from #:koya-server/db/contents #:find-content #:content-id)
   (:import-from #:koya-server/db/content-revisions
@@ -14,21 +13,27 @@
                 #:revision-id #:revision-event #:revision-data #:revision-by #:revision-created-at)
   (:import-from #:koya-server/db/schema-store #:find-space #:find-model)
   (:import-from #:koya-server/db/media #:find-media #:media-filename)
-  (:import-from #:koya-server/lib/content-service #:resolve-model)
-  (:import-from #:koya-server/lib/http #:path-param #:api-error)
-  (:import-from #:koya-server/lib/forms #:number->string)
+  (:import-from #:koya-server/features/contents/service #:resolve-model)
+  (:import-from #:koya-server/lib/http #:path-param #:api-error #:param)
+  (:import-from #:koya-server/features/contents/forms #:number->string)
   (:import-from #:koya-server/lib/assets #:asset-url)
-  (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:param #:short-time #:caller-name #:content-label
-                #:~layout #:~empty-state #:~icon #:action-refusal #:content-url #:model-url)
+  (:import-from #:koya-server/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
+  (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/lib/display #:short-time #:caller-name)
+  (:import-from #:koya-server/features/contents/labels #:content-label)
+  (:import-from #:koya-server/features/contents/revisions #:changed-keys)
+  (:import-from #:koya-server/lib/urls #:content-url #:model-url)
+  (:import-from #:koya-server/document #:set-title)
+  (:import-from #:koya-server/ui/layout #:~layout)
+  (:import-from #:koya-server/ui/elements #:~empty-state)
+  (:import-from #:koya-server/ui/icon #:~icon)
+  (:import-from #:koya-server/ui/toast #:action-refusal)
   (:export #:@get #:history-url #:restore-url #:browse-history))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>/history)
 
 ;;; A content's revisions, newest first, each drawn as what it changed against
 ;;; the one before it in the same view: every write, or the publishes alone,
 ;;; where the one before is the version that was live until then.
-
-(defparameter +page-size+ 20)
 
 (defun history-url (space model id &key published-only page)
   (render-uri (make-uri :path (format nil "~a/history" (content-url space model id))
@@ -38,9 +43,6 @@
 (defun restore-url (space model id revision-id)
   "The editor, with REVISION-ID's data in the form."
   (render-uri (make-uri :path (content-url space model id) :query `(("revision" . ,revision-id)))))
-
-(defun page-number (params)
-  (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
 
 (defparameter +events+
   '(("draft" . "Draft saved")
@@ -84,20 +86,6 @@
         ((json-array-p value)
          (format nil "~{~a~^, ~}" (map 'list (lambda (v) (scalar-text space field v)) value)))
         (t (scalar-text space field value))))
-
-(defun changed-keys (model before after)
-  "The keys whose value differs between BEFORE and AFTER (either may be NIL): the
-model's fields in its order, then keys it no longer has."
-  (let* ((fields (mapcar #'field-name (model-fields model)))
-         (gone (remove-if (lambda (key) (member key fields :test #'string=))
-                          (remove-duplicates (append (and before (jkeys before)) (jkeys after))
-                                             :test #'string=))))
-    (remove-if (lambda (key)
-                 (multiple-value-bind (a found-a) (if before (gethash key before) (values nil nil))
-                   (multiple-value-bind (b found-b) (gethash key after)
-                     (or (and (not found-a) (not found-b))
-                         (and found-a found-b (json-equal a b))))))
-               (append fields (sort gone #'string<)))))
 
 (defun richtext-document (html)
   "A page of its own for HTML, styled as the site might style it."
@@ -170,7 +158,7 @@ allow-same-origin is only there so that koya-editor.js can read its height."
           children)))
 
 (defun page-count (id published-only)
-  (max 1 (ceiling (count-revisions id :published-only published-only) +page-size+)))
+  (last-page (count-revisions id :published-only published-only)))
 
 (defcomp ~revisions (&key space model content published-only page)
   "What a tab or a page draws again: the tabs, the versions and their pager."
@@ -180,7 +168,7 @@ allow-same-origin is only there so that koya-editor.js can read its height."
          (page (min page pages))
          ;; one more than the page, so its last row has the one before it to compare with
          (rows (list-revisions id :published-only published-only
-                                  :limit (1+ +page-size+) :offset (* (1- page) +page-size+)))
+                                  :limit (1+ +page-size+) :offset (page-offset page)))
          (items (subseq rows 0 (min +page-size+ (length rows))))
          (view (if published-only "published" "")))
     (flet ((page-link (n)

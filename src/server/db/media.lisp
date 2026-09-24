@@ -26,7 +26,7 @@
            #:media-width #:media-height #:media-alt #:media-created-at))
 (in-package #:koya-server/db/media)
 
-;;; Rows of the media table. The file itself lives on disk (see lib/media-store);
+;;; Rows of the media table. The file itself lives on disk (see features/media/store);
 ;;; this module only knows the metadata.
 
 (defstruct media

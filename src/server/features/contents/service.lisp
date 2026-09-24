@@ -1,4 +1,4 @@
-(defpackage #:koya-server/lib/content-service
+(defpackage #:koya-server/features/contents/service
   (:use #:cl)
   (:import-from #:koya/core/schema
                 #:model-kind #:model-fields #:field-name #:field-option)
@@ -13,17 +13,17 @@
   (:import-from #:koya-server/db/schema-store
                 #:find-space #:find-model #:space-webhook-secret)
   (:import-from #:koya-server/db/contents
-                #:create-content #:save-draft #:publish-content #:unpublish-content #:delete-content #:discard-draft
-                #:find-content #:find-object-content #:unique-value-taken-p #:get-content
-                #:content-id #:content-published #:content-draft #:content-published-at #:content-data
-                #:content-references)
-  (:import-from #:koya-server/lib/presenter
+                #:create-content #:save-draft #:publish-content #:unpublish-content
+                #:delete-content #:discard-draft #:find-content #:find-object-content
+                #:unique-value-taken-p #:get-content #:content-id #:content-published
+                #:content-data #:content-references)
+  (:import-from #:koya-server/features/contents/presenter
                 #:content->jobject)
-  (:import-from #:koya-server/lib/webhook
+  (:import-from #:koya-server/features/webhooks/notify
                 #:notify-webhooks)
   (:import-from #:koya-server/lib/http
                 #:fail-api)
-  (:import-from #:koya-server/lib/forms
+  (:import-from #:koya-server/features/contents/forms
                 #:slugify)
   (:import-from #:koya-server/lib/auth
                 #:calling-identity)
@@ -38,7 +38,7 @@
            #:unpublish
            #:discard
            #:destroy))
-(in-package #:koya-server/lib/content-service)
+(in-package #:koya-server/features/contents/service)
 
 ;;; Content operations shared by the admin API and the admin UI: lookup,
 ;;; validation, persistence and webhook notification.

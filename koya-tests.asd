@@ -13,10 +13,10 @@
                "koya-tests/server/totp"
                "koya-tests/server/timezone"
                "koya-tests/server/db"
-               "koya-tests/server/contents"
-               "koya-tests/server/media"
+               "koya-tests/server/features/contents/service"
+               "koya-tests/server/features/media/store"
                "koya-tests/server/http"
-               "koya-tests/server/webhook"
+               "koya-tests/server/features/webhooks/notify"
                "koya-tests/server/admin-api/schema"
                "koya-tests/server/admin-api/contents"
                "koya-tests/server/admin-api/media"
@@ -31,6 +31,6 @@
                "koya-tests/server/pages/media"
                "koya-tests/server/pages/content-list"
                "koya-tests/server/pages/editor"
-               "koya-tests/server/actions/space-import"
+               "koya-tests/server/pages/space-import"
                "koya-tests/client")
   :perform (test-op (o c) (symbol-call :rove :run c :style :dot)))

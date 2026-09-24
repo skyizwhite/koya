@@ -2,8 +2,8 @@
   (:use #:cl)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-server/lib/http #:path-param #:read-json-body #:body-field #:fail-api)
-  (:import-from #:koya-server/lib/content-service #:resolve-model #:resolve-content #:update-draft #:destroy)
-  (:import-from #:koya-server/lib/presenter #:admin-content->jobject)
+  (:import-from #:koya-server/features/contents/service #:resolve-model #:resolve-content #:update-draft #:destroy)
+  (:import-from #:koya-server/features/contents/presenter #:admin-content->jobject)
   (:export #:@get #:@patch #:@delete))
 (in-package #:koya-server/admin-api/contents/<space>/<model>/<id>/index)
 

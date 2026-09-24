@@ -1,4 +1,4 @@
-(defpackage #:koya-server/lib/space-archive
+(defpackage #:koya-server/features/spaces/archive
   (:use #:cl)
   (:import-from #:koya-server/db/connection
                 #:with-db-transaction)
@@ -20,9 +20,9 @@
                 #:space-media #:insert-media #:count-media
                 #:media-id #:media-filename #:media-mime #:media-size
                 #:media-width #:media-height #:media-alt #:media-created-at)
-  (:import-from #:koya-server/lib/media-store
+  (:import-from #:koya-server/features/media/store
                 #:media-path #:media-file-path)
-  (:import-from #:koya-server/lib/image
+  (:import-from #:koya-server/features/media/image
                 #:sniff-image #:image-extension)
   (:import-from #:koya/core/schema
                 #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p)
@@ -39,10 +39,11 @@
                 #:entry-to-vector #:entry-to-file)
   (:export #:export-space
            #:import-space
+           #:import-space-stream
            #:archive-file-name
            #:archive-error
            #:+max-archive-bytes+))
-(in-package #:koya-server/lib/space-archive)
+(in-package #:koya-server/features/spaces/archive)
 
 ;;; A space as one zip: space.json -- the schema, every content with its draft,
 ;;; its system timestamps and its history, the media rows, the keys and the
@@ -317,3 +318,24 @@ changes nothing when the archive is malformed or the space is not empty."
            (setf done t))
       (unless done (mapc #'uiop:delete-file-if-exists (car written))))
     space))
+
+;;; An archive sent as a request body is copied to a file and read from there,
+;;; so it is never held in memory whole.
+
+(defun copy-to-file (in path)
+  "Copy IN to PATH, refusing more than the import limit: a chunked body has no
+Content-Length for the middleware to check."
+  (with-open-file (out path :direction :output :element-type '(unsigned-byte 8) :if-exists :supersede)
+    (let ((buffer (make-array 65536 :element-type '(unsigned-byte 8))))
+      (loop :for n := (read-sequence buffer in)
+            :for total := n :then (+ total n)
+            :while (plusp n)
+            :do (when (> total +max-archive-bytes+)
+                  (error "The archive is larger than ~a MB" (floor +max-archive-bytes+ (* 1024 1024))))
+                (write-sequence buffer out :end n)))))
+
+(defun import-space-stream (in &key (by ""))
+  "IMPORT-SPACE for the archive read from the stream IN."
+  (uiop:with-temporary-file (:pathname path :type "zip")
+    (copy-to-file in path)
+    (import-space path :by by)))

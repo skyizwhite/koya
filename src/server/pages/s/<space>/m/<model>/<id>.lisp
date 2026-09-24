@@ -3,31 +3,35 @@
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-fields #:field-name #:field-type #:field-option
-                #:webhook-covers-p
+                #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url)
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
-  (:import-from #:koya-server/lib/query #:make-query)
   (:import-from #:koya-server/db/contents
-                #:list-contents #:find-content #:content-id #:content-status #:content-published #:content-draft
+                #:find-content #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data)
   (:import-from #:koya-server/db/schema-store
                 #:find-space #:find-model #:space-webhooks)
-  (:import-from #:koya-server/lib/content-service
+  (:import-from #:koya-server/features/contents/service
                 #:resolve-model #:default-data #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
-  (:import-from #:koya-server/lib/http #:path-param #:api-error #:api-error-message #:api-error-status)
-  (:import-from #:koya-server/lib/forms #:form->data)
-  (:import-from #:koya-server/lib/page
-                #:with-owner #:set-title #:param #:set-toast #:expand-url-template
-                #:short-time #:content-label #:~layout #:~status-badge #:~errors #:~icon #:~toast-oob #:action-refusal
-                #:content-url #:model-url)
+  (:import-from #:koya-server/lib/http
+                #:path-param #:api-error #:api-error-message #:api-error-status #:param)
+  (:import-from #:koya-server/features/contents/forms #:form->data)
+  (:import-from #:koya-server/lib/auth #:with-owner)
+  (:import-from #:koya-server/lib/display #:short-time)
+  (:import-from #:koya-server/features/contents/labels #:content-label #:reference-options)
+  (:import-from #:koya-server/lib/urls #:expand-url-template #:content-url #:model-url)
+  (:import-from #:koya-server/document #:set-title)
+  (:import-from #:koya-server/ui/layout #:~layout)
+  (:import-from #:koya-server/ui/elements #:~status-badge #:~errors)
+  (:import-from #:koya-server/ui/icon #:~icon)
+  (:import-from #:koya-server/ui/toast #:set-toast #:~toast-oob #:action-refusal)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
-  (:import-from #:koya-server/components/field-input #:~field-input)
-  (:import-from #:koya-server/actions/media-picker #:~media-picker-dialog)
+  (:import-from #:koya-server/ui/content/field-input #:~field-input)
+  (:import-from #:koya-server/ui/media/picker #:~media-picker-dialog)
   (:import-from #:koya-server/db/media #:find-media)
   (:import-from #:koya-server/db/content-revisions
                 #:find-revision #:revision-data #:revision-created-at)
-  (:import-from #:koya-server/lib/revisions #:restore-data)
+  (:import-from #:koya-server/features/contents/revisions #:restore-data)
   (:import-from #:koya-server/pages/s/<space>/m/<model>/<id>/history #:history-url)
   (:export #:@get #:editor-action))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>)
@@ -38,16 +42,6 @@
   "The media struct behind a :media field's id, or NIL."
   (and (eq (field-type field) :media) (stringp value) (plusp (length value))
        (find-media space value)))
-
-(defun reference-options (space field)
-  "Selectable contents of FIELD's target model as (id . label), sorted by label."
-  (when (eq (field-type field) :reference)
-    (let ((target (find-model space (field-option field :model))))
-      (when target
-        (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target)))
-                      (list-contents space (model-name target) target
-                                     (make-query :limit 1000) :status :all))
-              #'string-lessp :key #'cdr)))))
 
 (defun field-error (errors name)
   (let ((e (find name errors :key (lambda (e) (getf e :field)) :test #'string=)))

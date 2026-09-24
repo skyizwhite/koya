@@ -29,20 +29,40 @@ src/
   server/
     app.lisp  middlewares.lisp  main.lisp  document.lisp
     pages/            ; the admin UI (ningle-fbr: the directory is the URL), GET only
-    actions/          ; actions more than one page calls: the media picker, the import
-    components/       ; hsx components shared by pages
+    ui/               ; hsx components shared by pages: layout, icon, toast,
+                      ; elements at the top; content/ and media/ below
     api/              ; the delivery API
     admin-api/        ; the admin API
+    features/         ; what one part of koya does, for the pages and the APIs alike:
+      contents/       ;   service, presenter, forms, revisions, listing, labels, bulk
+      media/          ;   store, image, library
+      spaces/         ;   archive, lifecycle
+      webhooks/       ;   notify
     db/               ; connection, migrations, and one file per table
-    lib/              ; env, auth, http, query, presenter, content-service,
-                      ; forms, page, timezone, totp, media-store, webhook,
-                      ; space-archive
+    lib/              ; what several parts share: env, assets, auth, http, query,
+                      ; paging, display, urls, timezone, totp
 tests/                ; mirrors src/
 assets/               ; style/ (Tailwind in and out), js/
 ```
 
 Both `pages/` and the two API directories are file-routed: the path of the file
 is the URL, and `<space>` in a directory name is a path parameter.
+
+A component that more than one page draws is under `ui/`. A component that only
+one page draws is in that page's file, next to the actions that answer with it.
+See `adr/2026-09-25-shared-components-live-in-ui.md`.
+
+What koya does is kept apart from how it is asked for and shown. The logic of one
+part of koya -- contents, media, spaces, webhooks -- is under `features/<part>/`,
+used by its pages and its API routes alike; what several parts share is under
+`lib/`. A page, a component or an action reads the request, calls into those,
+and draws or words the result. What only one page needs to draw -- its URLs, a
+badge's class, how a value reads there -- stays in that page's file. See
+`adr/2026-09-25-logic-lives-in-features-and-lib.md`.
+
+`ui/` uses `features/` and `lib/`; `features/` uses `lib/`, `db/` and another
+feature where one part sets off another (a content write notifies the webhooks);
+`lib/` uses no feature and no component; and nothing but a page uses a page.
 
 ## Storage
 
@@ -92,13 +112,16 @@ for itself; pages check with `with-owner`. The delivery API is mounted behind
 `*delivery-cors-middleware*`, which answers any origin; nothing else is.
 
 A page route answers GET and draws a page; everything done on it is an action
-(`defaction`), defined beside the page that calls it. The actions middleware lets
+(`defaction`), defined beside the page that calls it, or with the `ui/`
+component that cannot work without it (the media picker, Log out). The actions middleware lets
 through htmx requests only, from the owner's session and this origin, and sends a
 request that has lost its session to the login page with `HX-Redirect`. An action
 answers the part of the page it changed, under that part's id, and the toast out
 of band into the layout's `#toast`; a result on another page is an `HX-Redirect`
 with the toast in the session. A path declared with `public-path` (`lib/auth`)
-needs no session; logging in is the only one. Searching, filtering, sorting and
+needs no session; logging in is the only one. A path declared with
+`archive-path` (`middlewares`) takes a space archive as its body, set aside
+unread; the import is the only one. Searching, filtering, sorting and
 paging a list are actions as well, answered with `HX-Replace-Url` so the page's
 URL still carries that state for its GET to draw. See
 `adr/2026-09-25-pages-answer-get-and-every-change-is-an-action.md` and

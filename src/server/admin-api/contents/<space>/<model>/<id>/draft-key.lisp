@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-server/lib/http #:path-param)
-  (:import-from #:koya-server/lib/content-service #:resolve-model #:resolve-content)
+  (:import-from #:koya-server/features/contents/service #:resolve-model #:resolve-content)
   (:import-from #:koya-server/db/contents #:ensure-draft-key)
   (:export #:@post))
 (in-package #:koya-server/admin-api/contents/<space>/<model>/<id>/draft-key)

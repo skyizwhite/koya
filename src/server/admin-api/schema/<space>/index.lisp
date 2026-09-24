@@ -3,7 +3,7 @@
   (:import-from #:koya/core/schema #:schema->jobject #:jobject->schema)
   (:import-from #:koya/core/diff #:diff-schemas #:destructive-changes-p #:change->jobject)
   (:import-from #:koya/core/json #:jobject)
-  (:import-from #:koya-server/lib/http #:read-json-body #:path-param #:query-param #:fail-api)
+  (:import-from #:koya-server/lib/http #:read-json-body #:path-param #:param #:fail-api)
   (:import-from #:koya-server/lib/auth #:calling-identity)
   (:import-from #:koya-server/db/schema-store #:load-schema #:save-schema #:find-space)
   (:export #:@get #:@put))
@@ -29,7 +29,7 @@
   (let* ((space (space-of params))
          (new (jobject->schema (read-json-body)))
          (changes (diff-schemas (load-schema space) new))
-         (force (equal (query-param params "force") "true")))
+         (force (equal (param params "force") "true")))
     (when (and (destructive-changes-p changes) (not force))
       (fail-api 409 "destructive_changes" "Schema deploy contains destructive changes; retry with force=true"
                 (changes->jarray changes)))

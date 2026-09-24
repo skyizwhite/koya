@@ -1,11 +1,11 @@
-(defpackage #:koya-tests/server/media
+(defpackage #:koya-tests/server/features/media/store
   (:use #:cl #:rove)
   (:import-from #:koya-server/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:delete-space)
   (:import-from #:koya-server/db/contents #:create-content)
-  (:import-from #:koya-server/lib/image #:sniff-image)
-  (:import-from #:koya-server/lib/media-store
+  (:import-from #:koya-server/features/media/image #:sniff-image)
+  (:import-from #:koya-server/features/media/store
                 #:store-upload #:remove-media #:remove-space-media #:media-path #:media-url #:media->jobject)
   (:import-from #:koya-server/db/media
                 #:find-media #:list-media #:count-media #:update-media #:media-references #:media-reference-counts
@@ -15,7 +15,7 @@
   (:import-from #:koya/core/json #:jget #:parse-json)
   (:import-from #:babel #:string-to-octets)
   (:export #:png-bytes #:*media-root* #:multipart-body))
-(in-package #:koya-tests/server/media)
+(in-package #:koya-tests/server/features/media/store)
 
 (defvar *media-root*
   (uiop:ensure-directory-pathname
@@ -135,7 +135,7 @@ Returns (values octets content-type)."
   (flet ((status (thunk) (handler-case (progn (funcall thunk) nil) (api-error (e) (api-error-status e)))))
     (ok (= 422 (status (lambda () (store-upload "website" (bytes 1 2 3) :filename "x.bin")))) "unknown type")
     (ok (= 422 (status (lambda () (store-upload "website" (bytes) :filename "x.png")))) "empty")
-    (ok (= 413 (status (lambda () (store-upload "website" (make-array (1+ koya-server/lib/media-store:+max-upload-bytes+)
+    (ok (= 413 (status (lambda () (store-upload "website" (make-array (1+ koya-server/features/media/store:+max-upload-bytes+)
                                                                        :element-type '(unsigned-byte 8) :initial-element 0)
                                                 :filename "big.png"))))
         "too large")))
