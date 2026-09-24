@@ -3,10 +3,10 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle #:context)
   (:import-from #:koya-server/lib/totp
-                #:totp-enabled-p #:totp-code-valid-p #:generate-totp-secret #:otpauth-uri
-                #:enable-totp #:disable-totp)
-  (:import-from #:koya-server/lib/timezone
-                #:display-timezone-name #:set-display-timezone #:timezone-names #:format-local)
+                #:totp-enabled-p #:totp-code-valid-p #:enable-totp #:disable-totp)
+  (:import-from #:koya-server/domain/totp #:generate-totp-secret #:otpauth-uri)
+  (:import-from #:koya-server/domain/timezone #:timezone-names #:format-local)
+  (:import-from #:koya-server/lib/timezone #:display-timezone-name #:display-timezone #:set-display-timezone)
   (:import-from #:koya/core/time #:now-iso)
   (:import-from #:koya-server/lib/http #:param)
   (:import-from #:koya-server/lib/auth #:with-owner)
@@ -98,7 +98,7 @@
        (datalist :id "timezones"
          (loop :for name :in (timezone-names) :collect (hsx (option :value name))))
        (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Save"))
-     (p :class "mt-3 text-xs text-muted" "Now: " (format-local (now-iso))))))
+     (p :class "mt-3 text-xs text-muted" "Now: " (format-local (now-iso) :timezone (display-timezone))))))
 
 (defcomp ~settings-page (&key pending)
   (hsx (~layout :crumbs (list (cons "Settings" nil))

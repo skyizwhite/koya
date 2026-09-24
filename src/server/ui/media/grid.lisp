@@ -1,6 +1,6 @@
 (defpackage #:koya-server/ui/media/grid
   (:use #:cl #:hsx)
-  (:import-from #:koya-server/db/media
+  (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-width #:media-height #:media-alt)
   (:import-from #:koya-server/features/media/store
                 #:media-url)

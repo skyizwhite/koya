@@ -9,21 +9,21 @@
                 #:stored-delivery-keys #:import-delivery-key)
   (:import-from #:koya-server/db/management-keys
                 #:stored-management-keys #:import-management-key)
-  (:import-from #:koya-server/db/contents
-                #:space-contents #:import-content #:make-content
-                #:content-id #:content-model #:content-published #:content-draft #:content-draft-key
-                #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at)
-  (:import-from #:koya-server/db/content-revisions
-                #:content-history #:import-revision
+  (:import-from #:koya-server/db/contents #:space-contents #:import-content)
+  (:import-from #:koya-server/domain/content
+                #:make-content #:content-id #:content-model #:content-published #:content-draft
+                #:content-draft-key #:content-created-at #:content-updated-at
+                #:content-published-at #:content-revised-at)
+  (:import-from #:koya-server/domain/revision
                 #:revision-event #:revision-data #:revision-by #:revision-created-at)
-  (:import-from #:koya-server/db/media
-                #:space-media #:insert-media #:count-media
-                #:media-id #:media-filename #:media-mime #:media-size
-                #:media-width #:media-height #:media-alt #:media-created-at)
+  (:import-from #:koya-server/domain/media
+                #:media-id #:media-filename #:media-mime #:media-size #:media-width
+                #:media-height #:media-alt #:media-created-at)
+  (:import-from #:koya-server/db/content-revisions #:content-history #:import-revision)
+  (:import-from #:koya-server/domain/image #:sniff-image #:image-extension)
+  (:import-from #:koya-server/db/media #:space-media #:insert-media #:count-media)
   (:import-from #:koya-server/features/media/store
                 #:media-path #:media-file-path)
-  (:import-from #:koya-server/features/media/image
-                #:sniff-image #:image-extension)
   (:import-from #:koya/core/schema
                 #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p)
   (:import-from #:koya/core/json

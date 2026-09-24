@@ -8,7 +8,8 @@
   (:import-from #:koya-server/db/connection #:disconnect-db #:fetch-one #:col)
   (:import-from #:koya-server/db/delivery-keys #:list-delivery-keys)
   (:import-from #:koya-server/db/delivery-keys #:list-delivery-keys)
-  (:import-from #:koya-server/lib/totp #:totp #:enable-totp #:disable-totp)
+  (:import-from #:koya-server/lib/totp #:enable-totp #:disable-totp)
+  (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/lib/auth #:clear-login-failures))
 (in-package #:koya-tests/server/pages/login)
 

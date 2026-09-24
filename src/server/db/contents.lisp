@@ -2,9 +2,14 @@
   (:use #:cl)
   (:import-from #:koya-server/db/connection
                 #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
-  (:import-from #:koya-server/lib/query
-                #:query-limit #:query-offset #:query-orders #:query-filters
-                #:build-where #:build-order-by)
+  (:import-from #:koya-server/db/content-query #:build-where #:build-order-by)
+  (:import-from #:koya-server/domain/query
+                #:query-limit #:query-offset #:query-orders #:query-filters)
+  (:import-from #:koya-server/domain/content
+                #:make-content #:content-id #:content-published #:content-draft #:content-draft-key
+                #:content-space #:content-model
+                #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
+                #:status-of)
   (:import-from #:koya/core/ulid
                 #:make-ulid)
   (:import-from #:koya/core/time
@@ -19,11 +24,7 @@
                 #:schema-models #:model-name #:model-fields #:field-name #:field-type #:field-option)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
-  (:export #:make-content #:content-id #:content-space #:content-model #:content-status
-           #:content-published #:content-draft #:content-draft-key
-           #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
-           #:content-data
-           #:create-content
+  (:export #:create-content
            #:save-draft
            #:publish-content
            #:unpublish-content
@@ -42,15 +43,11 @@
            #:content-references))
 (in-package #:koya-server/db/contents)
 
-;;; Content rows. PUBLISHED and DRAFT are JSON objects (hash tables) or NIL.
-;;; status is one of "draft", "published", "published+draft".
+;;; Content rows, the published and draft data stored as JSON.
 ;;;
 ;;; Every write records a revision in the same transaction (db/content-revisions);
 ;;; BY names who made it, as lib/auth's CALLING-IDENTITY does. IMPORT-CONTENT is
 ;;; the exception: an imported content brings its own history.
-
-(defstruct content
-  id space model status published draft draft-key created-at updated-at published-at revised-at)
 
 (defun row->content (row)
   (flet ((json (name) (let ((v (col row name))) (and v (parse-json v)))))
@@ -60,19 +57,8 @@
                   :created-at (col row "created_at") :updated-at (col row "updated_at")
                   :published-at (col row "published_at") :revised-at (col row "revised_at"))))
 
-(defun content-data (content &key draft)
-  "The published data, or with DRAFT the draft data falling back to published."
-  (if draft
-      (or (content-draft content) (content-published content))
-      (content-published content)))
-
 (defun new-draft-key ()
   (byte-array-to-hex-string (random-data 16)))
-
-(defun status-for (published draft)
-  (cond ((and published draft) "published+draft")
-        (published "published")
-        (t "draft")))
 
 (defun get-content (id)
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ?" id)))
@@ -117,7 +103,7 @@ so old preview links stop working."
   (let ((content (or (get-content id) (error "content ~a not found" id))))
     (with-db-transaction
       (exec "UPDATE contents SET draft = ?, draft_key = ?, status = ?, updated_at = ? WHERE id = ?"
-            (to-json data) (new-draft-key) (status-for (content-published content) t) (now-iso) id)
+            (to-json data) (new-draft-key) (status-of (content-published content) t) (now-iso) id)
       (record-revision id "draft" data :by by))
     (get-content id)))
 
@@ -267,7 +253,7 @@ importer brings the content's history along with it."
   (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         (content-id content) (content-space content) (content-model content)
-        (status-for (content-published content) (content-draft content))
+        (status-of (content-published content) (content-draft content))
         (let ((v (content-published content))) (and v (to-json v)))
         (let ((v (content-draft content))) (and v (to-json v)))
         (content-draft-key content)

@@ -1,10 +1,11 @@
-(defpackage #:koya-tests/server/totp
+(defpackage #:koya-tests/server/domain/totp
   (:use #:cl #:rove)
-  (:import-from #:koya-server/lib/totp
-                #:base32-decode #:base32-encode #:hotp #:totp #:totp-code-valid-p
-                #:generate-totp-secret #:otpauth-uri #:*totp-last-counter*)
+  (:import-from #:koya-server/lib/totp #:totp-code-valid-p #:*totp-last-counter*)
+  (:import-from #:koya-server/domain/totp
+                #:base32-decode #:base32-encode #:hotp #:totp #:generate-totp-secret
+                #:otpauth-uri)
   (:import-from #:babel #:string-to-octets #:octets-to-string))
-(in-package #:koya-tests/server/totp)
+(in-package #:koya-tests/server/domain/totp)
 
 ;; RFC 4226 / RFC 6238 test secret: the ASCII string 12345678901234567890
 (defparameter *rfc-secret* "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")

@@ -2,32 +2,27 @@
   (:use #:cl)
   (:import-from #:koya/core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type #:+system-fields+)
-  (:import-from #:koya-server/db/contents
-                #:list-contents #:content-data)
+  (:import-from #:koya-server/db/contents #:list-contents)
+  (:import-from #:koya-server/domain/content #:content-data)
   (:import-from #:koya-server/db/media
                 #:find-media-by-ids)
-  (:import-from #:koya-server/lib/query
-                #:make-query)
+  (:import-from #:koya-server/domain/query #:make-query)
   (:import-from #:koya-server/lib/http
                 #:blank-p)
   (:import-from #:koya-server/lib/paging
                 #:+page-size+ #:page-offset #:last-page)
-  (:export #:+statuses+
-           #:parse-sort
+  (:export #:parse-sort
            #:content-page
            #:page-media))
 (in-package #:koya-server/features/contents/listing)
 
 ;;; A model's contents a page at a time, searched, filtered by status and
-;;; sorted. All three go through lib/query, the delivery API's own machinery for
-;;; a WHERE and an ORDER BY over the JSON.
+;;; sorted. All three make a delivery API query (domain/query), which the store
+;;; turns into a WHERE and an ORDER BY over the JSON.
 
 (defparameter +searchable-types+ '(:text :textarea :slug :richtext)
   "Field types a search looks inside. :RICHTEXT is searched as the HTML it is
 stored as, so a query that reads like markup can match a tag.")
-
-(defparameter +statuses+ '("draft" "published" "published+draft")
-  "The status filter's choices: the three badges the list shows.")
 
 (defun search-filters (model search-text)
   "Filter groups matching SEARCH-TEXT against every searchable field of MODEL and

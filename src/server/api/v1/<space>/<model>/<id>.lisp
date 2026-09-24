@@ -2,10 +2,11 @@
   (:use #:cl)
   (:import-from #:koya-server/lib/http #:path-param #:param #:fail-api)
   (:import-from #:koya-server/lib/auth #:require-delivery-key)
-  (:import-from #:koya-server/lib/query #:parse-query #:query-fields #:query-include)
+  (:import-from #:koya-server/domain/query #:parse-query #:query-fields #:query-include)
   (:import-from #:koya-server/features/contents/service #:resolve-model)
   (:import-from #:koya-server/features/contents/presenter #:content->jobject)
-  (:import-from #:koya-server/db/contents #:find-content #:content-published #:content-draft-key)
+  (:import-from #:koya-server/domain/content #:content-published #:content-draft-key)
+  (:import-from #:koya-server/db/contents #:find-content)
   (:export #:@get))
 (in-package #:koya-server/api/v1/<space>/<model>/<id>)
 

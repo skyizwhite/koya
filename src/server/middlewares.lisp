@@ -1,7 +1,6 @@
 (defpackage #:koya-server/middlewares
   (:use #:cl)
-  (:import-from #:koya-server/features/media/store
-                #:+max-upload-bytes+)
+  (:import-from #:koya-server/domain/media #:+max-upload-bytes+)
   (:import-from #:koya-server/features/spaces/archive
                 #:+max-archive-bytes+)
   (:export #:archive-path

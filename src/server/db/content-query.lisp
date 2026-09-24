@@ -1,100 +1,14 @@
-(defpackage #:koya-server/lib/query
+(defpackage #:koya-server/db/content-query
   (:use #:cl)
   (:import-from #:koya/core/schema
-                #:model-field #:field-type #:field-many-p #:+system-fields+)
-  (:import-from #:cl-ppcre
-                #:scan-to-strings #:split)
-  (:export #:query-error
-           #:query-error-message
-           #:parse-query
-           #:make-query
-           #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
-           #:build-where
-           #:build-order-by
-           #:+system-fields+))
-(in-package #:koya-server/lib/query)
+                #:model-field #:field-type #:field-many-p)
+  (:import-from #:koya-server/domain/query
+                #:bad-query)
+  (:export #:build-where
+           #:build-order-by))
+(in-package #:koya-server/db/content-query)
 
-;;; Parsing of the delivery API's list query parameters and translation of
-;;; filters/orders into SQL over the JSON data column.
-
-(define-condition query-error (error)
-  ((message :initarg :message :reader query-error-message))
-  (:report (lambda (c s) (format s "Bad query: ~a" (query-error-message c)))))
-
-(defun bad (fmt &rest args)
-  (error 'query-error :message (apply #'format nil fmt args)))
-
-(defparameter +default-limit+ 10)
-(defparameter +max-limit+ 100)
-
-(defstruct query
-  (limit +default-limit+)  ; NIL for every row
-  (offset 0)
-  orders    ; list of (name . :asc/:desc)
-  filters   ; list of groups, each group a list of (name op value); groups are OR'ed, terms AND'ed
-  fields    ; list of field names or NIL for all
-  include)  ; list of reference paths to embed, each a list of field names (a.b -> ("a" "b"))
-
-(defun param (params name)
-  (let ((v (cdr (assoc name params :test #'string=))))
-    (if (and (stringp v) (string= v "")) nil v)))
-
-(defun parse-integer-param (params name default &key (min 0) max)
-  (let ((raw (param params name)))
-    (if (null raw)
-        default
-        (let ((n (handler-case (parse-integer raw) (error () (bad "~a must be an integer" name)))))
-          (when (< n min) (bad "~a must be at least ~a" name min))
-          (if (and max (> n max)) max n)))))
-
-(defun split-csv (string)
-  (remove "" (mapcar (lambda (s) (string-trim " " s)) (split "," string)) :test #'string=))
-
-(defun parse-include (string)
-  "include=tags,author.avatar -> ((\"tags\") (\"author\" \"avatar\"))"
-  (mapcar (lambda (path) (remove "" (split "\\." path) :test #'string=)) (split-csv string)))
-
-(defun parse-orders (string)
-  (mapcar (lambda (item)
-            (if (char= (char item 0) #\-)
-                (cons (subseq item 1) :desc)
-                (cons item :asc)))
-          (split-csv string)))
-
-(defun parse-term (term)
-  (multiple-value-bind (match groups) (scan-to-strings "^([A-Za-z0-9_.]+)\\[([a-z_]+)\\](.*)$" term)
-    (unless match (bad "malformed filter ~s" term))
-    (list (aref groups 0) (aref groups 1) (aref groups 2))))
-
-(defun parse-filters (string)
-  "\"a[equals]1[and]b[exists][or]c[equals]2\" -> ((\"a\" ... ) (\"b\" ...)) groups OR'ed."
-  (let ((groups '())
-        (current '())
-        (rest string))
-    (loop
-      (multiple-value-bind (match parts) (scan-to-strings "^(.*?)\\[(and|or)\\](.*)$" rest)
-        (cond (match
-               (push (parse-term (aref parts 0)) current)
-               (when (string= (aref parts 1) "or")
-                 (push (nreverse current) groups)
-                 (setf current '()))
-               (setf rest (aref parts 2)))
-              (t
-               (push (parse-term rest) current)
-               (push (nreverse current) groups)
-               (return)))))
-    (nreverse groups)))
-
-(defun parse-query (params)
-  "Build a QUERY from ningle's params alist. Signals QUERY-ERROR on bad input."
-  (make-query :limit (parse-integer-param params "limit" +default-limit+ :min 0 :max +max-limit+)
-              :offset (parse-integer-param params "offset" 0)
-              :orders (let ((o (param params "orders"))) (and o (parse-orders o)))
-              :filters (let ((f (param params "filters"))) (and f (parse-filters f)))
-              :fields (let ((f (param params "fields"))) (and f (split-csv f)))
-              :include (let ((i (param params "include"))) (and i (parse-include i)))))
-
-;;; --- SQL generation ---------------------------------------------------------
+;;; A query's filters and orders as SQL over a JSON data column.
 
 (defun system-column (name)
   (cond ((string= name "id") "id")
@@ -109,7 +23,7 @@
 live inside the JSON data column."
   (or (system-column name)
       (progn
-        (unless (model-field model name) (bad "unknown field ~s" name))
+        (unless (model-field model name) (bad-query "unknown field ~s" name))
         (format nil "json_extract(~a, '$.~a')" column name))))
 
 (defun parse-number-strictly (string)
@@ -126,9 +40,9 @@ syntax, and the whole string must be one number: filter values come from the net
   (let ((field (model-field model name)))
     (cond ((null field) value)
           ((eq (field-type field) :number)
-           (or (parse-number-strictly value) (bad "~a expects a number" name)))
+           (or (parse-number-strictly value) (bad-query "~a expects a number" name)))
           ((eq (field-type field) :boolean)
-           (cond ((string= value "true") 1) ((string= value "false") 0) (t (bad "~a expects true or false" name))))
+           (cond ((string= value "true") 1) ((string= value "false") 0) (t (bad-query "~a expects true or false" name))))
           (t value))))
 
 (defun term-sql (term model column)
@@ -156,7 +70,7 @@ syntax, and the whole string must be one number: filter values come from the net
           ((string= op "begins_with") (values (format nil "~a LIKE ? ESCAPE '\\'" expr) (list (format nil "~a%" (escape-like value)))))
           ((string= op "exists") (values (format nil "~a IS NOT NULL" expr) '()))
           ((string= op "not_exists") (values (format nil "~a IS NULL" expr) '()))
-          (t (bad "unknown filter operator ~s" op)))))))
+          (t (bad-query "unknown filter operator ~s" op)))))))
 
 (defun escape-like (string)
   (with-output-to-string (out)

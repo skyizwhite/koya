@@ -1,7 +1,7 @@
 (defpackage #:koya-server/lib/display
   (:use #:cl)
-  (:import-from #:koya-server/lib/timezone
-                #:format-local)
+  (:import-from #:koya-server/domain/timezone #:format-local)
+  (:import-from #:koya-server/lib/timezone #:display-timezone)
   (:export #:short-time
            #:caller-name))
 (in-package #:koya-server/lib/display)
@@ -10,7 +10,7 @@
 
 (defun short-time (iso)
   "2026-09-20T05:04:03.123Z -> 2026-09-20 14:04 JST, in the zone chosen on the settings page."
-  (format-local iso))
+  (format-local iso :timezone (display-timezone)))
 
 (defun caller-name (by)
   "\"owner\" or \"key:<label>\" as stored, in words. Kept out of the rows so that

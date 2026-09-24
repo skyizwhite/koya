@@ -4,15 +4,14 @@
   (:import-from #:koya/core/json
                 #:json-null)
   (:import-from #:cl-ppcre
-                #:regex-replace-all #:split #:scan)
-  (:import-from #:koya-server/lib/timezone
-                #:iso->local-input #:local-input->iso)
+                #:split #:scan)
+  (:import-from #:koya-server/domain/timezone #:iso->local-input #:local-input->iso)
+  (:import-from #:koya-server/lib/timezone #:display-timezone)
   (:import-from #:koya-server/lib/http
                 #:form-values)
   (:export #:form->data
            #:field-param-name
            #:form-value
-           #:slugify
            #:value->string
            #:number->string))
 (in-package #:koya-server/features/contents/forms)
@@ -64,7 +63,7 @@ except booleans which are always present (unchecked = false)."
                (when raw (setf (gethash (field-name field) data) raw))))
           (:datetime
            ;; datetime-local gives 2026-09-20T10:00 in the display zone; stored as UTC
-           (when raw (setf (gethash (field-name field) data) (local-input->iso raw))))
+           (when raw (setf (gethash (field-name field) data) (local-input->iso raw :timezone (display-timezone)))))
           (:richtext
            ;; stored as the editor sent it (see koya-editor.js), but for the CRLF
            ;; a form submission turns its line breaks into -- not trimmed, as the
@@ -91,12 +90,7 @@ except booleans which are always present (unchecked = false)."
          (format nil "~{~a~^, ~}" (coerce value 'list)))
         ((eq (field-type field) :datetime)
          ;; 2026-09-20T01:00:00.000Z -> 2026-09-20T10:00 for datetime-local, in the display zone
-         (if (stringp value) (iso->local-input value) (princ-to-string value)))
+         (if (stringp value) (iso->local-input value :timezone (display-timezone)) (princ-to-string value)))
         ((eq value t) "true")
         (t (princ-to-string value))))
 
-(defun slugify (string)
-  "Lowercase ASCII slug: letters, digits and single hyphens."
-  (let* ((lower (string-downcase string))
-         (dashed (regex-replace-all "[^a-z0-9]+" lower "-")))
-    (string-trim "-" dashed)))

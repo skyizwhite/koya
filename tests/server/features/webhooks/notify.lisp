@@ -4,7 +4,12 @@
   (:import-from #:koya-server/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/db/schema-store #:save-schema)
   (:import-from #:koya-server/features/webhooks/notify #:*webhook-sender*)
-  (:import-from #:koya-server/db/webhook-deliveries #:list-deliveries #:count-deliveries #:+keep-per-space+ #:+max-response-chars+ #:delivery-ok #:delivery-status #:delivery-response #:delivery-error #:delivery-event #:delivery-model #:delivery-label #:delivery-url #:delivery-content-id #:delivery-duration-ms)
+  (:import-from #:koya-server/db/webhook-deliveries
+                #:list-deliveries #:count-deliveries #:+keep-per-space+ #:+max-response-chars+)
+  (:import-from #:koya-server/domain/webhook-delivery
+                #:delivery-ok #:delivery-status #:delivery-response #:delivery-error
+                #:delivery-event #:delivery-model #:delivery-label #:delivery-url
+                #:delivery-content-id #:delivery-duration-ms)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema #:make-webhook)
   (:import-from #:koya/core/json #:jobject #:jget #:json-null))
 (in-package #:koya-tests/server/features/webhooks/notify)

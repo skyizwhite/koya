@@ -7,12 +7,15 @@
                 #:model-kind #:model-name #:model-field #:field-type #:field-option)
   (:import-from #:koya/core/json #:json-array-p)
   (:import-from #:koya/core/validate #:blank-value-p)
-  (:import-from #:koya-server/db/contents #:find-content #:content-id)
-  (:import-from #:koya-server/db/content-revisions
-                #:list-revisions #:count-revisions
-                #:revision-id #:revision-event #:revision-data #:revision-by #:revision-created-at)
+  (:import-from #:koya-server/db/contents #:find-content)
+  (:import-from #:koya-server/domain/content #:content-id #:content-label)
+  (:import-from #:koya-server/domain/revision
+                #:revision-id #:revision-event #:revision-data #:revision-by
+                #:revision-created-at #:changed-keys)
+  (:import-from #:koya-server/db/content-revisions #:list-revisions #:count-revisions)
+  (:import-from #:koya-server/domain/media #:media-filename)
   (:import-from #:koya-server/db/schema-store #:find-space #:find-model)
-  (:import-from #:koya-server/db/media #:find-media #:media-filename)
+  (:import-from #:koya-server/db/media #:find-media)
   (:import-from #:koya-server/features/contents/service #:resolve-model)
   (:import-from #:koya-server/lib/http #:path-param #:api-error #:param)
   (:import-from #:koya-server/features/contents/forms #:number->string)
@@ -20,8 +23,6 @@
   (:import-from #:koya-server/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/lib/auth #:with-owner)
   (:import-from #:koya-server/lib/display #:short-time #:caller-name)
-  (:import-from #:koya-server/features/contents/labels #:content-label)
-  (:import-from #:koya-server/features/contents/revisions #:changed-keys)
   (:import-from #:koya-server/lib/urls #:content-url #:model-url)
   (:import-from #:koya-server/document #:set-title)
   (:import-from #:koya-server/ui/layout #:~layout)

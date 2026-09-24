@@ -5,7 +5,8 @@
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/media
-                #:list-media #:count-media #:find-media #:update-media #:media-reference-counts
+                #:list-media #:count-media #:find-media #:update-media #:media-reference-counts)
+  (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
   (:import-from #:koya-server/features/media/store #:remove-media #:media-url)
   (:import-from #:koya-server/features/media/library #:store-uploads #:remove-each)

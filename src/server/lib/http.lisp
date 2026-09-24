@@ -14,8 +14,9 @@
                 #:schema-error #:schema-error-message)
   (:import-from #:koya/core/validate
                 #:validation-error #:validation-error-errors)
-  (:import-from #:koya-server/lib/query
-                #:query-error #:query-error-message)
+  (:import-from #:koya-server/domain/errors
+                #:koya-error #:koya-error-code #:koya-error-message #:koya-error-details
+                #:not-found #:conflict #:invalid-input #:rejected #:too-large)
   (:import-from #:koya-server/lib/env
                 #:dev-mode-p #:base-url)
   (:import-from #:quri
@@ -42,6 +43,7 @@
            #:origin-allowed-p
            #:error-object
            #:json-response
+           #:error-status
            #:ok-status))
 (in-package #:koya-server/lib/http)
 
@@ -67,6 +69,15 @@
         (list :content-type "application/json; charset=utf-8")
         (list (to-json object))))
 
+(defun error-status (condition)
+  "The HTTP status a KOYA-ERROR is answered with."
+  (etypecase condition
+    (not-found 404)
+    (conflict 409)
+    (invalid-input 400)
+    (rejected 422)
+    (too-large 413)))
+
 (defun validation-details (errors)
   (map 'vector (lambda (e) (jobject "field" (getf e :field) "code" (getf e :code) "message" (getf e :message)))
        errors))
@@ -83,8 +94,9 @@ vectors, strings...) and whose errors become JSON error responses."))
     (api-error (e)
       (json-response (api-error-status e)
                      (error-object (api-error-code e) (api-error-message e) (api-error-details e))))
-    (query-error (e)
-      (json-response 400 (error-object "bad_query" (query-error-message e))))
+    (koya-error (e)
+      (json-response (error-status e)
+                     (error-object (koya-error-code e) (koya-error-message e) (koya-error-details e))))
     (schema-error (e)
       (json-response 400 (error-object "invalid_schema" (schema-error-message e))))
     (validation-error (e)

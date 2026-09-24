@@ -2,6 +2,8 @@
   (:use #:cl)
   (:import-from #:koya-server/db/connection
                 #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/domain/revision
+                #:make-revision #:revision-data)
   (:import-from #:koya/core/time
                 #:now-iso)
   (:import-from #:koya/core/json
@@ -11,17 +13,11 @@
            #:count-revisions
            #:find-revision
            #:content-history
-           #:import-revision
-           #:revision-id #:revision-content-id #:revision-event #:revision-data
-           #:revision-by #:revision-created-at))
+           #:import-revision))
 (in-package #:koya-server/db/content-revisions)
 
-;;; One row per write to a content: the data the write left it with. EVENT is
-;;; "draft", "publish", "unpublish" or "discard". Rows go with their content
+;;; One row per write to a content (domain/revision). Rows go with their content
 ;;; (ON DELETE CASCADE) and are otherwise kept.
-
-(defstruct revision
-  id content-id event data by created-at)
 
 (defun row->revision (row)
   (make-revision :id (col row "id")

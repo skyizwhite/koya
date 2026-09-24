@@ -1,31 +1,18 @@
 (defpackage #:koya-server/features/contents/labels
   (:use #:cl)
   (:import-from #:koya/core/schema
-                #:model-label #:model-name #:model-fields
+                #:model-name #:model-fields
                 #:field-name #:field-type #:field-option)
   (:import-from #:koya-server/db/schema-store
                 #:find-model)
-  (:import-from #:koya-server/db/contents
-                #:list-contents #:find-contents-by-ids #:content-id #:content-data)
-  (:import-from #:koya-server/lib/query
-                #:make-query)
-  (:export #:content-label
-           #:reference-options
+  (:import-from #:koya-server/db/contents #:list-contents #:find-contents-by-ids)
+  (:import-from #:koya-server/domain/content #:content-id #:content-data #:content-label)
+  (:import-from #:koya-server/domain/query #:make-query)
+  (:export #:reference-options
            #:reference-labels))
 (in-package #:koya-server/features/contents/labels)
 
-;;; What a content is called where it is shown or pointed at.
-
-(defun content-label (content model)
-  "What CONTENT is shown as: the value of the field MODEL declares as its :label,
-else its id. No field is taken for a title unless the schema says so -- the
-first text field of one model is another's subtitle."
-  (let* ((label (model-label model))
-         (data (and label (content-data content :draft t)))
-         (value (and data (gethash label data))))
-    (if (and (stringp value) (plusp (length value)))
-        value
-        (content-id content))))
+;;; What a reference field offers, and what the ids it holds are called.
 
 (defun reference-options (space field)
   "Every content of FIELD's target model as (id . label), sorted by label, drafts

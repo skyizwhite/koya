@@ -8,7 +8,8 @@
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:to-json)
   (:import-from #:koya/core/schema #:schema->jobject)
-  (:import-from #:koya-server/db/schema-deploys #:list-deploys #:deploy-by))
+  (:import-from #:koya-server/db/schema-deploys #:list-deploys)
+  (:import-from #:koya-server/domain/deploy #:deploy-by))
 (in-package #:koya-tests/server/pages/deploys)
 
 (setup (setup-pages) (log-in))

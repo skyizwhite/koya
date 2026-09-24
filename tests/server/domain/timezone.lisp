@@ -1,10 +1,10 @@
-(defpackage #:koya-tests/server/timezone
+(defpackage #:koya-tests/server/domain/timezone
   (:use #:cl #:rove)
-  (:import-from #:koya-server/lib/timezone
-                #:find-timezone #:timezone-name-p #:timezone-names
-                #:format-local #:iso->local-input #:local-input->iso)
+  (:import-from #:koya-server/domain/timezone
+                #:find-timezone #:timezone-name-p #:timezone-names #:format-local
+                #:iso->local-input #:local-input->iso)
   (:import-from #:local-time #:+utc-zone+))
-(in-package #:koya-tests/server/timezone)
+(in-package #:koya-tests/server/domain/timezone)
 
 ;;; Conversions with an explicit zone; the display zone (a setting) is covered by
 ;;; the UI tests. Asia/Tokyo has no daylight saving, so the offset is always +09:00.

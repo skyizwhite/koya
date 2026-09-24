@@ -9,7 +9,7 @@
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/sessions #:purge-expired-sessions)
   (:import-from #:koya-server/db/schema-dump #:write-snapshot)
-  (:import-from #:koya-server/lib/totp #:totp)
+  (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/lib/assets #:refresh-asset-version)
   (:export #:start
            #:stop

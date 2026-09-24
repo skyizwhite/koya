@@ -2,6 +2,8 @@
   (:use #:cl)
   (:import-from #:koya-server/db/connection
                 #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/domain/webhook-delivery
+                #:make-delivery)
   (:import-from #:koya/core/ulid
                 #:make-ulid)
   (:import-from #:koya/core/time
@@ -13,10 +15,7 @@
            #:delivery-labels
            #:delivery-models
            #:+keep-per-space+
-           #:+max-response-chars+
-           #:delivery-id #:delivery-space #:delivery-label #:delivery-url #:delivery-model
-           #:delivery-event #:delivery-content-id #:delivery-ok #:delivery-status
-           #:delivery-response #:delivery-error #:delivery-duration-ms #:delivery-created-at))
+           #:+max-response-chars+))
 (in-package #:koya-server/db/webhook-deliveries)
 
 ;;; What came back from each webhook call, so the admin UI can show whether the
@@ -29,9 +28,6 @@
 (defparameter +max-response-chars+ 4000
   "How much of a response body is stored. A receiver that answers with a page
 instead of a line should not fill the database.")
-
-(defstruct delivery
-  id space label url model event content-id ok status response error duration-ms created-at)
 
 (defun row->delivery (row)
   (make-delivery :id (col row "id") :space (col row "space") :label (col row "label")

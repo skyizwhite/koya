@@ -4,7 +4,7 @@
   (:import-from #:koya-server/pages/s/<space>/webhooks #:browse-deliveries)
   (:import-from #:koya-server/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/db/schema-store #:save-schema)
-  (:import-from #:koya-server/db/contents #:content-id)
+  (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/db/webhook-deliveries #:record-delivery)
   (:import-from #:koya/core/schema #:make-webhook)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema))

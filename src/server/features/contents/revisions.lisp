@@ -6,13 +6,12 @@
   (:import-from #:koya/core/validate
                 #:validate-content #:blank-value-p)
   (:import-from #:koya/core/json
-                #:json-array-p #:json-equal #:jkeys)
-  (:import-from #:koya-server/db/contents
-                #:find-content #:content-published #:unique-value-taken-p)
+                #:json-array-p #:jkeys)
+  (:import-from #:koya-server/db/contents #:find-content #:unique-value-taken-p)
+  (:import-from #:koya-server/domain/content #:content-published)
   (:import-from #:koya-server/db/media
                 #:find-media)
-  (:export #:restore-data
-           #:changed-keys))
+  (:export #:restore-data))
 (in-package #:koya-server/features/contents/revisions)
 
 ;;; What a revision's data becomes when it is brought back into the editor. The
@@ -89,20 +88,3 @@ keeps CURRENT's, and ids that can no longer be pointed at are dropped."
                      (keep-current name))
                     (t (setf (gethash name data) value))))))))
     (values data (nreverse notes))))
-
-;;; What a revision changed: the history page draws each revision against the one
-;;; before it.
-
-(defun changed-keys (model before after)
-  "The keys whose value differs between BEFORE and AFTER (either may be NIL): the
-model's fields in its order, then keys it no longer has."
-  (let* ((fields (mapcar #'field-name (model-fields model)))
-         (gone (remove-if (lambda (key) (member key fields :test #'string=))
-                          (remove-duplicates (append (and before (jkeys before)) (jkeys after))
-                                             :test #'string=))))
-    (remove-if (lambda (key)
-                 (multiple-value-bind (a found-a) (if before (gethash key before) (values nil nil))
-                   (multiple-value-bind (b found-b) (gethash key after)
-                     (or (and (not found-a) (not found-b))
-                         (and found-a found-b (json-equal a b))))))
-               (append fields (sort gone #'string<)))))

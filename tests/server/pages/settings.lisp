@@ -5,11 +5,14 @@
                 #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
                 #:enable-two-factor-action #:disable-two-factor-action)
   (:import-from #:koya-server/db/connection #:disconnect-db)
-  (:import-from #:koya-server/db/contents #:list-contents #:content-draft #:content-id)
-  (:import-from #:koya-server/lib/totp #:totp #:*totp-last-counter* #:totp-enabled-p)
-  (:import-from #:koya-server/lib/timezone #:display-timezone-name #:find-timezone)
+  (:import-from #:koya-server/db/contents #:list-contents)
+  (:import-from #:koya-server/domain/content #:content-draft #:content-id)
+  (:import-from #:koya-server/domain/totp #:totp)
+  (:import-from #:koya-server/domain/timezone #:find-timezone)
+  (:import-from #:koya-server/lib/totp #:*totp-last-counter* #:totp-enabled-p)
+  (:import-from #:koya-server/domain/query #:parse-query)
+  (:import-from #:koya-server/lib/timezone #:display-timezone-name)
   (:import-from #:cl-ppcre #:scan-to-strings)
-  (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:koya/core/json #:jget))
 (in-package #:koya-tests/server/pages/settings)
 

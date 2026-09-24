@@ -2,14 +2,14 @@
   (:use #:cl)
   (:import-from #:koya-server/lib/env
                 #:media-dir #:base-url)
-  (:import-from #:koya-server/features/media/image
-                #:sniff-image #:image-extension #:+image-types+)
+  (:import-from #:koya-server/domain/image #:sniff-image #:image-extension #:+image-types+)
   (:import-from #:koya-server/lib/http
                 #:fail-api)
-  (:import-from #:koya-server/db/media
-                #:insert-media #:delete-media #:media-references #:media-id #:media-space
-                #:media-filename #:media-mime #:media-size #:media-width #:media-height #:media-alt
-                #:media-created-at)
+  (:import-from #:koya-server/domain/media
+                #:media-id #:media-space #:media-filename #:media-mime #:media-size #:media-width
+                #:media-height #:media-alt #:media-created-at #:media-file-name #:safe-filename
+                #:+max-upload-bytes+)
+  (:import-from #:koya-server/db/media #:insert-media #:delete-media #:media-references)
   (:import-from #:koya/core/json
                 #:jobject #:json-null)
   (:import-from #:cl-ppcre
@@ -21,17 +21,11 @@
            #:media-path
            #:media-file-path
            #:media-url
-           #:media->jobject
-           #:+max-upload-bytes+))
+           #:media->jobject))
 (in-package #:koya-server/features/media/store)
 
 ;;; Files on disk plus the metadata row. Layout: {KOYA_MEDIA_DIR}/{space}/{id}.{ext},
 ;;; served by the app itself at /media/{space}/{id}.{ext}.
-
-(defparameter +max-upload-bytes+ (* 20 1024 1024))
-
-(defun media-file-name (media)
-  (format nil "~a.~a" (media-id media) (image-extension (media-mime media))))
 
 (defun media-file-path (space id mime)
   (merge-pathnames (format nil "~a/~a.~a" space id (image-extension mime))
@@ -56,13 +50,6 @@
            "height" (or (media-height media) json-null)
            "alt" (media-alt media)
            "createdAt" (media-created-at media)))
-
-(defun safe-filename (name)
-  "The base name of an uploaded file, without any directory part, or a default."
-  (let* ((name (or name ""))
-         (base (subseq name (1+ (or (position-if (lambda (c) (member c '(#\/ #\\))) name :from-end t) -1))))
-         (base (string-trim " " base)))
-    (if (plusp (length base)) base "upload")))
 
 (defun store-upload (space bytes &key filename (alt ""))
   "Accept BYTES as a new media of SPACE: sniff the type, write the file, insert the

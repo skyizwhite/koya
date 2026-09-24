@@ -2,6 +2,8 @@
   (:use #:cl)
   (:import-from #:koya-server/db/connection
                 #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/domain/media
+                #:make-media #:media-id)
   (:import-from #:koya/core/ulid
                 #:make-ulid)
   (:import-from #:koya/core/time
@@ -21,16 +23,11 @@
            #:update-media
            #:delete-media
            #:media-references
-           #:media-reference-counts
-           #:media-id #:media-space #:media-filename #:media-mime #:media-size
-           #:media-width #:media-height #:media-alt #:media-created-at))
+           #:media-reference-counts))
 (in-package #:koya-server/db/media)
 
 ;;; Rows of the media table. The file itself lives on disk (see features/media/store);
 ;;; this module only knows the metadata.
-
-(defstruct media
-  id space filename mime size width height alt created-at)
 
 (defun row->media (row)
   (make-media :id (col row "id") :space (col row "space") :filename (col row "filename")

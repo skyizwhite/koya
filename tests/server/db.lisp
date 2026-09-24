@@ -9,8 +9,8 @@
   (:import-from #:koya-server/db/schema-store
                 #:load-schema #:save-schema #:find-model
                 #:list-spaces #:create-space #:delete-space #:find-space)
-  (:import-from #:koya-server/db/schema-deploys
-                #:list-deploys #:count-deploys
+  (:import-from #:koya-server/db/schema-deploys #:list-deploys #:count-deploys)
+  (:import-from #:koya-server/domain/deploy
                 #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by
                 #:change-description #:change-op)
   (:import-from #:koya/core/schema
@@ -19,11 +19,12 @@
                 #:schema->jobject)
   (:import-from #:koya/core/diff
                 #:destructive-changes-p)
-  (:import-from #:koya-server/db/contents
-                #:create-content #:get-content
+  (:import-from #:koya-server/domain/content
                 #:content-id #:content-model #:content-published #:content-draft)
-  (:import-from #:koya-server/db/content-revisions
-                #:list-revisions #:revision-event #:revision-data #:revision-created-at)
+  (:import-from #:koya-server/domain/revision
+                #:revision-event #:revision-data #:revision-created-at)
+  (:import-from #:koya-server/db/contents #:create-content #:get-content)
+  (:import-from #:koya-server/db/content-revisions #:list-revisions)
   (:import-from #:koya-server/db/sessions
                 #:make-session-store #:purge-expired-sessions)
   (:import-from #:lack/middleware/session/store

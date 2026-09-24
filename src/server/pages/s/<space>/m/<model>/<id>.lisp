@@ -6,19 +6,21 @@
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url)
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
-  (:import-from #:koya-server/db/contents
-                #:find-content #:content-id #:content-status #:content-published #:content-draft
-                #:content-created-at #:content-updated-at #:content-draft-key #:content-data)
+  (:import-from #:koya-server/db/contents #:find-content)
+  (:import-from #:koya-server/domain/content
+                #:content-id #:content-status #:content-published #:content-draft
+                #:content-created-at #:content-updated-at #:content-draft-key #:content-data
+                #:default-data #:content-label)
   (:import-from #:koya-server/db/schema-store
                 #:find-space #:find-model #:space-webhooks)
   (:import-from #:koya-server/features/contents/service
-                #:resolve-model #:default-data #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
+                #:resolve-model #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
   (:import-from #:koya-server/lib/http
                 #:path-param #:api-error #:api-error-message #:api-error-status #:param)
   (:import-from #:koya-server/features/contents/forms #:form->data)
   (:import-from #:koya-server/lib/auth #:with-owner)
   (:import-from #:koya-server/lib/display #:short-time)
-  (:import-from #:koya-server/features/contents/labels #:content-label #:reference-options)
+  (:import-from #:koya-server/features/contents/labels #:reference-options)
   (:import-from #:koya-server/lib/urls #:expand-url-template #:content-url #:model-url)
   (:import-from #:koya-server/document #:set-title)
   (:import-from #:koya-server/ui/layout #:~layout)
@@ -29,8 +31,8 @@
   (:import-from #:koya-server/ui/content/field-input #:~field-input)
   (:import-from #:koya-server/ui/media/picker #:~media-picker-dialog)
   (:import-from #:koya-server/db/media #:find-media)
-  (:import-from #:koya-server/db/content-revisions
-                #:find-revision #:revision-data #:revision-created-at)
+  (:import-from #:koya-server/domain/revision #:revision-data #:revision-created-at)
+  (:import-from #:koya-server/db/content-revisions #:find-revision)
   (:import-from #:koya-server/features/contents/revisions #:restore-data)
   (:import-from #:koya-server/pages/s/<space>/m/<model>/<id>/history #:history-url)
   (:export #:@get #:editor-action))

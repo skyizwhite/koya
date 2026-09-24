@@ -4,8 +4,8 @@
                 #:model-name)
   (:import-from #:koya/core/validate
                 #:validation-error #:validation-error-errors)
-  (:import-from #:koya-server/db/contents
-                #:find-content #:content-published #:content-draft)
+  (:import-from #:koya-server/db/contents #:find-content)
+  (:import-from #:koya-server/domain/content #:content-published #:content-draft)
   (:import-from #:koya-server/lib/http
                 #:api-error #:api-error-message)
   (:import-from #:koya-server/features/contents/service

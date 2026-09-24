@@ -6,8 +6,7 @@
                 #:json-null)
   (:import-from #:koya-server/features/contents/forms
                 #:field-param-name #:value->string)
-  (:import-from #:koya-server/db/media
-                #:media-filename #:media-alt)
+  (:import-from #:koya-server/domain/media #:media-filename #:media-alt)
   (:import-from #:koya-server/features/media/store
                 #:media-url)
   (:import-from #:koya-server/ui/icon #:~icon)

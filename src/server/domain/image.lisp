@@ -1,9 +1,9 @@
-(defpackage #:koya-server/features/media/image
+(defpackage #:koya-server/domain/image
   (:use #:cl)
   (:export #:sniff-image
            #:image-extension
            #:+image-types+))
-(in-package #:koya-server/features/media/image)
+(in-package #:koya-server/domain/image)
 
 ;;; Recognise the image formats the media library accepts by their leading
 ;;; bytes and read the pixel size from the header. Nothing else is decoded.

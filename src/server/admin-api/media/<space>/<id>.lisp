@@ -15,8 +15,8 @@
 
 (defun with-references (media)
   (let ((obj (media->jobject media)))
-    (setf (gethash "references" obj) (media-references (koya-server/db/media:media-space media)
-                                                       (koya-server/db/media:media-id media)))
+    (setf (gethash "references" obj) (media-references (koya-server/domain/media:media-space media)
+                                                       (koya-server/domain/media:media-id media)))
     obj))
 
 (defun @get (params)
@@ -28,8 +28,8 @@
   (let* ((media (require-media params))
          (alt (body-field (read-json-body) "alt")))
     (unless (stringp alt) (fail-api 400 "bad_request" "\"alt\" must be a string"))
-    (media->jobject (update-media (koya-server/db/media:media-space media)
-                                  (koya-server/db/media:media-id media) :alt alt))))
+    (media->jobject (update-media (koya-server/domain/media:media-space media)
+                                  (koya-server/domain/media:media-id media) :alt alt))))
 
 (defun @delete (params)
   "Delete the file and its row. Contents that referenced it keep a dangling id."

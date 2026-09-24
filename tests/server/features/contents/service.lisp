@@ -4,22 +4,23 @@
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:find-model)
   (:import-from #:koya-server/db/contents
-                #:create-content #:save-draft #:publish-content #:unpublish-content #:delete-content
-                #:get-content #:find-content #:list-contents #:ensure-draft-key #:find-object-content
-                #:unique-value-taken-p
-                #:content-id #:content-status #:content-published #:content-draft #:content-published-at
-                #:content-revised-at #:content-draft-key)
+                #:create-content #:save-draft #:publish-content #:unpublish-content
+                #:delete-content #:get-content #:find-content #:list-contents #:ensure-draft-key
+                #:find-object-content #:unique-value-taken-p)
+  (:import-from #:koya-server/domain/content
+                #:content-id #:content-status #:content-published #:content-draft
+                #:content-published-at #:content-revised-at #:content-draft-key)
   (:import-from #:koya-server/db/contents #:discard-draft)
-  (:import-from #:koya-server/db/content-revisions
-                #:list-revisions #:count-revisions #:find-revision
+  (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by)
+  (:import-from #:koya-server/db/content-revisions
+                #:list-revisions #:count-revisions #:find-revision)
   (:import-from #:koya-server/db/connection #:fetch-one #:col)
+  (:import-from #:koya-server/domain/query
+                #:parse-query #:make-query #:query-limit #:query-offset #:query-orders
+                #:query-filters #:query-fields #:query-include #:query-error)
   (:import-from #:koya-server/db/delivery-keys
                 #:create-delivery-key #:list-delivery-keys #:delete-delivery-key #:space-for-delivery-key)
-  (:import-from #:koya-server/lib/query
-                #:parse-query #:make-query
-                #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
-                #:query-error)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya/core/json #:parse-json #:jget))
 (in-package #:koya-tests/server/features/contents/service)

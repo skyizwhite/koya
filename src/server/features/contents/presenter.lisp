@@ -3,8 +3,7 @@
   (:import-from #:koya/core/schema
                 #:model-fields #:field-name #:field-type #:field-option #:field-many-p)
   (:import-from #:koya/core/json #:jobject #:json-null)
-  (:import-from #:koya-server/lib/query
-                #:query-error)
+  (:import-from #:koya-server/domain/query #:query-error)
   (:import-from #:koya-server/db/schema-store
                 #:find-model)
   (:import-from #:koya-server/db/media
@@ -15,10 +14,11 @@
                 #:base-url)
   (:import-from #:cl-ppcre
                 #:regex-replace-all)
-  (:import-from #:koya-server/db/contents
-                #:content-id #:content-status #:content-published #:content-draft #:content-draft-key
-                #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
-                #:content-data #:find-content)
+  (:import-from #:koya-server/domain/content
+                #:content-id #:content-status #:content-published #:content-draft
+                #:content-draft-key #:content-created-at #:content-updated-at
+                #:content-published-at #:content-revised-at #:content-data)
+  (:import-from #:koya-server/db/contents #:find-content)
   (:export #:content->jobject
            #:admin-content->jobject))
 (in-package #:koya-server/features/contents/presenter)

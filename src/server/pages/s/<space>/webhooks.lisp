@@ -8,7 +8,9 @@
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
   (:import-from #:koya-server/db/webhook-deliveries
                 #:list-deliveries #:count-deliveries #:+keep-per-space+ #:delivery-labels
-                #:delivery-models #:delivery-label #:delivery-url #:delivery-model #:delivery-event
+                #:delivery-models)
+  (:import-from #:koya-server/domain/webhook-delivery
+                #:delivery-label #:delivery-url #:delivery-model #:delivery-event
                 #:delivery-content-id #:delivery-ok #:delivery-status #:delivery-response
                 #:delivery-error #:delivery-duration-ms #:delivery-created-at)
   (:import-from #:koya-server/lib/http #:path-param #:param #:blank-p)

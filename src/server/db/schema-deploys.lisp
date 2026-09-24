@@ -7,27 +7,21 @@
   (:import-from #:koya/core/time
                 #:now-iso)
   (:import-from #:koya/core/json
-                #:parse-json #:to-json #:jget)
+                #:parse-json #:to-json)
+  (:import-from #:koya-server/domain/deploy
+                #:make-deploy)
   (:import-from #:koya/core/diff
                 #:change->jobject #:destructive-change-p)
   (:export #:record-deploy
            #:list-deploys
            #:count-deploys
-           #:+keep-per-space+
-           #:deploy-id #:deploy-space #:deploy-changes #:deploy-change-count
-           #:deploy-destructive #:deploy-by #:deploy-created-at
-           #:change-op #:change-path #:change-destructive #:change-description))
+           #:+keep-per-space+))
 (in-package #:koya-server/db/schema-deploys)
 
-;;; One row per deploy that changed something, holding the changes in the wire
-;;; format (core/diff's CHANGE->JOBJECT). The schema document itself is not kept:
-;;; this says what changed, not what it was.
+;;; One row per deploy that changed something (domain/deploy).
 
 (defparameter +keep-per-space+ 100
   "Deploys kept per space; older rows are dropped as new ones arrive.")
-
-(defstruct deploy
-  id space changes change-count destructive by created-at)
 
 (defun row->deploy (row)
   (make-deploy :id (col row "id")
@@ -37,11 +31,6 @@
                :destructive (plusp (or (col row "destructive") 0))
                :by (col row "deployed_by")
                :created-at (col row "created_at")))
-
-(defun change-op (change) (jget change "op"))
-(defun change-path (change) (jget change "path"))
-(defun change-destructive (change) (and (jget change "destructive") t))
-(defun change-description (change) (jget change "description"))
 
 (defun record-deploy (space changes &key (by ""))
   "Store what a deploy changed. CHANGES is the diff's change plists; NIL records
