@@ -11,8 +11,9 @@
   (:export #:@get))
 (in-package #:koya-server/web/pages/s/<space>/export)
 
-;;; The space as a zip download (usecases/spaces/archive). The whole archive is
-;;; built in memory before it is sent, so its size is what the process must hold.
+;;; The space as a zip download (usecases/spaces/archive). Its files are read into
+;;; memory and the archive is built there before it is sent, so the process holds
+;;; about twice the archive's size.
 ;;;
 ;;; The link to it carries no download attribute: Content-Disposition makes the
 ;;; zip a download on its own, and a failure -- a redirect to the space page with

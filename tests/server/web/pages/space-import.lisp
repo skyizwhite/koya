@@ -11,7 +11,8 @@
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-published #:content-draft #:content-id
                 #:content-draft-key #:content-created-at #:content-published-at)
-  (:import-from #:koya-server/usecases/ports/media #:list-media #:media-file-path)
+  (:import-from #:koya-server/usecases/ports/media
+                #:list-media #:media-file-path #:read-media-file #:write-media-file #:delete-media-file)
   (:import-from #:koya-server/domain/media #:media-id #:media-filename #:media-space #:media-mime)
   (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
   (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
@@ -168,6 +169,24 @@
         (ok (string= location "/")))
       (ok (search "not a zip archive" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive")))
+    (testing "a file already in the library is never replaced, and the import changes nothing"
+      (write-media-file "archive" (media-id media) "image/png" (png-bytes 1 1))
+      (ok (string= (nth-value 1 (import-archive octets)) "/"))
+      (ok (search "already in the media library" (nth-value 1 (request :get "/"))))
+      (ng (find-space "archive"))
+      (ok (equalp (read-media-file "archive" (media-id media) "image/png") (png-bytes 1 1))
+          "the file that was there is as it was")
+      (remove-space-media "archive"))
+    (testing "a space whose file has gone is not exported, and says why"
+      (ok (string= (nth-value 1 (import-archive octets)) "/s/archive"))
+      (delete-media-file "archive" (media-id media) "image/png")
+      (multiple-value-bind (status body headers) (request :get "/s/archive/export")
+        (declare (ignore body))
+        (ok (= status 303))
+        (ok (string= (getf headers :location) "/s/archive")))
+      (ok (search "missing from the media library" (nth-value 1 (request :get "/s/archive"))))
+      (delete-space "archive")
+      (remove-space-media "archive"))
     (testing "a multipart post is not an import"
       (ok (string= (getf (nth-value 2 (request :post (import-space-action) :headers +as-htmx+
                                                :multipart (list (list "file" "a.zip" "application/zip" octets))))

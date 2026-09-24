@@ -21,7 +21,8 @@
   (:import-from #:koya-server/domain/revision
                 #:revision-event #:revision-data #:revision-by #:revision-created-at)
   (:import-from #:koya-server/usecases/ports/media
-                #:space-media #:insert-media #:count-media #:media-file-path)
+                #:space-media #:insert-media #:count-media #:read-media-file #:write-media-file
+                #:delete-media-file)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-space #:media-filename #:media-mime #:media-size #:media-width
                 #:media-height #:media-alt #:media-created-at)
@@ -38,7 +39,7 @@
                 #:string-to-octets #:octets-to-string)
   (:import-from #:org.shirakumo.zippy
                 #:zip-file #:zip-entry #:compress-zip #:open-zip-file #:entries #:file-name
-                #:entry-to-vector #:entry-to-file)
+                #:entry-to-vector)
   (:export #:export-space
            #:import-space
            #:import-space-stream
@@ -73,9 +74,6 @@ names, so nothing else is accepted.")
 
 (defun or-null (value) (if (null value) json-null value))
 (defun nullable (value) (if (json-null-p value) nil value))
-
-(defun media-path (media)
-  (media-file-path (media-space media) (media-id media) (media-mime media)))
 
 (defun archive-file-name (space)
   (format nil "~a-~a.zip" space (remove-if-not #'digit-char-p (subseq (now-iso) 0 19))))
@@ -130,8 +128,8 @@ goes through a temporary one."
         octets))))
 
 (defun export-space (space)
-  "The archive of SPACE as zip octets. Signals ARCHIVE-ERROR when a media file is
-missing from the disk: an archive without it would not restore."
+  "The archive of SPACE as zip octets. Signals ARCHIVE-ERROR when the file of a
+media is missing: an archive without it would not restore."
   (let* ((schema (or (load-schema space) (fail "Space ~a not found" space)))
          (media (space-media space))
          (document (jobject "koyaExport" +archive-version+
@@ -147,12 +145,12 @@ missing from the disk: an archive without it would not restore."
      (cons (make-instance 'zip-entry :file-name "space.json"
                                      :content (string-to-octets (to-json document) :encoding :utf-8))
            (loop :for m :in media
-                 :for path := (media-path m)
-                 :unless (probe-file path)
-                   :do (fail "The file of ~a (~a) is missing from the media directory" (media-filename m) (media-id m))
+                 :for bytes := (or (read-media-file (media-space m) (media-id m) (media-mime m))
+                                   (fail "The file of ~a (~a) is missing from the media library"
+                                         (media-filename m) (media-id m)))
                  ;; images are compressed already; deflating them again only costs time
                  :collect (make-instance 'zip-entry :file-name (media-entry-name (media-id m) (media-mime m))
-                                                    :content path :compression-method :store))))))
+                                                    :content bytes :compression-method :store))))))
 
 ;;; --- Import -------------------------------------------------------------------
 ;;;
@@ -256,15 +254,14 @@ keys. Its webhooks and webhook secret are the archive's to replace."
     (fail "Space ~a is not empty. Import into a new space, or one with no models, media or keys." space)))
 
 (defun write-media-files (space media written)
-  "Write every file, pushing each path onto the list in the cons WRITTEN once it
-is made, so a caller that fails later takes away only what this import made. A
-file already there is an error, never replaced: it may be another import's."
+  "Write every file, pushing each media onto the list in the cons WRITTEN once its
+file is made, so a caller that fails later takes away only what this import
+made. A file already there is an error, never replaced: it may be another
+import's."
   (dolist (m media)
-    (let ((path (media-file-path space (getf m :id) (getf m :mime))))
-      (ensure-directories-exist path)
-      (when (probe-file path) (fail "The file of media ~a is already in the media directory" (getf m :id)))
-      (entry-to-file path (getf m :entry) :if-exists :error :restore-attributes nil)
-      (push path (car written)))))
+    (unless (write-media-file space (getf m :id) (getf m :mime) (entry-to-vector (getf m :entry)) :new t)
+      (fail "The file of media ~a is already in the media library" (getf m :id)))
+    (push m (car written))))
 
 (defun import-space (source &key (by *actor*))
   "Make the space in the archive SOURCE -- a pathname, or octets -- again: its
@@ -319,7 +316,9 @@ changes nothing when the archive is malformed or the space is not empty."
                          (import-revision (content-id content) (getf r :event) (getf r :data)
                                           :by (getf r :by) :created-at (getf r :created-at)))))
            (setf done t))
-      (unless done (mapc #'uiop:delete-file-if-exists (car written))))
+      (unless done
+        (dolist (m (car written))
+          (delete-media-file space (getf m :id) (getf m :mime)))))
     space))
 
 ;;; An archive sent as a request body is copied to a file and read from there,
