@@ -42,8 +42,9 @@ src/
                       ;   and actor, auth, keys, system at the top
       ports/          ; what the use cases need from outside: store, spaces,
                       ; contents, media, keys, webhooks, settings, sessions, config
-    infra/            ; the ports, defined: env, media-files, webhook-sender, and
-      db/             ;   connection, migrations, schema.sql, one file per table
+    infra/            ; the ports, implemented: main (all of infra, as main loads it),
+                      ; env, media-files, webhook-sender, and
+      db/             ;   main, connection, migrations, schema.sql, one file per table
     web/              ; the way in: app, middlewares, http, auth, presenters,
                       ; forms, media, paging, display, urls, assets, document
       pages/          ;   the admin UI (ningle-fbr: the directory is the URL), GET only
