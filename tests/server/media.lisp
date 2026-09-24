@@ -8,7 +8,7 @@
   (:import-from #:koya-server/lib/media-store
                 #:store-upload #:remove-media #:remove-space-media #:media-path #:media-url #:media->jobject)
   (:import-from #:koya-server/db/media
-                #:find-media #:list-media #:count-media #:update-media #:media-references
+                #:find-media #:list-media #:count-media #:update-media #:media-references #:media-reference-counts
                 #:media-id #:media-filename #:media-mime #:media-width #:media-height #:media-alt)
   (:import-from #:koya-server/lib/http #:api-error #:api-error-status)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
@@ -105,7 +105,23 @@ Returns (values octets content-type)."
       (ok (= (media-references "website" (media-id media)) 0))
       (create-content "website" "blog" (parse-json (format nil "{\"title\": \"x\", \"cover\": \"~a\"}" (media-id media))))
       (create-content "website" "blog" (parse-json (format nil "{\"title\": \"y\", \"body\": \"<img src=\\\"~a\\\">\"}" (media-url media))))
-      (ok (= (media-references "website" (media-id media)) 2) "field values and richtext URLs both count"))
+      (ok (= (media-references "website" (media-id media)) 2) "field values and richtext URLs both count")
+      (ok (= (gethash (media-id media) (media-reference-counts "website" (list (media-id media)))) 2)
+          "the library's counts agree"))
+    (testing "only the fields in the schema count"
+      (koya-server/db/connection:exec "DELETE FROM contents")
+      (create-content "website" "blog" (parse-json (format nil "{\"title\": \"~a\"}" (media-id media))))
+      (ok (= (media-references "website" (media-id media)) 0) "a text field mentioning the id is not a use")
+      (create-content "website" "blog" (parse-json (format nil "{\"title\": \"z\", \"cover\": \"~a\"}" (media-id media))))
+      (ok (= (media-references "website" (media-id media)) 1))
+      (save-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
+                                                                                         (make-field :body :richtext))))))
+      (ok (= (media-references "website" (media-id media)) 0) "a field removed by a deploy leaves its value unread")
+      (ok (= (gethash (media-id media) (media-reference-counts "website" (list (media-id media)))) 0))
+      (save-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
+                                                                                         (make-field :cover :media)
+                                                                                         (make-field :body :richtext))))))
+      (ok (= (media-references "website" (media-id media)) 1) "and counts again once the field is back"))
     (testing "remove"
       (ok (= 409 (handler-case (progn (remove-media media) nil) (api-error (e) (api-error-status e))))
           "a file in use stays")

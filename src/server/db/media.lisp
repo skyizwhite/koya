@@ -6,6 +6,12 @@
                 #:make-ulid)
   (:import-from #:koya/core/time
                 #:now-iso)
+  (:import-from #:koya/core/json
+                #:parse-json)
+  (:import-from #:koya/core/schema
+                #:schema-models #:model-name #:model-fields #:field-name #:field-type)
+  (:import-from #:koya-server/db/schema-store
+                #:load-schema)
   (:export #:insert-media
            #:find-media
            #:find-media-by-ids
@@ -85,22 +91,52 @@
 (defun delete-media (space id)
   (exec "DELETE FROM media WHERE space = ? AND id = ?" space id))
 
-(defun media-references (space id)
-  "Number of contents in SPACE whose published or draft data mentions ID, as a
-:media field value or inside richtext HTML (the URL contains the id)."
-  (let ((needle (format nil "%~a%" id)))
-    (col (fetch-one "SELECT COUNT(*) AS n FROM contents WHERE space = ? AND (published LIKE ? OR draft LIKE ?)"
-                    space needle needle)
-         "n")))
+(defun media-fields (space)
+  "Hash of model name -> the fields of that model in SPACE's schema that can hold
+a media: :media fields by id, :richtext by URL (which contains the id)."
+  (let ((table (make-hash-table :test 'equal))
+        (schema (load-schema space)))
+    (dolist (model (and schema (schema-models schema)) table)
+      (setf (gethash (model-name model) table)
+            (remove-if-not (lambda (f) (member (field-type f) '(:media :richtext))) (model-fields model))))))
 
-(defun media-reference-counts (space ids)
-  "Hash of id -> number of contents in SPACE mentioning it, for all IDS in one pass
-over the space's content data (a page of the library asks for 48 at once)."
-  (let ((counts (make-hash-table :test 'equal)))
+;; Only the fields in the schema count: a deploy that removes a field leaves its
+;; values in the stored JSON, where nothing reads them any more, and they must
+;; not keep a file from being deleted.
+(defun mentioned-ids (fields json ids)
+  "Those of IDS that the FIELDS of the content data JSON (a string, or NIL) mention."
+  (let ((data (and json (parse-json json))))
+    (when (hash-table-p data)
+      (remove-if-not
+       (lambda (id)
+         (some (lambda (field)
+                 (let ((value (gethash (field-name field) data)))
+                   (and (stringp value)
+                        (if (eq (field-type field) :media) (string= value id) (search id value)))))
+               fields))
+       ids))))
+
+(defun media-reference-counts (space ids &key (where "") params)
+  "Hash of id -> number of contents in SPACE whose published or draft data mentions
+it in a :media or :richtext field of the current schema, for all IDS in one pass
+over the space's contents (a page of the library asks for all its cards at once).
+WHERE and PARAMS narrow the rows read."
+  (let ((counts (make-hash-table :test 'equal))
+        (fields (media-fields space)))
     (dolist (id ids) (setf (gethash id counts) 0))
     (when ids
-      (dolist (row (fetch "SELECT published, draft FROM contents WHERE space = ?" space))
-        (let ((text (concatenate 'string (or (col row "published") "") (or (col row "draft") ""))))
-          (dolist (id ids)
-            (when (search id text) (incf (gethash id counts)))))))
+      (dolist (row (apply #'fetch (format nil "SELECT model, published, draft FROM contents WHERE space = ?~a" where)
+                          space params))
+        (let ((model-fields (gethash (col row "model") fields)))
+          (dolist (id (union (mentioned-ids model-fields (col row "published") ids)
+                             (mentioned-ids model-fields (col row "draft") ids)
+                             :test #'string=))
+            (incf (gethash id counts))))))
     counts))
+
+(defun media-references (space id)
+  "Number of contents in SPACE that mention ID (see MEDIA-REFERENCE-COUNTS)."
+  (let ((needle (format nil "%~a%" id)))
+    ;; LIKE only skips the contents that cannot mention it; the fields decide
+    (gethash id (media-reference-counts space (list id) :where " AND (published LIKE ? OR draft LIKE ?)"
+                                                        :params (list needle needle)))))

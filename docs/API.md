@@ -184,8 +184,9 @@ with `POST /admin/api/schema/{space}/plan`: see [SCHEMA.md](SCHEMA.md), and
 `POST /admin/api/media/{space}` takes `multipart/form-data` with one or more
 `file` parts and an optional `alt`: PNG, JPEG, GIF or WebP up to 20 MB each, the
 type decided by the file's leading bytes. The answer is `{"media": [...]}`; put a
-media object's `id` in a `media` field. A media still used by a content, as a
-field value or inside rich text, cannot be deleted (`409 in_use`).
+media object's `id` in a `media` field. A media still used by a content, in a
+`media` or `richtext` field of the current schema, cannot be deleted
+(`409 in_use`); a value left in a field a deploy removed does not count.
 
 ## Errors
 

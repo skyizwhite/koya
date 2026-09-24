@@ -367,7 +367,9 @@ and the message says how many could not and why.
   size and upload time, an **alt text** box to save, and **Delete**. A file that
   any content still uses — as a `media` value or inside rich text — cannot be
   deleted: its button is disabled and says how many contents use it, and the
-  server refuses too. Take it out of those contents first.
+  server refuses too. Take it out of those contents first. Only the fields in
+  the current schema count: a value left behind in a field a deploy removed
+  does not keep a file.
 - The same library opens as a picker inside the editor — from a `media` field's
   **Choose…** button and from Quill's image button. The picker searches and
   uploads too, so an image can go straight from the desktop into a content.

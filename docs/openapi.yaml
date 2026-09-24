@@ -593,7 +593,7 @@ paths:
       security: [{ managementKey: [] }]
       responses:
         "200":
-          description: The media plus `references`, the number of contents whose data mentions it
+          description: The media plus `references`, the number of contents that use it in a `media` or `richtext` field of the current schema
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MediaWithReferences" }
@@ -1219,7 +1219,7 @@ components:
         - type: object
           required: [references]
           properties:
-            references: { type: integer, description: The number of contents whose data mentions it }
+            references: { type: integer, description: The number of contents that use it in a `media` or `richtext` field of the current schema }
 
     DeliveryKeys:
       type: object
