@@ -26,7 +26,7 @@
       "?"))
 
 (defcomp ~thumb (&key media)
-  (hsx (img :src (media-url media :absolute nil) :alt (media-alt media) :loading "lazy"
+  (hsx (img :src (media-url media :absolute nil) :alt (media-alt media) :loading "lazy" :decoding "async"
             :class "aspect-square w-full rounded-md border border-line bg-panel object-contain")))
 
 (defun delete-confirmation (media references)
