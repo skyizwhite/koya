@@ -14,13 +14,23 @@
   (:import-from #:koya-server/infra/db/media)
   (:import-from #:koya-server/infra/db/webhook-deliveries)
   (:import-from #:koya-server/infra/db/settings)
-  (:import-from #:koya-server/infra/db/sessions)
-  (:export #:connect-db
-           #:disconnect-db
-           #:migrate
+  (:import-from #:koya-server/infra/db/sessions #:purge-expired-sessions)
+  (:export #:open-store
+           #:close-store
            #:write-snapshot))
 (in-package #:koya-server/infra/db)
 
-;;; The SQLite store: every port it implements, and what it takes to open it.
+;;; The SQLite store: every port it implements, and opening and closing it.
 ;;; Imported by its file name, koya-server/infra/db/main -- ASDF finds a file by
 ;;; the name it is imported under.
+
+(defun open-store (path)
+  "Open the database at PATH, bring it up to the latest migration, and drop the
+sessions that ran out while it was closed."
+  (connect-db path)
+  (let ((applied (migrate)))
+    (when applied (format t "~&[koya] applied migrations ~{~a~^, ~}~%" applied)))
+  (purge-expired-sessions))
+
+(defun close-store ()
+  (disconnect-db))

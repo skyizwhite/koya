@@ -2,15 +2,14 @@
   (:nicknames #:koya-server/infra/main)
   (:use #:cl)
   (:import-from #:koya-server/infra/env #:db-path #:server-port)
-  (:import-from #:koya-server/infra/db/main #:connect-db #:disconnect-db #:migrate #:write-snapshot)
+  (:import-from #:koya-server/infra/db/main #:open-store #:close-store #:write-snapshot)
   ;; loaded for the methods they add to the ports
   (:import-from #:koya-server/infra/media-files)
   (:import-from #:koya-server/infra/webhook-sender)
   (:export #:db-path
            #:server-port
-           #:connect-db
-           #:disconnect-db
-           #:migrate
+           #:open-store
+           #:close-store
            #:write-snapshot))
 (in-package #:koya-server/infra)
 

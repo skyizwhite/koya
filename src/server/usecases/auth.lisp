@@ -10,14 +10,13 @@
   (:import-from #:koya-server/usecases/settings/two-factor
                 #:totp-enabled-p #:totp-code-valid-p)
   (:import-from #:koya-server/usecases/ports/sessions
-                #:make-session-store #:purge-expired-sessions #:+session-seconds+)
+                #:make-session-store #:+session-seconds+)
   (:export #:secure-string=
            #:check-login
            #:login-locked-p
            #:note-login-failure
            #:clear-login-failures
            #:make-session-store
-           #:purge-expired-sessions
            #:+session-seconds+))
 (in-package #:koya-server/usecases/auth)
 

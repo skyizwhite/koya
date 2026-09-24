@@ -6,7 +6,8 @@
   (:import-from #:lack/middleware/session/store
                 #:store #:fetch-session #:store-session #:remove-session)
   (:import-from #:koya-server/usecases/ports/sessions
-                #:+session-seconds+ #:make-session-store #:purge-expired-sessions))
+                #:+session-seconds+ #:make-session-store)
+  (:export #:purge-expired-sessions))
 (in-package #:koya-server/infra/db/sessions)
 
 ;;; The owner's session lives in the database rather than in the process, so a
@@ -46,5 +47,7 @@
 (defmethod remove-session ((store session-store) sid)
   (exec "DELETE FROM sessions WHERE id = ?" sid))
 
-(defmethod purge-expired-sessions ()
+(defun purge-expired-sessions ()
+  "Drop the rows behind sessions that have run out. A session that outlives its
+row is refused by FETCH-SESSION anyway; this keeps the table from growing."
   (exec "DELETE FROM sessions WHERE expires_at <= ?" (now-iso)))

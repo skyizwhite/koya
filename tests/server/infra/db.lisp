@@ -19,7 +19,8 @@
                 #:create-content #:get-content #:list-revisions)
   (:import-from #:koya/core/diff
                 #:destructive-changes-p)
-  (:import-from #:koya-server/usecases/ports/sessions #:make-session-store #:purge-expired-sessions)
+  (:import-from #:koya-server/usecases/ports/sessions #:make-session-store)
+  (:import-from #:koya-server/infra/db/sessions #:purge-expired-sessions)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-model #:content-published #:content-draft)
   (:import-from #:koya-server/domain/revision

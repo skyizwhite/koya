@@ -4,12 +4,11 @@
   (:import-from #:clack)
   (:import-from #:ironclad)
   (:import-from #:koya-server/infra/main
-                #:db-path #:server-port #:connect-db #:disconnect-db #:migrate #:write-snapshot)
+                #:db-path #:server-port #:open-store #:close-store #:write-snapshot)
   (:import-from #:koya-server/web/app #:app #:*app* #:install-routes)
   (:import-from #:koya-server/web/assets #:refresh-asset-version)
   (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/usecases/ports/config #:dev-mode-p)
-  (:import-from #:koya-server/usecases/ports/sessions #:purge-expired-sessions)
   (:import-from #:koya-server/usecases/ports/main #:unimplemented-ports)
   (:import-from #:koya-server/usecases/settings/two-factor #:totp-secret)
   (:export #:start
@@ -33,18 +32,12 @@
 
 (defvar *server* nil)
 
-(defun connect-and-migrate (db)
-  (connect-db db)
-  (let ((applied (migrate)))
-    (when applied (format t "~&[koya] applied migrations ~{~a~^, ~}~%" applied)))
-  (purge-expired-sessions))
-
 (defun start (&key (server :hunchentoot) (address "127.0.0.1") (port (server-port)) (db (db-path)))
   "Connect the database, apply migrations and start serving."
   (when *server*
     (restart-case (error "Server is already running.")
       (restart-server () :report "Restart the server" (stop))))
-  (connect-and-migrate db)
+  (open-store db)
   ;; :debug only in dev: with it on, an unhandled error invokes the debugger, which
   ;; in a --non-interactive image means the process exits. Off, clack answers 500.
   (setf *server* (clack:clackup (app) :server server :address address :port port :debug (dev-mode-p)))
@@ -54,7 +47,7 @@
   (when *server*
     (clack:stop *server*)
     (setf *server* nil)
-    (disconnect-db)
+    (close-store)
     (format t "~&[koya] server stopped~%")))
 
 (defun reload ()
@@ -70,10 +63,10 @@
   "Entry point for a deployed process: Woo on all interfaces, in this thread. Woo
 takes SIGTERM and SIGINT itself and returns; the database is closed and the
 process exits."
-  (connect-and-migrate (db-path))
+  (open-store (db-path))
   ;; in a thread, Woo would stop on SIGTERM and leave this one waiting forever
   (clack:clackup (app) :server :woo :address "0.0.0.0" :port (server-port) :debug nil :use-thread nil)
-  (disconnect-db)
+  (close-store)
   (format t "~&[koya] server stopped~%")
   (uiop:quit 0))
 
