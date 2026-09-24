@@ -14,7 +14,7 @@
   (:import-from #:koya-server/usecases/spaces/lifecycle
                 #:create-space #:remove-space #:list-spaces #:find-space)
   (:import-from #:koya-server/web/middlewares #:archive-path)
-  (:export #:@get #:@head #:create-space-action #:delete-space-action #:import-space-action))
+  (:export #:@get #:create-space-action #:delete-space-action #:import-space-action))
 (in-package #:koya-server/web/pages/index)
 
 ;;; The spaces. A space owns the contents, media, keys and webhook secret, so it
@@ -181,7 +181,3 @@ the import action as the request body (see IMPORT-SPACE-ACTION)."
   (declare (ignore params))
   (set-title "Spaces · koya")
   (hsx (~spaces-page :spaces (list-spaces))))
-
-;; health check
-(defun @head (params)
-  (declare (ignore params)))
