@@ -29,7 +29,7 @@ test:
 
 # Start the server in development mode (Hunchentoot, localhost:3100)
 dev:
-    @qlot exec ros -e '(ql:quickload :koya-server :silent t)' -e '(koya-server:start)' -e '(loop (sleep 3600))'
+    @qlot exec ros -e '(ql:quickload :koya-server :silent t)' -e '(koya-server:start)' -e '(handler-case (loop (sleep 3600)) (sb-sys:interactive-interrupt () (koya-server:stop) (uiop:quit 0)))'
 
 # Open a REPL with the server system loaded
 repl:
