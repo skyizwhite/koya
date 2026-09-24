@@ -10,9 +10,7 @@
   (:import-from #:bordeaux-threads-2
                 #:make-thread)
   (:export #:notify-webhooks
-           #:*webhook-sender*
-           #:*webhook-async*
-           #:*webhook-log*))
+           #:*webhook-async*))
 (in-package #:koya-server/usecases/webhooks/notify)
 
 ;;; Content change notifications:
@@ -29,15 +27,8 @@
   (let ((name (model-name model)))
     (remove-if-not (lambda (hook) (webhook-covers-p hook name)) (space-webhooks space-name))))
 
-(defvar *webhook-sender* 'send-webhook
-  "Function (URL PAYLOAD-STRING HEADERS-ALIST) that delivers one webhook and
-returns (values STATUS BODY ERROR). Rebound in tests.")
-
 (defvar *webhook-async* t
   "Deliver webhooks from a background thread. Tests bind this to NIL.")
-
-(defvar *webhook-log* t
-  "Record every delivery for the admin UI's webhook log.")
 
 (defun ok-status-p (status)
   (and (integerp status) (<= 200 status 299)))
@@ -52,22 +43,21 @@ failed write may stop the hooks queued behind it."
         (status nil) (body nil) (failure nil))
     (handler-case
         (multiple-value-setq (status body failure)
-          (funcall *webhook-sender* (webhook-url hook) payload headers))
+          (send-webhook (webhook-url hook) payload headers))
       (error (e) (setf status nil body nil failure (princ-to-string e))))
-    (when *webhook-log*
-      (handler-case
-          (record-delivery space
-                           :label (webhook-label hook)
-                           :url (webhook-url hook)
-                           :model model
-                           :event event
-                           :content-id id
-                           :ok (and (null failure) (ok-status-p status))
-                           :status (and (integerp status) status)
-                           :response body
-                           :error failure
-                           :duration-ms (elapsed-ms start))
-        (error (e) (format *error-output* "~&[koya] webhook log failed: ~a~%" e))))))
+    (handler-case
+        (record-delivery space
+                         :label (webhook-label hook)
+                         :url (webhook-url hook)
+                         :model model
+                         :event event
+                         :content-id id
+                         :ok (and (null failure) (ok-status-p status))
+                         :status (and (integerp status) status)
+                         :response body
+                         :error failure
+                         :duration-ms (elapsed-ms start))
+      (error (e) (format *error-output* "~&[koya] webhook log failed: ~a~%" e)))))
 
 (defun notify-webhooks (space-name model id event &key old new (async *webhook-async*) secret)
   "Send EVENT (one of +EVENTS+) for content ID to the webhooks of the space named

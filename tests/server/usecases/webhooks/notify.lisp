@@ -6,7 +6,7 @@
   (:import-from #:koya-server/infra/db/webhook-deliveries #:+max-response-chars+)
   (:import-from #:koya-server/usecases/ports/webhooks #:+deliveries-kept+)
   (:import-from #:koya-server/usecases/ports/webhooks #:list-deliveries #:count-deliveries)
-  (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-sender*)
+  (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-server/domain/webhook-delivery
                 #:delivery-ok #:delivery-status #:delivery-response #:delivery-error
                 #:delivery-event #:delivery-model #:delivery-label #:delivery-url

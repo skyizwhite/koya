@@ -14,7 +14,7 @@
   (:import-from #:koya-server/usecases/ports/media #:list-media #:media-file-path)
   (:import-from #:koya-server/domain/media #:media-id #:media-filename #:media-space #:media-mime)
   (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
-  (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-sender*)
+  (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya/core/schema #:make-webhook)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
