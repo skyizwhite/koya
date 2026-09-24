@@ -29,7 +29,11 @@ WORKDIR /app
 COPY . /app
 RUN qlot install
 
-RUN qlot exec sbcl --non-interactive \
+# The heap the executable gets is the one this process starts with: the saved
+# image keeps its runtime options and reads none from its own command line.
+# An export holds its files and the zip made of them at once, so twice the
+# largest archive an import takes (512 MB), and room for the rest.
+RUN qlot exec sbcl --dynamic-space-size 2048 --non-interactive \
       --eval '(ql:quickload "koya-server")' \
       --eval '(koya-server:save-executable "/app/koya")'
 

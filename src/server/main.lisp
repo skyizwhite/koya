@@ -80,7 +80,8 @@ compiling anything, and needs neither Quicklisp nor a C toolchain."
   ;; the image would be dead in the next process
   (setf ironclad::*os-prng-stream* nil)
   (sb-ext:save-lisp-and-die path :executable t :toplevel #'main
-                                 ;; the image takes no command line; SBCL must not read one either
+                                 ;; the image takes no command line; SBCL must not read one either,
+                                 ;; and the heap is the one the saving process has (Dockerfile)
                                  :save-runtime-options t))
 
 (defun write-schema-snapshot ()

@@ -170,7 +170,10 @@ One Docker image plus a volume for the SQLite file and the media directory,
 published to `ghcr.io/skyizwhite/koya` by the Image workflow. The Dockerfile builds in one stage and runs in another: the build loads
 `koya-server` and saves it with `(koya-server:save-executable)`, and the runtime
 image holds that executable, `assets/` and the C libraries it opens — no
-Quicklisp, sources or compiler. Migrations apply themselves at startup.
+Quicklisp, sources or compiler. Migrations apply themselves at startup. The
+executable's heap is fixed when it is saved, at 2048 MB: it reads no runtime
+options when it starts, and an export holds twice the largest archive an import
+takes.
 
 Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
 `KOYA_PORT` and `KOYA_ENV`. `GET /health` is unauthenticated and touches the database.
