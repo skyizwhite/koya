@@ -41,7 +41,8 @@ src/
       settings/       ;   timezone, two-factor
                       ;   and actor, auth, keys, system at the top
       ports/          ; what the use cases need from outside: store, spaces,
-                      ; contents, media, keys, webhooks, settings, sessions, config
+                      ; contents, media, keys, webhooks, settings, sessions, config,
+                      ; and main, which lists them and finds any left unimplemented
     infra/            ; the ports, implemented: main (all of infra, as main loads it),
                       ; env, media-files, webhook-sender, and
       db/             ;   main, connection, migrations, schema.sql, one file per table

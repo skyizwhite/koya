@@ -10,6 +10,7 @@
   (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/usecases/ports/config #:dev-mode-p)
   (:import-from #:koya-server/usecases/ports/sessions #:purge-expired-sessions)
+  (:import-from #:koya-server/usecases/ports/main #:unimplemented-ports)
   (:import-from #:koya-server/usecases/settings/two-factor #:totp-secret)
   (:export #:start
            #:stop
@@ -23,17 +24,6 @@
 ;;; The composition root: the one place that loads infra, whose modules add the
 ;;; methods of the ports the use cases call (usecases/ports/store), and starts
 ;;; the web app on top.
-
-(defun unimplemented-ports ()
-  "The generic functions of the ports that no method implements."
-  (let ((missing '()))
-    (dolist (package (list-all-packages) (sort missing #'string< :key #'symbol-name))
-      (when (eql 0 (search "KOYA-SERVER/USECASES/PORTS/" (package-name package)))
-        (do-external-symbols (symbol package)
-          (when (and (fboundp symbol)
-                     (typep (fdefinition symbol) 'generic-function)
-                     (null (sb-mop:generic-function-methods (fdefinition symbol))))
-            (push symbol missing)))))))
 
 ;; when this file loads, infra has: a port it leaves out would otherwise be found
 ;; only when a request first calls it
