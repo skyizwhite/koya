@@ -91,6 +91,26 @@ of this system, so loading it again leaves an edited route stale; RELOAD calls t
   "Cache-Control for everything that did not set one: immutable assets, no-store otherwise.
 /media/ sets its own (see *media-middleware*).")
 
+;; A delivery key reads only what is published, so a page on any origin may use one;
+;; answering with "*" rather than the caller's origin keeps the answer the same for
+;; every caller, so no Vary is needed. The admin API is not mounted under this.
+(defparameter *delivery-cors-middleware*
+  (lambda (app)
+    (lambda (env)
+      (if (eq (getf env :request-method) :options)
+          ;; a preflight never reaches the routes: it carries no key to check
+          (list 204 (list :access-control-allow-origin "*"
+                          :access-control-allow-methods "GET"
+                          :access-control-allow-headers "X-KOYA-DELIVERY-KEY"
+                          :access-control-max-age "86400")
+                '())
+          (let ((response (funcall app env)))
+            (when (listp response)
+              (setf (getf (second response) :access-control-allow-origin) "*"))
+            response))))
+  "CORS for the delivery API: answers the preflight a browser sends before a GET with
+X-KOYA-DELIVERY-KEY, and lets the page read every answer, errors included.")
+
 (defparameter +max-body-bytes+ (+ +max-upload-bytes+ (* 1024 1024))
   "Largest request body accepted: the media upload limit plus room for the other parts.")
 
@@ -147,7 +167,8 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
   ;; media and the delivery API need no session; keeping them outside the session
   ;; middleware also keeps the in-memory store from growing with every image fetch
   (install-middleware *page-app* *media-middleware*)
-  (install-middleware *page-app* (with-args *lack-middleware-mount* "/api" *api-app*))
+  (install-middleware *page-app* (with-args *lack-middleware-mount* "/api"
+                                            (lack:builder *delivery-cors-middleware* *api-app*)))
   ;; the store is the database, not the process, so a restart keeps the owner logged in
   ;; :keep-empty nil: a request that never touches its session leaves nothing behind
   (install-middleware *page-app* (with-args *lack-middleware-session*

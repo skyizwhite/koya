@@ -149,9 +149,10 @@ Each content is typed by its model — `post.cover?.url`, and
 `post.tags?.[0]?.name` with `include` — and carries the system fields `id`,
 `createdAt`, `updatedAt`, `publishedAt` and `revisedAt`.
 
-Read from the server side — server rendering, build time, an API route: the
-delivery API does not yet answer cross-origin requests from a browser
-([#16](https://github.com/skyizwhite/koya/issues/16)).
+This works on a server (server rendering, build time, an API route) and in a
+browser: the delivery API answers cross-origin requests from any site. A
+delivery key in the browser is visible to anyone who loads the page, and it
+reads only what is published. Keep draft keys on preview pages.
 
 Writing content from code, uploading media and more are in the
 [koya-ts-sdk README](https://github.com/skyizwhite/koya-ts-sdk#readme).

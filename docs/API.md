@@ -36,9 +36,15 @@ change everything in its space: keep it on a server and out of anything shipped
 to a browser. The owner secret (`KOYA_SECRET`) only logs into the admin UI and
 is not accepted by either API.
 
-The delivery API does not yet answer cross-origin requests from a browser
-([#16](https://github.com/skyizwhite/koya/issues/16)): read content from the
-server side — server rendering, build time, an API route.
+The delivery API answers browsers on any origin: it replies to the preflight
+`OPTIONS` (`Access-Control-Allow-Origin: *`, `GET`, the `X-KOYA-DELIVERY-KEY`
+header, cached for a day), and every answer, errors included, carries
+`Access-Control-Allow-Origin: *`. So a delivery key can be used from a page's
+own scripts as well as from a server. Anyone who loads the page can read the
+key and use it; it reaches only what is published, and a draft only with its
+draft key, so show a draft key only on a preview page. Every answer is
+`no-store`, so reading from the server side, where the site can cache, keeps the
+load on koya lower. The admin API answers no cross-origin request.
 
 ## Reading content
 

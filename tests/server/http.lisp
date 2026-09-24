@@ -102,3 +102,47 @@
     (ok (= status 404))
     (ok (string= (jget json "error" "code") "not_found"))))
 
+
+(defun raw-request (method path headers)
+  "The whole Lack response, headers included, which REQUEST does not return."
+  (funcall *app* (list :request-method method :script-name "" :path-info path :query-string ""
+                       :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                       :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
+                       :headers (alist-hash-table headers :test 'equal)
+                       :content-type nil :content-length nil :raw-body nil)))
+
+(deftest delivery-cors
+  (testing "the preflight is answered without a key"
+    (destructuring-bind (status headers body)
+        (raw-request :options "/api/v1/website/blog"
+                     '(("origin" . "https://example.com")
+                       ("access-control-request-method" . "GET")
+                       ("access-control-request-headers" . "x-koya-delivery-key")))
+      (declare (ignore body))
+      (ok (= status 204))
+      (ok (string= (getf headers :access-control-allow-origin) "*"))
+      (ok (string= (getf headers :access-control-allow-methods) "GET"))
+      (ok (string-equal (getf headers :access-control-allow-headers) "X-KOYA-DELIVERY-KEY"))
+      (ok (getf headers :access-control-max-age))))
+  (testing "every answer can be read by a page on another origin"
+    (destructuring-bind (status headers body)
+        (raw-request :get "/api/v1/website/blog" `(("origin" . "https://example.com") ("x-koya-delivery-key" . ,*api-key*)))
+      (declare (ignore body))
+      (ok (= status 200))
+      (ok (string= (getf headers :access-control-allow-origin) "*"))
+      (ok (string= (getf headers :cache-control) "no-store")))
+    (destructuring-bind (status headers body) (raw-request :get "/api/v1/website/blog" '(("origin" . "https://example.com")))
+      (declare (ignore body))
+      (ok (= status 401))
+      (ok (string= (getf headers :access-control-allow-origin) "*") "errors too, so the page sees why")))
+  (testing "the admin API stays same-origin"
+    (destructuring-bind (status headers body)
+        (raw-request :options "/admin/api/me" '(("origin" . "https://example.com") ("access-control-request-method" . "GET")))
+      (declare (ignore status body))
+      (ng (getf headers :access-control-allow-origin)))
+    (destructuring-bind (status headers body)
+        (raw-request :get "/admin/api/me" `(("origin" . "https://example.com")
+                                            ("authorization" . ,(format nil "Bearer ~a" *management-key*))))
+      (declare (ignore body))
+      (ok (= status 200))
+      (ng (getf headers :access-control-allow-origin)))))

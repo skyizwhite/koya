@@ -87,7 +87,8 @@ The four apps — pages, delivery API, admin API and actions — are separate ni
 apps mounted together, so each decides its own response type. The admin API and
 the actions are each guarded where they are mounted (`*admin-auth-middleware*`,
 `*actions-auth-middleware*`), so a route added later is covered without checking
-for itself; pages check with `with-owner`.
+for itself; pages check with `with-owner`. The delivery API is mounted behind
+`*delivery-cors-middleware*`, which answers any origin; nothing else is.
 
 ## Running it
 
