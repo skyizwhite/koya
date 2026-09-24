@@ -27,7 +27,7 @@ src/
   client.lisp         ; plan / deploy / pull, get-list …, the admin API wrappers
   core/               ; schema, validate, diff, json, case, time, ulid
   server/
-    app.lisp  main.lisp  document.lisp
+    app.lisp  middlewares.lisp  main.lisp  document.lisp
     pages/            ; the admin UI (ningle-fbr: the directory is the URL)
     components/       ; hsx components shared by pages
     api/              ; the delivery API
