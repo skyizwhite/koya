@@ -5,14 +5,24 @@
                 #:location #:request-url #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/db/connection #:disconnect-db)
   (:import-from #:koya-server/db/contents #:list-contents #:content-id)
-  (:import-from #:koya-server/db/media #:list-media #:media-id #:media-filename)
-  (:import-from #:koya-server/ui/media/picker #:media-picker #:media-picker-upload)
+  (:import-from #:koya-server/db/media #:list-media #:count-media #:media-id #:media-filename)
+  (:import-from #:koya-server/ui/media/picker #:media-picker #:media-picker-more #:media-picker-upload)
   (:import-from #:koya-server/pages/s/<space>/media
                 #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt)
   (:import-from #:koya-tests/server/features/media/store #:png-bytes)
+  (:import-from #:koya-server/features/media/store #:store-upload)
   (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:babel #:string-to-octets))
 (in-package #:koya-tests/server/pages/media)
+
+(defun hx-get (url)
+  "URL as an hx-get attribute is written: hsx escapes its ampersands."
+  (format nil "hx-get=\"~a\"" (cl-ppcre:regex-replace-all "&" url "&amp;")))
+
+(defun count-matches (needle haystack)
+  (loop :for start := 0 :then (+ found (length needle))
+        :for found := (search needle haystack :start2 start)
+        :while found :count t))
 
 (setup (setup-pages) (log-in))
 
@@ -164,3 +174,24 @@
             (call-action :post (delete-media-action :space "website") :form `(("id" . ,kept)))))
         (testing "nothing selected is not an action"
           (ok (search "Nothing was selected." (delete-selected))))))))
+
+(deftest the-picker-scrolls-through-the-library
+  (dotimes (i 17)
+    (store-upload "website" (png-bytes 1 1) :filename (format nil "paged-~2,'0d.png" i)))
+  (flet ((cards (body) (count-matches "data-pick-id=" body))
+         (answer (url) (nth-value 1 (call-action :get url))))
+    (let* ((total (count-media "website"))
+           (pages (ceiling total 12)))
+      (let ((body (answer (media-picker :space "website"))))
+        (ok (= (cards body) 12) "the picker opens on three rows of four")
+        (ok (search (hx-get (media-picker-more :space "website" :q "" :page 2)) body)
+            "and fetches the next ones as its last row comes into view")
+        (ok (search "hx-trigger=\"revealed\"" body)))
+      (let ((body (answer (media-picker-more :space "website" :q "" :page pages))))
+        (ok (= (cards body) (- total (* 12 (1- pages)))) "the last fetch holds the rest")
+        (ng (search "revealed" body) "and asks for nothing after it")
+        (ng (search "<ul" body) "cards to append, not a grid"))
+      (let ((body (answer (media-picker :space "website" :q "paged-"))))
+        (ok (= (cards body) 12) "a search is fetched the same way")
+        (ok (search (hx-get (media-picker-more :space "website" :q "paged-" :page 2)) body)))
+      (ok (= (cards (answer (media-picker-more :space "website" :q "paged-" :page 2))) 5)))))

@@ -393,8 +393,9 @@ and the message says how many could not and why.
   the current schema count: a value left behind in a field a deploy removed
   does not keep a file.
 - The same library opens as a picker inside the editor — from a `media` field's
-  **Choose…** button and from Quill's image button. The picker searches and
-  uploads too, so an image can go straight from the desktop into a content.
+  **Choose…** button and from Quill's image button. The picker searches, scrolls
+  through the library newest first, and uploads too, so an image can go
+  straight from the desktop into a content.
 
 ## Keys
 
@@ -473,8 +474,9 @@ on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key = 'totp
 
 | Thing | Value |
 |---|---|
-| Rows per page: contents, media, deliveries, deploys, revisions | 20 |
-| Media per picker page | 24 |
+| Rows per page: contents, deliveries, deploys, revisions | 20 |
+| Files per media library page | 24 |
+| Files the picker fetches at a time, as it is scrolled | 12 |
 | Webhook deliveries kept | the newest 200 per space |
 | Schema deploys kept | the newest 100 per space |
 | Response body stored per delivery | 4000 characters |

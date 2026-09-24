@@ -11,7 +11,7 @@
   (:import-from #:koya-server/features/media/library #:store-uploads #:remove-each)
   (:import-from #:koya-server/lib/http
                 #:path-param #:uploaded-files #:api-error #:api-error-message #:param #:form-values)
-  (:import-from #:koya-server/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
+  (:import-from #:koya-server/lib/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/lib/auth #:with-owner)
   (:import-from #:koya-server/lib/display #:short-time)
   (:import-from #:koya-server/lib/urls #:space-url)
@@ -30,6 +30,9 @@
 ;;; and the pager -- is drawn again, with the count out of band, and the URL is
 ;;; replaced with the search and page, so a reload or a link comes back to them.
 ;;; The preview dialog is drawn by the server for the file it opens.
+
+(defparameter +library-size+ 24
+  "Files per page: four rows of the six columns a wide screen shows.")
 
 (defun media-page-url (space) (format nil "~a/media" (space-url space)))
 
@@ -81,9 +84,9 @@ joins the selection form."
 
 (defcomp ~library (&key space search page)
   (let* ((total (count-media space :search search))
-         (pages (last-page total))
+         (pages (last-page total +library-size+))
          (page (min page pages))
-         (items (list-media space :search search :limit +page-size+ :offset (page-offset page)))
+         (items (list-media space :search search :limit +library-size+ :offset (page-offset page +library-size+)))
          (references (media-reference-counts space (mapcar #'media-id items)))
          (q (or search "")))
     (hsx
@@ -224,7 +227,7 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
 when that one has emptied), the URL it is now read at, and MESSAGE as the toast.
 CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
   (let* ((search (param params "q"))
-         (pages (last-page (count-media space :search search)))
+         (pages (last-page (count-media space :search search) +library-size+))
          (page (min (page-number params) pages)))
     (set-response-header :hx-replace-url (library-url space :search search :page page))
     (let ((library (hsx (~library :space space :search search :page page)))

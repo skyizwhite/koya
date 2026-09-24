@@ -19,9 +19,9 @@ particular row is found.")
   "?page=, or 1 for none or anything that is not a number."
   (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
 
-(defun last-page (total)
+(defun last-page (total &optional (size +page-size+))
   "The last page for TOTAL rows: 1 when there are none, so an empty list is a page."
-  (max 1 (ceiling total +page-size+)))
+  (max 1 (ceiling total size)))
 
-(defun page-offset (page)
-  (* (1- page) +page-size+))
+(defun page-offset (page &optional (size +page-size+))
+  (* (1- page) size))

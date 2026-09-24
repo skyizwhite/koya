@@ -6,6 +6,7 @@
                 #:media-url)
   (:import-from #:koya-server/ui/elements #:~empty-state)
   (:export #:~media-grid
+           #:~pick-cards
            #:~thumb
            #:dimensions
            #:human-size))
@@ -41,9 +42,19 @@
        (div :class "truncate" :title (media-filename media) (media-filename media))
        (div :class "text-muted" (dimensions media))))))
 
-(defcomp ~media-grid (&key items)
+(defcomp ~pick-cards (&key items more)
+  "The picker's cards, and when MORE -- the URL of the next ones -- the row that
+fetches them as it scrolls into view and is replaced by them."
+  (hsx
+   (<> (loop :for media :in items :collect (hsx (~pick-card :media media)))
+       (when more
+         (hsx (li :class "col-span-full py-2 text-center text-xs text-muted"
+                  :hx-get more :hx-trigger "revealed" :hx-swap "outerHTML"
+                "Loading…"))))))
+
+(defcomp ~media-grid (&key items more)
   "The picker's grid."
   (if (null items)
       (hsx (~empty-state "No media yet. Upload an image above."))
       (hsx (ul :class "grid grid-cols-3 gap-3 sm:grid-cols-4"
-             (loop :for media :in items :collect (hsx (~pick-card :media media)))))))
+             (~pick-cards :items items :more more)))))
