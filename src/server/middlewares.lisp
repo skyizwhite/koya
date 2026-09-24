@@ -4,6 +4,8 @@
                 #:+max-upload-bytes+)
   (:import-from #:koya-server/lib/space-archive
                 #:+max-archive-bytes+)
+  (:import-from #:koya-server/actions/space-import
+                #:import-path)
   (:export #:*cache-control-middleware*
            #:*delivery-cors-middleware*
            #:*body-limit-middleware*))
@@ -58,7 +60,7 @@ X-KOYA-DELIVERY-KEY, and lets the page read every answer, errors included.")
 
 (defun import-body-p (env)
   (and (eq (getf env :request-method) :post)
-       (string= (getf env :path-info) "/import")
+       (string= (getf env :path-info) (import-path))
        (prefix-p "application/zip" (or (getf env :content-type) ""))))
 
 (defparameter *body-limit-middleware*
@@ -78,7 +80,7 @@ X-KOYA-DELIVERY-KEY, and lets the page read every answer, errors included.")
                      (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")
                            (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message))))))
               (import-p
-               ;; a space archive is set aside unread for pages/import, which
+               ;; a space archive is set aside unread for actions/space-import, which
                ;; copies it to a file once the owner is known. Left as the raw
                ;; body, lack would wrap it in a stream that keeps whatever is read
                ;; in memory.

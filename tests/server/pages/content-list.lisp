@@ -1,6 +1,6 @@
 (defpackage #:koya-tests/server/pages/content-list
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/pages/support #:*secret* #:*cookie* #:blog-model #:request #:location #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/pages/support #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/db/contents #:list-contents #:content-status #:content-id #:content-draft-key)
   (:import-from #:koya-server/lib/query #:parse-query)
@@ -9,8 +9,15 @@
   (:import-from #:koya-server/db/media #:insert-media #:media-id)
   (:import-from #:koya-server/db/contents #:get-content #:content-published)
   (:import-from #:koya-server/lib/content-service #:resolve-model #:create)
-  (:import-from #:koya/core/json #:jobject))
+  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-tests/server/pages/support #:call-action)
+  (:import-from #:koya-server/pages/s/<space>/m/<model>/index #:bulk-contents))
 (in-package #:koya-tests/server/pages/content-list)
+
+(defun bulk (op ids &key (q "") (status "") (page 1))
+  "Do OP to IDS as the list's bulk bar does; (values status body)."
+  (call-action :post (bulk-contents :space "website" :model "blog" :op op :q q :status status :sort "" :page page)
+               :form (mapcar (lambda (id) (cons "id" id)) ids)))
 
 (setup (setup-pages) (log-in))
 
@@ -19,10 +26,10 @@
 (deftest list-paging
   (let ((origin '(("origin" . "http://localhost:3000"))))
     (setf *cookie* nil)
-    (request :post "/login" :form `(("secret" . ,*secret*)))
+    (post-login :form `(("secret" . ,*secret*)))
     ;; one more than a page holds, so there are two
     (dotimes (i 21)
-      (request :post "/s/website/m/blog/new" :form `(("action" . "save") ("f-title" . ,(format nil "Page filler ~3,'0d" i))) :headers origin))
+      (edit "/s/website/m/blog/new" :form `(("action" . "save") ("f-title" . ,(format nil "Page filler ~3,'0d" i))) :headers origin))
     (multiple-value-bind (status body) (request :get "/s/website/m/blog")
       (ok (= status 200))
       (ok (search "Page 1 of 2" body))
@@ -45,17 +52,17 @@
   (let* ((origin '(("origin" . "http://localhost:3000")))
          (query '(("orders" . "-createdAt"))))
     (setf *cookie* nil)
-    (request :post "/login" :form `(("secret" . ,*secret*)))
+    (post-login :form `(("secret" . ,*secret*)))
     (labels ((newest ()
                (content-id (first (list-contents "website" "blog" (blog-model) (parse-query query) :status :all))))
              (save (title body)
-               (request :post "/s/website/m/blog/new"
-                        :form `(("action" . "save") ("f-title" . ,title) ("f-body" . ,body))
+               (edit "/s/website/m/blog/new"
+                         :form `(("action" . "save") ("f-title" . ,title) ("f-body" . ,body))
                         :headers origin)
                (newest))
              (post (id action title)
-               (request :post (format nil "/s/website/m/blog/~a" id)
-                        :form `(("action" . ,action) ("f-title" . ,title) ("f-body" . "<p>x</p>"))
+               (edit (format nil "/s/website/m/blog/~a" id)
+                         :form `(("action" . ,action) ("f-title" . ,title) ("f-body" . "<p>x</p>"))
                         :headers origin))
              (before-p (body a b) (< (search a body) (search b body))))
       (let ((alpha (save "Alpha" "<p>a needle in the body</p>"))
@@ -136,7 +143,7 @@
             (ok (search "status=draft" body) "and the filter")
             (ok (search "value=\"title\"" body) "and the sort survives a new filter")))
         (dolist (id (list alpha beta gamma))
-          (request :post (format nil "/s/website/m/blog/~a" id) :form '(("action" . "delete")) :headers origin))
+          (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "delete")) :headers origin))
         (testing "an empty list says which of the three left it empty"
           (multiple-value-bind (status body) (request :get "/s/website/m/blog" :query "status=draft")
             (ok (= status 200))
@@ -149,11 +156,11 @@
 
 (deftest list-columns-are-bounded
   (multiple-value-bind (status body headers)
-      (request :post "/s/website/m/blog/new" :form '(("action" . "save") ("f-title" . "Columns") ("f-body" . "<p>x</p>"))
+      (edit "/s/website/m/blog/new" :form '(("action" . "save") ("f-title" . "Columns") ("f-body" . "<p>x</p>"))
                :headers '(("origin" . "http://localhost:3000")))
     (declare (ignore body))
-    (ok (= status 303))
-    (let ((path (subseq (location headers) 0 (position #\? (location headers)))))
+    (ok (= status 200))
+    (let ((path (subseq (moved-to headers) 0 (position #\? (moved-to headers)))))
       (multiple-value-bind (status body) (request :get "/s/website/m/blog")
         (ok (= status 200))
         (ok (search ">related<" body) "every field keeps its column")
@@ -162,7 +169,7 @@
         (ok (search "line-clamp-2" body) "a preview is clamped to two lines")
         (ok (search "h-14" body) "every row is the same height")
         (ok (< (search ">status<" body) (search ">title<" body)) "status leads the row"))
-      (request :post path :form '(("action" . "delete")) :headers '(("origin" . "http://localhost:3000"))))))
+      (edit path :form '(("action" . "delete")) :headers '(("origin" . "http://localhost:3000"))))))
 
 (deftest list-shows-media-as-images
   (let ((origin '(("origin" . "http://localhost:3000")))
@@ -171,11 +178,11 @@
         (paths '()))
     (flet ((save (title cover)
              (multiple-value-bind (status body headers)
-                 (request :post "/s/website/m/blog/new"
-                          :form `(("action" . "save") ("f-title" . ,title) ("f-cover" . ,cover))
+                 (edit "/s/website/m/blog/new"
+                           :form `(("action" . "save") ("f-title" . ,title) ("f-cover" . ,cover))
                           :headers origin)
                (declare (ignore status body))
-               (push (subseq (location headers) 0 (position #\? (location headers))) paths))))
+               (push (subseq (moved-to headers) 0 (position #\? (moved-to headers))) paths))))
       (save "With cover" (media-id media))
       (save "Lost cover" "01MISSINGMEDIA0000000000000")
       (save "No cover" "")
@@ -190,16 +197,16 @@
         (ng (search "src=\"/media/website/01MISSINGMEDIA" body))
         (ok (search "min-w-24 max-w-36" body) "the media column keeps its bounds"))
       (dolist (path paths)
-        (request :post path :form '(("action" . "delete")) :headers origin)))))
+        (edit path :form '(("action" . "delete")) :headers origin)))))
 
 (deftest bulk-actions-on-the-content-list
   (let ((origin '(("origin" . "http://localhost:3000")))
         (query '(("orders" . "-createdAt"))))
     (setf *cookie* nil)
-    (request :post "/login" :form `(("secret" . ,*secret*)))
+    (post-login :form `(("secret" . ,*secret*)))
     (labels ((save (title)
-               (request :post "/s/website/m/blog/new"
-                        :form `(("action" . "save") ("f-title" . ,title) ("f-body" . "<p>x</p>"))
+               (edit "/s/website/m/blog/new"
+                         :form `(("action" . "save") ("f-title" . ,title) ("f-body" . "<p>x</p>"))
                         :headers origin)
                (content-id (first (list-contents "website" "blog" (blog-model) (parse-query query) :status :all))))
              (status-of (id) (content-status (find id (list-contents "website" "blog" (blog-model)
@@ -215,88 +222,56 @@
             (ok (search (format nil "name=\"id\" data-bulk-item value=\"~a\"" one) body)
                 "each row carries its id")
             (ok (search "data-bulk-bar hidden" body) "the bar waits for a selection")
-            (ok (search "value=\"publish\"" body))
-            (ok (search "value=\"unpublish\"" body))
-            (ok (search "data-bulk-confirm=\"Delete the selection ({n})?" body)
-                "and the question counts what is selected")))
+            (ok (search "op=publish" body))
+            (ok (search "op=unpublish" body))
+            (ok (search "hx-confirm=\"Delete the selected contents?" body))))
         (testing "publishing a selection publishes each of them"
-          (multiple-value-bind (status body headers)
-              (request :post "/s/website/m/blog"
-                       :form `(("action" . "publish") ("id" . ,one) ("id" . ,two))
-                       :headers origin)
-            (declare (ignore body))
-            (ok (= status 303))
-            (ok (string= (location headers) "/s/website/m/blog")))
+          (multiple-value-bind (status body) (bulk "publish" (list one two))
+            (ok (= status 200))
+            (ok (search "id=\"contents\"" body) "the list is drawn again")
+            (ok (search "Published 2 contents." body)))
           (ok (string= (status-of one) "published"))
           (ok (string= (status-of two) "published"))
-          (ok (string= (status-of three) "draft") "and leaves the rest alone")
-          (multiple-value-bind (status body) (request :get "/s/website/m/blog")
-            (declare (ignore status))
-            (ok (search "Published 2 contents." body))))
+          (ok (string= (status-of three) "draft") "and leaves the rest alone"))
         (testing "unpublishing takes them back off"
-          (request :post "/s/website/m/blog"
-                   :form `(("action" . "unpublish") ("id" . ,one)) :headers origin)
+          (bulk "unpublish" (list one))
           (ok (string= (status-of one) "draft"))
           (ok (string= (status-of two) "published")))
         (testing "an action with nothing to do to a content leaves it alone and says so"
           ;; TWO is published with no draft: publishing it again would give it a
           ;; new revisedAt and fire a webhook for a change that did not happen
-          (request :post "/s/website/m/blog"
-                   :form `(("action" . "publish") ("id" . ,two)) :headers origin)
-          (multiple-value-bind (status body) (request :get "/s/website/m/blog")
-            (declare (ignore status))
-            (ok (search "Published 0 contents. 1 was already published." body)))
+          (ok (search "Published 0 contents. 1 was already published." (nth-value 1 (bulk "publish" (list two)))))
           ;; ONE is a draft: unpublishing it would reissue its draft key and break
           ;; a preview link someone is holding
           (let ((key (content-draft-key (find one (list-contents "website" "blog" (blog-model)
                                                                  (parse-query query) :status :all)
                                               :key #'content-id :test #'string=))))
-            (request :post "/s/website/m/blog"
-                     :form `(("action" . "unpublish") ("id" . ,one)) :headers origin)
-            (multiple-value-bind (status body) (request :get "/s/website/m/blog")
-              (declare (ignore status))
-              (ok (search "Unpublished 0 contents. 1 was not published." body)))
+            (ok (search "Unpublished 0 contents. 1 was not published." (nth-value 1 (bulk "unpublish" (list one)))))
             (ok (string= key (content-draft-key (find one (list-contents "website" "blog" (blog-model)
                                                                         (parse-query query) :status :all)
                                                       :key #'content-id :test #'string=)))
                 "and the preview link it was holding still works")))
-        (testing "the filters the list was read under come back with the redirect"
-          (multiple-value-bind (status body headers)
-              (request :post "/s/website/m/blog"
-                       :form `(("action" . "unpublish") ("id" . ,two) ("status" . "published") ("q" . "Bulk"))
-                       :headers origin)
-            (declare (ignore body))
-            (ok (= status 303))
-            (ok (string= (location headers) "/s/website/m/blog?q=Bulk&status=published"))))
+        (testing "the list comes back under the filters it was read with"
+          (let ((body (nth-value 1 (bulk "unpublish" (list two) :q "Bulk" :status "published"))))
+            (ok (search "value=\"Bulk\"" body) "the search")
+            (ok (search "value=\"published\" selected" body) "and the status filter")
+            (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
           ;; a title is required, so a draft saved without one cannot be published
           (koya-server/db/contents:save-draft three (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal))
-          (multiple-value-bind (status body headers)
-              (request :post "/s/website/m/blog"
-                       :form `(("action" . "publish") ("id" . ,one) ("id" . ,three))
-                       :headers origin)
-            (declare (ignore body headers))
-            (ok (= status 303)))
-          (ok (string= (status-of one) "published") "the one that could be")
-          (multiple-value-bind (status body) (request :get "/s/website/m/blog")
-            (declare (ignore status))
+          (let ((body (nth-value 1 (bulk "publish" (list one three)))))
             (ok (search "Published 1 content. 1 could not be: title is required." body)
-                "the field that stopped it, not the condition's own report")))
+                "the field that stopped it, not the condition's own report"))
+          (ok (string= (status-of one) "published") "the one that could be"))
         (testing "nothing selected is not an action"
-          (request :post "/s/website/m/blog" :form '(("action" . "publish")) :headers origin)
-          (multiple-value-bind (status body) (request :get "/s/website/m/blog")
-            (declare (ignore status))
-            (ok (search "Nothing was selected." body))))
+          (ok (search "Nothing was selected." (nth-value 1 (bulk "publish" nil)))))
         (testing "deleting a selection deletes each of them"
-          (request :post "/s/website/m/blog"
-                   :form `(("action" . "delete") ("id" . ,one) ("id" . ,two) ("id" . ,three))
-                   :headers origin)
+          (bulk "delete" (list one two three))
           (ok (null (list-contents "website" "blog" (blog-model) (parse-query query) :status :all))))
-        (testing "an action the page does not offer is refused"
-          (multiple-value-bind (status) (request :post "/s/website/m/blog"
-                                                 :form `(("action" . "burn") ("id" . ,one))
-                                                 :headers origin)
-            (ok (= status 400))))))))
+        (testing "an action the list does not offer is refused"
+          (ok (= 404 (bulk "burn" (list one)))))
+        (testing "the page takes no posts"
+          (ok (= 404 (request :post "/s/website/m/blog" :form '(("op" . "publish")) :headers origin))))))))
 
 
 (deftest bulk-actions-leave-a-referenced-content
@@ -309,17 +284,13 @@
                (other (make "Other"))
                (referrer (make "Refers" "related" (vector target))))
           (testing "unpublishing a selection skips the one another refers to"
-            (request :post "/s/website/m/blog" :form `(("action" . "unpublish") ("id" . ,target) ("id" . ,other))
-                     :headers origin)
-            (multiple-value-bind (status body) (request :get "/s/website/m/blog")
-              (declare (ignore status))
-              (ok (search "Unpublished 1 content. 1 could not be: This content is referenced by 1 other content" body)))
+            (ok (search "Unpublished 1 content. 1 could not be: This content is referenced by 1 other content"
+                        (nth-value 1 (bulk "unpublish" (list target other)))))
             (ok (content-published (get-content target)) "it is still published")
             (ng (content-published (get-content other)) "the rest of the selection went"))
           (testing "deleting a selection does the same"
-            (request :post "/s/website/m/blog" :form `(("action" . "delete") ("id" . ,target) ("id" . ,referrer))
-                     :headers origin)
+            (bulk "delete" (list target referrer))
             (ok (get-content target) "refused while the referrer was still there")
             (ng (get-content referrer))
-            (request :post "/s/website/m/blog" :form `(("action" . "delete") ("id" . ,target)) :headers origin)
+            (bulk "delete" (list target))
             (ng (get-content target) "and it goes once nothing refers to it")))))))

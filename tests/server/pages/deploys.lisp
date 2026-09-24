@@ -1,6 +1,6 @@
 (defpackage #:koya-tests/server/pages/deploys
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/pages/support #:*secret* #:*cookie* #:request #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/pages/support #:post-login #:*secret* #:*cookie* #:request #:setup-pages #:log-in)
   (:import-from #:koya-server/db/connection #:disconnect-db)
   (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:delete-space)
   (:import-from #:koya-server/db/management-keys #:create-management-key)
@@ -16,7 +16,7 @@
 
 (deftest deploys-page
   (setf *cookie* nil)
-  (request :post "/login" :form `(("secret" . ,*secret*)))
+  (post-login :form `(("secret" . ,*secret*)))
   (create-space "deployed")
   (save-schema "deployed"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text)))))
@@ -69,7 +69,7 @@
   ;; management key, so a request carrying both is the owner's; the log has to
   ;; say what the decision said
   (setf *cookie* nil)
-  (request :post "/login" :form `(("secret" . ,*secret*)))
+  (post-login :form `(("secret" . ,*secret*)))
   (create-space "witnessed")
   (let ((key (create-management-key "witnessed" :label "ci")))
     (unwind-protect

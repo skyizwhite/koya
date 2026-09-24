@@ -15,6 +15,7 @@
   (:import-from #:lack/request
                 #:request-env)
   (:import-from #:bordeaux-threads-2)
+  (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri)
   (:import-from #:koya-server/lib/totp
                 #:totp-enabled-p #:totp-code-valid-p)
   (:export #:secure-string=
@@ -26,6 +27,7 @@
            #:*admin-auth-middleware*
            #:*actions-auth-middleware*
            #:require-delivery-key
+           #:public-path
            #:session-login
            #:session-logout
            #:session-owner-p))
@@ -168,16 +170,50 @@ a Bearer management key only its own, and no request writes cross-origin.")
   (list 403 (list :content-type "text/html; charset=utf-8")
         (list (format nil "<p class=\"text-sm text-danger\">~a</p>" message))))
 
+;;; Paths reachable without the owner's session. Everything else behind a guard
+;;; needs one; a path is let through by being named here, where it is defined,
+;;; so what is open can be found by looking for PUBLIC-PATH.
+
+(defvar *public-paths* (make-hash-table :test 'equal))
+
+(defun public-path (url)
+  "Let URL's path (its query dropped) through without a session. Returns URL."
+  (setf (gethash (subseq url 0 (position #\? url)) *public-paths*) t)
+  url)
+
+(defun public-path-p (path)
+  (and (gethash path *public-paths*) t))
+
+(defun htmx-request-p (env)
+  (equal (gethash "hx-request" (getf env :headers)) "true"))
+
+(defun login-location (env)
+  "Where a request that has lost its session goes: the login page, coming back to
+the page htmx says it was sent from. The login page checks NEXT is a local path."
+  (let* ((current (ignore-errors (uri (gethash "hx-current-url" (getf env :headers)))))
+         (next (and current (render-uri (make-uri :path (or (uri-path current) "/") :query (uri-query current))))))
+    (if (and next (string/= next "/"))
+        (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
+        "/login")))
+
 (defparameter *actions-auth-middleware*
   (lambda (app)
     (lambda (env)
       (cond ((not (actions-path-p (getf env :path-info))) (funcall app env))
-            ((not (session-env-owner-p env)) (html-forbidden "Log in again to continue."))
+            ;; an action answers a fragment of a page, never a page: a link or a
+            ;; plain form post has no business here
+            ((not (htmx-request-p env))
+             (list 400 (list :content-type "text/plain; charset=utf-8") (list "Bad Request")))
+            ((not (or (session-env-owner-p env) (public-path-p (getf env :path-info))))
+             ;; htmx follows HX-Redirect, so the owner logs in and comes back
+             (list 401 (list :content-type "text/html; charset=utf-8" :hx-redirect (login-location env))
+                   (list "<p class=\"text-sm text-danger\">Log in again to continue.</p>")))
             ((cross-origin-write-p env) (html-forbidden "Cross-origin request rejected."))
             (t (funcall app env)))))
-  "Lack middleware guarding every ningle-actions endpoint: owner session only, no
-cross-origin writes. Installed just outside *ACTIONS-MIDDLEWARE*, so an action
-defined later is covered without checking for itself.")
+  "Lack middleware guarding every ningle-actions endpoint: htmx requests only, owner
+session only (but for a PUBLIC-PATH), no cross-origin writes. Installed just
+outside *ACTIONS-MIDDLEWARE*, so an action defined later is covered without
+checking for itself.")
 
 (defun require-delivery-key (space)
   "Signal 401/403 unless the request carries a delivery key valid for SPACE."

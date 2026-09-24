@@ -28,7 +28,8 @@ src/
   core/               ; schema, validate, diff, json, case, time, ulid
   server/
     app.lisp  middlewares.lisp  main.lisp  document.lisp
-    pages/            ; the admin UI (ningle-fbr: the directory is the URL)
+    pages/            ; the admin UI (ningle-fbr: the directory is the URL), GET only
+    actions/          ; actions more than one page calls: the media picker, the import
     components/       ; hsx components shared by pages
     api/              ; the delivery API
     admin-api/        ; the admin API
@@ -75,7 +76,7 @@ SBCL with package-inferred systems — a file under `src/` is a package — and
 |---|---|
 | HTTP | Clack / Lack; Hunchentoot in development, Woo in production |
 | Router | jingle (a ningle extension) + ningle-fbr |
-| Templates | hsx, with ningle-actions + HTMX for the media picker |
+| Templates | hsx; ningle-actions + HTMX for everything done on a page |
 | DB | cl-dbi + dbd-sqlite3 + sxql |
 | JSON | jzon, with kebab/camel conversion in `core/case` |
 | Client | dexador |
@@ -89,6 +90,16 @@ the actions are each guarded where they are mounted (`*admin-auth-middleware*`,
 `*actions-auth-middleware*`), so a route added later is covered without checking
 for itself; pages check with `with-owner`. The delivery API is mounted behind
 `*delivery-cors-middleware*`, which answers any origin; nothing else is.
+
+A page route answers GET and draws a page; everything done on it is an action
+(`defaction`), defined beside the page that calls it. The actions middleware lets
+through htmx requests only, from the owner's session and this origin, and sends a
+request that has lost its session to the login page with `HX-Redirect`. An action
+answers the part of the page it changed, under that part's id, and the flash out
+of band into the layout's `#flash`; a result on another page is an `HX-Redirect`
+with the flash in the session. A path declared with `public-path` (`lib/auth`)
+needs no session; logging in is the only one. See
+`adr/2026-09-25-pages-answer-get-and-every-change-is-an-action.md`.
 
 ## Running it
 

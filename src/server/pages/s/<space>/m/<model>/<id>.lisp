@@ -1,6 +1,7 @@
 (defpackage #:koya-server/pages/s/<space>/m/<model>/<id>
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
+  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya/core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:field-option
                 #:webhook-covers-p
@@ -11,14 +12,15 @@
                 #:list-contents #:find-content #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data)
   (:import-from #:koya-server/db/schema-store
-                #:find-model #:space-webhooks)
+                #:find-space #:find-model #:space-webhooks)
   (:import-from #:koya-server/lib/content-service
                 #:resolve-model #:default-data #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
-  (:import-from #:koya-server/lib/http #:path-param #:api-error #:api-error-message)
+  (:import-from #:koya-server/lib/http #:path-param #:api-error #:api-error-message #:api-error-status)
   (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:with-owner-post #:set-title #:redirect-to #:param #:set-flash #:expand-url-template
-                #:short-time #:content-label #:~layout #:~status-badge #:~errors #:~icon #:content-url #:model-url)
+                #:with-owner #:set-title #:param #:set-flash #:expand-url-template
+                #:short-time #:content-label #:~layout #:~status-badge #:~errors #:~icon #:~flash-oob #:action-refusal
+                #:content-url #:model-url)
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
   (:import-from #:koya-server/components/field-input #:~field-input)
   (:import-from #:koya-server/actions/media-picker #:~media-picker-dialog)
@@ -27,7 +29,7 @@
                 #:find-revision #:revision-data #:revision-created-at)
   (:import-from #:koya-server/lib/revisions #:restore-data)
   (:import-from #:koya-server/pages/s/<space>/m/<model>/<id>/history #:history-url)
-  (:export #:@get #:@post))
+  (:export #:@get #:editor-action))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>)
 
 (defun new-p (id) (string= id "new"))
@@ -54,9 +56,12 @@
 (defcomp ~external-link (&key href children)
   (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" children (~icon :name :external))))
 
-(defcomp ~action-button (&key value (class "btn") onclick icon children)
-  "A submit button for the editor form, usable outside the form element."
-  (hsx (button :type "submit" :form "editor-form" :name "action" :value value :class class :onclick onclick
+(defcomp ~action-button (&key space model id op (class "btn") confirm icon children)
+  "A button in the bar or the danger zone: the action OP on the editor form's fields."
+  (hsx (button :type "button" :class class
+               :hx-post (editor-action :space space :model model :id id :op op)
+               :hx-include "#editor-form" :hx-target "#editor" :hx-swap "outerHTML"
+               :hx-confirm confirm
          (when icon (hsx (~icon :name icon)))
          children)))
 
@@ -83,6 +88,8 @@ stored yet, and what did not come back."
                 (hsx (li (strong (getf note :field)) " " (getf note :note))))))))))
 
 (defcomp ~editor (&key space model content data errors restoring)
+  "Everything an action on the content draws again: the bar, the form and the
+danger zone. The media picker stays outside it."
   (let* ((space-name space)
          (model-name (model-name model))
          (id (if content (content-id content) "new"))
@@ -94,11 +101,7 @@ stored yet, and what did not come back."
                                                 :id id :draft-key (content-draft-key content))))
          (public-url (and published (expand-url-template (model-public-url model) :id id))))
     (hsx
-     (~layout :space space-name
-              :crumbs (if object-p
-                          (list (cons model-name nil))
-                          (list (cons model-name (model-url space-name model-name))
-                                (cons (if content (content-label content model) "new") nil)))
+     (div :id "editor"
        ;; Sticky action bar: title and metadata on the left, links and actions on the right.
        ;; -mt-3 takes back the bar's own top padding so the title starts where every
        ;; other page's title does, under the layout's padding alone.
@@ -123,24 +126,26 @@ stored yet, and what did not come back."
                        (~icon :name :webhook) "Webhooks"))))
            (div :class "flex flex-wrap items-center gap-2"
              (when (and published draft)
-               (hsx (~action-button :value "discard" :icon :discard :class "btn btn-danger"
-                                    :onclick "return confirm('Discard the draft and go back to the published version?')"
+               (hsx (~action-button :space space-name :model model-name :id id :op "discard"
+                                    :icon :discard :class "btn btn-danger"
+                                    :confirm "Discard the draft and go back to the published version?"
                                     "Discard draft")))
-             (~action-button :value "save" :icon :save "Save draft")
-             (~action-button :value "publish" :icon :publish :class "btn btn-primary" "Publish"))))
+             (~action-button :space space-name :model model-name :id id :op "save" :icon :save "Save draft")
+             (~action-button :space space-name :model model-name :id id :op "publish" :icon :publish
+                             :class "btn btn-primary" "Publish"))))
        (~errors :errors errors)
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
-       (form :id "editor-form" :method "post" :action (content-url space-name model-name id)
-             :class "space-y-6" :data-editor-form t
+       ;; Enter in a field saves a draft, as the form's own submit
+       (form :id "editor-form" :class "space-y-6"
+             :hx-post (editor-action :space space-name :model model-name :id id :op "save")
+             :hx-target "#editor" :hx-swap "outerHTML"
          (loop :for field :in (model-fields model) :collect
            (hsx (~field-input :field field
                               :value (and data (gethash (field-name field) data))
                               :references (reference-options space field)
                               :media (media-for space field (and data (gethash (field-name field) data)))
                               :error (field-error errors (field-name field))))))
-       ;; one picker per page, shared by :media fields and Quill's image button
-       (~media-picker-dialog :space space-name)
        ;; the two ways to take content off the site, kept away from the daily ones
        (when content
          (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
@@ -151,9 +156,24 @@ stored yet, and what did not come back."
                         "Unpublishing takes the content off the site; deleting empties it and starts over."
                         "Unpublishing takes the content off the site; deleting removes it for good.")))
                 (div :class "flex flex-wrap items-center gap-2"
-                  (when published (hsx (~action-button :value "unpublish" :icon :unpublish "Unpublish")))
-                  (~action-button :value "delete" :icon :delete :class "btn btn-danger"
-                                  :onclick "return confirm('Delete this content?')" "Delete")))))))))
+                  (when published
+                    (hsx (~action-button :space space-name :model model-name :id id :op "unpublish"
+                                         :icon :unpublish "Unpublish")))
+                  (~action-button :space space-name :model model-name :id id :op "delete"
+                                  :icon :delete :class "btn btn-danger" :confirm "Delete this content?"
+                                  "Delete")))))))))
+
+(defcomp ~editor-page (&key space model content data errors restoring)
+  (let ((model-name (model-name model)))
+    (hsx
+     (~layout :space space
+              :crumbs (if (eq (model-kind model) :object)
+                          (list (cons model-name nil))
+                          (list (cons model-name (model-url space model-name))
+                                (cons (if content (content-label content model) "new") nil)))
+       (~editor :space space :model model :content content :data data :errors errors :restoring restoring)
+       ;; one picker per page, shared by :media fields and Quill's image button
+       (~media-picker-dialog :space space)))))
 
 (defun load-editor (params)
   "Return (values space model content) for the route, or signal 404 for unknown model."
@@ -192,60 +212,65 @@ named that this content does not have."
             (revision
              (multiple-value-bind (data notes)
                  (restore-data space model (content-id content) (revision-data revision) current)
-               (hsx (~editor :space space :model model :content content :data data
-                             :restoring (list :revision revision :notes notes)))))
+               (hsx (~editor-page :space space :model model :content content :data data
+                                  :restoring (list :revision revision :notes notes)))))
             (unknown
-             (hsx (~editor :space space :model model :content content :data current
-                           :errors (list (list :field "revision"
-                                               :message "does not exist for this content; this is its current data")))))
+             (hsx (~editor-page :space space :model model :content content :data current
+                                :errors (list (list :field "revision"
+                                                    :message "does not exist for this content; this is its current data")))))
             (t
-             (hsx (~editor :space space :model model :content content :data current)))))))))
+             (hsx (~editor-page :space space :model model :content content :data current)))))))))
 
-(defun @post (params)
-  (with-owner-post
-    (with-editor (space model content) params
-      (set-title (format nil "~a · ~a · koya" (model-name model) space))
-      (let* ((action (or (param params "action") "save"))
-             (space-name space)
-             (model-name (model-name model))
+;;; --- The action ---------------------------------------------------------------
+;;; What stays on this content answers #editor drawn again, with the flash out of
+;;; band; what moves to another page -- a content just made, one deleted -- goes
+;;; there with HX-Redirect, and the flash waits in the session.
+
+(defun done (space model content message)
+  "#editor for CONTENT as it is now stored. The URL loses a ?revision= a restore
+was being read at: what it offered is now saved or left behind."
+  (set-response-header :hx-replace-url (content-url space (model-name model) (content-id content)))
+  (hsx (<> (~editor :space space :model model :content content :data (content-data content :draft t))
+           (~flash-oob :message message))))
+
+(defun move-on (url message)
+  (set-flash message)
+  (set-response-header :hx-redirect url)
+  (hsx (<>)))
+
+(defaction editor-action :post (params)
+  (let* ((space (param params "space"))
+         (op (or (param params "op") "save"))
+         (model (and space (find-space space) (find-model space (or (param params "model") ""))))
+         (id (param params "id"))
+         (content (and model id (not (new-p id)) (find-content space (model-name model) id))))
+    (cond
+      ((null model) (action-refusal "Model not found." 404))
+      ((and (null content) (not (and (equal id "new") (member op '("save" "publish") :test #'string=))))
+       (action-refusal "Content not found." 404))
+      (t
+       (let ((model-name (model-name model))
              (data (form->data model params)))
-        (handler-case
-            (cond
-              ((and (null content) (member action '("delete" "unpublish" "discard") :test #'string=))
-               ;; posted against /new: there is nothing to act on
-               (set-response-status 404)
-               (hsx (~layout :space space-name (h1 :class "text-xl font-bold" "Content not found"))))
-              ((string= action "delete")
-               (destroy space model (content-id content))
-               (set-flash "Content deleted.")
-               (redirect-to (model-url space-name model-name)))
-              ((string= action "unpublish")
-               (unpublish space model (content-id content))
-               (set-flash "Unpublished.")
-               (redirect-to (content-url space-name model-name (content-id content))))
-              ((string= action "discard")
-               (discard space model (content-id content))
-               (set-flash "Draft discarded.")
-               (redirect-to (content-url space-name model-name (content-id content))))
-              ((string= action "publish")
-               (let ((result (if content
-                                 (publish space model (content-id content) data)
-                                 (create space model data :publish t))))
-                 (set-flash "Published.")
-                 (redirect-to (content-url space-name model-name (content-id result)))))
-              (t
-               (let ((result (if content
-                                 (update-draft space model (content-id content) data :replace t)
-                                 (create space model data))))
-                 (set-flash "Draft saved.")
-                 (redirect-to (content-url space-name model-name (content-id result))))))
-          (validation-error (e)
-            (set-response-status 422)
-            (hsx (~editor :space space :model model :content content :data data
-                          :errors (validation-error-errors e))))
-          (api-error (e)
-            ;; refused as things stand, such as a delete while other contents refer
-            ;; to this one: back to it with why. Without a content, WITH-EDITOR answers.
-            (unless content (error e))
-            (set-flash (api-error-message e) :error)
-            (redirect-to (content-url space-name model-name (content-id content)))))))))
+         (handler-case
+             (cond
+               ((string= op "delete")
+                (destroy space model (content-id content))
+                (move-on (model-url space model-name) "Content deleted."))
+               ((string= op "unpublish")
+                (done space model (unpublish space model (content-id content)) "Unpublished."))
+               ((string= op "discard")
+                (done space model (discard space model (content-id content)) "Draft discarded."))
+               ((null content)
+                (let ((made (create space model data :publish (string= op "publish"))))
+                  (move-on (content-url space model-name (content-id made))
+                      (if (string= op "publish") "Published." "Draft saved."))))
+               ((string= op "publish")
+                (done space model (publish space model (content-id content) data) "Published."))
+               (t
+                (done space model (update-draft space model (content-id content) data :replace t) "Draft saved.")))
+           (validation-error (e)
+             (set-response-status 422)
+             (hsx (~editor :space space :model model :content content :data data
+                           :errors (validation-error-errors e))))
+           ;; refused as things stand, such as a delete while other contents refer to this one
+           (api-error (e) (action-refusal (api-error-message e) (api-error-status e)))))))))

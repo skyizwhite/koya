@@ -1,6 +1,7 @@
 (defpackage #:koya-tests/server/pages/support
   (:use #:cl #:rove)
   (:import-from #:koya-server/app #:*app*)
+  (:import-from #:koya-server/pages/s/<space>/m/<model>/<id> #:editor-action)
   (:import-from #:koya-server/db/connection #:connect-db)
   (:import-from #:koya-server/db/migrations #:migrate)
   (:import-from #:koya-server/db/schema-store #:save-schema #:create-space)
@@ -11,7 +12,7 @@
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
   (:import-from #:quri #:url-encode-params)
-  (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:setup-pages #:log-in))
+  (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in))
 (in-package #:koya-tests/server/pages/support)
 
 ;;; What every file of page tests shares: an in-memory instance with the website
@@ -87,6 +88,28 @@ admin API, which the session reaches as well as a management key does."
   (let ((q (position #\? url)))
     (apply #'request method (subseq url 0 q) :query (and q (subseq url (1+ q))) args)))
 
+(defun edit (path &key form headers)
+  "Do to the content at PATH (/s/<space>/m/<model>/<id>) what the editor's button
+named by FORM's \"action\" does (save when there is none), with the rest of FORM as
+the editor's fields. (values status body headers)."
+  (destructuring-bind (s space m model id) (rest (uiop:split-string path :separator "/"))
+    (declare (ignore s m))
+    (call-action :post (editor-action :space space :model model :id id
+                                      :op (or (cdr (assoc "action" form :test #'equal)) "save"))
+                 :form (remove "action" form :key #'car :test #'equal)
+                 :headers headers)))
+
+(defun moved-to (headers)
+  "Where an action's answer sends the browser: another page, or this one's URL cleaned."
+  (or (getf headers :hx-redirect) (getf headers :hx-replace-url)))
+
+(defun call-action (method url &rest args &key headers &allow-other-keys)
+  "Call an action as htmx does: from this server's origin, with HX-Request. HEADERS
+override those: the first of a name is the one the table keeps."
+  (apply #'request-url method url
+         :headers (append headers '(("hx-request" . "true") ("origin" . "http://localhost:3000")))
+         (loop :for (k v) :on args :by #'cddr :unless (eq k :headers) :append (list k v))))
+
 (defun setup-pages ()
   "A fresh in-memory instance with the website space, for one file of page tests."
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
@@ -101,6 +124,12 @@ admin API, which the session reaches as well as a management key does."
                (make-schema :models (list (blog-model)
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
 
+(defun post-login (&rest args &key form headers)
+  "Send the login form as the page does. (values status body headers)."
+  (declare (ignore form headers))
+  ;; named in full: LOG-IN here is the tests' own
+  (apply #'call-action :post (koya-server/pages/login:log-in) args))
+
 (defun log-in ()
   (setf *cookie* nil)
-  (request :post "/login" :form `(("secret" . ,*secret*))))
+  (post-login :form `(("secret" . ,*secret*))))

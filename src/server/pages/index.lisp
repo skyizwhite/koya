@@ -1,18 +1,24 @@
 (defpackage #:koya-server/pages/index
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
+  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/db/schema-store
                 #:list-spaces #:find-space #:create-space #:delete-space)
   (:import-from #:koya-server/lib/media-store #:remove-space-media)
   (:import-from #:koya-server/lib/page
-                #:with-owner #:with-owner-post #:set-title #:param #:set-flash #:redirect-to
-                #:~layout #:~empty-state #:~icon #:space-url)
-  (:export #:@get #:@head #:@post))
+                #:with-owner #:set-title #:param
+                #:~layout #:~empty-state #:~icon #:~flash-oob #:action-refusal #:space-url)
+  (:import-from #:koya-server/actions/space-import #:import-space-action)
+  (:export #:@get #:@head #:create-space-action #:delete-space-action))
 (in-package #:koya-server/pages/index)
 
 ;;; The spaces. A space owns the contents, media, keys and webhook secret, so it
 ;;; is made and deleted here, never by a deploy, which only changes its models.
 ;;; Its name is its id -- it is in every URL -- so there is nothing to edit.
+;;;
+;;; Making and deleting one are actions answered in place. The dialogs open and
+;;; close by HTML alone (commandfor, closedby), so one swapped in works like the
+;;; one it replaced.
 
 (defcomp ~space-row (&key space)
   (let ((name (getf space :name)))
@@ -21,45 +27,59 @@
        (a :href (space-url name) :class "min-w-0 flex-1 hover:underline"
          (span :class "block font-semibold" name)
          (span :class "block text-sm text-muted" (format nil "~a model~:p" (getf space :models))))
-       (form :method "post" :class "shrink-0"
-         (input :type "hidden" :name "action" :value "delete")
+       (form :class "shrink-0"
+             :hx-post (delete-space-action) :hx-target "#spaces" :hx-swap "outerHTML"
+             :hx-confirm (format nil "Delete ~a with every model, content, media file and key in it? This cannot be undone." name)
          (input :type "hidden" :name "name" :value name)
-         ;; the name goes in an attribute, not an inline handler (koya-editor.js)
          (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete space"
-                 :data-confirm (format nil "Delete ~a with every model, content, media file and key in it? This cannot be undone." name)
            (~icon :name :delete)))))))
+
+(defcomp ~space-list (&key spaces oob)
+  (hsx
+   (div :id "spaces" :hx-swap-oob (and oob "true")
+     (if (null spaces)
+         (hsx (~empty-state
+                (p "No spaces yet.")
+                (p :class "mt-2" "Make one with " (strong "New space") ", then deploy its models with "
+                   (code "(koya:deploy)") " from your project's REPL.")))
+         (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                (loop :for space :in spaces :collect (hsx (~space-row :space space)))))))))
+
+(defcomp ~dialog-close (&key dialog children)
+  (hsx (button :type "button" :commandfor dialog :command "close" :class "btn" children)))
 
 (defcomp ~new-space-dialog ()
   "The whole of making a space is one name, so it lives in a dialog rather than
-taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
+taking up the page."
   (hsx
-   (dialog :id "new-space" :class "koya-dialog max-w-sm"
-     (form :method "post"
-       (input :type "hidden" :name "action" :value "create")
+   (dialog :id "new-space" :closedby "any" :class "koya-dialog max-w-sm"
+     (form :hx-post (create-space-action) :hx-target "#new-space" :hx-swap "outerHTML"
        (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
          (h2 :class "font-semibold" "New space")
-         (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close"
+         (button :type "button" :commandfor "new-space" :command "close" :class "btn btn-icon" :aria-label "Close"
            (~icon :name :close)))
        (div :class "px-4 py-4"
          (label :for "name" :class "label" "Name")
+         ;; the hyphen is escaped: browsers read a pattern with the v flag, where a bare one is an error
          (input :type "text" :id "name" :name "name" :required t :autofocus t :autocomplete "off"
-                :pattern "[a-z][a-z0-9-]*" :placeholder "website" :class "input mt-1.5")
+                :pattern "[a-z][a-z0-9\\-]*" :placeholder "website" :class "input mt-1.5")
          (p :class "mt-2 text-xs text-muted"
             "Lowercase letters, digits and hyphens. It is in every URL and in the delivery API, "
-            "so it cannot be changed later."))
+            "so it cannot be changed later.")
+         (p :id "new-space-error" :class "mt-2 text-sm text-danger"))
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
-         (button :type "button" :class "btn" :data-dialog-close t "Cancel")
+         (~dialog-close :dialog "new-space" "Cancel")
          (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create space"))))))
 
 (defcomp ~import-space-dialog ()
   "A space archive from a space's Export. koya-editor.js sends the chosen file to
-/import as the request body (see pages/import)."
+the import action as the request body (see actions/space-import)."
   (hsx
-   (dialog :id "import-space" :class "koya-dialog max-w-sm"
-     (form :method "post" :action "/import" :data-import t
+   (dialog :id "import-space" :closedby "any" :class "koya-dialog max-w-sm"
+     (form :data-import (import-space-action)
        (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
          (h2 :class "font-semibold" "Import space")
-         (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close"
+         (button :type "button" :commandfor "import-space" :command "close" :class "btn btn-icon" :aria-label "Close"
            (~icon :name :close)))
        (div :class "px-4 py-4"
          (label :for "archive" :class "label" "Archive")
@@ -71,7 +91,7 @@ taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
             "exist yet, or must be empty: no models, media or keys. Nothing is sent to the webhooks."))
        (p :class "hidden px-4 pb-3 text-sm text-danger" :data-import-error t)
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
-         (button :type "button" :class "btn" :data-dialog-close t "Cancel")
+         (~dialog-close :dialog "import-space" "Cancel")
          (button :type "submit" :class "btn btn-primary" (~icon :name :import) "Import"))))))
 
 (defcomp ~spaces-page (&key spaces)
@@ -80,19 +100,51 @@ taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
      (div :class "mb-6 flex flex-wrap items-center justify-between gap-3"
        (h1 :class "text-2xl font-bold" "Spaces")
        (div :class "flex flex-wrap gap-2"
-         (button :type "button" :class "btn" :data-dialog-open "import-space"
+         (button :type "button" :class "btn" :commandfor "import-space" :command "show-modal"
            (~icon :name :import) "Import")
-         (button :type "button" :class "btn btn-primary" :data-dialog-open "new-space"
+         (button :type "button" :class "btn btn-primary" :commandfor "new-space" :command "show-modal"
            (~icon :name :plus) "New space")))
-     (if (null spaces)
-         (hsx (~empty-state
-                (p "No spaces yet.")
-                (p :class "mt-2" "Make one with " (strong "New space") ", then deploy its models with "
-                   (code "(koya:deploy)") " from your project's REPL.")))
-         (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                (loop :for space :in spaces :collect (hsx (~space-row :space space))))))
+     (~space-list :spaces spaces)
      (~new-space-dialog)
      (~import-space-dialog))))
+
+;;; --- The work ------------------------------------------------------------------
+
+(defun make-space (params)
+  "(values MESSAGE ERROR). A bad or taken name signals; its message is what the owner needs."
+  (handler-case (values (format nil "Space ~a created." (create-space (or (param params "name") ""))) nil)
+    (error (e) (values nil (princ-to-string e)))))
+
+(defun remove-space (name)
+  ;; the rows go first: the cascade takes the media rows with the space, and
+  ;; only then is there nothing left pointing at the files
+  (delete-space name)
+  (remove-space-media name))
+
+;;; --- Actions ------------------------------------------------------------------
+
+(defaction create-space-action :post (params)
+  (multiple-value-bind (message error) (make-space params)
+    (cond (error
+           ;; the dialog stays open with the reason under the name
+           (set-response-status 422)
+           (set-response-header :hx-retarget "#new-space-error")
+           (set-response-header :hx-reswap "innerHTML")
+           (hsx (<> error)))
+          (t
+           ;; a fresh dialog in place of the open one closes it and clears the name
+           (hsx (<> (~new-space-dialog)
+                    (~space-list :spaces (list-spaces) :oob t)
+                    (~flash-oob :message message)))))))
+
+(defaction delete-space-action :post (params)
+  (let ((name (param params "name")))
+    (cond ((null (and name (find-space name))) (action-refusal "Space not found." 404))
+          (t (remove-space name)
+             (hsx (<> (~space-list :spaces (list-spaces))
+                      (~flash-oob :message (format nil "Space ~a deleted." name))))))))
+
+;;; --- Page ---------------------------------------------------------------------
 
 (defun @get (params)
   (declare (ignore params))
@@ -103,27 +155,3 @@ taking up the page. Opened by the [data-dialog-open] button (koya-editor.js)."
 ;; health check
 (defun @head (params)
   (declare (ignore params)))
-
-(defun @post (params)
-  (with-owner-post
-    (let ((action (param params "action"))
-          (name (param params "name")))
-      (cond ((equal action "create")
-             ;; a bad or taken name signals; the message is what the owner needs
-             (handler-case
-                 (set-flash (format nil "Space ~a created." (create-space (or name ""))))
-               (error (e) (set-flash (princ-to-string e) :error)))
-             (redirect-to "/"))
-            ((not (equal action "delete"))
-             (set-response-status 400)
-             (hsx (~layout (p "Unknown action"))))
-            ((null (and name (find-space name)))
-             (set-response-status 404)
-             (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
-            (t
-             ;; the rows go first: the cascade takes the media rows with the space,
-             ;; and only then is there nothing left pointing at the files
-             (delete-space name)
-             (remove-space-media name)
-             (set-flash (format nil "Space ~a deleted." name))
-             (redirect-to "/"))))))

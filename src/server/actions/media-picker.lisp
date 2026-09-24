@@ -35,7 +35,7 @@
          (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
        (span :class "text-muted" "PNG, JPEG, GIF or WebP. Uploaded files are added to the library.")
        (when error (hsx (span :class "text-danger" error))))
-     (~media-grid :items (list-media space :search search :limit +picker-size+) :space space :mode :picker))))
+     (~media-grid :items (list-media space :search search :limit +picker-size+)))))
 
 (defun forbidden (message)
   (set-response-status 403)

@@ -1,6 +1,6 @@
-(defpackage #:koya-tests/server/pages/import
+(defpackage #:koya-tests/server/actions/space-import
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/pages/support #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/pages/support #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/db/connection #:disconnect-db)
   (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:find-space #:delete-space)
   (:import-from #:koya-server/db/delivery-keys #:create-delivery-key #:list-delivery-keys)
@@ -21,8 +21,9 @@
   (:import-from #:koya-server/lib/media-store #:store-upload #:media-path #:remove-space-media)
   (:import-from #:koya-server/db/contents #:create-content #:save-draft #:content-created-at #:content-published-at)
   (:import-from #:koya-server/db/schema-store #:load-schema #:space-webhooks #:space-webhook-secret)
-  (:import-from #:koya/core/schema #:schema-models #:model-name #:webhook-url))
-(in-package #:koya-tests/server/pages/import)
+  (:import-from #:koya/core/schema #:schema-models #:model-name #:webhook-url)
+  (:import-from #:koya-server/actions/space-import #:import-path))
+(in-package #:koya-tests/server/actions/space-import)
 
 (setup (setup-pages) (log-in))
 
@@ -37,16 +38,19 @@
                                                             (make-field :tags :reference :model "tag" :many t))
                                          :label :title))))
 
+(defparameter +as-htmx+ '(("origin" . "http://localhost:3000") ("hx-request" . "true"))
+  "What the import dialog's fetch sends: an action answers htmx requests only.")
+
 (defun import-archive (octets)
-  "Send OCTETS to /import as the import form does; (values status next-location)."
-  (multiple-value-bind (status body)
-      (request :post "/import" :headers '(("origin" . "http://localhost:3000"))
-                               :body octets :content-type "application/zip")
-    (values status body)))
+  "Send OCTETS to the import action as the import dialog does; (values status next-location)."
+  (multiple-value-bind (status body headers)
+      (request :post (import-path) :headers +as-htmx+ :body octets :content-type "application/zip")
+    (declare (ignore body))
+    (values status (getf headers :hx-redirect))))
 
 (deftest a-space-is-exported-and-imported-again
   (setf *cookie* nil)
-  (request :post "/login" :form `(("secret" . ,*secret*)))
+  (post-login :form `(("secret" . ,*secret*)))
   (create-space "archive")
   (save-schema "archive" (archive-schema))
   (let* ((media (store-upload "archive" (png-bytes 4 5) :filename "cover.png" :alt "A cover"))
@@ -159,14 +163,19 @@
       (ok (search "not a zip archive" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive")))
     (testing "a multipart post is not an import"
-      (ok (string= (nth-value 1 (request :post "/import" :headers '(("origin" . "http://localhost:3000"))
-                                         :multipart (list (list "file" "a.zip" "application/zip" octets))))
+      (ok (string= (getf (nth-value 2 (request :post (import-path) :headers +as-htmx+
+                                               :multipart (list (list "file" "a.zip" "application/zip" octets))))
+                         :hx-redirect)
                    "/"))
       (ok (search "Choose an archive" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive")))
     (testing "an import from another site is refused"
-      (ok (= 403 (request :post "/import" :headers '(("origin" . "https://evil.test"))
-                                          :body octets :content-type "application/zip")))
+      (ok (= 403 (request :post (import-path) :headers '(("origin" . "https://evil.test") ("hx-request" . "true"))
+                                           :body octets :content-type "application/zip")))
+      (ng (find-space "archive"))
+      (ok (= 400 (request :post (import-path) :headers '(("origin" . "http://localhost:3000"))
+                                           :body octets :content-type "application/zip"))
+          "nor is a plain post: an action answers htmx only")
       (ng (find-space "archive")))
     (testing "the import dialog is on the spaces page"
-      (ok (search "action=\"/import\" data-import" (nth-value 1 (request :get "/")))))))
+      (ok (search (format nil "data-import=\"~a\"" (import-path)) (nth-value 1 (request :get "/")))))))

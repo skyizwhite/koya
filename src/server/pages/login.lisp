@@ -1,33 +1,41 @@
 (defpackage #:koya-server/pages/login
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya-server/lib/auth #:session-login #:login-locked-p #:note-login-failure #:clear-login-failures)
+  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/lib/auth
+                #:session-login #:login-locked-p #:note-login-failure #:clear-login-failures #:public-path)
   (:import-from #:lack/request #:request-remote-addr)
   (:import-from #:koya-server/lib/totp #:totp-enabled-p)
   (:import-from #:koya-server/lib/assets #:asset-url)
-  (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:same-origin-p #:local-path-p #:~icon #:~footer)
-  (:export #:@get #:@post))
+  (:import-from #:koya-server/lib/page #:owner-p #:set-title #:redirect-to #:param #:local-path-p #:~icon #:~footer)
+  (:export #:@get #:log-in))
 (in-package #:koya-server/pages/login)
 
-(defcomp ~login-form (&key error next)
+(defcomp ~login-fields (&key error next)
+  "The form, which the log-in action draws again with what went wrong."
+  (hsx
+   (form :id "login" :class "space-y-4"
+         :hx-post (log-in) :hx-target "#login" :hx-swap "outerHTML"
+     (when next (hsx (input :type "hidden" :name "next" :value next)))
+     (div
+       (label :for "secret" :class "label" "Owner secret")
+       (input :type "password" :id "secret" :name "secret" :required t :autofocus t :class "input mt-1.5"))
+     (when (totp-enabled-p)
+       (hsx (div
+              (label :for "code" :class "label" "One-time code")
+              (input :type "text" :id "code" :name "code" :inputmode "numeric" :autocomplete "one-time-code"
+                     :pattern "[0-9 ]*" :required t :class "input mt-1.5"))))
+     (when error (hsx (p :class "text-sm text-danger" error)))
+     (button :type "submit" :class "btn btn-primary w-full justify-center" (~icon :name :login) "Log in"))))
+
+(defcomp ~login-page (&key next)
   (hsx
    (<>
     (main :class "mx-auto w-full max-w-sm flex-1 px-4 py-24"
       (h1 :class "mb-6 flex items-center gap-3 text-2xl font-bold tracking-tight"
         (img :src (asset-url "icon.svg") :alt "" :width "32" :height "32" :class "h-8 w-8 rounded-md")
         "koya")
-      (form :method "post" :action "/login" :class "space-y-4"
-        (when next (hsx (input :type "hidden" :name "next" :value next)))
-        (div
-          (label :for "secret" :class "label" "Owner secret")
-          (input :type "password" :id "secret" :name "secret" :required t :autofocus t :class "input mt-1.5"))
-        (when (totp-enabled-p)
-          (hsx (div
-                 (label :for "code" :class "label" "One-time code")
-                 (input :type "text" :id "code" :name "code" :inputmode "numeric" :autocomplete "one-time-code"
-                        :pattern "[0-9 ]*" :required t :class "input mt-1.5"))))
-        (when error (hsx (p :class "text-sm text-danger" error)))
-        (button :type "submit" :class "btn btn-primary w-full justify-center" (~icon :name :login) "Log in")))
+      (~login-fields :next next))
     (~footer))))
 
 (defun next-path (params)
@@ -39,29 +47,29 @@
   (set-title "Log in · koya")
   (if (owner-p)
       (redirect-to (or (next-path params) "/") 302)
-      (hsx (~login-form :next (next-path params)))))
+      (hsx (~login-page :next (next-path params)))))
 
-(defun @post (params)
-  (set-title "Log in · koya")
-  (cond ((not (same-origin-p))
-         (set-response-status 403)
-         (hsx (~login-form :error "Cross-origin request rejected" :next (next-path params))))
-        ((login-locked-p (request-remote-addr ningle:*request*))
-         ;; 403, not 429: Woo has no status line for 429 and fails to write the response
-         (set-response-status 403)
-         (hsx (~login-form :error "Too many attempts. Wait a few minutes and try again."
-                           :next (next-path params))))
-        (t
-         (let* ((address (request-remote-addr ningle:*request*))
-                (result (session-login (or (param params "secret") "") (param params "code"))))
-           (cond ((eq result t)
-                  (clear-login-failures address)
-                  (redirect-to (or (next-path params) "/")))
-                 (t
-                  (note-login-failure address)
-                  (set-response-status 401)
-                  ;; one message for both factors: not saying which one was wrong
-                  (hsx (~login-form :error (if (totp-enabled-p)
-                                                "Wrong secret or one-time code"
-                                                "Wrong secret")
-                                    :next (next-path params)))))))))
+;; The one action reachable without a session: it is where a session comes from.
+;; The actions guard still asks for htmx and this server's origin, which keeps
+;; another site from logging a browser in.
+(defaction log-in :post (params)
+  (let ((address (request-remote-addr ningle:*request*))
+        (next (next-path params)))
+    (flet ((refuse (status error)
+             (set-response-status status)
+             (hsx (~login-fields :error error :next next)))
+           (go-on ()
+             (set-response-header :hx-redirect (or next "/"))
+             (hsx (<>))))
+      (cond ((owner-p) (go-on))
+            ;; 403, not 429: Woo has no status line for 429 and fails to write the response
+            ((login-locked-p address) (refuse 403 "Too many attempts. Wait a few minutes and try again."))
+            ((eq (session-login (or (param params "secret") "") (param params "code")) t)
+             (clear-login-failures address)
+             (go-on))
+            (t
+             (note-login-failure address)
+             ;; one message for both factors: not saying which one was wrong
+             (refuse 401 (if (totp-enabled-p) "Wrong secret or one-time code" "Wrong secret")))))))
+
+(public-path (log-in))

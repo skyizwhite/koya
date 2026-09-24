@@ -1,6 +1,8 @@
-// Rich text fields: a Quill editor per [data-quill-for] holder, writing HTML
-// back into the hidden input just before the form is submitted -- unless the
-// editor still holds what it was opened with. Quill rewrites HTML it did not
+// Rich text fields: a Quill editor per [data-quill-for] holder, on the page and
+// in whatever htmx swaps in (every action on a content draws its editor again).
+// It writes HTML back into the hidden input as the text changes -- unless the
+// editor holds what it was opened with. The buttons send the form with htmx,
+// which fires no submit event, so the input has to be current all along. Quill rewrites HTML it did not
 // write itself (drops ids and figures, adds rel to links...), so writing back
 // an untouched field would record a change nobody made. The server stores the
 // HTML as it arrives, so what the editor writes is tidied here.
@@ -11,10 +13,9 @@
 //   private-use placeholder before loading and restored on save;
 // - getSemanticHTML() turns every ASCII space into &nbsp;, which is undone for
 //   single spaces (runs of two or more are kept, they are deliberate).
-document.addEventListener("DOMContentLoaded", () => {
+{
   const IDEOGRAPHIC_SPACE = "　";
   const PLACEHOLDER = "";
-  const editors = [];
 
   const protect = (html) => html.replaceAll(IDEOGRAPHIC_SPACE, PLACEHOLDER);
   const restore = (html) =>
@@ -35,7 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .replace(ownMedia, '$1="/media/')
       .trim();
 
-  document.querySelectorAll("[data-quill-for]").forEach((holder) => {
+  htmx.onLoad((root) => root.querySelectorAll("[data-quill-for]").forEach((holder) => {
     const input = document.getElementById(holder.dataset.quillFor);
     if (!input || typeof Quill === "undefined") return;
     const quill = new Quill(holder, {
@@ -58,40 +59,20 @@ document.addEventListener("DOMContentLoaded", () => {
       },
     });
     if (input.value) quill.clipboard.dangerouslyPasteHTML(protect(input.value));
-    editors.push({ quill, input, opened: tidy(restore(quill.getSemanticHTML())) });
-  });
-
-  document.querySelectorAll("form[data-editor-form]").forEach((form) => {
-    form.addEventListener("submit", () => {
-      editors.forEach(({ quill, input, opened }) => {
-        if (!form.contains(input)) return;
-        const html = tidy(restore(quill.getSemanticHTML()));
-        if (html !== opened) input.value = html;
-      });
+    const opened = tidy(restore(quill.getSemanticHTML()));
+    const original = input.value;
+    quill.on("text-change", () => {
+      const html = tidy(restore(quill.getSemanticHTML()));
+      input.value = html === opened ? original : html;
     });
-  });
-});
-
-// List rows: a [data-href] row opens its editor on click or Enter, unless the
-// click landed on a real link or button inside it.
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("[data-href]").forEach((row) => {
-    const open = () => { window.location.href = row.dataset.href; };
-    row.addEventListener("click", (event) => {
-      if (event.target.closest("a, button, input, select")) return;
-      open();
-    });
-    row.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && event.target === row) open();
-    });
-  });
-});
+  }));
+}
 
 // Many-reference fields: the <select multiple> keeps the submitted values but is
 // hidden; the user sees the chosen contents as chips and adds more from an
-// ordinary dropdown.
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("select[multiple][data-picker]").forEach((select) => {
+// ordinary dropdown. Built for whatever htmx swaps in, as the rich text is.
+htmx.onLoad((root) => {
+  root.querySelectorAll("select[multiple][data-picker]").forEach((select) => {
     const wrap = document.createElement("div");
     wrap.className = "flex flex-wrap items-center gap-2";
     const chips = document.createElement("div");
@@ -176,11 +157,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  document.querySelectorAll("[data-media-pick-for]").forEach((button) => {
-    button.addEventListener("click", () => picker.open({ kind: "field", name: button.dataset.mediaPickFor }));
-  });
-  document.querySelectorAll("[data-media-clear-for]").forEach((button) => {
-    button.addEventListener("click", () => setField(button.dataset.mediaClearFor, null));
+  // listened for on the document: the editor is drawn again by every action on it
+  document.addEventListener("click", (event) => {
+    const pick = event.target.closest("[data-media-pick-for]");
+    const clear = event.target.closest("[data-media-clear-for]");
+    if (pick) picker.open({ kind: "field", name: pick.dataset.mediaPickFor });
+    if (clear) setField(clear.dataset.mediaClearFor, null);
   });
   dialog.querySelector("[data-dialog-close]").addEventListener("click", picker.close);
   dialog.addEventListener("click", (event) => {
@@ -204,98 +186,33 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// Image preview: [data-preview-src] buttons (the library thumbnails and their
-// Preview buttons) show the image large in <dialog id="media-preview">.
-document.addEventListener("DOMContentLoaded", () => {
-  const dialog = document.getElementById("media-preview");
-  if (!dialog) return;
-  const image = dialog.querySelector("[data-preview-image]");
-  const title = dialog.querySelector("[data-preview-title]");
-  const caption = dialog.querySelector("[data-preview-caption]");
-  const ids = dialog.querySelectorAll("[data-preview-id]");
-  const alt = dialog.querySelector("[data-preview-alt-input]");
-  const remove = dialog.querySelector("[data-preview-delete]");
-
-  document.querySelectorAll("[data-preview-src]").forEach((button) => {
-    button.addEventListener("click", () => {
-      image.src = button.dataset.previewSrc;
-      image.alt = button.dataset.previewAlt || "";
-      title.textContent = button.dataset.previewName || "";
-      caption.textContent = button.dataset.previewMeta || "";
-      // the dialog's alt and delete forms act on whichever file was opened
-      ids.forEach((input) => { input.value = button.dataset.previewId || ""; });
-      if (alt) alt.value = button.dataset.previewAlt || "";
-      if (remove) {
-        // a file in use cannot be deleted (the server refuses too); the text says why
-        const inUse = Number(button.dataset.previewReferences || 0) > 0;
-        remove.dataset.confirm = button.dataset.previewConfirm || "";
-        remove.disabled = inUse;
-        remove.title = inUse ? button.dataset.previewConfirm || "" : "";
-      }
-      dialog.showModal();
-    });
-  });
-  dialog.querySelector("[data-dialog-close]").addEventListener("click", () => dialog.close());
-  dialog.addEventListener("click", (event) => {
-    if (event.target === dialog) dialog.close();
-  });
-  dialog.addEventListener("close", () => image.removeAttribute("src"));
-});
-
-// A file input behind a button-styled label has nothing to submit it, so its
-// form goes as soon as files are chosen (the picker does the same over HTMX).
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("[data-submit-on-change]").forEach((input) => {
-    input.addEventListener("change", () => {
-      if (input.files.length && input.form) input.form.requestSubmit();
-    });
-  });
+// A <dialog data-show-modal> that htmx swaps in opens itself as a modal: the
+// server draws a dialog's contents for what it shows (the media preview), and an
+// element swapped in cannot be opened by the button that asked for it.
+htmx.onLoad((root) => {
+  const dialogs = root.matches?.("dialog[data-show-modal]") ? [root] : root.querySelectorAll("dialog[data-show-modal]");
+  dialogs.forEach((dialog) => { if (!dialog.open) dialog.showModal(); });
 });
 
 // Settings: draw a QR code for every [data-qr] element (the otpauth URI when
-// setting up two-factor login). qrcode.min.js is davidshimjs/qrcodejs (MIT).
-document.addEventListener("DOMContentLoaded", () => {
+// setting up two-factor login), on the page and in whatever htmx swaps in --
+// setting up is answered in place. qrcode.min.js is davidshimjs/qrcodejs (MIT).
+const drawQrCodes = (root) => {
   if (typeof QRCode === "undefined") return;
-  document.querySelectorAll("[data-qr]").forEach((el) => {
+  root.querySelectorAll("[data-qr]").forEach((el) => {
     new QRCode(el, { text: el.dataset.qr, width: 192, height: 192, correctLevel: QRCode.CorrectLevel.M });
   });
-});
-
-// Buttons with data-confirm ask before their form submits. The text lives in an
-// attribute rather than an inline handler, so any file name is safe in it.
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("[data-confirm]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      if (!window.confirm(button.dataset.confirm)) event.preventDefault();
-    });
-  });
-});
-
-// Plain modals: [data-dialog-open="id"] opens that <dialog>, and a
-// [data-dialog-close] inside it or a click on the backdrop closes it again.
-// Dialogs whose contents are fetched or filled in (the media picker and the
-// image preview) bind their own opening above; this is for the rest.
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("[data-dialog-open]").forEach((button) => {
-    const dialog = document.getElementById(button.dataset.dialogOpen);
-    if (!dialog) return;
-    button.addEventListener("click", () => dialog.showModal());
-    dialog.querySelectorAll("[data-dialog-close]").forEach((close) => {
-      close.addEventListener("click", () => dialog.close());
-    });
-    dialog.addEventListener("click", (event) => {
-      // a click on the backdrop lands on the dialog element itself
-      if (event.target === dialog) dialog.close();
-    });
-  });
-});
+};
+if (window.htmx) htmx.onLoad(drawQrCodes);
+else document.addEventListener("DOMContentLoaded", () => drawQrCodes(document));
 
 // Bulk selection: inside a [data-bulk] form, ticking a [data-bulk-item] box shows
-// the [data-bulk-bar], counts into [data-bulk-count] and writes the count into
-// each [data-bulk-confirm] question. [data-bulk-all] selects and clears the page.
-// The bar starts hidden, so bulk actions need this file.
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("form[data-bulk]").forEach((form) => {
+// the [data-bulk-bar] and counts into [data-bulk-count]. [data-bulk-all] selects
+// and clears the page.
+// The bar starts hidden, so bulk actions need this file. Bound for whatever htmx
+// swaps in as well: the media library draws its selection again after each action.
+htmx.onLoad((root) => {
+  root.querySelectorAll("form[data-bulk]").forEach((form) => {
     // form.elements, not querySelectorAll: a box may sit outside the form, tied
     // to it by its form attribute (the media grid does that)
     const controls = () => Array.from(form.elements);
@@ -312,9 +229,6 @@ document.addEventListener("DOMContentLoaded", () => {
         all.checked = n > 0 && n === items.length;
         all.indeterminate = n > 0 && n < items.length;
       }
-      form.querySelectorAll("[data-bulk-confirm]").forEach((button) => {
-        button.dataset.confirm = button.dataset.bulkConfirm.replace("{n}", n);
-      });
     };
     boxes().forEach((box) => box.addEventListener("change", render));
     if (all) {
@@ -341,9 +255,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// Import: the archive goes to /import as the request body itself, not as a
-// multipart form, so the server can copy it to disk instead of holding it in
-// memory. The answer is the page to go to, where the result waits as a flash.
+// Import: the archive goes to the import action ([data-import]) as the request
+// body itself, not as a multipart form, so the server can copy it to disk instead
+// of holding it in memory. htmx sends forms only, so this is a fetch that says it
+// is htmx, as an action requires. The answer names the page to go to in
+// HX-Redirect, where the result waits as a flash.
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("form[data-import]").forEach((form) => {
     const error = form.querySelector("[data-import-error]");
@@ -357,16 +273,14 @@ document.addEventListener("DOMContentLoaded", () => {
       submit.textContent = "Importing…";
       error.classList.add("hidden");
       try {
-        const response = await fetch(form.action, {
+        const response = await fetch(form.dataset.import, {
           method: "POST",
           body: file,
-          headers: { "Content-Type": "application/zip" },
+          headers: { "Content-Type": "application/zip", "HX-Request": "true" },
         });
-        // a lost session answers with the login page
-        if (response.redirected) { window.location.href = response.url; return; }
         const text = await response.text();
         if (!response.ok) throw new Error(new DOMParser().parseFromString(text, "text/html").body.textContent);
-        window.location.href = text;
+        window.location.href = response.headers.get("HX-Redirect") || "/";
       } catch (e) {
         error.textContent = e.message || "The import could not be sent.";
         error.classList.remove("hidden");

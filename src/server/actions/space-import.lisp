@@ -1,19 +1,25 @@
-(defpackage #:koya-server/pages/import
+(defpackage #:koya-server/actions/space-import
   (:use #:cl #:hsx)
+  (:import-from #:ningle-actions #:defaction)
+  (:import-from #:jingle #:set-response-header)
   (:import-from #:lack/request #:request-env)
   (:import-from #:koya-server/lib/auth #:calling-identity)
   (:import-from #:koya-server/lib/space-archive #:import-space #:+max-archive-bytes+)
-  (:import-from #:koya-server/lib/page #:with-owner-post #:set-flash #:space-url)
-  (:export #:@post))
-(in-package #:koya-server/pages/import)
+  (:import-from #:koya-server/lib/page #:set-flash #:space-url)
+  (:export #:import-space-action
+           #:import-path))
+(in-package #:koya-server/actions/space-import)
 
 ;;; A space archive from Export, made into a space again (lib/space-archive).
 ;;;
-;;; The form on the spaces page sends the file itself as an application/zip body
-;;; (koya-editor.js), not as a multipart form, which lack would hold in memory
-;;; several times over. *BODY-LIMIT-MIDDLEWARE* sets that body aside unread; it
-;;; is copied to a file here, once the owner is known, and read from there. The
-;;; answer is where to go next, as text: the flash waits there.
+;;; The dialog on the spaces page sends the file itself as an application/zip
+;;; body (koya-editor.js), not as a multipart form, which lack would hold in
+;;; memory several times over. *BODY-LIMIT-MIDDLEWARE* knows this action by
+;;; IMPORT-PATH and sets that body aside unread; it is copied to a file here, once
+;;; the owner is known, and read from there. That is why this action is here and
+;;; not with the page: the middleware is loaded before any page is.
+;;;
+;;; The answer is where to go next, in HX-Redirect; the flash waits there.
 
 (defun copy-to-file (in path)
   "Copy IN to PATH, refusing more than the import limit: a chunked body has no
@@ -42,11 +48,16 @@ Content-Length for the middleware to check."
         (set-flash (format nil "Import failed: ~a" e) :error)
         "/"))))
 
-(defun @post (params)
+(defaction import-space-action :post (params)
   (declare (ignore params))
-  (with-owner-post
-    (let ((body (getf (request-env ningle:*request*) :koya.import-body)))
-      (list 200 (list :content-type "text/plain; charset=utf-8")
-            (list (if body
-                      (import-archive body)
-                      (progn (set-flash "Choose an archive to import." :error) "/")))))))
+  (let ((body (getf (request-env ningle:*request*) :koya.import-body)))
+    (set-response-header :hx-redirect
+                         (if body
+                             (import-archive body)
+                             (progn (set-flash "Choose an archive to import." :error) "/")))
+    (hsx (<>))))
+
+(defun import-path ()
+  "The path this action is served at, without a query."
+  (let ((url (import-space-action)))
+    (subseq url 0 (position #\? url))))

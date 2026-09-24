@@ -1,7 +1,7 @@
 (defpackage #:koya-server/lib/page
   (:use #:cl #:hsx)
   (:import-from #:jingle
-                #:redirect #:set-response-status #:get-request-header)
+                #:redirect #:set-response-status #:set-response-header)
   (:import-from #:ningle
                 #:context)
   (:import-from #:lack/request
@@ -11,9 +11,9 @@
   (:import-from #:cl-ppcre
                 #:regex-replace-all)
   (:import-from #:koya-server/lib/auth
-                #:session-owner-p)
-  (:import-from #:koya-server/lib/http
-                #:origin-allowed-p)
+                #:session-owner-p #:session-logout)
+  (:import-from #:ningle-actions
+                #:defaction)
   (:import-from #:koya-server/lib/assets
                 #:asset-url)
   (:import-from #:koya-server/lib/timezone
@@ -25,12 +25,10 @@
   (:import-from #:koya-server/db/contents
                 #:content-id #:content-data)
   (:export #:with-owner
-           #:with-owner-post
            #:owner-p
            #:set-title
            #:page-title
            #:redirect-to
-           #:same-origin-p
            #:local-path-p
            #:param
            #:set-flash
@@ -43,6 +41,9 @@
            #:~footer
            #:~status-badge
            #:~flash
+           #:~flash-oob
+           #:logout
+           #:action-refusal
            #:~errors
            #:~empty-state
            #:~icon
@@ -108,12 +109,6 @@ first text field of one model is another's subtitle."
                           (regex-replace-all "\\{CONTENT_ID\\}" template (or id ""))
                           (or draft-key ""))))
 
-(defun same-origin-p ()
-  "True when the request's Origin (or Referer) matches the Host header or KOYA_BASE_URL.
-See ORIGIN-ALLOWED-P."
-  (flet ((h (name) (first (get-request-header name))))
-    (origin-allowed-p (h "origin") (h "referer") (h "host"))))
-
 (defun local-path-p (path)
   "True for a path on this server. What the login page redirects to comes from the
 URL, so anything that a browser could read as another host (//evil, /\\evil) is out."
@@ -128,14 +123,11 @@ URL, so anything that a browser could read as another host (//evil, /\\evil) is 
     (render-uri (make-uri :path (or (uri-path uri) "/") :query (uri-query uri)))))
 
 (defun return-path ()
-  "The page to come back to after logging in: the one requested, or for a form
-post the page the form was on, since the post itself cannot be replayed."
+  "The page to come back to after logging in: the one requested. Pages answer GET
+only; an action that finds no session sends its own way back (lib/auth)."
   (ignore-errors
-   (if (eq (request-method ningle:*request*) :get)
-       ;; the raw request line: path-info is decoded, and an encoded ? or / would change meaning
-       (path-and-query (request-uri ningle:*request*))
-       (let ((referer (first (get-request-header "referer"))))
-         (and referer (same-origin-p) (path-and-query referer))))))
+   ;; the raw request line: path-info is decoded, and an encoded ? or / would change meaning
+   (path-and-query (request-uri ningle:*request*))))
 
 (defun redirect-to-login ()
   (let ((next (return-path)))
@@ -149,12 +141,6 @@ post the page the form was on, since the post itself cannot be replayed."
   `(if (owner-p)
        (progn ,@body)
        (redirect-to-login)))
-
-(defmacro with-owner-post (&body body)
-  "Like WITH-OWNER for form posts: also rejects cross-origin submissions."
-  `(cond ((not (owner-p)) (redirect-to-login))
-         ((not (same-origin-p)) (set-response-status 403) (hsx (p "Forbidden: cross-origin request")))
-         (t ,@body)))
 
 (defun param (params name)
   (let ((v (cdr (assoc name params :test #'equal))))
@@ -238,6 +224,18 @@ post the page the form was on, since the post itself cannot be replayed."
                                 (if (eq kind :error) "border-danger/40 bg-danger/5 text-danger" "border-ok/40 bg-ok/5 text-ok"))
                 message))))))
 
+(defcomp ~flash-oob (&key message (kind :ok))
+  "The flash for an action's answer: the session's flash waits for the next page,
+which a swap never renders, so the message goes out of band into the layout's #flash."
+  (hsx (div :id "flash" :hx-swap-oob "true" (~flash :message message :kind kind))))
+
+(defun action-refusal (message &optional (status 400))
+  "An action's answer when it cannot do what was asked: the page stays as it is and
+MESSAGE shows as the flash. htmx 4 swaps an error response in, so the reswap says not to."
+  (set-response-status status)
+  (set-response-header :hx-reswap "none")
+  (hsx (~flash-oob :message message :kind :error)))
+
 (defcomp ~errors (&key errors)
   (hsx
    (<> (when errors
@@ -271,6 +269,13 @@ post the page the form was on, since the post itself cannot be replayed."
              (hsx (a :href href :class "max-w-48 truncate text-fg hover:underline sm:max-w-xs" :title label label))
              (hsx (span :class "max-w-48 truncate text-muted sm:max-w-xs" :title label label))))))
 
+;; the header's Log out, on every page
+(defaction logout :post (params)
+  (declare (ignore params))
+  (session-logout)
+  (set-response-header :hx-redirect "/login")
+  (hsx (<>)))
+
 (defcomp ~layout (&key space crumbs children)
   (hsx
    (<>
@@ -289,12 +294,12 @@ post the page the form was on, since the post itself cannot be replayed."
          (div :class "flex shrink-0 items-center gap-2"
            (a :href "/settings" :class "btn" :aria-label "Settings"
               (~icon :name :settings) (span :class "hidden sm:inline" "Settings"))
-           (form :method "post" :action "/logout"
+           (form :hx-post (logout)
              (button :type "submit" :class "btn" :aria-label "Log out"
                      (~icon :name :logout) (span :class "hidden sm:inline" "Log out"))))))
      (main :class "mx-auto w-full max-w-5xl flex-1 px-4 py-8"
        (multiple-value-bind (message kind) (take-flash)
-         (~flash :message message :kind kind))
+         (hsx (div :id "flash" (~flash :message message :kind kind))))
        children)
      (~footer))))
 

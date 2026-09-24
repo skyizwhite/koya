@@ -45,11 +45,15 @@ no user accounts: whoever knows the secret is the owner.
   a redeploy does not log the owner out. The cookie is `HttpOnly`, `SameSite=Lax`
   and, when `KOYA_BASE_URL` is an `https://` URL, `Secure`.
 - A page reached without a session sends the owner to `/login?next=…`, and
-  logging in returns there. A form post returns to the page the form was on; what
-  it submitted is not replayed. `next` is followed only when it is a path on this
-  server.
-- Every page has **Log out** in the header; form submissions from another origin
-  are rejected.
+  logging in returns there. So does a button pressed on a page left open after
+  the session ended: it comes back to that page, and what it sent is not
+  replayed. `next` is followed only when it is a path on this server.
+- Every page has **Log out** in the header; anything sent from another origin is
+  rejected.
+- The admin UI needs JavaScript. What is done on a page — saving, publishing,
+  uploading, deleting, making a key — is sent with htmx and answered in place,
+  so the page does not reload; moving between pages is ordinary navigation, and
+  a list's search, filter, sort and page stay in its URL.
 - The UI works down to a phone's width (375px): the page itself never scrolls
   sideways, though a wide table scrolls inside its own box. On a narrow screen
   the header's **Settings** and **Log out** are icons, its crumbs wrap, and the
@@ -159,9 +163,8 @@ still opens the list, and a page past the end comes back to the last one.
 ### Doing it to several at once
 
 A checkbox per row, one in the header for the page. Tick any and a bar appears
-with **Publish**, **Unpublish** and **Delete**; Delete asks first, naming how
-many. Filter first and select the page: *status = draft*, select all, Publish.
-The buttons need JavaScript.
+with **Publish**, **Unpublish** and **Delete**; Delete asks first. Filter first
+and select the page: *status = draft*, select all, Publish.
 
 Each content goes one at a time through the path a single one takes, so the
 validation, the timestamps and the webhooks are the same, and a content another
@@ -362,7 +365,7 @@ the newest 100 of a space are kept.
 ![The media library](img/media.png)
 
 Each card has a checkbox and **Select all** sits above the grid. With a
-selection, **Delete** appears and asks first, naming how many. A file some
+selection, **Delete** appears and asks first. A file some
 content still uses is refused as it is singly; the rest of the selection goes,
 and the message says how many could not and why.
 
@@ -442,9 +445,8 @@ on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key = 'totp
 | Path | Page |
 |---|---|
 | `/` | spaces: the list, and where they are made and deleted |
-| `/login`, `/logout` | log in, log out |
+| `/login` | log in |
 | `/settings` | instance settings (time zone, two-factor login) |
-| `/import` | where **Import** posts a space's zip |
 | `/s/{space}` | a space: models and webhooks |
 | `/s/{space}/export` | the space as a zip |
 | `/s/{space}/deploys` | what each schema deploy changed |
@@ -455,6 +457,7 @@ on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key = 'totp
 | `/s/{space}/media` | media library |
 | `/s/{space}/keys` | delivery keys, management keys and the webhook secret |
 | `/health` | unauthenticated health check (verifies the database answers) |
+| `/actions/…` | what the pages' buttons and forms send, answered in place; htmx requests only |
 
 ### Limits worth knowing
 
