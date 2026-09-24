@@ -370,3 +370,33 @@
         (ng (search "Draft saved" body) "the published versions alone")
         (ok (string= (getf headers :hx-replace-url) (format nil "~a?view=published" path)))))
     (ok (= 404 (call-action :get (browse-history :space "website" :model "blog" :id "nope"))))))
+
+(deftest a-draft-that-changes-nothing-is-none
+  (exec "DELETE FROM contents")
+  (let* ((id (new-blog '(("action" . "publish") ("f-title" . "Live") ("f-slug" . "live"))))
+         (path (format nil "/s/website/m/blog/~a" id))
+         (form '(("f-title" . "Live") ("f-slug" . "live"))))
+    (testing "the form and its Save draft are marked for the script that turns it on"
+      (let ((body (nth-value 1 (request :get path))))
+        (ok (search "data-save-draft" body))
+        (ok (search "data-editor-form" body))
+        (ng (search "data-unsaved" body) "what is shown is what is stored")))
+    (testing "saving what is published already writes nothing"
+      (let ((before (count-revisions id)))
+        (multiple-value-bind (status body) (edit path :form (cons '("action" . "save") form))
+          (ok (= status 200))
+          (ok (search "Nothing to save." body)))
+        (ok (= (count-revisions id) before) "no revision")
+        (ok (string= (koya-server/db/contents:content-status (get-content id)) "published") "and no draft")))
+    (testing "a draft taken back to the published data is dropped, and the history says so"
+      (edit path :form '(("action" . "save") ("f-title" . "Changed") ("f-slug" . "live")))
+      (ok (string= (koya-server/db/contents:content-status (get-content id)) "published+draft"))
+      (multiple-value-bind (status body) (edit path :form (cons '("action" . "save") form))
+        (ok (= status 200))
+        (ok (search "Back to the published version" body)))
+      (ok (string= (koya-server/db/contents:content-status (get-content id)) "published") "the draft is gone")
+      (ok (string= (revision-event (first (list-revisions id))) "discard")
+          "and it went as a discard, which has something to show"))
+    (testing "a restore is marked unsaved"
+      (let ((revision (revision-id (car (last (list-revisions id))))))
+        (ok (search "data-unsaved" (nth-value 1 (request :get path :query (format nil "revision=~a" revision)))))))))

@@ -32,7 +32,7 @@
     (ok (search "type=\"checkbox\"" body))
     (ok (search "datetime-local" body))
     (ok (search "data-quill-for=\"f-body\"" body) "rich text gets a Quill holder")
-    (ok (search "id=\"editor-form\" class=\"space-y-6\" hx-post=" body) "the form is an action"))
+    (ok (search "id=\"editor-form\" class=\"space-y-6\" data-editor-form hx-post=" body) "the form is an action"))
   (multiple-value-bind (status) (request :get "/s/nope")
     (ok (= status 404)))
   (multiple-value-bind (status) (edit "/s/website/m/blog/new" :form '(("action" . "delete")))

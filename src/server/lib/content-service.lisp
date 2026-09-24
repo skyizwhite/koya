@@ -7,7 +7,7 @@
   (:import-from #:koya/core/time
                 #:parse-iso)
   (:import-from #:koya/core/json
-                #:json-null)
+                #:json-null #:json-equal)
   (:import-from #:koya-server/db/connection
                 #:with-db-transaction)
   (:import-from #:koya-server/db/schema-store
@@ -173,16 +173,26 @@ and only PUBLISHED-AT applies."
             (insert))))))
 
 (defun update-draft (space model id patch &key replace)
-  "Save a draft: PATCH is merged onto the current draft (or published data) unless REPLACE."
+  "Save a draft: PATCH is merged onto the current draft (or published data) unless
+REPLACE. Returns the content and what came of it: :SAVED; :UNCHANGED when that is
+what the content holds already, and nothing is written; or :PUBLISHED when it is
+the published data again, and the draft is dropped -- a draft that changes nothing
+is none, and would only leave a discard with nothing to show in the history."
   (let* ((space-name space)
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
-         (data (if replace patch (merge-data (content-data content :draft t) patch))))
-    (with-db-transaction
-      (check-content space-name model data :exclude-id id)
-      (let ((saved (save-draft id data :by (calling-identity))))
-        (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved))
-        saved))))
+         (current (content-data content :draft t))
+         (published (content-published content))
+         (data (if replace patch (merge-data current patch))))
+    (cond ((json-equal data current) (values content :unchanged))
+          ((and published (json-equal data published))
+           (values (discard-draft id :by (calling-identity)) :published))
+          (t
+           (with-db-transaction
+             (check-content space-name model data :exclude-id id)
+             (let ((saved (save-draft id data :by (calling-identity))))
+               (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved))
+               (values saved :saved)))))))
 
 (defun publish (space model id &optional data &key published-at)
   "Publish DATA, or the current draft. PUBLISHED-AT (ISO 8601) overrides the publish date. Fires webhooks."

@@ -169,6 +169,9 @@ POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a previ
 - `status` is `draft`, `published` or `published+draft`.
 - Saving a draft (`PATCH`, `{"data": {…}}`) **merges** onto the current draft, or
   the published data when there is none: keys given replace, `null` removes a key.
+  When the result is what the content holds already, nothing is written (no
+  revision, no webhook); when it is the published data again, the draft is
+  dropped, as `discard-draft` would.
 - Publishing takes `data` when given, else the draft, else re-publishes.
 - Creating may give `id` and the four timestamps, for imports that keep another
   system's ids and dates. On an object model that already has its content,

@@ -227,7 +227,7 @@ content can be seen on the left, what can be done to it on the right:
 | **History** | the content's revisions, and where an old version is restored from — see [History](#history) |
 | **Webhooks** | an object model's delivery log, where the list page would carry it — shown only while a webhook covers the model |
 | **Discard draft** | throws the draft away and goes back to the published version (published contents only) |
-| **Save draft** | saves the form as a draft, leaving what is published untouched |
+| **Save draft** | saves the form as a draft, leaving what is published untouched — on only while the form holds a change |
 | **Publish** | validates and publishes the form as it stands |
 
 At the bottom, the **Danger zone** holds **Unpublish** (takes the content off the
@@ -261,8 +261,10 @@ A content is in one of three states, shown as its badge:
 
 Every write to a content is kept: each draft save, publish, unpublish and
 discard, with who made it (the owner, or a management key by its label) and
-when. A draft save that changes nothing is not kept. Nothing is ever pruned;
-deleting the content deletes its history with it.
+when. A draft that changes nothing is not made at all: saving what the content
+holds already writes nothing, and saving the published data again drops the
+draft, which is kept as a discard. So every entry has a change to show. Nothing
+is ever pruned; deleting the content deletes its history with it.
 
 `/s/{space}/m/{model}/{id}/history` — **History** in the editor — shows it newest
 first, 20 to a page, in two views, each tab counting its revisions:

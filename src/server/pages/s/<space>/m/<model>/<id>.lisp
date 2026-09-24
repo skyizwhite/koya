@@ -59,6 +59,8 @@
 (defcomp ~action-button (&key space model id op (class "btn") confirm icon children)
   "A button in the bar or the danger zone: the action OP on the editor form's fields."
   (hsx (button :type "button" :class class
+               ;; Save draft is on only while the form holds a change (koya-editor.js)
+               :data-save-draft (equal op "save")
                :hx-post (editor-action :space space :model model :id id :op op)
                :hx-include "#editor-form" :hx-target "#editor" :hx-swap "outerHTML"
                :hx-confirm confirm
@@ -137,7 +139,9 @@ danger zone. The media picker stays outside it."
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
        ;; Enter in a field saves a draft, as the form's own submit
-       (form :id "editor-form" :class "space-y-6"
+       ;; unsaved: what the form shows is not what is stored -- a version being
+       ;; restored, or what was sent and refused -- so it can be saved as it stands
+       (form :id "editor-form" :class "space-y-6" :data-editor-form t :data-unsaved (and (or restoring errors) t)
              :hx-post (editor-action :space space-name :model model-name :id id :op "save")
              :hx-target "#editor" :hx-swap "outerHTML"
          (loop :for field :in (model-fields model) :collect
@@ -267,7 +271,11 @@ was being read at: what it offered is now saved or left behind."
                ((string= op "publish")
                 (done space model (publish space model (content-id content) data) "Published."))
                (t
-                (done space model (update-draft space model (content-id content) data :replace t) "Draft saved.")))
+                (multiple-value-bind (saved outcome) (update-draft space model (content-id content) data :replace t)
+                  (done space model saved (case outcome
+                                            (:unchanged "Nothing to save.")
+                                            (:published "Back to the published version: the draft is gone.")
+                                            (t "Draft saved."))))))
            (validation-error (e)
              (set-response-status 422)
              (hsx (~editor :space space :model model :content content :data data

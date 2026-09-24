@@ -209,3 +209,14 @@
       (unwind-protect
            (ok (= 200 (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag))))
         (save-schema "website" (test-schema))))))
+
+(deftest a-patch-that-changes-nothing-writes-nothing
+  (let ((id (jget (nth-value 1 (admin :post "/admin/api/contents/website/tag"
+                                      :body (jobject "data" (jobject "name" "same") "publish" t)))
+                  "id")))
+    (setf *webhooks* '())
+    (multiple-value-bind (status json) (admin :patch (format nil "/admin/api/contents/website/tag/~a" id)
+                                              :body (jobject "data" (jobject "name" "same")))
+      (ok (= status 200))
+      (ok (string= (jget json "status") "published") "no draft is made"))
+    (ok (null *webhooks*) "and nothing is sent")))

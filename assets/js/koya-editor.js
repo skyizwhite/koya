@@ -1,11 +1,32 @@
-// Rich text fields: a Quill editor per [data-quill-for] holder, on the page and
-// in whatever htmx swaps in (every action on a content draws its editor again).
-// It writes HTML back into the hidden input as the text changes -- unless the
-// editor holds what it was opened with. The buttons send the form with htmx,
-// which fires no submit event, so the input has to be current all along. Quill rewrites HTML it did not
-// write itself (drops ids and figures, adds rel to links...), so writing back
-// an untouched field would record a change nobody made. The server stores the
-// HTML as it arrives, so what the editor writes is tidied here.
+// ONEACH binds what this file does to elements, on the page and in whatever htmx
+// swaps in. htmx initialises in a timeout of its own once the deferred scripts
+// run, so when a script before this one is slow to arrive it can have processed
+// the page before an htmx.onLoad here was registered, and the page's own elements
+// would never be bound. So the page is also bound at DOMContentLoaded, whichever
+// comes first, and each element is bound once.
+const onEach = (selector, bind) => {
+  const bound = new WeakSet();
+  const run = (root) => {
+    const found = root.matches?.(selector) ? [root] : [];
+    found.concat(Array.from(root.querySelectorAll(selector))).forEach((el) => {
+      if (bound.has(el)) return;
+      bound.add(el);
+      bind(el);
+    });
+  };
+  htmx.onLoad(run);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => run(document.body));
+  else run(document.body);
+};
+
+// Rich text fields: a Quill editor per [data-quill-for] holder (every action on a
+// content draws its editor again). It writes HTML back into the hidden input as
+// the text changes -- unless the editor holds what it was opened with. The
+// buttons send the form with htmx, which fires no submit event, so the field has
+// to be current all along. Quill rewrites HTML it did not write itself (drops
+// ids and figures, adds rel to links...), so writing back an untouched field
+// would record a change nobody made. The server stores the HTML as it arrives,
+// so what the editor writes is tidied here.
 //
 // Two Quill quirks are worked around here:
 // - pasted text has every whitespace character (including U+3000, the
@@ -36,7 +57,7 @@
       .replace(ownMedia, '$1="/media/')
       .trim();
 
-  htmx.onLoad((root) => root.querySelectorAll("[data-quill-for]").forEach((holder) => {
+  onEach("[data-quill-for]", (holder) => {
     const input = document.getElementById(holder.dataset.quillFor);
     if (!input || typeof Quill === "undefined") return;
     const quill = new Quill(holder, {
@@ -64,55 +85,60 @@
     quill.on("text-change", () => {
       const html = tidy(restore(quill.getSemanticHTML()));
       input.value = html === opened ? original : html;
+      // a value set from script fires nothing; the editor form listens for this
+      input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-  }));
+  });
 }
 
 // Many-reference fields: the <select multiple> keeps the submitted values but is
 // hidden; the user sees the chosen contents as chips and adds more from an
-// ordinary dropdown. Built for whatever htmx swaps in, as the rich text is.
-htmx.onLoad((root) => {
-  root.querySelectorAll("select[multiple][data-picker]").forEach((select) => {
-    const wrap = document.createElement("div");
-    wrap.className = "flex flex-wrap items-center gap-2";
-    const chips = document.createElement("div");
-    chips.className = "flex flex-wrap items-center gap-2";
-    const picker = document.createElement("select");
-    picker.setAttribute("aria-label", "Add");
-    wrap.append(chips, picker);
+// ordinary dropdown.
+onEach("select[multiple][data-picker]", (select) => {
+  const wrap = document.createElement("div");
+  wrap.className = "flex flex-wrap items-center gap-2";
+  const chips = document.createElement("div");
+  chips.className = "flex flex-wrap items-center gap-2";
+  const picker = document.createElement("select");
+  picker.setAttribute("aria-label", "Add");
+  wrap.append(chips, picker);
 
-    const render = () => {
-      chips.replaceChildren();
-      picker.replaceChildren(new Option("Add…", ""));
-      Array.from(select.options).forEach((option) => {
-        if (option.selected) {
-          const chip = document.createElement("span");
-          chip.className = "badge inline-flex items-center gap-1 bg-line text-fg";
-          chip.append(option.text);
-          const remove = document.createElement("button");
-          remove.type = "button";
-          remove.className = "text-muted hover:text-danger";
-          remove.setAttribute("aria-label", `Remove ${option.text}`);
-          remove.textContent = "×";
-          remove.addEventListener("click", () => { option.selected = false; render(); });
-          chip.append(remove);
-          chips.append(chip);
-        } else {
-          picker.append(new Option(option.text, option.value));
-        }
-      });
-      picker.value = "";
-    };
-    picker.addEventListener("change", () => {
-      const option = Array.from(select.options).find((o) => o.value === picker.value);
-      if (option) option.selected = true;
-      render();
+  const render = () => {
+    chips.replaceChildren();
+    picker.replaceChildren(new Option("Add…", ""));
+    Array.from(select.options).forEach((option) => {
+      if (option.selected) {
+        const chip = document.createElement("span");
+        chip.className = "badge inline-flex items-center gap-1 bg-line text-fg";
+        chip.append(option.text);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "text-muted hover:text-danger";
+        remove.setAttribute("aria-label", `Remove ${option.text}`);
+        remove.textContent = "×";
+        remove.addEventListener("click", () => { option.selected = false; changed(); });
+        chip.append(remove);
+        chips.append(chip);
+      } else {
+        picker.append(new Option(option.text, option.value));
+      }
     });
-
-    select.hidden = true;
-    select.after(wrap);
+    picker.value = "";
+  };
+  // the chosen options are set from script, which fires nothing; the editor form listens for this
+  const changed = () => {
     render();
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  picker.addEventListener("change", () => {
+    const option = Array.from(select.options).find((o) => o.value === picker.value);
+    if (option) option.selected = true;
+    changed();
   });
+
+  select.hidden = true;
+  select.after(wrap);
+  render();
 });
 
 // Media picker: one <dialog id="media-picker"> per editor page. Its body is
@@ -145,6 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const img = wrap.querySelector("[data-media-preview]");
     const label = wrap.querySelector("[data-media-name]");
     input.value = item ? item.id : "";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
     if (item) {
       img.src = item.url;
       img.alt = item.alt;
@@ -189,71 +216,76 @@ document.addEventListener("DOMContentLoaded", () => {
 // A <dialog data-show-modal> that htmx swaps in opens itself as a modal: the
 // server draws a dialog's contents for what it shows (the media preview), and an
 // element swapped in cannot be opened by the button that asked for it.
-htmx.onLoad((root) => {
-  const dialogs = root.matches?.("dialog[data-show-modal]") ? [root] : root.querySelectorAll("dialog[data-show-modal]");
-  dialogs.forEach((dialog) => { if (!dialog.open) dialog.showModal(); });
-});
+onEach("dialog[data-show-modal]", (dialog) => { if (!dialog.open) dialog.showModal(); });
 
 // Settings: draw a QR code for every [data-qr] element (the otpauth URI when
 // setting up two-factor login), on the page and in whatever htmx swaps in --
 // setting up is answered in place. qrcode.min.js is davidshimjs/qrcodejs (MIT).
-const drawQrCodes = (root) => {
+onEach("[data-qr]", (el) => {
   if (typeof QRCode === "undefined") return;
-  root.querySelectorAll("[data-qr]").forEach((el) => {
-    new QRCode(el, { text: el.dataset.qr, width: 192, height: 192, correctLevel: QRCode.CorrectLevel.M });
-  });
-};
-if (window.htmx) htmx.onLoad(drawQrCodes);
-else document.addEventListener("DOMContentLoaded", () => drawQrCodes(document));
+  new QRCode(el, { text: el.dataset.qr, width: 192, height: 192, correctLevel: QRCode.CorrectLevel.M });
+});
 
 // Bulk selection: inside a [data-bulk] form, ticking a [data-bulk-item] box shows
 // the [data-bulk-bar] and counts into [data-bulk-count]. [data-bulk-all] selects
 // and clears the page.
-// The bar starts hidden, so bulk actions need this file. Bound for whatever htmx
-// swaps in as well: the media library draws its selection again after each action.
-htmx.onLoad((root) => {
-  root.querySelectorAll("form[data-bulk]").forEach((form) => {
-    // form.elements, not querySelectorAll: a box may sit outside the form, tied
-    // to it by its form attribute (the media grid does that)
-    const controls = () => Array.from(form.elements);
-    const boxes = () => controls().filter((el) => el.matches("[data-bulk-item]"));
-    const bar = form.querySelector("[data-bulk-bar]");
-    const all = controls().find((el) => el.matches("[data-bulk-all]"));
-    const count = form.querySelector("[data-bulk-count]");
-    const render = () => {
-      const items = boxes();
-      const n = items.filter((box) => box.checked).length;
-      if (bar) bar.hidden = n === 0;
-      if (count) count.textContent = `${n} selected`;
-      if (all) {
-        all.checked = n > 0 && n === items.length;
-        all.indeterminate = n > 0 && n < items.length;
-      }
-    };
-    boxes().forEach((box) => box.addEventListener("change", render));
+// The bar starts hidden, so bulk actions need this file.
+onEach("form[data-bulk]", (form) => {
+  // form.elements, not querySelectorAll: a box may sit outside the form, tied
+  // to it by its form attribute (the media grid does that)
+  const controls = () => Array.from(form.elements);
+  const boxes = () => controls().filter((el) => el.matches("[data-bulk-item]"));
+  const bar = form.querySelector("[data-bulk-bar]");
+  const all = controls().find((el) => el.matches("[data-bulk-all]"));
+  const count = form.querySelector("[data-bulk-count]");
+  const render = () => {
+    const items = boxes();
+    const n = items.filter((box) => box.checked).length;
+    if (bar) bar.hidden = n === 0;
+    if (count) count.textContent = `${n} selected`;
     if (all) {
-      all.addEventListener("change", () => {
-        boxes().forEach((box) => { box.checked = all.checked; });
-        render();
-      });
+      all.checked = n > 0 && n === items.length;
+      all.indeterminate = n > 0 && n < items.length;
     }
-    render();
-  });
+  };
+  boxes().forEach((box) => box.addEventListener("change", render));
+  if (all) {
+    all.addEventListener("change", () => {
+      boxes().forEach((box) => { box.checked = all.checked; });
+      render();
+    });
+  }
+  render();
+});
+
+// The editor's Save draft is on only while the form holds something the content
+// does not: a draft that changes nothing is not saved (the server leaves it, or
+// drops the draft when the form is the published data again). What the form was
+// drawn with is the baseline, unless the server marks it data-unsaved -- a version
+// being restored, or what was sent and refused. Publish is always on: publishing
+// the same data again is a publish.
+onEach("form[data-editor-form]", (form) => {
+  const button = document.querySelector("[data-save-draft]");
+  const snapshot = () => new URLSearchParams(new FormData(form)).toString();
+  const drawn = snapshot();
+  const update = () => {
+    if (button) button.disabled = !("unsaved" in form.dataset) && snapshot() === drawn;
+  };
+  form.addEventListener("input", update);
+  form.addEventListener("change", update);
+  update();
 });
 
 // History: rich text is drawn in a sandboxed [data-fit-content] iframe, which
 // is as tall as its document once that has loaded -- its stylesheet included.
-// Bound for whatever htmx swaps in: a tab or a page of the history draws its versions again.
-htmx.onLoad((root) => {
-  root.querySelectorAll("iframe[data-fit-content]").forEach((frame) => {
-    const fit = () => {
-      const doc = frame.contentDocument;
-      // the body, not the root: the root is never shorter than the frame itself
-      if (doc && doc.body) frame.style.height = `${doc.body.scrollHeight}px`;
-    };
-    frame.addEventListener("load", fit);
-    if (frame.contentDocument && frame.contentDocument.readyState === "complete") fit();
-  });
+onEach("iframe[data-fit-content]", (frame) => {
+  const fit = () => {
+    const doc = frame.contentDocument;
+    // the body, not the root: the root is never shorter than the frame itself
+    if (doc && doc.body) frame.style.height = `${doc.body.scrollHeight}px`;
+  };
+  frame.addEventListener("load", fit);
+  if (frame.contentDocument && frame.contentDocument.readyState === "complete") fit();
 });
 
 // Import: the archive goes to the import action ([data-import]) as the request
