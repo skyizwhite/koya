@@ -90,7 +90,11 @@ koya-editor.js to the page's media picker dialog."
          (:richtext
           (hsx
            (<>
-             (input :type "hidden" :id id :name name :value string)
+             ;; the HTML as text, not a hidden input's value: hsx collapses the
+             ;; whitespace of attribute values, and an untouched field is sent
+             ;; back as it is here. The parser drops one newline right after
+             ;; <textarea>, so one goes first for the value's own.
+             (textarea :id id :name name :hidden t (format nil "~%~a" string))
              (div :class "quill-editor" :data-quill-for id))))
          (:number
           (hsx (input :type "number" :id id :name name :value string :step "any" :class "input")))

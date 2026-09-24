@@ -72,9 +72,10 @@ except booleans which are always present (unchecked = false)."
            (when raw (setf (gethash (field-name field) data) (local-input->iso raw))))
           (:richtext
            ;; stored as the editor sent it (see koya-editor.js), but for the CRLF
-           ;; a form submission turns its line breaks into. Quill reports an
-           ;; empty document as <p></p> or <p><br></p>.
-           (let ((html (and raw (remove #\Return raw))))
+           ;; a form submission turns its line breaks into -- not trimmed, as the
+           ;; other fields are, or an untouched field would lose the whitespace
+           ;; around it. Quill reports an empty document as <p></p> or <p><br></p>.
+           (let ((html (and raw (remove #\Return (first (form-values params name))))))
              (when (and html (not (scan "^(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" html)))
                (setf (gethash (field-name field) data) html))))
           (t

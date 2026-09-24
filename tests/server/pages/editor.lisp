@@ -178,10 +178,20 @@
                                                  data)
                                    :publish t))))
          (path (format nil "/s/website/m/blog/~a" id)))
+    (testing "the editor carries the HTML whole, its line breaks included"
+      (let ((body (nth-value 1 (request :get path))))
+        (ok (search (format nil "<textarea id=\"f-body\" name=\"f-body\" hidden>~%&lt;h2" ) body)
+            "as the text of a hidden textarea, after the newline the parser drops")
+        (ok (search (format nil "a&lt;&#x2F;p&gt;~%&lt;p&gt;b") body)
+            "an attribute value would have had its line break collapsed to a space")))
     (testing "an untouched field comes back as it was, less the CRLF of the form"
       (edit path :form `(("action" . "save") ("f-title" . "Renamed")
                                   ("f-body" . ,(format nil "<h2 id=\"intro\">Intro</h2><p>a</p>~c~%<p>b</p>" #\Return))))
       (ok (string= (jget (content-draft (get-content id)) "body") html)))
+    (testing "the whitespace around it is kept too"
+      (let ((spaced (format nil "~%<p>a</p>~%")))
+        (edit path :form `(("action" . "save") ("f-title" . "Renamed") ("f-body" . ,spaced)))
+        (ok (string= (jget (content-draft (get-content id)) "body") spaced))))
     (testing "an edited one is stored as the editor wrote it"
       (edit path :form '(("action" . "save") ("f-title" . "Renamed") ("f-body" . "<p>c</p><p>d</p>")))
       (ok (string= (jget (content-draft (get-content id)) "body") "<p>c</p><p>d</p>")))))
