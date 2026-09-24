@@ -5,7 +5,7 @@
 (register-system-packages "zippy" '(:org.shirakumo.zippy))
 
 (defsystem "koya-server"
-  :version "0.10.1"
+  :version "0.10.2"
   :description "koya - a small headless CMS in Common Lisp (server)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
   :license "AGPL-3.0-or-later"

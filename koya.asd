@@ -1,6 +1,6 @@
 
 (defsystem "koya"
-  :version "0.10.1"
+  :version "0.10.2"
   :description "koya - a small headless CMS in Common Lisp (client library and config DSL)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
   :license "MIT"
