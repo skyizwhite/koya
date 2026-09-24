@@ -1,7 +1,8 @@
 (defpackage #:koya-server/pages/s/<space>/webhooks
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status)
+  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/db/schema-store #:load-schema)
   (:import-from #:koya/core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
@@ -14,13 +15,15 @@
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:param #:short-time
-                #:~layout #:~empty-state #:~icon #:space-url #:content-url)
-  (:export #:@get #:webhook-log-url))
+                #:~layout #:~empty-state #:~icon #:action-refusal #:space-url #:content-url)
+  (:export #:@get #:webhook-log-url #:browse-deliveries))
 (in-package #:koya-server/pages/s/<space>/webhooks)
 
 ;;; One log per space: the last +KEEP-PER-SPACE+ calls it made and what came
 ;;; back. ?label= narrows it to one webhook, ?model= to the calls one model set
 ;;; off -- which includes the space's own hooks, since they fire for every model.
+;;; Filtering and paging are an action that draws #deliveries again in place and
+;;; puts the filters and page back in the URL.
 
 (defparameter +page-size+ 20)
 
@@ -48,11 +51,10 @@
            (cond (status (format nil "~a" status))
                  (t "no response"))))))
 
-;;; The filters, as a plain GET form: the two selects both show what is filtered
-;;; now and are how it is set, and Filter applies them. Submitting on change
-;;; instead would cost the keyboard its choice -- arrowing a closed select fires
-;;; change on every step -- so the button stays. Submitting drops ?page= and
-;;; starts at the first again.
+;;; The filters: the two selects both show what is filtered now and are how it is
+;;; set. Picking one draws the log again at its first page, in place: the selects
+;;; are outside what is drawn, so arrowing through a closed one keeps its focus
+;;; and only redraws the list at each step.
 ;;;
 ;;; The options are the schema's -- every model of the space, every webhook that
 ;;; can fire for it -- plus anything the log holds that the schema no longer
@@ -88,7 +90,7 @@ option it silently replaces with the first one, which here reads \"All\"."
        (loop :for value :in options :collect
          (hsx (option :value value :selected (equal value selected) value)))))))
 
-(defcomp ~filters (&key space schema label model)
+(defcomp ~filters (&key space schema label model oob)
   ;; SCHEMA comes from @GET: loading it reads and parses every model of the space,
   ;; so it is loaded once a request, not once a lookup
   (let ((labels (union-options (webhook-labels schema) (delivery-labels space) label))
@@ -96,15 +98,15 @@ option it silently replaces with the first one, which here reads \"All\"."
     (hsx
      (<> (unless (and (null labels) (null models))
            (hsx
-            (form :method "get" :action (format nil "~a/webhooks" (space-url space))
+            (form :id "filters" :method "get" :action (format nil "~a/webhooks" (space-url space))
+                  :hx-get (browse-deliveries :space space) :hx-target "#deliveries" :hx-swap "outerHTML"
+                  ;; the change of either select, as it bubbles: from:'find select' would be the first alone
+                  :hx-trigger "change, submit" :hx-swap-oob (and oob "true")
                   :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
               (~filter-select :name "label" :label "Webhook" :all "All webhooks"
                               :options labels :selected label)
               (~filter-select :name "model" :label "Model" :all "All models"
-                              :options models :selected model)
-              (button :type "submit" :class "btn" (~icon :name :search) "Filter")
-              (when (filtered-p label model)
-                (hsx (a :href (webhook-log-url space) :class "btn" (~icon :name :close) "Clear"))))))))))
+                              :options models :selected model))))))))
 
 (defcomp ~field (&key label children)
   (hsx
@@ -152,38 +154,74 @@ option it silently replaces with the first one, which here reads \"All\"."
                 (span :class "text-danger" (delivery-error delivery)))))
        (~field :label "response" (~body-block :text (delivery-response delivery)))))))
 
-(defcomp ~log-page (&key space schema label model page)
+(defcomp ~delivery-count (&key space label model oob)
+  (let ((total (count-deliveries space :label label :model model)))
+    (hsx (p :id "delivery-count" :class "mb-4 text-sm text-muted" :hx-swap-oob (and oob "true")
+           (format nil "~a call~:p~a. The newest ~a of the space are kept." total
+                   (cond ((not (filtered-p label model)) "")
+                         ((= total 1) " matches")
+                         (t " match"))
+                   +keep-per-space+)))))
+
+(defcomp ~deliveries (&key space label model page)
+  "What a filter or a page draws again: the calls and their pager."
   (let* ((total (count-deliveries space :label label :model model))
          (pages (max 1 (ceiling total +page-size+)))
          (page (min page pages))
          (items (list-deliveries space :label label :model model
                                        :limit +page-size+ :offset (* (1- page) +page-size+))))
-    (hsx
-     (~layout :space space :crumbs (list (cons "Webhooks" nil))
-       (h1 :class "mb-2 text-2xl font-bold" "Webhooks")
-       (p :class "mb-4 text-sm text-muted"
-         (format nil "~a call~:p~a. The newest ~a of the space are kept." total
-                 (cond ((not (filtered-p label model)) "")
-                       ((= total 1) " matches")
-                       (t " match"))
-                 +keep-per-space+))
-       (~filters :space space :schema schema :label label :model model)
-       (if (null items)
-           (hsx (~empty-state (if (filtered-p label model)
-                                  "Nothing matches these filters."
-                                  "Nothing has been delivered yet.")))
-           (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                  (loop :for delivery :in items :collect
-                    (hsx (li (~delivery :space space :delivery delivery)))))))
-       (when (> pages 1)
-         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                (when (> page 1)
-                  (hsx (a :href (webhook-log-url space :label label :model model :page (1- page))
-                          :class "btn" (~icon :name :prev) "Previous")))
-                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                (when (< page pages)
-                  (hsx (a :href (webhook-log-url space :label label :model model :page (1+ page))
-                          :class "btn" "Next" (~icon :name :next)))))))))))
+    (flet ((page-link (n)
+             (hsx (a :href (webhook-log-url space :label label :model model :page n)
+                     :hx-get (browse-deliveries :space space :label (or label "") :model (or model "") :page n)
+                     :hx-target "#deliveries" :hx-swap "outerHTML" :class "btn"
+                     (if (< n page)
+                         (hsx (<> (~icon :name :prev) "Previous"))
+                         (hsx (<> "Next" (~icon :name :next))))))))
+      (hsx
+       (div :id "deliveries"
+         (when (filtered-p label model)
+           (hsx (p :class "-mt-3 mb-3 text-sm"
+                  (a :href (webhook-log-url space)
+                     :hx-get (browse-deliveries :space space :clear "1") :hx-target "#deliveries" :hx-swap "outerHTML"
+                     :class "text-muted hover:text-fg hover:underline"
+                    "Clear the filters"))))
+         (if (null items)
+             (hsx (~empty-state (if (filtered-p label model)
+                                    "Nothing matches these filters."
+                                    "Nothing has been delivered yet.")))
+             (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                    (loop :for delivery :in items :collect
+                      (hsx (li (~delivery :space space :delivery delivery)))))))
+         (when (> pages 1)
+           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
+                  (when (> page 1) (page-link (1- page)))
+                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
+                  (when (< page pages) (page-link (1+ page)))))))))))
+
+(defcomp ~log-page (&key space schema label model page)
+  (hsx
+   (~layout :space space :crumbs (list (cons "Webhooks" nil))
+     (h1 :class "mb-2 text-2xl font-bold" "Webhooks")
+     (~delivery-count :space space :label label :model model)
+     (~filters :space space :schema schema :label label :model model)
+     (~deliveries :space space :label label :model model :page page))))
+
+(defaction browse-deliveries :get (params)
+  (let* ((space (param params "space"))
+         (schema (and space (load-schema space)))
+         (clear (equal (param params "clear") "1"))
+         (label (and (not clear) (param params "label")))
+         (model (and (not clear) (param params "model")))
+         (pages (and schema (max 1 (ceiling (count-deliveries space :label label :model model) +page-size+))))
+         (page (and schema (min (page-number params) pages))))
+    (cond ((null schema) (action-refusal "Space not found." 404))
+          (t
+           (set-response-header :hx-replace-url (webhook-log-url space :label label :model model :page page))
+           (hsx (<> (~deliveries :space space :label label :model model :page page)
+                    (~delivery-count :space space :label label :model model :oob t)
+                    (if clear
+                        (hsx (~filters :space space :schema schema :oob t))
+                        (hsx (<>)))))))))
 
 (defun @get (params)
   (with-owner

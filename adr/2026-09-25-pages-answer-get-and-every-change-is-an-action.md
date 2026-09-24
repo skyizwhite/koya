@@ -1,5 +1,7 @@
 # Pages answer GET, and every change is an action
 
+Superseded by adr/2026-09-25-lists-are-read-in-place-and-the-url-follows.md (what lives in the query string)
+
 *2026-09-25*
 
 ## Context

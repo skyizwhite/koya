@@ -1,7 +1,7 @@
 (defpackage #:koya-server/pages/s/<space>/m/<model>/index
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status)
+  (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya/core/schema
                 #:model-kind #:model-name #:model-fields #:model-field
@@ -29,7 +29,7 @@
   (:import-from #:koya-server/pages/s/<space>/webhooks #:webhook-log-url)
   (:import-from #:koya-server/db/media #:find-media-by-ids #:media-alt)
   (:import-from #:koya-server/lib/media-store #:media-url)
-  (:export #:@get #:bulk-contents))
+  (:export #:@get #:bulk-contents #:browse-contents))
 (in-package #:koya-server/pages/s/<space>/m/<model>/index)
 
 (defparameter +page-size+ 20
@@ -210,37 +210,52 @@ images costs what the images cost, once, then comes from the cache."
           (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
                  (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—"))))))))
 
-(defcomp ~filters (&key space model search-text status sort-key)
-  "The search box and the status filter, as a GET form. Submitting drops ?page=
-and keeps the sort."
+(defun browse-url (space model state &key (search-text (getf state :search-text)) (status (getf state :status))
+                                             (sort-key (getf state :sort-key)) (page (getf state :page)) clear)
+  "The action that draws #contents for STATE, with any part of it replaced."
+  (browse-contents :space space :model model :q (or search-text "") :status (or status "")
+                   :sort (or sort-key "") :page page :clear (if clear "1" "")))
+
+(defcomp ~sort-input (&key sort-key oob)
+  "The sort the filters send along. A header's link changes it, so the answer to one
+puts it back out of band -- this input alone, not the box being typed in."
+  (hsx (input :type "hidden" :id "filter-sort" :name "sort" :value (or sort-key "")
+              :hx-swap-oob (and oob "true"))))
+
+(defcomp ~filters (&key space model search-text status sort-key oob)
+  "The search box and the status filter. Typing, or picking a status, draws the
+list again at its first page; the box is outside what is drawn, so it keeps its
+focus. Without JavaScript it is a GET form."
   (hsx
-   (form :method "get" :action (model-url space model)
+   (form :id "filters" :method "get" :action (model-url space model)
+         :hx-get (browse-contents :space space :model model) :hx-target "#contents" :hx-swap "outerHTML"
+         ;; find is the first match only: one search box and one select, so each is named
+         :hx-trigger "input changed delay:300ms from:'find input[type=search]', change from:'find select', submit"
+         :hx-swap-oob (and oob "true")
          :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
-     (unless (blank-p sort-key) (hsx (input :type "hidden" :name "sort" :value sort-key)))
+     (~sort-input :sort-key sort-key)
      (input :type "search" :name "q" :value (or search-text "") :placeholder "Search text and ids"
-            :class "input w-64 max-w-full")
+            :aria-label "Search" :class "input w-64 max-w-full")
      (span :class "flex items-center gap-2"
        (label :for "status" :class "text-sm text-muted" "Status")
        (select :id "status" :name "status" :class "text-sm"
          (option :value "" :selected (blank-p status) "All")
          (loop :for value :in +statuses+ :collect
-           (hsx (option :value value :selected (equal value status) value)))))
-     (button :type "submit" :class "btn" (~icon :name :search) "Filter")
-     (unless (and (blank-p search-text) (blank-p status))
-       (hsx (a :href (list-url space model :sort-key sort-key) :class "btn" (~icon :name :close) "Clear"))))))
+           (hsx (option :value value :selected (equal value status) value))))))))
 
-(defcomp ~column-header (&key space model field search-text status sort-name sort-direction)
+(defcomp ~column-header (&key space model field state)
   "The header sorts by its field; clicking the sorted one turns it around."
   (let* ((name (field-name field))
-         (active (equal name sort-name))
-         (next (if (and active (eq sort-direction :asc)) (format nil "-~a" name) name)))
+         (active (equal name (getf state :sort-name)))
+         (next (if (and active (eq (getf state :sort-direction) :asc)) (format nil "-~a" name) name)))
     (hsx
      (th :class "py-2 pr-4 font-medium"
-       (a :href (list-url space model :search-text search-text :status status :sort-key next)
+       (a :href (list-url space model :search-text (getf state :search-text) :status (getf state :status) :sort-key next)
+          :hx-get (browse-url space model state :sort-key next :page 1) :hx-target "#contents" :hx-swap "outerHTML"
           :class "flex items-center gap-1 hover:text-fg"
          (span :class (clsx "truncate" (column-width field)) name)
          (when active
-           (hsx (span :class "shrink-0 text-accent" (if (eq sort-direction :asc) "↑" "↓")))))))))
+           (hsx (span :class "shrink-0 text-accent" (if (eq (getf state :sort-direction) :asc) "↑" "↓")))))))))
 
 (defcomp ~bulk-bar (&key space model state)
   "What can be done to a selection. Hidden until there is one (koya-editor.js).
@@ -280,29 +295,88 @@ Each button is an action on the selection form's boxes."
         (list-contents space (model-name model) model query :status :all :only-status (getf state :status))
       (values contents total (max 1 (ceiling total +page-size+))))))
 
-(defcomp ~content-list (&key space model state contents total pages)
-  "Everything under the header: drawn again, whole, by a bulk action."
+(defun filtered-p (state)
+  (not (and (blank-p (getf state :search-text)) (blank-p (getf state :status)))))
+
+(defcomp ~content-count (&key space model state total oob)
+  (hsx (span :id "content-count" :class "ml-3 text-base font-normal text-muted" :hx-swap-oob (and oob "true")
+         (if (filtered-p state)
+             (format nil "~a of ~a" total (count-contents space (model-name model)))
+             (format nil "~a content~:p" total)))))
+
+(defcomp ~content-list (&key space model state contents pages)
+  "What a search, a sort, a page or a bulk action draws again: the table and its pager."
   (let* ((model-name (model-name model))
          (fields (model-fields model))
          (ref-labels (reference-labels space model))
          (media (page-media space model contents))
          (page (getf state :page))
          (search-text (getf state :search-text))
-         (status (getf state :status))
-         (sort-name (getf state :sort-name))
-         (sort-direction (getf state :sort-direction))
-         (sort-key (getf state :sort-key))
-         (filtered (not (and (blank-p search-text) (blank-p status))))
-         (link (lambda (page) (list-url space model-name :search-text search-text :status status
-                                                          :sort-key sort-key :page page))))
+         (status (getf state :status)))
+    (flet ((page-link (n)
+             (hsx (a :href (list-url space model-name :search-text search-text :status status
+                                                      :sort-key (getf state :sort-key) :page n)
+                     :hx-get (browse-url space model-name state :page n) :hx-target "#contents" :hx-swap "outerHTML"
+                     :class "btn"
+                     (if (< n page)
+                         (hsx (<> (~icon :name :prev) "Previous"))
+                         (hsx (<> "Next" (~icon :name :next))))))))
+      (hsx
+       (div :id "contents"
+         (when (filtered-p state)
+           (hsx (p :class "-mt-3 mb-3 text-sm"
+                  (a :href (list-url space model-name :sort-key (getf state :sort-key))
+                     :hx-get (browse-url space model-name state :search-text "" :status "" :page 1 :clear t)
+                     :hx-target "#contents" :hx-swap "outerHTML"
+                     :class "text-muted hover:text-fg hover:underline"
+                    "Clear the search and filter"))))
+         (if (null contents)
+             (hsx (~empty-state (cond ((not (blank-p search-text)) "Nothing matches this search.")
+                                      ((not (blank-p status)) "No contents with this status.")
+                                      (t "No contents yet."))))
+             (hsx (form :data-bulk t
+                    (~bulk-bar :space space :model model-name :state state)
+                    (div :class "overflow-x-auto rounded-md border border-line bg-panel"
+                      (table :class "w-full text-sm"
+                        (thead (tr :class "border-b border-line text-left text-muted"
+                                 (th :class "py-2 pl-4 pr-2"
+                                   (input :type "checkbox" :data-bulk-all t
+                                          :aria-label "Select every content on this page"))
+                                 (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
+                                 (loop :for field :in fields :collect
+                                   (hsx (~column-header :space space :model model-name :field field :state state)))
+                                 (th)))
+                        (tbody :class "divide-y divide-line"
+                          (loop :for content :in contents :collect
+                            ;; the whole row opens the editor: the link in its last cell
+                            ;; covers the row, and the box sits above it
+                            (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
+                                   (td :class "relative z-10 py-2 pl-4 pr-2"
+                                     (input :type "checkbox" :name "id" :data-bulk-item t
+                                            :value (content-id content)
+                                            :aria-label (format nil "Select ~a" (content-label content model))))
+                                   (td :class "py-2 pr-4 whitespace-nowrap"
+                                     (~status-badge :status (content-status content)))
+                                   (loop :for field :in fields :collect
+                                     (hsx (~preview-cell :field field :content content :ref-labels ref-labels :media media)))
+                                   (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent"
+                                     (a :href (content-url space model-name (content-id content))
+                                        :class "after:absolute after:inset-0"
+                                        :aria-label (format nil "Open ~a" (content-label content model))
+                                       "›")))))))))))
+         (when (> pages 1)
+           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
+                  (when (> page 1) (page-link (1- page)))
+                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
+                  (when (< page pages) (page-link (1+ page)))))))))))
+
+(defcomp ~list-page (&key space model state contents total pages)
+  (let ((model-name (model-name model)))
     (hsx
-     (div :id "contents"
+     (~layout :space space :crumbs (list (cons model-name nil))
        (div :class "mb-6 flex flex-wrap items-center justify-between gap-3"
          (h1 :class "text-2xl font-bold" model-name
-           (span :class "ml-3 text-base font-normal text-muted"
-             (if filtered
-                 (format nil "~a of ~a" total (count-contents space model-name))
-                 (format nil "~a content~:p" total))))
+           (~content-count :space space :model model :state state :total total))
          (div :class "flex items-center gap-2"
            ;; only where a hook can fire, or the log can hold nothing
            (when (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space))
@@ -310,50 +384,27 @@ Each button is an action on the selection form's boxes."
                      (~icon :name :webhook) "Webhooks")))
            (a :href (content-url space model-name "new") :class "btn btn-primary"
               (~icon :name :plus) "New content")))
-       (~filters :space space :model model-name :search-text search-text :status status :sort-key sort-key)
-       (if (null contents)
-           (hsx (~empty-state (cond ((not (blank-p search-text)) "Nothing matches this search.")
-                                    ((not (blank-p status)) "No contents with this status.")
-                                    (t "No contents yet."))))
-           (hsx (form :data-bulk t
-                  (~bulk-bar :space space :model model-name :state state)
-                  (div :class "overflow-x-auto rounded-md border border-line bg-panel"
-                    (table :class "w-full text-sm"
-                      (thead (tr :class "border-b border-line text-left text-muted"
-                               (th :class "py-2 pl-4 pr-2"
-                                 (input :type "checkbox" :data-bulk-all t
-                                        :aria-label "Select every content on this page"))
-                               (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
-                               (loop :for field :in fields :collect
-                                 (hsx (~column-header :space space :model model-name :field field
-                                                      :search-text search-text :status status
-                                                      :sort-name sort-name :sort-direction sort-direction)))
-                               (th)))
-                      (tbody :class "divide-y divide-line"
-                        (loop :for content :in contents :collect
-                          ;; the whole row opens the editor: the link in its last cell
-                          ;; covers the row, and the box sits above it
-                          (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
-                                 (td :class "relative z-10 py-2 pl-4 pr-2"
-                                   (input :type "checkbox" :name "id" :data-bulk-item t
-                                          :value (content-id content)
-                                          :aria-label (format nil "Select ~a" (content-label content model))))
-                                 (td :class "py-2 pr-4 whitespace-nowrap"
-                                   (~status-badge :status (content-status content)))
-                                 (loop :for field :in fields :collect
-                                   (hsx (~preview-cell :field field :content content :ref-labels ref-labels :media media)))
-                                 (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent"
-                                   (a :href (content-url space model-name (content-id content))
-                                      :class "after:absolute after:inset-0"
-                                      :aria-label (format nil "Open ~a" (content-label content model))
-                                     "›")))))))))))
-       (when (> pages 1)
-         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                (when (> page 1)
-                  (hsx (a :href (funcall link (1- page)) :class "btn" (~icon :name :prev) "Previous")))
-                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                (when (< page pages)
-                  (hsx (a :href (funcall link (1+ page)) :class "btn" "Next" (~icon :name :next)))))))))))
+       (~filters :space space :model model-name :search-text (getf state :search-text)
+                 :status (getf state :status) :sort-key (getf state :sort-key))
+       (~content-list :space space :model model :state state :contents contents :pages pages)))))
+
+(defun answer-list (space model state &key message kind clear)
+  "#contents for STATE (at its last page when it asks for one past the end), the
+count, the sort the filters send, and the URL the list is now read at."
+  (multiple-value-bind (contents total pages) (fetch-page space model state)
+    (when (> (getf state :page) pages)
+      (setf (getf state :page) pages)
+      (multiple-value-setq (contents total pages) (fetch-page space model state)))
+    (let ((model-name (model-name model)))
+      (set-response-header :hx-replace-url
+                           (list-url space model-name :search-text (getf state :search-text) :status (getf state :status)
+                                                      :sort-key (getf state :sort-key) :page (getf state :page)))
+      (hsx (<> (~content-list :space space :model model :state state :contents contents :pages pages)
+               (~content-count :space space :model model :state state :total total :oob t)
+               (if clear
+                   (hsx (~filters :space space :model model-name :sort-key (getf state :sort-key) :oob t))
+                   (hsx (~sort-input :sort-key (getf state :sort-key) :oob t)))
+               (if message (hsx (~flash-oob :message message :kind kind)) (hsx (<>))))))))
 
 (defun @get (params)
   (with-owner
@@ -376,9 +427,8 @@ Each button is an action on the selection form's boxes."
                                                              :status (getf state :status)
                                                              :sort-key (getf state :sort-key) :page pages)
                                   302)
-                     (hsx (~layout :space space :crumbs (list (cons model-name nil))
-                            (~content-list :space space :model model :state state
-                                           :contents contents :total total :pages pages)))))))))))
+                     (hsx (~list-page :space space :model model :state state
+                                      :contents contents :total total :pages pages))))))))))
 
 ;;; Bulk actions: one content at a time through content-service, so validation,
 ;;; timestamps and webhooks behave as they do for a single one. One that fails
@@ -450,12 +500,12 @@ draft key and break a preview link."
                    (values "Nothing was selected." :error)
                    (multiple-value-bind (done skipped failed first) (apply-to-each space model ids op)
                      (values (bulk-flash op done skipped failed first) (if (plusp failed) :error :ok))))
-             (let ((state (read-state params model)))
-               ;; a page emptied by a delete shows the last one there still is
-               (multiple-value-bind (contents total pages) (fetch-page space model state)
-                 (when (> (getf state :page) pages)
-                   (setf (getf state :page) pages)
-                   (multiple-value-setq (contents total pages) (fetch-page space model state)))
-                 (hsx (<> (~content-list :space space :model model :state state
-                                         :contents contents :total total :pages pages)
-                          (~flash-oob :message message :kind kind))))))))))
+             ;; a page emptied by a delete shows the last one there still is
+             (answer-list space model (read-state params model) :message message :kind kind))))))
+
+(defaction browse-contents :get (params)
+  (let* ((space (param params "space"))
+         (model (and space (find-space space) (find-model space (or (param params "model") "")))))
+    (if (and model (eq (model-kind model) :list))
+        (answer-list space model (read-state params model) :clear (equal (param params "clear") "1"))
+        (action-refusal "Unknown model." 404))))

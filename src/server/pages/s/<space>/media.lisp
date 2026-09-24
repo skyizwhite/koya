@@ -1,7 +1,7 @@
 (defpackage #:koya-server/pages/s/<space>/media
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status)
+  (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/media
@@ -15,21 +15,24 @@
   (:import-from #:koya-server/components/media-grid #:~thumb #:dimensions #:human-size)
   (:import-from #:koya-server/lib/forms #:form-values)
   (:export #:@get #:media-page-url
-           #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt))
+           #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt))
 (in-package #:koya-server/pages/s/<space>/media)
 
-;;; The media library. The search and the page are the URL's, so moving between
-;;; them is a page load; what is done to the files is an action answered in place:
-;;; #library -- the count, the upload row, the selection and the grid -- is drawn
-;;; again at the search and page it was read at. The preview dialog is drawn by
-;;; the server for the file it opens.
+;;; The media library. Searching, paging and what is done to the files are all
+;;; actions answered in place: #library -- the upload row, the selection, the grid
+;;; and the pager -- is drawn again, with the count out of band, and the URL is
+;;; replaced with the search and page, so a reload or a link comes back to them.
+;;; The preview dialog is drawn by the server for the file it opens.
 
 (defparameter +page-size+ 20)
 
 (defun media-page-url (space) (format nil "~a/media" (space-url space)))
 
-(defun page-link (page search)
-  (render-uri (make-uri :query `(("page" . ,page) ,@(and search (plusp (length search)) `(("q" . ,search)))))))
+(defun library-url (space &key search (page 1))
+  "The library as it is being read: the search and the page, when they are not the first."
+  (render-uri (make-uri :path (media-page-url space)
+                        :query (append (and search (plusp (length search)) `(("q" . ,search)))
+                                       (and (> page 1) `(("page" . ,page)))))))
 
 (defparameter +bulk-form+ "media-bulk"
   "The selection form's id: the boxes are on the cards and join it by their form
@@ -83,12 +86,6 @@ joins the selection form."
          (q (or search "")))
     (hsx
      (div :id "library"
-       (div :class "mb-6 flex flex-wrap items-center justify-between gap-4"
-         (h1 :class "text-2xl font-bold" "Media"
-           (span :class "ml-3 text-base font-normal text-muted" (format nil "~a file~:p" total)))
-         (form :method "get" :action (media-page-url space) :class "flex gap-2"
-           (input :type "search" :name "q" :value q :placeholder "Search file names" :class "input")
-           (button :type "submit" :class "btn btn-icon" :aria-label "Search" (~icon :name :search))))
        ;; the files go up as soon as they are chosen, as in the picker
        ;; (actions/media-picker); alt text is written afterwards, in the preview
        (form :hx-post (upload-media :space space :q q :page page)
@@ -122,12 +119,33 @@ joins the selection form."
                   (hsx (~media-card :space space :media media :search search :page page
                                     :references (gethash (media-id media) references 0))))))))
        (when (> pages 1)
-         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                (when (> page 1)
-                  (hsx (a :href (page-link (1- page) search) :class "btn" (~icon :name :prev) "Previous")))
-                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                (when (< page pages)
-                  (hsx (a :href (page-link (1+ page) search) :class "btn" "Next" (~icon :name :next)))))))))))
+         (flet ((page-link (n)
+                  (hsx (a :href (library-url space :search search :page n)
+                          :hx-get (browse-media :space space :q q :page n) :hx-target "#library" :hx-swap "outerHTML"
+                          :class "btn"
+                          (if (< n page)
+                              (hsx (<> (~icon :name :prev) "Previous"))
+                              (hsx (<> "Next" (~icon :name :next))))))))
+           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
+                  (when (> page 1) (page-link (1- page)))
+                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
+                  (when (< page pages) (page-link (1+ page)))))))))))
+
+(defcomp ~media-count (&key space search oob)
+  (hsx (span :id "media-count" :class "ml-3 text-base font-normal text-muted" :hx-swap-oob (and oob "true")
+         (format nil "~a file~:p" (count-media space :search search)))))
+
+(defcomp ~library-header (&key space search)
+  "The title, the count and the search box, outside #library: typing draws the
+library again, and the box keeps its focus."
+  (hsx
+   (div :class "mb-6 flex flex-wrap items-center justify-between gap-4"
+     (h1 :class "text-2xl font-bold" "Media" (~media-count :space space :search search))
+     (form :method "get" :action (media-page-url space) :class "flex gap-2"
+           :hx-get (browse-media :space space) :hx-target "#library" :hx-swap "outerHTML"
+           :hx-trigger "input changed delay:300ms from:'find input', submit"
+       (input :type "search" :name "q" :value (or search "") :placeholder "Search file names"
+              :aria-label "Search" :class "input")))))
 
 (defcomp ~media-preview-dialog (&key space media references search page oob)
   "The picture large, its alt text and Delete. Empty and closed until a card asks
@@ -217,35 +235,45 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
   (let ((space (param params "space")))
     (and space (find-space space) space)))
 
-(defun answer (params space message kind &key close-preview)
-  "#library at the search and page it was read at, with MESSAGE as the flash.
+(defun answer (params space &key message kind close-preview)
+  "#library and the count at the search and page it was read at (the last page,
+when that one has emptied), the URL it is now read at, and MESSAGE as the flash.
 CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
-  (let ((library (hsx (~library :space space :search (param params "q") :page (page-number params))))
-        (flash (hsx (~flash-oob :message message :kind kind))))
-    (if close-preview
-        (hsx (<> library (~media-preview-dialog :oob t) flash))
-        (hsx (<> library flash)))))
+  (let* ((search (param params "q"))
+         (pages (max 1 (ceiling (count-media space :search search) +page-size+)))
+         (page (min (page-number params) pages)))
+    (set-response-header :hx-replace-url (library-url space :search search :page page))
+    (let ((library (hsx (~library :space space :search search :page page)))
+          (count (hsx (~media-count :space space :search search :oob t)))
+          (flash (if message (hsx (~flash-oob :message message :kind kind)) (hsx (<>)))))
+      (if close-preview
+          (hsx (<> library count (~media-preview-dialog :oob t) flash))
+          (hsx (<> library count flash))))))
 
 (defaction upload-media :post (params)
   (let ((space (action-space params)))
     (if space
         (multiple-value-bind (message kind) (upload space (uploaded-files params "file"))
-          (answer params space message kind))
+          (answer params space :message message :kind kind))
         (action-refusal "Space not found." 404))))
 
 (defaction delete-media-action :post (params)
   (let ((space (action-space params)))
     (if space
         (multiple-value-bind (message kind) (delete-one space (or (param params "id") ""))
-          (answer params space message kind :close-preview t))
+          (answer params space :message message :kind kind :close-preview t))
         (action-refusal "Space not found." 404))))
 
 (defaction delete-selected-media :post (params)
   (let ((space (action-space params)))
     (if space
         (multiple-value-bind (message kind) (delete-many space (form-values params "id"))
-          (answer params space message kind))
+          (answer params space :message message :kind kind))
         (action-refusal "Space not found." 404))))
+
+(defaction browse-media :get (params)
+  (let ((space (action-space params)))
+    (if space (answer params space) (action-refusal "Space not found." 404))))
 
 (defaction preview-media :get (params)
   (let* ((space (action-space params))
@@ -271,5 +299,6 @@ CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
       (cond ((null space) (set-response-status 404) (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
             (t (set-title (format nil "Media · ~a · koya" space))
                (hsx (~layout :space space :crumbs (list (cons "Media" nil))
+                      (~library-header :space space :search (param params "q"))
                       (~library :space space :search (param params "q") :page (page-number params))
                       (~media-preview-dialog))))))))

@@ -1,6 +1,7 @@
 (defpackage #:koya-tests/server/pages/editor
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/pages/support #:edit #:moved-to #:blog-model #:request #:location #:setup-pages #:log-in)
+  (:import-from #:koya-server/pages/s/<space>/m/<model>/<id>/history #:browse-history)
+  (:import-from #:koya-tests/server/pages/support #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/db/schema-store #:save-schema)
   (:import-from #:koya-server/db/contents #:list-contents #:content-status #:content-published #:content-draft #:content-id)
@@ -344,3 +345,19 @@
         (ok (null (moved-to headers)) "and on this content, not the list")
         (ok (search "referenced by 1 other content" body) "the flash says why")
         (ok (get-content target) "it is still there")))))
+
+(deftest history-is-read-in-place
+  (exec "DELETE FROM contents")
+  (let* ((id (new-blog '(("action" . "publish") ("f-title" . "Once"))))
+         (path (format nil "/s/website/m/blog/~a/history" id)))
+    (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "save") ("f-title" . "Twice")))
+    (testing "the tabs call the action"
+      (ok (search (subseq (browse-history) 0 (position #\? (browse-history))) (nth-value 1 (request :get path)))))
+    (testing "a tab draws #revisions and puts the view in the URL"
+      (multiple-value-bind (status body headers)
+          (call-action :get (browse-history :space "website" :model "blog" :id id :view "published" :page 1))
+        (ok (= status 200))
+        (ok (search "id=\"revisions\"" body))
+        (ng (search "Draft saved" body) "the published versions alone")
+        (ok (string= (getf headers :hx-replace-url) (format nil "~a?view=published" path)))))
+    (ok (= 404 (call-action :get (browse-history :space "website" :model "blog" :id "nope"))))))

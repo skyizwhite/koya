@@ -1,7 +1,8 @@
 (defpackage #:koya-server/pages/s/<space>/deploys
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status)
+  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/db/schema-store #:find-space)
   (:import-from #:koya-server/db/schema-deploys
                 #:list-deploys #:count-deploys #:+keep-per-space+
@@ -11,8 +12,8 @@
   (:import-from #:koya-server/lib/http #:path-param)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:param #:short-time #:caller-name
-                #:~layout #:~empty-state #:~icon #:space-url)
-  (:export #:@get #:deploys-url))
+                #:~layout #:~empty-state #:~icon #:action-refusal #:space-url)
+  (:export #:@get #:deploys-url #:browse-deploys))
 (in-package #:koya-server/pages/s/<space>/deploys)
 
 ;;; What each deploy of this space's schema changed, newest first. Read-only:
@@ -60,28 +61,46 @@
        (span :class "shrink-0 whitespace-nowrap text-muted" (short-time (deploy-created-at deploy))))
      (~diff :changes (deploy-changes deploy)))))
 
-(defcomp ~deploys-page (&key space page)
-  (let* ((total (count-deploys space))
-         (pages (max 1 (ceiling total +page-size+)))
+(defcomp ~deploys (&key space page)
+  "What paging draws again: the deploys and their pager."
+  (let* ((pages (max 1 (ceiling (count-deploys space) +page-size+)))
          (page (min page pages))
          (items (list-deploys space :limit +page-size+ :offset (* (1- page) +page-size+))))
-    (hsx
-     (~layout :space space :crumbs (list (cons "Schema Deploys" nil))
-       (h1 :class "mb-2 text-2xl font-bold" "Schema Deploys")
-       (p :class "mb-4 text-sm text-muted"
-         (format nil "~a deploy~:p, the newest ~a kept." total +keep-per-space+))
-       (if (null items)
-           (hsx (~empty-state "Nothing has been deployed yet."))
-           (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                  (loop :for deploy :in items :collect
-                    (hsx (~deploy :deploy deploy))))))
-       (when (> pages 1)
-         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                (when (> page 1)
-                  (hsx (a :href (deploys-url space :page (1- page)) :class "btn" (~icon :name :prev) "Previous")))
-                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                (when (< page pages)
-                  (hsx (a :href (deploys-url space :page (1+ page)) :class "btn" "Next" (~icon :name :next)))))))))))
+    (flet ((page-link (n)
+             (hsx (a :href (deploys-url space :page n)
+                     :hx-get (browse-deploys :space space :page n) :hx-target "#deploys" :hx-swap "outerHTML"
+                     :class "btn"
+                     (if (< n page)
+                         (hsx (<> (~icon :name :prev) "Previous"))
+                         (hsx (<> "Next" (~icon :name :next))))))))
+      (hsx
+       (div :id "deploys"
+         (if (null items)
+             (hsx (~empty-state "Nothing has been deployed yet."))
+             (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                    (loop :for deploy :in items :collect
+                      (hsx (~deploy :deploy deploy))))))
+         (when (> pages 1)
+           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
+                  (when (> page 1) (page-link (1- page)))
+                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
+                  (when (< page pages) (page-link (1+ page)))))))))))
+
+(defcomp ~deploys-page (&key space page)
+  (hsx
+   (~layout :space space :crumbs (list (cons "Schema Deploys" nil))
+     (h1 :class "mb-2 text-2xl font-bold" "Schema Deploys")
+     (p :class "mb-4 text-sm text-muted"
+       (format nil "~a deploy~:p, the newest ~a kept." (count-deploys space) +keep-per-space+))
+     (~deploys :space space :page page))))
+
+;; paging is answered in place, with the page put back in the URL
+(defaction browse-deploys :get (params)
+  (let ((space (param params "space")))
+    (cond ((not (and space (find-space space))) (action-refusal "Space not found." 404))
+          (t (let ((page (min (page-number params) (max 1 (ceiling (count-deploys space) +page-size+)))))
+               (set-response-header :hx-replace-url (deploys-url space :page page))
+               (hsx (~deploys :space space :page page)))))))
 
 (defun @get (params)
   (with-owner

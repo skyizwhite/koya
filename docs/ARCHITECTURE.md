@@ -98,8 +98,11 @@ request that has lost its session to the login page with `HX-Redirect`. An actio
 answers the part of the page it changed, under that part's id, and the flash out
 of band into the layout's `#flash`; a result on another page is an `HX-Redirect`
 with the flash in the session. A path declared with `public-path` (`lib/auth`)
-needs no session; logging in is the only one. See
-`adr/2026-09-25-pages-answer-get-and-every-change-is-an-action.md`.
+needs no session; logging in is the only one. Searching, filtering, sorting and
+paging a list are actions as well, answered with `HX-Replace-Url` so the page's
+URL still carries that state for its GET to draw. See
+`adr/2026-09-25-pages-answer-get-and-every-change-is-an-action.md` and
+`adr/2026-09-25-lists-are-read-in-place-and-the-url-follows.md`.
 
 ## Running it
 

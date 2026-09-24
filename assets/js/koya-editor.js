@@ -243,8 +243,9 @@ htmx.onLoad((root) => {
 
 // History: rich text is drawn in a sandboxed [data-fit-content] iframe, which
 // is as tall as its document once that has loaded -- its stylesheet included.
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("iframe[data-fit-content]").forEach((frame) => {
+// Bound for whatever htmx swaps in: a tab or a page of the history draws its versions again.
+htmx.onLoad((root) => {
+  root.querySelectorAll("iframe[data-fit-content]").forEach((frame) => {
     const fit = () => {
       const doc = frame.contentDocument;
       // the body, not the root: the root is never shorter than the frame itself

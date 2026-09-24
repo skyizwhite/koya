@@ -1,7 +1,8 @@
 (defpackage #:koya-server/pages/s/<space>/m/<model>/<id>/history
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status)
+  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya/core/schema
                 #:model-kind #:model-name #:model-fields #:model-field
                 #:field-name #:field-type #:field-option)
@@ -11,7 +12,7 @@
   (:import-from #:koya-server/db/content-revisions
                 #:list-revisions #:count-revisions
                 #:revision-id #:revision-event #:revision-data #:revision-by #:revision-created-at)
-  (:import-from #:koya-server/db/schema-store #:find-model)
+  (:import-from #:koya-server/db/schema-store #:find-space #:find-model)
   (:import-from #:koya-server/db/media #:find-media #:media-filename)
   (:import-from #:koya-server/lib/content-service #:resolve-model)
   (:import-from #:koya-server/lib/http #:path-param #:api-error)
@@ -19,8 +20,8 @@
   (:import-from #:koya-server/lib/assets #:asset-url)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:set-title #:param #:short-time #:caller-name #:content-label
-                #:~layout #:~empty-state #:~icon #:content-url #:model-url)
-  (:export #:@get #:history-url #:restore-url))
+                #:~layout #:~empty-state #:~icon #:action-refusal #:content-url #:model-url)
+  (:export #:@get #:history-url #:restore-url #:browse-history))
 (in-package #:koya-server/pages/s/<space>/m/<model>/<id>/history)
 
 ;;; A content's revisions, newest first, each drawn as what it changed against
@@ -162,25 +163,64 @@ allow-same-origin is only there so that koya-editor.js can read its height."
                :before (and previous (revision-data previous))
                :after (revision-data revision)))))
 
-(defcomp ~tab (&key href active children)
-  (hsx (a :href href :class (clsx "border-b-2 px-3 py-2 text-sm"
-                                  (if active "border-accent font-medium text-fg" "border-transparent text-muted hover:text-fg"))
+(defcomp ~tab (&key href browse active children)
+  (hsx (a :href href :hx-get browse :hx-target "#revisions" :hx-swap "outerHTML"
+          :class (clsx "border-b-2 px-3 py-2 text-sm"
+                       (if active "border-accent font-medium text-fg" "border-transparent text-muted hover:text-fg"))
           children)))
 
-(defcomp ~history-page (&key space model content published-only page)
+(defun page-count (id published-only)
+  (max 1 (ceiling (count-revisions id :published-only published-only) +page-size+)))
+
+(defcomp ~revisions (&key space model content published-only page)
+  "What a tab or a page draws again: the tabs, the versions and their pager."
   (let* ((model-name (model-name model))
          (id (content-id content))
-         (object-p (eq (model-kind model) :object))
-         (total (count-revisions id :published-only published-only))
-         (pages (max 1 (ceiling total +page-size+)))
+         (pages (page-count id published-only))
          (page (min page pages))
          ;; one more than the page, so its last row has the one before it to compare with
          (rows (list-revisions id :published-only published-only
                                   :limit (1+ +page-size+) :offset (* (1- page) +page-size+)))
-         (items (subseq rows 0 (min +page-size+ (length rows)))))
+         (items (subseq rows 0 (min +page-size+ (length rows))))
+         (view (if published-only "published" "")))
+    (flet ((page-link (n)
+             (hsx (a :href (history-url space model-name id :published-only published-only :page n)
+                     :hx-get (browse-history :space space :model model-name :id id :view view :page n)
+                     :hx-target "#revisions" :hx-swap "outerHTML" :class "btn"
+                     (if (< n page)
+                         (hsx (<> (~icon :name :prev) "Previous"))
+                         (hsx (<> "Next" (~icon :name :next))))))))
+      (hsx
+       (div :id "revisions"
+         (nav :class "mb-4 flex items-center gap-1 border-b border-line"
+           (~tab :href (history-url space model-name id)
+                 :browse (browse-history :space space :model model-name :id id :view "" :page 1)
+                 :active (not published-only)
+                 (format nil "All changes (~a)" (count-revisions id)))
+           (span :class "text-sm text-muted" :aria-hidden "true" "/")
+           (~tab :href (history-url space model-name id :published-only t)
+                 :browse (browse-history :space space :model model-name :id id :view "published" :page 1)
+                 :active published-only
+                 (format nil "Published (~a)" (count-revisions id :published-only t))))
+         (if (null items)
+             (hsx (~empty-state (if published-only "This content has never been published." "No history yet.")))
+             (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                    (loop :for (revision previous) :on rows
+                          :for n :below (length items)
+                          :collect (hsx (~revision :space space :model model :id id
+                                                   :revision revision :previous previous))))))
+         (when (> pages 1)
+           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
+                  (when (> page 1) (page-link (1- page)))
+                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
+                  (when (< page pages) (page-link (1+ page)))))))))))
+
+(defcomp ~history-page (&key space model content published-only page)
+  (let* ((model-name (model-name model))
+         (id (content-id content)))
     (hsx
      (~layout :space space
-              :crumbs (if object-p
+              :crumbs (if (eq (model-kind model) :object)
                           (list (cons model-name (content-url space model-name id)) (cons "History" nil))
                           (list (cons model-name (model-url space model-name))
                                 (cons (content-label content model) (content-url space model-name id))
@@ -188,28 +228,22 @@ allow-same-origin is only there so that koya-editor.js can read its height."
        (h1 :class "mb-2 text-2xl font-bold" "History")
        (p :class "mb-4 text-sm text-muted"
          "Every saved version of this content, newest first.")
-       (nav :class "mb-4 flex items-center gap-1 border-b border-line"
-         (~tab :href (history-url space model-name id) :active (not published-only)
-               (format nil "All changes (~a)" (count-revisions id)))
-         (span :class "text-sm text-muted" :aria-hidden "true" "/")
-         (~tab :href (history-url space model-name id :published-only t) :active published-only
-               (format nil "Published (~a)" (count-revisions id :published-only t))))
-       (if (null items)
-           (hsx (~empty-state (if published-only "This content has never been published." "No history yet.")))
-           (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                  (loop :for (revision previous) :on rows
-                        :for n :below (length items)
-                        :collect (hsx (~revision :space space :model model :id id
-                                                 :revision revision :previous previous))))))
-       (when (> pages 1)
-         (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                (when (> page 1)
-                  (hsx (a :href (history-url space model-name id :published-only published-only :page (1- page))
-                          :class "btn" (~icon :name :prev) "Previous")))
-                (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                (when (< page pages)
-                  (hsx (a :href (history-url space model-name id :published-only published-only :page (1+ page))
-                          :class "btn" "Next" (~icon :name :next)))))))))))
+       (~revisions :space space :model model :content content :published-only published-only :page page)))))
+
+;; a tab or a page is answered in place, with the view and page put back in the URL
+(defaction browse-history :get (params)
+  (let* ((space (param params "space"))
+         (model (and space (find-space space) (find-model space (or (param params "model") ""))))
+         (content (and model (find-content space (model-name model) (or (param params "id") "")))))
+    (cond ((null content) (action-refusal "Content not found." 404))
+          (t
+           (let* ((published-only (equal (param params "view") "published"))
+                  (page (min (page-number params) (page-count (content-id content) published-only))))
+             (set-response-header :hx-replace-url
+                                  (history-url space (model-name model) (content-id content)
+                                               :published-only published-only :page page))
+             (hsx (~revisions :space space :model model :content content
+                              :published-only published-only :page page)))))))
 
 (defun @get (params)
   (with-owner

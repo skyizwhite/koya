@@ -52,8 +52,11 @@ no user accounts: whoever knows the secret is the owner.
   rejected.
 - The admin UI needs JavaScript. What is done on a page — saving, publishing,
   uploading, deleting, making a key — is sent with htmx and answered in place,
-  so the page does not reload; moving between pages is ordinary navigation, and
-  a list's search, filter, sort and page stay in its URL.
+  so the page does not reload; moving between pages is ordinary navigation.
+  Searching, filtering, sorting and paging a list are answered in place too, and
+  the URL is replaced with them, so a reload, a bookmark or the back button from
+  another page comes back to the list as it was left. The steps in between are
+  not history entries of their own.
 - The UI works down to a phone's width (375px): the page itself never scrolls
   sideways, though a wide table scrolls inside its own box. On a narrow screen
   the header's **Settings** and **Log out** are icons, its crumbs wrap, and the
@@ -140,9 +143,10 @@ starts the content over.
 
 ### Finding one
 
-A search box and a status filter above the table, applied with **Filter**, and
-the column headers sort. All three live in the query string, so the list as you
-are reading it is a link:
+A search box and a status filter above the table, and the column headers sort.
+The search goes as the typing stops, and the status as it is picked; there is no
+button. All three are put in the query string, so the list as you are reading it
+is a link:
 
 | | |
 |---|---|
@@ -152,7 +156,8 @@ are reading it is a link:
 
 Clicking a header sorts by it, clicking the sorted one turns it around, and an
 arrow marks it. The count beside the heading reads *3 of 120* while anything is
-filtered; **Clear** drops the search and the filter, keeping the sort.
+filtered; *Clear the search and filter*, above the table, drops both and keeps
+the sort.
 
 A search looks inside the data the list shows — the draft when there is one.
 Rich text is searched as its stored HTML, so a query that reads like markup can
@@ -324,8 +329,8 @@ There is one log per space, and the narrower views are the same page filtered:
 
 Both together narrow to one webhook's calls for one model. Two selects above
 the list both show what is filtered and are how it is set, so a filter can be
-set on the page as well as arrived at by link: **Filter** applies them, and
-**Clear** drops both. They offer every model of the space
+set on the page as well as arrived at by link: picking one applies it, and
+*Clear the filters* drops both. They offer every model of the space
 and every webhook of it, whether or not it has fired yet, plus
 anything the log still holds that the schema no longer does.
 
@@ -374,7 +379,7 @@ and the message says how many could not and why.
   claims. Files are stored under `KOYA_MEDIA_DIR/{space}/` and served at
   `/media/{space}/{id}.{ext}` with a long immutable cache.
 - The grid is thumbnails only, 20 per page, with paging underneath. The search box
-  matches file names.
+  matches file names as the typing stops; `?q=` and `?page=` carry both.
 - Clicking a thumbnail opens a preview dialog with the file's name, dimensions,
   size and upload time, an **alt text** box to save, and **Delete**. A file that
   any content still uses — as a `media` value or inside rich text — cannot be

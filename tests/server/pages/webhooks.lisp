@@ -1,6 +1,7 @@
 (defpackage #:koya-tests/server/pages/webhooks
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/pages/support #:blog-model #:request #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/pages/support #:blog-model #:request #:call-action #:setup-pages #:log-in)
+  (:import-from #:koya-server/pages/s/<space>/webhooks #:browse-deliveries)
   (:import-from #:koya-server/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/db/schema-store #:save-schema)
   (:import-from #:koya-server/db/contents #:content-id)
@@ -68,7 +69,7 @@
            (testing "the filters can be set from the page itself"
              (multiple-value-bind (status body) (request :get "/s/website/webhooks")
                (ok (= status 200))
-               (ok (search "<form method=\"get\" action=\"/s/website/webhooks\"" body)
+               (ok (search "<form id=\"filters\" method=\"get\" action=\"/s/website/webhooks\"" body)
                    "an unfiltered page still offers the form")
                (ok (search "name=\"label\"" body))
                (ok (search "name=\"model\"" body))
@@ -76,7 +77,7 @@
                (ok (search "<option value=\"blog\"" body))
                (ok (search "<option value=\"about\"" body)
                    "every model of the space is offered, not only the ones that have fired")
-               (ok (search "<button type=\"submit\" class=\"btn\"" body) "with a button to apply them")
+               (ng (search ">Filter<" body) "picking one applies it: there is no button")
                (ng (search "Clear" body) "nothing to clear when nothing is filtered")))
            (testing "either filter narrows it"
              (multiple-value-bind (status body) (request :get "/s/website/webhooks" :query "label=revalidate")
@@ -115,3 +116,30 @@
       (ok (= status 200))
       (ng (search "/s/website/webhooks" body)))))
 
+
+(deftest the-log-is-filtered-in-place
+  (exec "DELETE FROM webhook_deliveries")
+  (dolist (model '("blog" "blog" "about"))
+    (record-delivery "website" :label "revalidate" :url "https://site.test/api/revalidate"
+                               :model model :event "publish" :content-id "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+                               :ok t :status 200 :response "" :error "" :duration-ms 1))
+  (testing "the selects call the action as they are picked"
+    (let ((body (nth-value 1 (request :get "/s/website/webhooks"))))
+      (ok (search "hx-trigger=\"change, submit\"" body) "either select, as its change bubbles")
+      (ng (search ">Filter<" body) "so there is no button to press")))
+  (testing "a filter draws #deliveries and the count, and puts itself in the URL"
+    (multiple-value-bind (status body headers)
+        (call-action :get (browse-deliveries :space "website" :label "" :model "about" :page 1))
+      (ok (= status 200))
+      (ok (search "id=\"deliveries\"" body))
+      (ok (search "1 call matches." body) "the count, out of band")
+      (ok (search "Clear the filters" body))
+      (ng (search "id=\"filters\"" body) "the selects stay as they are")
+      (ok (string= (getf headers :hx-replace-url) "/s/website/webhooks?model=about"))))
+  (testing "clearing puts the selects back"
+    (multiple-value-bind (status body headers) (call-action :get (browse-deliveries :space "website" :clear "1"))
+      (ok (= status 200))
+      (ok (search "id=\"filters\"" body))
+      (ok (search "3 calls." body))
+      (ok (string= (getf headers :hx-replace-url) "/s/website/webhooks"))))
+  (ok (= 404 (call-action :get (browse-deliveries :space "nope")))))

@@ -1,6 +1,7 @@
 (defpackage #:koya-tests/server/pages/deploys
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/pages/support #:post-login #:*secret* #:*cookie* #:request #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/pages/support #:post-login #:*secret* #:*cookie* #:request #:call-action #:setup-pages #:log-in)
+  (:import-from #:koya-server/pages/s/<space>/deploys #:browse-deploys)
   (:import-from #:koya-server/db/connection #:disconnect-db)
   (:import-from #:koya-server/db/schema-store #:save-schema #:create-space #:delete-space)
   (:import-from #:koya-server/db/management-keys #:create-management-key)
@@ -100,3 +101,15 @@
              (ok (string= (deploy-by (first (list-deploys "by-key"))) "key:ci")))
         (delete-space "by-key")))))
 
+
+(deftest deploys-are-paged-in-place
+  (log-in)
+  (multiple-value-bind (status body headers) (call-action :get (browse-deploys :space "website" :page 1))
+    (ok (= status 200))
+    (ok (search "id=\"deploys\"" body))
+    (ng (search "<html" body))
+    (ok (string= (getf headers :hx-replace-url) "/s/website/deploys")))
+  (ok (string= (getf (nth-value 2 (call-action :get (browse-deploys :space "website" :page 9))) :hx-replace-url)
+               "/s/website/deploys")
+      "a page past the end is the last one")
+  (ok (= 404 (call-action :get (browse-deploys :space "nope")))))

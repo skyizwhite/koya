@@ -11,7 +11,7 @@
   (:import-from #:koya-server/lib/content-service #:resolve-model #:create)
   (:import-from #:koya/core/json #:jobject)
   (:import-from #:koya-tests/server/pages/support #:call-action)
-  (:import-from #:koya-server/pages/s/<space>/m/<model>/index #:bulk-contents))
+  (:import-from #:koya-server/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents))
 (in-package #:koya-tests/server/pages/content-list)
 
 (defun bulk (op ids &key (q "") (status "") (page 1))
@@ -40,7 +40,7 @@
       (ok (= status 200))
       (ok (search "Page 2 of 2" body))
       (ok (search "Page filler 000" body))
-      (ok (search "<a href=\"/s/website/m/blog\" class=\"btn\"" body)
+      (ok (search "<a href=\"/s/website/m/blog\" hx-get=" body)
           "and back, to the list's own URL: page 1 is not a query"))
     (multiple-value-bind (status body headers) (request :get "/s/website/m/blog" :query "page=9")
       (declare (ignore body))
@@ -252,9 +252,10 @@
                                                       :key #'content-id :test #'string=)))
                 "and the preview link it was holding still works")))
         (testing "the list comes back under the filters it was read with"
-          (let ((body (nth-value 1 (bulk "unpublish" (list two) :q "Bulk" :status "published"))))
-            (ok (search "value=\"Bulk\"" body) "the search")
-            (ok (search "value=\"published\" selected" body) "and the status filter")
+          (multiple-value-bind (status body headers) (bulk "unpublish" (list two) :q "Bulk" :status "published")
+            (declare (ignore status))
+            (ok (string= (getf headers :hx-replace-url) "/s/website/m/blog?q=Bulk&status=published")
+                "the URL keeps the search and the filter")
             (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
           ;; a title is required, so a draft saved without one cannot be published
@@ -294,3 +295,41 @@
             (ng (get-content referrer))
             (bulk "delete" (list target))
             (ng (get-content target) "and it goes once nothing refers to it")))))))
+
+(deftest the-list-is-read-in-place
+  (exec "DELETE FROM contents")
+  (multiple-value-bind (space model) (resolve-model "website" "blog")
+    (dolist (title '("Apple" "Banana" "Cherry"))
+      (create space model (jobject "title" title) :publish (string= title "Banana"))))
+  (flet ((browse (&rest args)
+           (call-action :get (apply #'browse-contents :space "website" :model "blog" args))))
+    (testing "the page's controls call the action"
+      (let ((body (nth-value 1 (request :get "/s/website/m/blog"))))
+        (ok (search "id=\"filters\"" body))
+        (ok (search "input changed delay:300ms" body) "the search goes as the typing stops")
+        (ok (search "change from:'find select'" body) "and the status as it is picked")
+        (ng (search ">Filter<" body) "so there is no button to press")
+        (ok (search (subseq (browse-contents) 0 (position #\? (browse-contents))) body)
+            "the headers and the pager too")))
+    (testing "a search draws #contents, the count and the sort, and puts the state in the URL"
+      (multiple-value-bind (status body headers) (browse :q "an" :status "" :sort "title" :page 1)
+        (ok (= status 200))
+        (ok (search "id=\"contents\"" body))
+        (ok (search "Banana" body))
+        (ng (search ">Cherry<" body))
+        (ok (search "id=\"content-count\" class=\"ml-3 text-base font-normal text-muted\" hx-swap-oob=\"true\"" body))
+        (ok (search "1 of 3" body))
+        (ok (search "id=\"filter-sort\" name=\"sort\" value=\"title\" hx-swap-oob=\"true\"" body)
+            "the sort the filters send, out of band")
+        (ng (search "id=\"filters\"" body) "but not the box being typed in")
+        (ok (string= (getf headers :hx-replace-url) "/s/website/m/blog?q=an&sort=title"))))
+    (testing "clearing puts the filters back empty"
+      (multiple-value-bind (status body headers) (browse :q "" :status "" :sort "" :page 1 :clear "1")
+        (ok (= status 200))
+        (ok (search "id=\"filters\"" body))
+        (ok (search "value=\"\" placeholder=\"Search text and ids\"" body))
+        (ok (string= (getf headers :hx-replace-url) "/s/website/m/blog"))))
+    (testing "a page past the end is the last one"
+      (ok (string= (getf (nth-value 2 (browse :q "" :status "" :sort "" :page 9)) :hx-replace-url) "/s/website/m/blog")))
+    (testing "an object model has no list"
+      (ok (= 404 (call-action :get (browse-contents :space "website" :model "about")))))))
