@@ -27,49 +27,76 @@ src/
   client.lisp         ; plan / deploy / pull, get-list …, the admin API wrappers
   core/               ; schema, validate, diff, json, case, time, ulid
   server/
-    app.lisp  middlewares.lisp  main.lisp  document.lisp
-    pages/            ; the admin UI (ningle-fbr: the directory is the URL), GET only
-    ui/               ; hsx components shared by pages: layout, icon, toast,
-                      ; elements at the top; content/ and media/ below
-    api/              ; the delivery API
-    admin-api/        ; the admin API
-    features/         ; what one part of koya does, for the pages and the APIs alike:
-      contents/       ;   service, presenter, forms, revisions, listing, labels, bulk
-      media/          ;   store, image, library
-      spaces/         ;   archive, lifecycle
-      webhooks/       ;   notify
-    db/               ; connection, migrations, and one file per table
-    lib/              ; what several parts share: env, assets, auth, http, query,
-                      ; paging, display, urls, timezone, totp
+    main.lisp         ; the composition root: loads infra/, then web/
+    domain/           ; what koya is made of: content, media, revision, deploy,
+                      ; webhook-delivery, query, errors, image, totp, timezone
+    usecases/         ; what koya does, knowing neither HTTP nor SQL:
+      contents/       ;   write, delivery, listing, labels, revisions, bulk, lookup
+      media/          ;   library, delivery
+      spaces/         ;   lifecycle, archive
+      schema/         ;   deploy
+      webhooks/       ;   notify, log
+      settings/       ;   timezone, two-factor
+                      ;   and actor, auth, keys, system at the top
+      ports/          ; what the use cases need from outside: store, spaces,
+                      ; contents, media, keys, webhooks, settings, sessions, config
+    infra/            ; the ports, defined: env, media-files, webhook-sender, and
+      db/             ;   connection, migrations, schema.sql, one file per table
+    web/              ; the way in: app, middlewares, http, auth, presenters,
+                      ; forms, media, paging, display, urls, assets, document
+      pages/          ;   the admin UI (ningle-fbr: the directory is the URL), GET only
+      ui/             ;   hsx components shared by pages: layout, icon, toast,
+                      ;   elements at the top; content/ and media/ below
+      api/            ;   the delivery API
+      admin-api/      ;   the admin API
 tests/                ; mirrors src/
 assets/               ; style/ (Tailwind in and out), js/
 ```
 
-Both `pages/` and the two API directories are file-routed: the path of the file
-is the URL, and `<space>` in a directory name is a path parameter.
+Both `web/pages/` and the two API directories are file-routed: the path of the
+file under them is the URL, and `<space>` in a directory name is a path parameter.
 
-A component that more than one page draws is under `ui/`. A component that only
-one page draws is in that page's file, next to the actions that answer with it.
-See `adr/2026-09-25-shared-components-live-in-ui.md`.
+A component that more than one page draws is under `web/ui/`. A component that
+only one page draws is in that page's file, next to the actions that answer with
+it. See `adr/2026-09-25-shared-components-live-in-ui.md`.
 
-What koya does is kept apart from how it is asked for and shown. The logic of one
-part of koya -- contents, media, spaces, webhooks -- is under `features/<part>/`,
-used by its pages and its API routes alike; what several parts share is under
-`lib/`. A page, a component or an action reads the request, calls into those,
-and draws or words the result. What only one page needs to draw -- its URLs, a
-badge's class, how a value reads there -- stays in that page's file. See
-`adr/2026-09-25-logic-lives-in-features-and-lib.md`.
+### Layers
 
-`ui/` uses `features/` and `lib/`; `features/` uses `lib/`, `db/` and another
-feature where one part sets off another (a content write notifies the webhooks);
-`lib/` uses no feature and no component; and nothing but a page uses a page.
+Each layer depends only on the ones inside it:
+
+```
+web  ──▶  usecases  ──▶  domain
+            │ calls
+            ▼
+          ports  ◀── defines ──  infra
+```
+
+- `domain/` depends on `koya/core` alone.
+- `usecases/` uses `domain/` and its ports. It raises the errors in
+  `domain/errors`, which say what went wrong without an HTTP status, and names
+  who is making a change from `*actor*` (`usecases/actor`).
+- A port is a package of declared functions. `infra/` defines them in the
+  port's own package, so a use case calls `find-content` without knowing that
+  SQLite answers it. `koya-server/main` is the only module that loads `infra/`.
+- `web/` reads the request, calls use cases, and draws or words the result. It
+  turns a domain error into a status in one place (`error-status` in
+  `web/http`). The auth guards bind `*actor*`. The web never reaches a port or
+  `infra/` directly: where a use case has nothing to add, it re-exports the
+  port's function.
+
+What only one page needs to draw -- its URLs, a badge's class, how a value
+reads there -- stays in that page's file.
+
+`tests/server/layers.lisp` fails when a file imports from a layer further out.
+See `adr/2026-09-25-the-server-is-layered-and-depends-inward.md`.
 
 ## Storage
 
-One SQLite database. The table definitions live in `src/server/db/migrations.lisp`
-(forward only, applied at startup); **the current shape is
-[`src/server/db/schema.sql`](../src/server/db/schema.sql)**, generated from them
-by `(koya-server:write-schema-snapshot)` — a test fails when it is stale.
+One SQLite database. The table definitions live in
+`src/server/infra/db/migrations.lisp` (forward only, applied at startup); **the
+current shape is [`src/server/infra/db/schema.sql`](../src/server/infra/db/schema.sql)**,
+generated from them by `(koya-server:write-schema-snapshot)` — a test fails when
+it is stale.
 
 | Table | Holds |
 |---|---|
@@ -118,9 +145,9 @@ through htmx requests only, from the owner's session and this origin, and sends 
 request that has lost its session to the login page with `HX-Redirect`. An action
 answers the part of the page it changed, under that part's id, and the toast out
 of band into the layout's `#toast`; a result on another page is an `HX-Redirect`
-with the toast in the session. A path declared with `public-path` (`lib/auth`)
+with the toast in the session. A path declared with `public-path` (`web/auth`)
 needs no session; logging in is the only one. A path declared with
-`archive-path` (`middlewares`) takes a space archive as its body, set aside
+`archive-path` (`web/middlewares`) takes a space archive as its body, set aside
 unread; the import is the only one. Searching, filtering, sorting and
 paging a list are actions as well, answered with `HX-Replace-Url` so the page's
 URL still carries that state for its GET to draw. See

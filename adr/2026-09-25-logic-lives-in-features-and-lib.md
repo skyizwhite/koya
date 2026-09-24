@@ -1,5 +1,7 @@
 # Logic lives in features/ and lib/, not in pages and components
 
+Superseded by adr/2026-09-25-the-server-is-layered-and-depends-inward.md
+
 *2026-09-25*
 
 ## Context
