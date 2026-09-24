@@ -37,6 +37,7 @@ in use, not published, destructive."))
   (:documentation "The request itself is malformed."))
 
 (define-condition rejected (koya-error) ()
+  (:default-initargs :code "rejected")
   (:documentation "Well-formed, but not something koya accepts: an empty file, an
 image type it does not take."))
 

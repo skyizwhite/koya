@@ -41,7 +41,7 @@ migration happens to create a table earlier."
   (format nil "~
 -- koya database schema, version ~a.
 --
--- Generated from src/server/db/migrations.lisp; do not edit by hand.
+-- Generated from src/server/infra/db/migrations.lisp; do not edit by hand.
 -- Regenerate it from the REPL with (koya-server:write-schema-snapshot).
 ~{~%~a;~}~%"
           (current-version) (ddl-statements)))
@@ -60,7 +60,7 @@ test's) alone."
     (uiop:read-file-string path)))
 
 (defun write-snapshot (&optional (path (snapshot-path)))
-  "Regenerate src/server/db/schema.sql. Run it after adding a migration."
+  "Regenerate src/server/infra/db/schema.sql. Run it after adding a migration."
   (let ((text (migrated-snapshot)))
     (with-open-file (out path :direction :output :if-exists :supersede
                               :if-does-not-exist :create :external-format :utf-8)

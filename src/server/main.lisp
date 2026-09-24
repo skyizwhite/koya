@@ -52,7 +52,9 @@
 
 (defun reload ()
   (stop)
-  (asdf:load-system :koya-server/web/app)
+  ;; the whole system: web/app alone reaches no infra, so an edited store
+  ;; method would stay the old one
+  (asdf:load-system :koya-server)
   (install-routes)
   ;; built again from the code just loaded
   (setf *app* nil)
@@ -82,7 +84,7 @@ compiling anything, and needs neither Quicklisp nor a C toolchain."
                                  :save-runtime-options t))
 
 (defun write-schema-snapshot ()
-  "Regenerate src/server/db/schema.sql from the migrations. Run it after adding
+  "Regenerate src/server/infra/db/schema.sql from the migrations. Run it after adding
 one: a test fails while the snapshot is stale."
   (write-snapshot))
 

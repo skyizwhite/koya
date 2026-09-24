@@ -1,6 +1,6 @@
 -- koya database schema, version 9.
 --
--- Generated from src/server/db/migrations.lisp; do not edit by hand.
+-- Generated from src/server/infra/db/migrations.lisp; do not edit by hand.
 -- Regenerate it from the REPL with (koya-server:write-schema-snapshot).
 
 CREATE TABLE content_revisions (
