@@ -310,7 +310,10 @@ paths:
         `data` is merged onto the current draft (or, without one, the published
         data): keys present replace, a `null` value removes the key, keys absent
         stay. The result is validated whole. A new draft key is issued, so earlier
-        preview links stop working.
+        preview links stop working. When the result is what the content holds
+        already, nothing is written -- no draft, no revision, no webhook -- and
+        the content comes back as it is; when it is the published data again,
+        the draft is dropped, as `discard-draft` would.
       security: [{ managementKey: [] }]
       requestBody:
         required: true
