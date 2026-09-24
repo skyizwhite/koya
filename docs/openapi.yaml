@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: koya
-  version: 0.10.0
+  version: 0.10.1
   summary: Delivery and admin APIs of a koya server
   description: |
     Two JSON APIs on one server.
@@ -836,7 +836,7 @@ components:
         owner: { type: boolean, description: "true when called with the admin UI's session" }
         management: { type: boolean, description: "true when called with a management key" }
         space: { type: [string, "null"], description: "the space a management key is limited to; null for the owner" }
-        version: { type: string, examples: ["0.10.0"] }
+        version: { type: string, examples: ["0.10.1"] }
 
     Schema:
       type: object
