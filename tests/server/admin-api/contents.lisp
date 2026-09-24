@@ -1,6 +1,8 @@
 (defpackage #:koya-tests/server/admin-api/contents
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/api-support #:*webhooks* #:admin #:delivery #:webhook-events #:setup-api #:reset-api)
+  (:import-from #:koya-tests/server/api-support #:*webhooks* #:admin #:delivery #:webhook-events #:setup-api #:reset-api #:test-schema)
+  (:import-from #:koya-server/db/schema-store #:save-schema)
+  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/db/connection #:disconnect-db)
   (:import-from #:koya/core/json #:jobject #:jget #:json-null))
 (in-package #:koya-tests/server/admin-api/contents)
@@ -163,3 +165,47 @@
     (ok (= status 200))
     (ok (= (jget json "totalCount") 1))))
 
+
+(deftest a-referenced-content-stays
+  (flet ((make (model data)
+           (jget (nth-value 1 (admin :post (format nil "/admin/api/contents/website/~a" model)
+                                     :body (jobject "data" data "publish" t)))
+                 "id")))
+    (let* ((tag (make "tag" (jobject "name" "lisp")))
+           (post (make "blog" (jobject "title" "Uses it" "tags" (vector tag)))))
+      (testing "deleting or unpublishing it is refused while a content refers to it"
+        (multiple-value-bind (status json) (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag))
+          (ok (= status 409))
+          (ok (string= (jget json "error" "code") "in_use"))
+          (ok (search "referenced by 1 other content" (jget json "error" "message"))))
+        (multiple-value-bind (status json) (admin :post (format nil "/admin/api/contents/website/tag/~a/unpublish" tag))
+          (ok (= status 409))
+          (ok (string= (jget json "error" "code") "in_use")))
+        (ok (string= (jget (nth-value 1 (delivery (format nil "/api/v1/website/tag/~a" tag))) "name") "lisp")
+            "and it is still delivered"))
+      (testing "a draft that still refers to it counts too"
+        (admin :patch (format nil "/admin/api/contents/website/blog/~a" post) :body (jobject "data" (jobject "tags" #())))
+        (ok (= 409 (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag))) "the published data still does")
+        (admin :post (format nil "/admin/api/contents/website/blog/~a/publish" post)))
+      (testing "a draft is unpublished whatever refers to it: nothing is taken away"
+        (let ((draft (jget (nth-value 1 (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "draft"))))
+                           "id")))
+          (admin :patch (format nil "/admin/api/contents/website/blog/~a" post) :body (jobject "data" (jobject "tags" (vector tag draft))))
+          (ok (= 200 (admin :post (format nil "/admin/api/contents/website/tag/~a/unpublish" draft))))
+          (ok (= 409 (admin :delete (format nil "/admin/api/contents/website/tag/~a" draft))) "but not deleted")
+          (admin :patch (format nil "/admin/api/contents/website/blog/~a" post) :body (jobject "data" (jobject "tags" #())))))
+      (testing "once the reference is taken out, it goes"
+        (ok (= 200 (admin :post (format nil "/admin/api/contents/website/tag/~a/unpublish" tag))))
+        (ok (= 200 (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag)))))))
+  (testing "a reference field removed by a deploy no longer holds anything"
+    (let* ((tag (jget (nth-value 1 (admin :post "/admin/api/contents/website/tag"
+                                          :body (jobject "data" (jobject "name" "cl") "publish" t)))
+                      "id")))
+      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Keeps an id" "tags" (vector tag))))
+      (ok (= 409 (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag))))
+      (save-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text :required t)))
+                                                        (make-model "tag" :list (list (make-field :name :text :required t)))
+                                                        (make-model "about" :object (list (make-field :body :richtext))))))
+      (unwind-protect
+           (ok (= 200 (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag))))
+        (save-schema "website" (test-schema))))))

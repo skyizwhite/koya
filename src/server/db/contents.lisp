@@ -13,6 +13,10 @@
                 #:parse-json #:to-json)
   (:import-from #:koya-server/db/content-revisions
                 #:record-revision)
+  (:import-from #:koya-server/db/schema-store
+                #:load-schema)
+  (:import-from #:koya/core/schema
+                #:schema-models #:model-name #:model-fields #:field-name #:field-type #:field-option)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
   (:export #:make-content #:content-id #:content-space #:content-model #:content-status
@@ -33,7 +37,8 @@
            #:find-object-content
            #:unique-value-taken-p
            #:space-contents
-           #:import-content))
+           #:import-content
+           #:content-references))
 (in-package #:koya-server/db/contents)
 
 ;;; Content rows. PUBLISHED and DRAFT are JSON objects (hash tables) or NIL.
@@ -144,6 +149,45 @@ Errors when the content has no published version: there would be nothing left."
 (defun delete-content (id)
   ;; its revisions go with it, ON DELETE CASCADE
   (exec "DELETE FROM contents WHERE id = ?" id))
+
+(defun reference-fields (space target)
+  "Hash of model name -> its :reference fields in SPACE's current schema that point at TARGET."
+  (let ((table (make-hash-table :test 'equal))
+        (schema (load-schema space)))
+    (dolist (model (and schema (schema-models schema)) table)
+      (let ((fields (remove-if-not (lambda (f) (and (eq (field-type f) :reference)
+                                                    (equal (field-option f :model) target)))
+                                   (model-fields model))))
+        (when fields (setf (gethash (model-name model) table) fields))))))
+
+(defun refers-p (fields json id)
+  (let ((data (and json (parse-json json))))
+    (and (hash-table-p data)
+         (some (lambda (field)
+                 (let ((value (gethash (field-name field) data)))
+                   (typecase value
+                     (string (string= value id))
+                     (vector (find id value :test #'equal)))))
+               fields))))
+
+;; Only the fields in the schema count, as for media (see db/media): a deploy that
+;; removes a reference field leaves its ids in the stored JSON, unread.
+(defun content-references (space model id)
+  "Number of other contents in SPACE whose published or draft data refers to
+content ID of MODEL through a :reference field of the current schema."
+  (let ((fields (reference-fields space model))
+        (needle (format nil "%~a%" id)))
+    (if (zerop (hash-table-count fields))
+        0
+        ;; LIKE only skips the contents that cannot refer to it; the fields decide
+        (count-if (lambda (row)
+                    (let ((fields (gethash (col row "model") fields)))
+                      (and fields
+                           (or (refers-p fields (col row "published") id)
+                               (refers-p fields (col row "draft") id)))))
+                  (fetch "SELECT model, published, draft FROM contents
+                          WHERE space = ? AND id <> ? AND (published LIKE ? OR draft LIKE ?)"
+                         space id needle needle)))))
 
 (defun ensure-draft-key (id)
   "Return the draft key of content ID, generating one on first use."

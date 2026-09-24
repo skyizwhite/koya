@@ -15,7 +15,8 @@
   (:import-from #:koya-server/db/contents
                 #:create-content #:save-draft #:publish-content #:unpublish-content #:delete-content #:discard-draft
                 #:find-content #:find-object-content #:unique-value-taken-p #:get-content
-                #:content-id #:content-published #:content-draft #:content-published-at #:content-data)
+                #:content-id #:content-published #:content-draft #:content-published-at #:content-data
+                #:content-references)
   (:import-from #:koya-server/lib/presenter
                 #:content->jobject)
   (:import-from #:koya-server/lib/webhook
@@ -197,12 +198,24 @@ and only PUBLISHED-AT applies."
         (notify space model id :publish :old old :new (published-view space model published))
         published))))
 
+(defun check-unreferenced (space-name model-name id verb)
+  "Refuse with 409 in_use while another content refers to ID: taking it away
+would leave that content pointing at nothing."
+  (let ((references (content-references space-name model-name id)))
+    (when (plusp references)
+      (fail-api 409 "in_use" (format nil "This content is referenced by ~a other content~:p; remove ~:*~[~;that reference~:;those references~] before you ~a it"
+                                     references verb)))))
+
 (defun unpublish (space model id)
   (let* ((space-name space)
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
-    (let ((result (unpublish-content id :by (calling-identity))))
+    (let ((result (with-db-transaction
+                    ;; a draft is out of the delivery API already; unpublishing it takes nothing away
+                    (when (content-published content)
+                      (check-unreferenced space-name model-name (content-id content) "unpublish"))
+                    (unpublish-content id :by (calling-identity)))))
       (when old (notify space model id :unpublish :old old))
       result)))
 
@@ -220,6 +233,8 @@ and only PUBLISHED-AT applies."
          (model-name (koya/core/schema:model-name model))
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
-    (delete-content id)
+    (with-db-transaction
+      (check-unreferenced space-name model-name (content-id content) "delete")
+      (delete-content id))
     (when old (notify space model id :delete :old old))
     t))

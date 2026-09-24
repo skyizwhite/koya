@@ -174,6 +174,11 @@ POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a previ
   system's ids and dates. On an object model that already has its content,
   creating updates it instead.
 - `discard-draft` needs a published version to fall back to (`409 not_published`).
+- A content another content refers to, in its published data or its draft,
+  through a `reference` field of the current schema, cannot be deleted, nor
+  unpublished while it is published (`409 in_use`, naming how many). Take the
+  reference out of those contents — and publish them, when it is in their
+  published data — first. An id left in a field a deploy removed does not count.
 
 The schema itself is deployed with `PUT /admin/api/schema/{space}` and previewed
 with `POST /admin/api/schema/{space}/plan`: see [SCHEMA.md](SCHEMA.md), and

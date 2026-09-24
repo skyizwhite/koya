@@ -332,10 +332,17 @@ paths:
       operationId: deleteAdminContent
       tags: [contents]
       summary: Delete a content
-      description: Removes both versions. Fires `delete` webhooks when it was published.
+      description: |
+        Removes both versions. Fires `delete` webhooks when it was published.
+        Refused with 409 `in_use` while another content refers to it.
       security: [{ managementKey: [] }]
       responses:
         "200": { $ref: "#/components/responses/Deleted" }
+        "409":
+          description: "`in_use`: other contents refer to it through a reference field of the current schema; the message names how many"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -380,7 +387,8 @@ paths:
       description: |
         Takes the content off the delivery API. Its data (the draft when there is
         one) is kept as a draft with a new draft key; `publishedAt` is cleared.
-        Fires `unpublish` webhooks.
+        Fires `unpublish` webhooks. A published content is refused with 409
+        `in_use` while another content refers to it.
       security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -392,6 +400,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AdminContent" }
+        "409":
+          description: "`in_use`: other contents refer to it through a reference field of the current schema; the message names how many"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }

@@ -14,7 +14,7 @@
                 #:find-model #:space-webhooks)
   (:import-from #:koya-server/lib/content-service
                 #:resolve-model #:default-data #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
-  (:import-from #:koya-server/lib/http #:path-param #:api-error)
+  (:import-from #:koya-server/lib/http #:path-param #:api-error #:api-error-message)
   (:import-from #:koya-server/lib/forms #:form->data)
   (:import-from #:koya-server/lib/page
                 #:with-owner #:with-owner-post #:set-title #:redirect-to #:param #:set-flash #:expand-url-template
@@ -242,4 +242,10 @@ named that this content does not have."
           (validation-error (e)
             (set-response-status 422)
             (hsx (~editor :space space :model model :content content :data data
-                          :errors (validation-error-errors e)))))))))
+                          :errors (validation-error-errors e))))
+          (api-error (e)
+            ;; refused as things stand, such as a delete while other contents refer
+            ;; to this one: back to it with why. Without a content, WITH-EDITOR answers.
+            (unless content (error e))
+            (set-flash (api-error-message e) :error)
+            (redirect-to (content-url space-name model-name (content-id content)))))))))

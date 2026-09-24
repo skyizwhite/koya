@@ -160,8 +160,9 @@ many. Filter first and select the page: *status = draft*, select all, Publish.
 The buttons need JavaScript.
 
 Each content goes one at a time through the path a single one takes, so the
-validation, the timestamps and the webhooks are the same. One that fails leaves
-the rest done — *Published 2 contents. 1 could not be: title is required* — and
+validation, the timestamps and the webhooks are the same, and a content another
+refers to is refused here too. One that fails leaves the rest done — *Published
+2 contents. 1 could not be: title is required* — and
 one with nothing to do is left alone and counted, so republishing what is
 published does not move its `revisedAt`, and unpublishing a draft does not
 reissue its draft key: *Published 2 contents. 5 were already published.*
@@ -219,7 +220,11 @@ content can be seen on the left, what can be done to it on the right:
 
 At the bottom, the **Danger zone** holds **Unpublish** (takes the content off the
 delivery API, keeping its data as a draft) and **Delete** (removes it for good;
-for an object model it starts the single content over). Both ask first.
+for an object model it starts the single content over). Both ask first. A
+content that another content refers to through a `reference` field — in its
+published data or its draft — can be neither: the page comes back saying how
+many refer to it. Take it out of those contents first. Only the reference fields
+in the current schema count, as for media.
 
 ## Drafts, publishing and previews
 

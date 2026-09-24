@@ -6,7 +6,10 @@
   (:import-from #:koya-server/lib/query #:parse-query)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:koya-server/db/contents #:save-draft)
-  (:import-from #:koya-server/db/media #:insert-media #:media-id))
+  (:import-from #:koya-server/db/media #:insert-media #:media-id)
+  (:import-from #:koya-server/db/contents #:get-content #:content-published)
+  (:import-from #:koya-server/lib/content-service #:resolve-model #:create)
+  (:import-from #:koya/core/json #:jobject))
 (in-package #:koya-tests/server/pages/content-list)
 
 (setup (setup-pages) (log-in))
@@ -295,3 +298,28 @@
                                                  :headers origin)
             (ok (= status 400))))))))
 
+
+(deftest bulk-actions-leave-a-referenced-content
+  (exec "DELETE FROM contents")
+  (let ((origin '(("origin" . "http://localhost:3000"))))
+    (multiple-value-bind (space model) (resolve-model "website" "blog")
+      (flet ((make (title &rest data)
+               (content-id (create space model (apply #'jobject "title" title data) :publish t))))
+        (let* ((target (make "Target"))
+               (other (make "Other"))
+               (referrer (make "Refers" "related" (vector target))))
+          (testing "unpublishing a selection skips the one another refers to"
+            (request :post "/s/website/m/blog" :form `(("action" . "unpublish") ("id" . ,target) ("id" . ,other))
+                     :headers origin)
+            (multiple-value-bind (status body) (request :get "/s/website/m/blog")
+              (declare (ignore status))
+              (ok (search "Unpublished 1 content. 1 could not be: This content is referenced by 1 other content" body)))
+            (ok (content-published (get-content target)) "it is still published")
+            (ng (content-published (get-content other)) "the rest of the selection went"))
+          (testing "deleting a selection does the same"
+            (request :post "/s/website/m/blog" :form `(("action" . "delete") ("id" . ,target) ("id" . ,referrer))
+                     :headers origin)
+            (ok (get-content target) "refused while the referrer was still there")
+            (ng (get-content referrer))
+            (request :post "/s/website/m/blog" :form `(("action" . "delete") ("id" . ,target)) :headers origin)
+            (ng (get-content target) "and it goes once nothing refers to it")))))))

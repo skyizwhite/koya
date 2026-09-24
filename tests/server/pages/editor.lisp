@@ -243,9 +243,11 @@
         (ng (search "Draft saved" body))
         (ok (search "Published" body))))
     ;; the world moves on: a referenced content is unpublished, another deleted,
-    ;; the media is gone, an option and a field are taken out of the schema
-    (request :post (format nil "/s/website/m/blog/~a" unpublished) :form '(("action" . "unpublish")))
-    (request :post (format nil "/s/website/m/blog/~a" deleted) :form '(("action" . "delete")))
+    ;; the media is gone, an option and a field are taken out of the schema. The
+    ;; two contents go past the guard that keeps a referenced content: this one
+    ;; still refers to them, and a revision is what outlives that
+    (koya-server/db/contents:unpublish-content unpublished)
+    (koya-server/db/contents:delete-content deleted)
     (delete-media "website" media)
     (save-schema "website"
                  (make-schema :models (list (make-model "blog" :list
@@ -329,3 +331,18 @@
                      (make-schema :models (list (blog-model)
                                                 (make-model "about" :object (list (make-field :body :richtext))))))))))
 
+
+(deftest a-referenced-content-is-not-deleted-from-the-editor
+  (exec "DELETE FROM contents")
+  (multiple-value-bind (space model) (resolve-model "website" "blog")
+    (let* ((target (content-id (create space model (koya/core/json:jobject "title" "Target") :publish t)))
+           (path (format nil "/s/website/m/blog/~a" target)))
+      (create space model (koya/core/json:jobject "title" "Refers" "related" (vector target)) :publish t)
+      (multiple-value-bind (status body headers) (request :post path :form '(("action" . "delete")))
+        (declare (ignore body))
+        (ok (= status 303))
+        (ok (string= (location headers) path) "back to the content, not the list")
+        (ok (get-content target) "it is still there"))
+      (multiple-value-bind (status body) (request :get path)
+        (ok (= status 200))
+        (ok (search "referenced by 1 other content" body) "and the page says why")))))
