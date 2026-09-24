@@ -1,6 +1,6 @@
 (defpackage #:koya-tests/server/usecases/webhooks/notify
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/api-support #:*webhooks* #:test-schema #:admin #:webhook-events #:setup-api #:reset-api)
+  (:import-from #:koya-tests/server/web/api-support #:*webhooks* #:test-schema #:admin #:webhook-events #:setup-api #:reset-api)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya-server/infra/db/webhook-deliveries #:+max-response-chars+)
