@@ -16,6 +16,7 @@
 (deftest spaces-page
   (multiple-value-bind (status body) (request :get "/")
     (ok (= status 200))
+    (ok (search "<html lang=\"en\"" body) "the admin UI is in English")
     (ok (search "website" body))
     (ok (search "commandfor=\"new-space\"" body) "the form is behind a button")
     (ok (search "<dialog id=\"new-space\"" body) "and lives in a dialog on the page")
