@@ -10,7 +10,6 @@
                 #:display-timezone-name #:display-timezone #:set-display-timezone)
   (:import-from #:koya/core/time #:now-iso)
   (:import-from #:koya-server/web/http #:param)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/web/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/icon #:~icon)
@@ -168,6 +167,5 @@
 
 (defun @get (params)
   (declare (ignore params))
-  (with-owner
-    (set-title "Settings · koya")
-    (hsx (~settings-page :pending (pending-secret)))))
+  (set-title "Settings · koya")
+  (hsx (~settings-page :pending (pending-secret))))

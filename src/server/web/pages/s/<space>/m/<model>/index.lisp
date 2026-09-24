@@ -12,7 +12,6 @@
                 #:content-id #:content-status #:content-data #:+statuses+ #:content-label)
   (:import-from #:koya-server/web/http #:path-param #:redirect-to #:param #:form-values #:blank-p)
   (:import-from #:koya-server/web/paging #:+page-size+ #:page-number)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/urls #:content-url #:model-url)
   (:import-from #:koya-server/web/document #:set-title)
@@ -329,28 +328,27 @@ count, the sort the filters send, and the URL the list is now read at."
                (if message (hsx (~toast-oob :message message :kind kind)) (hsx (<>))))))))
 
 (defun @get (params)
-  (with-owner
-    (let* ((space (path-param params :space))
-           (model-name (path-param params :model))
-           (model (and (find-space space) (find-model space model-name))))
-      (cond ((null model)
-             (set-response-status 404)
-             (hsx (~layout :space space (h1 :class "text-xl font-bold" "Model not found"))))
-            ((eq (model-kind model) :object)
-             (let ((content (find-object-content space model-name)))
-               (redirect-to (content-url space model-name (if content (content-id content) "new")) 302)))
-            (t
-             (set-title (format nil "~a · ~a · koya" model-name space))
-             (let ((state (read-state params model)))
-               (multiple-value-bind (contents total pages) (fetch-page space model state)
-                 (if (> (getf state :page) pages)
-                     ;; past the end: a link to a page that has since emptied
-                     (redirect-to (list-url space model-name :search-text (getf state :search-text)
-                                                             :status (getf state :status)
-                                                             :sort-key (getf state :sort-key) :page pages)
-                                  302)
-                     (hsx (~list-page :space space :model model :state state
-                                      :contents contents :total total :pages pages))))))))))
+  (let* ((space (path-param params :space))
+         (model-name (path-param params :model))
+         (model (and (find-space space) (find-model space model-name))))
+    (cond ((null model)
+           (set-response-status 404)
+           (hsx (~layout :space space (h1 :class "text-xl font-bold" "Model not found"))))
+          ((eq (model-kind model) :object)
+           (let ((content (find-object-content space model-name)))
+             (redirect-to (content-url space model-name (if content (content-id content) "new")) 302)))
+          (t
+           (set-title (format nil "~a · ~a · koya" model-name space))
+           (let ((state (read-state params model)))
+             (multiple-value-bind (contents total pages) (fetch-page space model state)
+               (if (> (getf state :page) pages)
+                   ;; past the end: a link to a page that has since emptied
+                   (redirect-to (list-url space model-name :search-text (getf state :search-text)
+                                                           :status (getf state :status)
+                                                           :sort-key (getf state :sort-key) :page pages)
+                                302)
+                   (hsx (~list-page :space space :model model :state state
+                                    :contents contents :total total :pages pages)))))))))
 
 (defun bulk-message (action done skipped failed message)
   (let ((verb (cond ((equal action "publish") "Published")

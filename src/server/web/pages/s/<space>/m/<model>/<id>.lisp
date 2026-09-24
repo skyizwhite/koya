@@ -19,7 +19,6 @@
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-message #:not-found)
   (:import-from #:koya-server/web/forms #:form->data)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/usecases/contents/labels #:reference-options)
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/urls #:expand-url-template #:content-url #:model-url)
@@ -203,23 +202,22 @@ named that this content does not have."
         (values revision (null revision))))))
 
 (defun @get (params)
-  (with-owner
-    (with-editor (space model content) params
-      (set-title (format nil "~a · ~a · koya" (model-name model) space))
-      (multiple-value-bind (revision unknown) (requested-revision params content)
-        (let ((current (if content (content-data content :draft t) (default-data model))))
-          (cond
-            (revision
-             (multiple-value-bind (data notes)
-                 (restore-data space model (content-id content) (revision-data revision) current)
-               (hsx (~editor-page :space space :model model :content content :data data
-                                  :restoring (list :revision revision :notes notes)))))
-            (unknown
-             (hsx (~editor-page :space space :model model :content content :data current
-                                :errors (list (list :field "revision"
-                                                    :message "does not exist for this content; this is its current data")))))
-            (t
-             (hsx (~editor-page :space space :model model :content content :data current)))))))))
+  (with-editor (space model content) params
+    (set-title (format nil "~a · ~a · koya" (model-name model) space))
+    (multiple-value-bind (revision unknown) (requested-revision params content)
+      (let ((current (if content (content-data content :draft t) (default-data model))))
+        (cond
+          (revision
+           (multiple-value-bind (data notes)
+               (restore-data space model (content-id content) (revision-data revision) current)
+             (hsx (~editor-page :space space :model model :content content :data data
+                                :restoring (list :revision revision :notes notes)))))
+          (unknown
+           (hsx (~editor-page :space space :model model :content content :data current
+                              :errors (list (list :field "revision"
+                                                  :message "does not exist for this content; this is its current data")))))
+          (t
+           (hsx (~editor-page :space space :model model :content content :data current))))))))
 
 ;;; --- The action ---------------------------------------------------------------
 ;;; What stays on this content answers #editor drawn again, with the toast out of

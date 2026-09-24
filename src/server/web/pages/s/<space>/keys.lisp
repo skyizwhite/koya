@@ -7,7 +7,6 @@
                 #:list-management-keys #:delete-management-key)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
   (:import-from #:koya-server/web/http #:path-param #:param)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
@@ -150,8 +149,7 @@
 (defun page-title (space) (format nil "Keys · ~a · koya" space))
 
 (defun @get (params)
-  (with-owner
-    (let ((space (ensure-space params)))
-      (cond ((null space) (set-response-status 404) (hsx (~layout (h1 "Space not found"))))
-            (t (set-title (page-title space))
-               (hsx (~keys-page :space space)))))))
+  (let ((space (ensure-space params)))
+    (cond ((null space) (set-response-status 404) (hsx (~layout (h1 "Space not found"))))
+          (t (set-title (page-title space))
+             (hsx (~keys-page :space space))))))

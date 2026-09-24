@@ -10,7 +10,6 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:set-toast #:~toast-oob #:action-refusal)
   (:import-from #:lack/request #:request-env)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/usecases/spaces/archive #:import-space-stream)
   (:import-from #:koya-server/usecases/spaces/lifecycle
                 #:create-space #:remove-space #:list-spaces #:find-space)
@@ -180,9 +179,8 @@ the import action as the request body (see IMPORT-SPACE-ACTION)."
 
 (defun @get (params)
   (declare (ignore params))
-  (with-owner
-    (set-title "Spaces · koya")
-    (hsx (~spaces-page :spaces (list-spaces)))))
+  (set-title "Spaces · koya")
+  (hsx (~spaces-page :spaces (list-spaces))))
 
 ;; health check
 (defun @head (params)

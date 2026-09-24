@@ -48,6 +48,9 @@
   (let ((next (param params "next")))
     (and (local-path-p next) next)))
 
+;; where a session comes from
+(public-path "/login")
+
 (defun @get (params)
   (set-title "Log in · koya")
   (if (session-owner-p)

@@ -26,7 +26,7 @@
                 #:*body-limit-middleware* #:*cache-control-middleware* #:*delivery-cors-middleware*)
   (:import-from #:koya-server/usecases/auth #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/web/auth
-                #:*admin-auth-middleware* #:*actions-auth-middleware*)
+                #:*admin-auth-middleware* #:*actions-auth-middleware* #:*pages-auth-middleware*)
   (:import-from #:koya-server/web/document
                 #:~document #:page-title)
   (:export #:app
@@ -102,6 +102,7 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
                                             (lack:builder *admin-auth-middleware* *admin-api-app*)))
   (install-middleware *page-app* *actions-auth-middleware*)
   (install-middleware *page-app* *actions-middleware*)
+  (install-middleware *page-app* *pages-auth-middleware*)
   (static-path *page-app* "/assets/" "assets/")
   (configure *page-app*))
 

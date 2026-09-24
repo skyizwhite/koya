@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/auth
   (:use #:cl)
   (:import-from #:koya-server/web/http
-                #:fail-api #:header #:json-response #:error-object #:origin-allowed-p #:redirect-to)
+                #:fail-api #:header #:json-response #:error-object #:origin-allowed-p)
   (:import-from #:koya-server/usecases/keys
                 #:space-for-delivery-key #:space-for-management-key #:management-key-label)
   (:import-from #:koya-server/usecases/auth
@@ -9,14 +9,14 @@
   (:import-from #:koya-server/usecases/actor
                 #:*actor*)
   (:import-from #:lack/request
-                #:request-env #:request-uri)
+                #:request-env)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri)
   (:export #:calling-space
            #:*admin-auth-middleware*
            #:*actions-auth-middleware*
+           #:*pages-auth-middleware*
            #:require-delivery-key
            #:public-path
-           #:with-owner
            #:local-path-p
            #:session-login
            #:session-logout
@@ -179,9 +179,6 @@ checking for itself.")
           ((string/= key-space space) (fail-api 403 "forbidden" "Delivery key does not belong to this space"))
           (t t))))
 
-;;; Pages are not behind a guard: a page that finds no owner sends the browser to
-;;; log in, and back to itself afterwards.
-
 (defun local-path-p (path)
   "True for a path on this server. What the login page redirects to comes from the
 URL, so anything that a browser could read as another host (//evil, /\\evil) is out."
@@ -195,22 +192,35 @@ URL, so anything that a browser could read as another host (//evil, /\\evil) is 
   (let ((uri (uri url)))
     (render-uri (make-uri :path (or (uri-path uri) "/") :query (uri-query uri)))))
 
-(defun return-path ()
-  "The page to come back to after logging in: the one requested. Pages answer GET
-only; an action that finds no session is sent back by LOGIN-LOCATION."
-  (ignore-errors
-   ;; the raw request line: path-info is decoded, and an encoded ? or / would change meaning
-   (path-and-query (request-uri ningle:*request*))))
+;;; Pages are guarded like the rest: a request for any page without the owner's
+;;; session goes to the login page, and comes back to that page afterwards. A
+;;; page answers only its owner without saying so, and what is open is what
+;;; names itself with PUBLIC-PATH.
 
-(defun redirect-to-login ()
-  (let ((next (return-path)))
-    (redirect-to (if (and (local-path-p next) (string/= next "/"))
-                     (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
-                     "/login")
-                 302)))
+(defun page-login-location (env)
+  "The login page, coming back to the page ENV asks for."
+  ;; the raw request line: path-info is decoded, and an encoded ? or / would change meaning
+  (let ((next (ignore-errors (path-and-query (getf env :request-uri)))))
+    (if (and (local-path-p next) (string/= next "/"))
+        (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
+        "/login")))
 
-(defmacro with-owner (&body body)
-  "Run BODY for the logged-in owner, otherwise redirect to the login page."
-  `(if (session-owner-p)
-       (progn ,@body)
-       (redirect-to-login)))
+(defun asset-path-p (path)
+  ;; the login page is drawn with them
+  (and (stringp path) (> (length path) 8) (string= "/assets/" path :end2 8)))
+
+(defparameter *pages-auth-middleware*
+  (lambda (app)
+    (lambda (env)
+      (let ((path (getf env :path-info)))
+        (if (or (session-env-owner-p env)
+                (public-path-p path)
+                (asset-path-p path)
+                ;; *ACTIONS-AUTH-MIDDLEWARE* has its own answer for these
+                (actions-path-p path))
+            (funcall app env)
+            (list 302 (list :location (page-login-location env)) '())))))
+  "Lack middleware guarding every page: the owner's session only, but for a
+PUBLIC-PATH. Installed inside everything mounted before the pages, so a page
+defined later is covered without checking for itself, and a path that is no
+page goes to the login page as well rather than saying it does not exist.")

@@ -10,7 +10,6 @@
                 #:deploy-created-at #:change-op #:change-destructive #:change-description)
   (:import-from #:koya-server/web/http #:path-param #:param #:blank-p)
   (:import-from #:koya-server/web/paging #:+page-size+ #:page-number #:last-page #:page-offset)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/web/display #:short-time #:caller-name)
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/document #:set-title)
@@ -101,11 +100,10 @@
                (hsx (~deploys :space space :page page)))))))
 
 (defun @get (params)
-  (with-owner
-    (let ((space (path-param params :space)))
-      (cond ((null (find-space space))
-             (set-response-status 404)
-             (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
-            (t
-             (set-title (format nil "Schema Deploys · ~a · koya" space))
-             (hsx (~deploys-page :space space :page (page-number params))))))))
+  (let ((space (path-param params :space)))
+    (cond ((null (find-space space))
+           (set-response-status 404)
+           (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
+          (t
+           (set-title (format nil "Schema Deploys · ~a · koya" space))
+           (hsx (~deploys-page :space space :page (page-number params)))))))

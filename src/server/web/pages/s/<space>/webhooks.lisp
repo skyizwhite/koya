@@ -15,7 +15,6 @@
                 #:delivery-error #:delivery-duration-ms #:delivery-created-at)
   (:import-from #:koya-server/web/http #:path-param #:param #:blank-p)
   (:import-from #:koya-server/web/paging #:+page-size+ #:page-number #:last-page #:page-offset)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/urls #:space-url #:content-url)
   (:import-from #:koya-server/web/document #:set-title)
@@ -224,16 +223,15 @@ option it silently replaces with the first one, which here reads \"All\"."
                         (hsx (<>)))))))))
 
 (defun @get (params)
-  (with-owner
-    (let* ((name (path-param params :space))
-           (schema (load-schema name)))
-      (cond ((null schema)
-             (set-response-status 404)
-             (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
-            (t
-             (set-title (format nil "Webhooks · ~a · koya" name))
-             (hsx (~log-page :space name
-                             :schema schema
-                             :label (param params "label")
-                             :model (param params "model")
-                             :page (page-number params))))))))
+  (let* ((name (path-param params :space))
+         (schema (load-schema name)))
+    (cond ((null schema)
+           (set-response-status 404)
+           (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
+          (t
+           (set-title (format nil "Webhooks · ~a · koya" name))
+           (hsx (~log-page :space name
+                           :schema schema
+                           :label (param params "label")
+                           :model (param params "model")
+                           :page (page-number params)))))))

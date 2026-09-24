@@ -21,7 +21,6 @@
   (:import-from #:koya-server/web/forms #:number->string)
   (:import-from #:koya-server/web/assets #:asset-url)
   (:import-from #:koya-server/web/paging #:+page-size+ #:page-number #:last-page #:page-offset)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/web/display #:short-time #:caller-name)
   (:import-from #:koya-server/web/urls #:content-url #:model-url)
   (:import-from #:koya-server/web/document #:set-title)
@@ -235,18 +234,17 @@ allow-same-origin is only there so that koya-editor.js can read its height."
                               :published-only published-only :page page)))))))
 
 (defun @get (params)
-  (with-owner
-    (handler-case
-        (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
-          (let ((content (find-content space (model-name model) (path-param params :id))))
-            (cond ((null content)
-                   (set-response-status 404)
-                   (hsx (~layout :space space (h1 :class "text-xl font-bold" "Content not found"))))
-                  (t
-                   (set-title (format nil "History · ~a · ~a · koya" (model-name model) space))
-                   (hsx (~history-page :space space :model model :content content
-                                       :published-only (equal (param params "view") "published")
-                                       :page (page-number params)))))))
-      (not-found ()
-        (set-response-status 404)
-        (hsx (~layout (h1 :class "text-xl font-bold" "Model not found")))))))
+  (handler-case
+      (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
+        (let ((content (find-content space (model-name model) (path-param params :id))))
+          (cond ((null content)
+                 (set-response-status 404)
+                 (hsx (~layout :space space (h1 :class "text-xl font-bold" "Content not found"))))
+                (t
+                 (set-title (format nil "History · ~a · ~a · koya" (model-name model) space))
+                 (hsx (~history-page :space space :model model :content content
+                                     :published-only (equal (param params "view") "published")
+                                     :page (page-number params)))))))
+    (not-found ()
+      (set-response-status 404)
+      (hsx (~layout (h1 :class "text-xl font-bold" "Model not found"))))))

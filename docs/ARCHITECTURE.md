@@ -139,10 +139,12 @@ SBCL with package-inferred systems — a file under `src/` is a package — and
 | Tests | rove (`koya-tests`) |
 
 The four apps — pages, delivery API, admin API and actions — are separate ningle
-apps mounted together, so each decides its own response type. The admin API and
-the actions are each guarded where they are mounted (`*admin-auth-middleware*`,
-`*actions-auth-middleware*`), so a route added later is covered without checking
-for itself; pages check with `with-owner`. The delivery API is mounted behind
+apps mounted together, so each decides its own response type. The admin API, the
+actions and the pages are each guarded where they are mounted
+(`*admin-auth-middleware*`, `*actions-auth-middleware*`, `*pages-auth-middleware*`),
+so a route added later is covered without checking for itself. A page asked for
+without the owner's session is a redirect to the login page, which comes back to
+it; so is a path that is no page. The delivery API is mounted behind
 `*delivery-cors-middleware*`, which answers any origin; nothing else is.
 
 A page route answers GET and draws a page; everything done on it is an action
@@ -153,7 +155,8 @@ request that has lost its session to the login page with `HX-Redirect`. An actio
 answers the part of the page it changed, under that part's id, and the toast out
 of band into the layout's `#toast`; a result on another page is an `HX-Redirect`
 with the toast in the session. A path declared with `public-path` (`web/auth`)
-needs no session; logging in is the only one. A path declared with
+needs no session: the login page and its action, and `/health`; `/assets/` is
+open as well, since the login page is drawn with it. A path declared with
 `archive-path` (`web/middlewares`) takes a space archive as its body, set aside
 unread; the import is the only one. Searching, filtering, sorting and
 paging a list are actions as well, answered with `HX-Replace-Url` so the page's

@@ -14,7 +14,6 @@
                 #:path-param #:uploaded-files #:param #:form-values)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/web/paging #:page-number #:last-page #:page-offset)
-  (:import-from #:koya-server/web/auth #:with-owner)
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/document #:set-title)
@@ -283,11 +282,10 @@ CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
 ;;; --- Page ---------------------------------------------------------------------
 
 (defun @get (params)
-  (with-owner
-    (let ((space (let ((name (path-param params :space))) (and (find-space name) name))))
-      (cond ((null space) (set-response-status 404) (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
-            (t (set-title (format nil "Media · ~a · koya" space))
-               (hsx (~layout :space space :crumbs (list (cons "Media" nil))
-                      (~library-header :space space :search (param params "q"))
-                      (~library :space space :search (param params "q") :page (page-number params))
-                      (~media-preview-dialog))))))))
+  (let ((space (let ((name (path-param params :space))) (and (find-space name) name))))
+    (cond ((null space) (set-response-status 404) (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
+          (t (set-title (format nil "Media · ~a · koya" space))
+             (hsx (~layout :space space :crumbs (list (cons "Media" nil))
+                    (~library-header :space space :search (param params "q"))
+                    (~library :space space :search (param params "q") :page (page-number params))
+                    (~media-preview-dialog)))))))
