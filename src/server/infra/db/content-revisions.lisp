@@ -41,29 +41,25 @@ changes nothing against the newest revision records nothing."
 (defun where (published-only)
   (format nil "content_id = ?~:[~; AND event = 'publish'~]" published-only))
 
-(defun list-revisions (content-id &key published-only (limit 20) (offset 0))
-  "Newest first. PUBLISHED-ONLY keeps the publishes: the versions that were live."
+(defmethod list-revisions (content-id &key published-only (limit 20) (offset 0))
   (mapcar #'row->revision
           (fetch (format nil "SELECT * FROM content_revisions WHERE ~a ORDER BY id DESC LIMIT ? OFFSET ?"
                          (where published-only))
                  content-id limit offset)))
 
-(defun count-revisions (content-id &key published-only)
+(defmethod count-revisions (content-id &key published-only)
   (col (fetch-one (format nil "SELECT COUNT(*) AS n FROM content_revisions WHERE ~a" (where published-only))
                   content-id)
        "n"))
 
-(defun find-revision (content-id id)
+(defmethod find-revision (content-id id)
   (let ((row (fetch-one "SELECT * FROM content_revisions WHERE content_id = ? AND id = ?" content-id id)))
     (and row (row->revision row))))
 
-(defun content-history (content-id)
-  "Every revision of CONTENT-ID, oldest first."
+(defmethod content-history (content-id)
   (mapcar #'row->revision
           (fetch "SELECT * FROM content_revisions WHERE content_id = ? ORDER BY id" content-id)))
 
-(defun import-revision (content-id event data &key (by "") created-at)
-  "Append a revision as it was written elsewhere. Imported oldest first, so the
-ids keep the order they had."
+(defmethod import-revision (content-id event data &key (by "") created-at)
   (exec "INSERT INTO content_revisions (content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?)"
         content-id event (to-json data) (or by "") (or created-at (now-iso))))

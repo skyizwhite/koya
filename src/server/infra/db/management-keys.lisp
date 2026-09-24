@@ -26,42 +26,35 @@
 ;;; that is handed to a front end and the right to deploy a schema is not a
 ;;; separation worth having.
 
-(defun create-management-key (space &key (label ""))
-  "Create a key for SPACE. Returns (values plaintext-key id)."
+(defmethod create-management-key (space &key (label ""))
   (let ((key (format nil "koya_mgmt_~a" (byte-array-to-hex-string (random-data 24))))
         (id (make-ulid)))
     (exec "INSERT INTO management_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
           id space (hash-key key) label (now-iso))
     (values key id)))
 
-(defun list-management-keys (space)
-  "Plists (:id :label :created-at) of the keys of SPACE, oldest first."
+(defmethod list-management-keys (space)
   (mapcar (lambda (row) (list :id (col row "id") :label (col row "label") :created-at (col row "created_at")))
           (fetch "SELECT id, label, created_at FROM management_keys WHERE space = ? ORDER BY created_at" space)))
 
-(defun delete-management-key (space id)
+(defmethod delete-management-key (space id)
   (exec "DELETE FROM management_keys WHERE space = ? AND id = ?" space id))
 
-(defun management-key-label (key)
-  "The label of the management key KEY, or NIL when it is not one. An unlabelled
-key answers with the empty string it was made with."
+(defmethod management-key-label (key)
   (and (stringp key)
        (let ((row (fetch-one "SELECT label FROM management_keys WHERE key_hash = ?" (hash-key key))))
          (and row (col row "label")))))
 
-(defun space-for-management-key (key)
-  "The space KEY manages, or NIL when it is not a management key."
+(defmethod space-for-management-key (key)
   (and (stringp key)
        (let ((row (fetch-one "SELECT space FROM management_keys WHERE key_hash = ?" (hash-key key))))
          (and row (col row "space")))))
 
-(defun stored-management-keys (space)
-  "Plists (:id :hash :label :created-at) of the keys of SPACE as stored, for an
-export: the hash is all there is, and all a moved key needs."
+(defmethod stored-management-keys (space)
   (mapcar (lambda (row) (list :id (col row "id") :hash (col row "key_hash")
                               :label (col row "label") :created-at (col row "created_at")))
           (fetch "SELECT * FROM management_keys WHERE space = ? ORDER BY created_at" space)))
 
-(defun import-management-key (space &key id hash label created-at)
+(defmethod import-management-key (space &key id hash label created-at)
   (exec "INSERT INTO management_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
         id space hash (or label "") created-at))

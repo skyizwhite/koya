@@ -34,63 +34,50 @@
   (mapcar (lambda (row) (jobject->model (parse-json (col row "definition"))))
           (fetch "SELECT definition FROM models WHERE space = ? ORDER BY position, name" space-name)))
 
-(defun load-schema (space-name)
-  "The schema of SPACE-NAME -- its webhooks and models -- or NIL when no such space."
+(defmethod load-schema (space-name)
   (let ((row (first (fetch "SELECT webhooks FROM spaces WHERE name = ?" space-name))))
     (and row
          (make-schema :webhooks (coerce (parse-json (col row "webhooks")) 'list)
                       :models (load-space-models space-name)))))
 
-(defun list-spaces ()
-  "Every space as a plist (:name :models n), in display order."
+(defmethod list-spaces ()
   (mapcar (lambda (row)
             (list :name (col row "name") :models (col row "models")))
           (fetch "SELECT s.name, (SELECT COUNT(*) FROM models m WHERE m.space = s.name) AS models
                   FROM spaces s ORDER BY s.position, s.name")))
 
-(defun find-space (name)
-  "The space's name when it exists, NIL otherwise. Handlers use it to tell a
-missing space from an empty one."
+(defmethod find-space (name)
   (and (first (fetch "SELECT name FROM spaces WHERE name = ?" name)) name))
 
-(defun space-webhooks (name)
-  "The webhooks every model of the space fires. Read on its own, without the
-models, because every content change needs them."
+(defmethod space-webhooks (name)
   (let ((row (first (fetch "SELECT webhooks FROM spaces WHERE name = ?" name))))
     (and row (map 'list #'jobject->webhook (parse-json (col row "webhooks"))))))
 
-(defun find-model (space-name model-name)
+(defmethod find-model (space-name model-name)
   (let ((schema (load-schema space-name)))
     (and schema (koya/core/schema:schema-model schema model-name))))
 
 (defun new-secret () (byte-array-to-hex-string (random-data 24)))
 
-(defun space-webhook-secret (space-name)
-  "The secret sent as X-KOYA-WEBHOOK-KEY with every webhook of SPACE-NAME."
+(defmethod space-webhook-secret (space-name)
   (let ((row (fetch "SELECT webhook_secret FROM spaces WHERE name = ?" space-name)))
     (and row (col (first row) "webhook_secret"))))
 
-(defun rotate-webhook-secret (space-name)
+(defmethod rotate-webhook-secret (space-name)
   (let ((secret (new-secret)))
     (exec "UPDATE spaces SET webhook_secret = ? WHERE name = ?" secret space-name)
     secret))
 
-(defun set-webhook-secret (space-name secret)
-  "Give SPACE-NAME the secret it had elsewhere: an imported space keeps the one
-its site already checks."
+(defmethod set-webhook-secret (space-name secret)
   (exec "UPDATE spaces SET webhook_secret = ? WHERE name = ?" secret space-name))
 
-(defun insert-space (name)
-  "Store a new space named NAME, last in display order, with a fresh webhook
-secret. Returns NAME."
+(defmethod insert-space (name)
   (exec "INSERT INTO spaces (name, webhooks, webhook_secret, position, created_at)
          VALUES (?, '[]', ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM spaces), ?)"
         name (new-secret) (now-iso))
   name)
 
-(defun delete-space (name)
-  "Delete a space with everything in it: models, contents, media rows, keys, the
-webhook log and the deploy log. The media files themselves are removed by the caller."
+(defmethod delete-space (name)
   (exec "DELETE FROM spaces WHERE name = ?" name))
 
 ;;; Renames. A :WAS matched by the diff is carried through to the stored content
@@ -142,11 +129,7 @@ rename names its model by the new name."
       (:rename-field (rename-content-field space-name (getf change :model)
                                            (getf change :from) (getf change :field))))))
 
-(defun save-schema (space-name schema &key (by ""))
-  "Replace the schema of SPACE-NAME with SCHEMA. Models that disappear are deleted
-(their contents go with them); models and fields declared with :WAS are renamed,
-content included. BY names whoever is deploying, for the log. Returns the list of
-changes applied."
+(defmethod save-schema (space-name schema &key (by ""))
   (check-schema schema)
   (with-db-transaction
     (let* ((old (load-schema space-name))

@@ -23,35 +23,30 @@
 fail to match, not fail to hash."
   (byte-array-to-hex-string (digest-sequence :sha256 (string-to-octets key :encoding :utf-8))))
 
-(defun create-delivery-key (space &key (label ""))
-  "Create a key for SPACE. Returns (values plaintext-key id)."
+(defmethod create-delivery-key (space &key (label ""))
   (let* ((key (format nil "koya_~a" (byte-array-to-hex-string (random-data 24))))
          (id (make-ulid)))
     (exec "INSERT INTO delivery_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
           id space (hash-key key) label (now-iso))
     (values key id)))
 
-(defun list-delivery-keys (space)
-  "Plists (:id :label :created-at) of the keys of SPACE."
+(defmethod list-delivery-keys (space)
   (mapcar (lambda (row) (list :id (col row "id") :label (col row "label") :created-at (col row "created_at")))
           (fetch "SELECT id, label, created_at FROM delivery_keys WHERE space = ? ORDER BY created_at" space)))
 
-(defun delete-delivery-key (space id)
+(defmethod delete-delivery-key (space id)
   (exec "DELETE FROM delivery_keys WHERE space = ? AND id = ?" space id))
 
-(defun space-for-delivery-key (key)
-  "The space name KEY grants access to, or NIL."
+(defmethod space-for-delivery-key (key)
   (and (stringp key)
        (let ((row (fetch-one "SELECT space FROM delivery_keys WHERE key_hash = ?" (hash-key key))))
          (and row (col row "space")))))
 
-(defun stored-delivery-keys (space)
-  "Plists (:id :hash :label :created-at) of the keys of SPACE as stored, for an
-export: the hash is all there is, and all a moved key needs."
+(defmethod stored-delivery-keys (space)
   (mapcar (lambda (row) (list :id (col row "id") :hash (col row "key_hash")
                               :label (col row "label") :created-at (col row "created_at")))
           (fetch "SELECT * FROM delivery_keys WHERE space = ? ORDER BY created_at" space)))
 
-(defun import-delivery-key (space &key id hash label created-at)
+(defmethod import-delivery-key (space &key id hash label created-at)
   (exec "INSERT INTO delivery_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
         id space hash (or label "") created-at))

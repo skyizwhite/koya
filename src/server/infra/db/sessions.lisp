@@ -16,8 +16,11 @@
 ;;; never evaluates what it holds. Values must therefore be JSON-representable
 ;;; -- strings, numbers, booleans and vectors of them.
 
-(defstruct (session-store (:include store))
+(defstruct (session-store (:include store) (:constructor %make-session-store))
   "Lack session store backed by the sessions table.")
+
+(defmethod make-session-store ()
+  (%make-session-store))
 
 (defmethod fetch-session ((store session-store) sid)
   (let ((row (fetch-one "SELECT data FROM sessions WHERE id = ? AND expires_at > ?" sid (now-iso))))
@@ -43,7 +46,5 @@
 (defmethod remove-session ((store session-store) sid)
   (exec "DELETE FROM sessions WHERE id = ?" sid))
 
-(defun purge-expired-sessions ()
-  "Drop the rows behind sessions that have run out. Called at startup; a session
-that outlives its row is already refused by FETCH-SESSION."
+(defmethod purge-expired-sessions ()
   (exec "DELETE FROM sessions WHERE expires_at <= ?" (now-iso)))

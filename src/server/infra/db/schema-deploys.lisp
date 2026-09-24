@@ -47,11 +47,10 @@ nothing. Returns the new row's id, or NIL."
             space space +deploys-kept+)
       id)))
 
-(defun list-deploys (space &key (limit 25) (offset 0))
-  "Newest first, to the millisecond a ULID carries."
+(defmethod list-deploys (space &key (limit 25) (offset 0))
   (mapcar #'row->deploy
           (fetch "SELECT * FROM schema_deploys WHERE space = ? ORDER BY id DESC LIMIT ? OFFSET ?"
                  space limit offset)))
 
-(defun count-deploys (space)
+(defmethod count-deploys (space)
   (or (col (fetch-one "SELECT COUNT(*) AS n FROM schema_deploys WHERE space = ?" space) "n") 0))

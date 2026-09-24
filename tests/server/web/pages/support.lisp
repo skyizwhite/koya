@@ -1,6 +1,6 @@
 (defpackage #:koya-tests/server/web/pages/support
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/app #:*app*)
+  (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id> #:editor-action)
   (:import-from #:koya-server/infra/db/connection #:connect-db)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
@@ -71,7 +71,7 @@ admin API, which the session reaches as well as a management key does."
         (setf (getf env :content-type) "application/json"
               (getf env :content-length) (length octets)
               (getf env :raw-body) (make-in-memory-input-stream octets))))
-    (destructuring-bind (status response-headers body) (funcall *app* env)
+    (destructuring-bind (status response-headers body) (funcall (app) env)
       (let ((set-cookie (getf response-headers :set-cookie)))
         (when set-cookie
           (setf *set-cookie* set-cookie

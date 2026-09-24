@@ -59,10 +59,10 @@
 (defmacro with-db-transaction (&body body)
   `(with-db (with-transaction *db* ,@body)))
 
-(defun call-with-transaction (thunk)
+(defmethod call-with-transaction (thunk)
   (with-db-transaction (funcall thunk)))
 
-(defun store-reachable-p ()
+(defmethod store-reachable-p ()
   (and (fetch-one "SELECT 1 AS ok") t))
 
 (defun exec (sql &rest params)

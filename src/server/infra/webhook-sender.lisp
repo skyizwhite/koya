@@ -10,7 +10,7 @@
 ;;; Webhooks go out over HTTP with dexador, with short timeouts: a receiver that
 ;;; hangs holds up only the thread its calls run in.
 
-(defun send-webhook (url payload headers)
+(defmethod send-webhook (url payload headers)
   (handler-case
       (multiple-value-bind (body status)
           (dexador:post url :headers (cons '("Content-Type" . "application/json") headers) :content payload

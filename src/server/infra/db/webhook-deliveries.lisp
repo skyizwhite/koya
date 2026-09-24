@@ -41,8 +41,7 @@ instead of a line should not fill the database.")
         ((typep text 'sequence) (format nil "<~a bytes, not text>" (length text)))
         (t (princ-to-string text))))
 
-(defun record-delivery (space &key label url model event content-id ok status response error duration-ms)
-  "Store one call's outcome and drop whatever now falls outside the cap."
+(defmethod record-delivery (space &key label url model event content-id ok status response error duration-ms)
   (let ((id (make-ulid)))
     (exec "INSERT INTO webhook_deliveries
              (id, space, label, url, model, event, content_id, ok, status, response, error, duration_ms, created_at)
@@ -69,17 +68,14 @@ instead of a line should not fill the database.")
             params (append params (list model))))
     (values where params)))
 
-(defun list-deliveries (space &key label model (limit 50) (offset 0))
-  "Newest first. LABEL keeps one webhook's calls; MODEL keeps the calls a change
-to that model set off, from its own webhooks and from the space's alike. Given
-together they narrow to one webhook's calls for one model."
+(defmethod list-deliveries (space &key label model (limit 50) (offset 0))
   (multiple-value-bind (where params) (filter-clause label model)
     (mapcar #'row->delivery
             (apply #'fetch
                    (format nil "SELECT * FROM webhook_deliveries WHERE space = ?~a ORDER BY id DESC LIMIT ? OFFSET ?" where)
                    space (append params (list limit offset))))))
 
-(defun count-deliveries (space &key label model)
+(defmethod count-deliveries (space &key label model)
   (multiple-value-bind (where params) (filter-clause label model)
     (or (col (apply #'fetch-one
                     (format nil "SELECT COUNT(*) AS n FROM webhook_deliveries WHERE space = ?~a" where)
@@ -93,16 +89,12 @@ together they narrow to one webhook's calls for one model."
                             space))
           :test #'string=))
 
-(defun delivery-labels (space)
-  "The webhook labels this space's log holds. Taken from the log rather than
-from the schema, so every option finds something and a hook that has since been
-renamed away is still reachable."
+(defmethod delivery-labels (space)
   (distinct-column space "label"))
 
-(defun delivery-models (space)
-  "The models this space's log holds. From the log, for the same reason."
+(defmethod delivery-models (space)
   (distinct-column space "model"))
 
-(defun find-delivery (space id)
+(defmethod find-delivery (space id)
   (let ((row (fetch-one "SELECT * FROM webhook_deliveries WHERE space = ? AND id = ?" space id)))
     (and row (row->delivery row))))

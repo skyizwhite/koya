@@ -8,15 +8,15 @@
 ;;; Instance-wide key/value settings the owner changes from the admin UI
 ;;; (currently the two-factor secret). Values are strings.
 
-(defun get-setting (key)
+(defmethod get-setting (key)
   (let ((row (fetch-one "SELECT value FROM settings WHERE key = ?" key)))
     (and row (col row "value"))))
 
-(defun set-setting (key value)
+(defmethod set-setting (key value)
   (exec "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
         key value (now-iso))
   value)
 
-(defun delete-setting (key)
+(defmethod delete-setting (key)
   (exec "DELETE FROM settings WHERE key = ?" key))

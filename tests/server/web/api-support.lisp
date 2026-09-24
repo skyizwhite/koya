@@ -1,6 +1,6 @@
 (defpackage #:koya-tests/server/web/api-support
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/app #:*app*)
+  (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/infra/db/connection #:connect-db #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
   (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
@@ -50,7 +50,7 @@
         (setf (getf env :content-type) "application/json"
               (getf env :content-length) (length octets)
               (getf env :raw-body) (make-in-memory-input-stream octets))))
-    (destructuring-bind (status response-headers body) (funcall *app* env)
+    (destructuring-bind (status response-headers body) (funcall (app) env)
       (if (pathnamep body)
           ;; a file response (see *media-middleware*): hand back the headers and the path
           (values status response-headers body)
@@ -70,7 +70,7 @@
                      :headers (alist-hash-table `(("authorization" . ,(format nil "Bearer ~a" *management-key*))) :test 'equal)
                      :content-type content-type :content-length (length octets)
                      :raw-body (make-in-memory-input-stream octets))))
-      (destructuring-bind (status headers body) (funcall *app* env)
+      (destructuring-bind (status headers body) (funcall (app) env)
         (declare (ignore headers))
         (let ((text (apply #'concatenate 'string (if (listp body) body (list body)))))
           (values status (and (plusp (length text)) (ignore-errors (parse-json text)))))))))

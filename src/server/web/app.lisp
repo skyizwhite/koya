@@ -29,7 +29,8 @@
                 #:*admin-auth-middleware* #:*actions-auth-middleware*)
   (:import-from #:koya-server/web/document
                 #:~document #:page-title)
-  (:export #:*app*
+  (:export #:app
+           #:*app*
            #:*api-app*
            #:*admin-api-app*
            #:*page-app*
@@ -104,4 +105,10 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
   (static-path *page-app* "/assets/" "assets/")
   (configure *page-app*))
 
-(defparameter *app* (build-app))
+(defvar *app* nil)
+
+(defun app ()
+  "The whole app, built on first use. Building it calls ports, so it waits for
+something to ask rather than happening when this file loads, before infra may
+have."
+  (or *app* (setf *app* (build-app))))

@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/server/web/app
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/web/pages/support #:edit #:moved-to #:*cookie* #:request #:location #:setup-pages #:log-in)
-  (:import-from #:koya-server/web/app #:*app*)
+  (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
@@ -74,7 +74,7 @@
 
 (deftest body-size-limit
   (flet ((huge-post (headers &key (path "/login") (mb 3000) (content-type "multipart/form-data; boundary=x"))
-           (funcall *app* (list :request-method :post :script-name "" :path-info path :query-string ""
+           (funcall (app) (list :request-method :post :script-name "" :path-info path :query-string ""
                                 :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                                 :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
                                 :headers (alist-hash-table (acons "host" "localhost:3000" headers) :test 'equal)

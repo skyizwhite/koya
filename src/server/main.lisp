@@ -3,7 +3,6 @@
   (:use #:cl)
   (:import-from #:clack)
   (:import-from #:ironclad)
-  ;; infra first: loading the web app calls port functions infra defines
   (:import-from #:koya-server/infra/env #:db-path #:server-port)
   (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
@@ -20,7 +19,7 @@
   (:import-from #:koya-server/infra/db/sessions)
   (:import-from #:koya-server/infra/media-files)
   (:import-from #:koya-server/infra/webhook-sender)
-  (:import-from #:koya-server/web/app #:*app* #:install-routes)
+  (:import-from #:koya-server/web/app #:app #:*app* #:install-routes)
   (:import-from #:koya-server/web/assets #:refresh-asset-version)
   (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/usecases/ports/config #:dev-mode-p)
@@ -35,9 +34,26 @@
            #:totp-code))
 (in-package #:koya-server)
 
-;;; The composition root: the one place that loads infra, whose modules define
-;;; the functions of the ports the use cases call (usecases/ports/store), and
-;;; starts the web app on top.
+;;; The composition root: the one place that loads infra, whose modules add the
+;;; methods of the ports the use cases call (usecases/ports/store), and starts
+;;; the web app on top.
+
+(defun unimplemented-ports ()
+  "The generic functions of the ports that no method implements."
+  (let ((missing '()))
+    (dolist (package (list-all-packages) (sort missing #'string< :key #'symbol-name))
+      (when (eql 0 (search "KOYA-SERVER/USECASES/PORTS/" (package-name package)))
+        (do-external-symbols (symbol package)
+          (when (and (fboundp symbol)
+                     (typep (fdefinition symbol) 'generic-function)
+                     (null (sb-mop:generic-function-methods (fdefinition symbol))))
+            (push symbol missing)))))))
+
+;; when this file loads, infra has: a port it leaves out would otherwise be found
+;; only when a request first calls it
+(let ((missing (unimplemented-ports)))
+  (when missing
+    (error "Nothing in infra implements ~{~s~^, ~}" missing)))
 
 (defvar *server* nil)
 
@@ -55,7 +71,7 @@
   (connect-and-migrate db)
   ;; :debug only in dev: with it on, an unhandled error invokes the debugger, which
   ;; in a --non-interactive image means the process exits. Off, clack answers 500.
-  (setf *server* (clack:clackup *app* :server server :address address :port port :debug (dev-mode-p)))
+  (setf *server* (clack:clackup (app) :server server :address address :port port :debug (dev-mode-p)))
   *server*)
 
 (defun stop ()
@@ -69,6 +85,8 @@
   (stop)
   (asdf:load-system :koya-server/web/app)
   (install-routes)
+  ;; built again from the code just loaded
+  (setf *app* nil)
   (refresh-asset-version)
   (start))
 
@@ -78,7 +96,7 @@ takes SIGTERM and SIGINT itself and returns; the database is closed and the
 process exits."
   (connect-and-migrate (db-path))
   ;; in a thread, Woo would stop on SIGTERM and leave this one waiting forever
-  (clack:clackup *app* :server :woo :address "0.0.0.0" :port (server-port) :debug nil :use-thread nil)
+  (clack:clackup (app) :server :woo :address "0.0.0.0" :port (server-port) :debug nil :use-thread nil)
   (disconnect-db)
   (format t "~&[koya] server stopped~%")
   (uiop:quit 0))

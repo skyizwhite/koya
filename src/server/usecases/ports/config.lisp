@@ -5,11 +5,15 @@
            #:dev-mode-p))
 (in-package #:koya-server/usecases/ports/config)
 
-;;; What the instance is told when it starts. See ports/store for what a port is.
+;;; What the instance is told when it starts.
 
-(declaim (ftype function public-url owner-secret dev-mode-p))
+(defgeneric public-url ()
+  (:documentation "The URL this server is reached at. Absolute media URLs are made from it,
+and a write may come from it as well as from the Host."))
 
-;; (public-url): the URL this server is reached at, as configured. Absolute media
-;; URLs are made from it, and a write may come from it as well as from the Host.
-;; (owner-secret): the secret the owner logs in with.
-;; (dev-mode-p): true in development.
+(defgeneric owner-secret ()
+  (:documentation "The secret the owner logs in with."))
+
+(defgeneric dev-mode-p ()
+  (:documentation "True in development."))
+

@@ -44,12 +44,11 @@
 (defun new-draft-key ()
   (byte-array-to-hex-string (random-data 16)))
 
-(defun get-content (id)
+(defmethod get-content (id)
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ?" id)))
     (and row (row->content row))))
 
-(defun find-contents-by-ids (space model ids)
-  "Hash of id -> content for those of IDS that are contents of MODEL in SPACE."
+(defmethod find-contents-by-ids (space model ids)
   (let ((table (make-hash-table :test 'equal))
         (ids (remove-duplicates ids :test #'equal)))
     (when ids
@@ -59,16 +58,12 @@
           (setf (gethash (content-id content) table) content))))
     table))
 
-(defun find-content (space model id)
+(defmethod find-content (space model id)
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ? AND space = ? AND model = ?" id space model)))
     (and row (row->content row))))
 
-(defun create-content (space model data &key publish (id (make-ulid))
-                                             created-at updated-at published-at revised-at by)
-  "Insert DATA as a new content. With PUBLISH it is published immediately,
-otherwise saved as a draft. The system timestamps default to now; imports may
-supply any of CREATED-AT, UPDATED-AT, PUBLISHED-AT and REVISED-AT (ISO 8601).
-PUBLISHED-AT and REVISED-AT are only stored when publishing."
+(defmethod create-content (space model data &key publish (id (make-ulid))
+                                                 created-at updated-at published-at revised-at by)
   (let ((now (now-iso)))
     (with-db-transaction
       (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
@@ -81,9 +76,7 @@ PUBLISHED-AT and REVISED-AT are only stored when publishing."
       (record-revision id (if publish "publish" "draft") data :by by))
     (get-content id)))
 
-(defun save-draft (id data &key by)
-  "Replace the draft of content ID with DATA. A fresh draft key is issued each time,
-so old preview links stop working."
+(defmethod save-draft (id data &key by)
   (let ((content (or (get-content id) (error "content ~a not found" id))))
     (with-db-transaction
       (exec "UPDATE contents SET draft = ?, draft_key = ?, status = ?, updated_at = ? WHERE id = ?"
@@ -91,9 +84,7 @@ so old preview links stop working."
       (record-revision id "draft" data :by by))
     (get-content id)))
 
-(defun publish-content (id &optional data &key published-at by)
-  "Publish DATA (or the current draft, or re-publish the published data) and clear the draft.
-PUBLISHED-AT overrides the publish date; otherwise the first publish date is kept."
+(defmethod publish-content (id &optional data &key published-at by)
   (let* ((content (or (get-content id) (error "content ~a not found" id)))
          (data (or data (content-draft content) (content-published content)))
          (now (now-iso)))
@@ -104,8 +95,7 @@ PUBLISHED-AT overrides the publish date; otherwise the first publish date is kep
       (record-revision id "publish" data :by by))
     (get-content id)))
 
-(defun unpublish-content (id &key by)
-  "Take content ID off the delivery API, keeping its data as a draft."
+(defmethod unpublish-content (id &key by)
   (let* ((content (or (get-content id) (error "content ~a not found" id)))
          (data (or (content-draft content) (content-published content))))
     (with-db-transaction
@@ -116,9 +106,7 @@ PUBLISHED-AT overrides the publish date; otherwise the first publish date is kep
         (record-revision id "unpublish" data :by by)))
     (get-content id)))
 
-(defun discard-draft (id &key by)
-  "Drop the draft of a published content ID, so it shows its published data again.
-Errors when the content has no published version: there would be nothing left."
+(defmethod discard-draft (id &key by)
   (let ((content (or (get-content id) (error "content ~a not found" id))))
     (unless (content-published content) (error "content ~a is not published; delete it instead" id))
     (with-db-transaction
@@ -128,15 +116,11 @@ Errors when the content has no published version: there would be nothing left."
         (record-revision id "discard" (content-published content) :by by)))
     (get-content id)))
 
-(defun delete-content (id)
+(defmethod delete-content (id)
   ;; its revisions go with it, ON DELETE CASCADE
   (exec "DELETE FROM contents WHERE id = ?" id))
 
-(defun contents-mentioning (space needle &key exclude-id)
-  "The contents of SPACE, but for EXCLUDE-ID, whose published or draft JSON holds
-the string NEEDLE anywhere: every content that can refer to it, and possibly
-some that do not (NEEDLE may appear in any field, and _ in it matches any
-character). What they refer to is domain/references's to say."
+(defmethod contents-mentioning (space needle &key exclude-id)
   (mapcar #'row->content
           (apply #'fetch (format nil "SELECT * FROM contents WHERE space = ?~:[~; AND id <> ?~]
                                         AND (published LIKE ? OR draft LIKE ?)"
@@ -144,16 +128,14 @@ character). What they refer to is domain/references's to say."
                  space (append (and exclude-id (list exclude-id))
                                (let ((like (format nil "%~a%" needle))) (list like like))))))
 
-(defun ensure-draft-key (id)
-  "Return the draft key of content ID, generating one on first use."
+(defmethod ensure-draft-key (id)
   (let ((content (or (get-content id) (error "content ~a not found" id))))
     (or (content-draft-key content)
         (let ((key (new-draft-key)))
           (exec "UPDATE contents SET draft_key = ? WHERE id = ?" key id)
           key))))
 
-(defun find-object-content (space model)
-  "The single content row of an object-kind model, or NIL."
+(defmethod find-object-content (space model)
   (let ((row (fetch-one "SELECT * FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" space model)))
     (and row (row->content row))))
 
@@ -167,13 +149,7 @@ character). What they refer to is domain/references's to say."
     (:published "published")
     (:all "COALESCE(draft, published)")))
 
-(defun list-contents (space model schema-model query &key (status :published) only-status)
-  "Return (values contents total-count) for QUERY. STATUS :published restricts to
-published data (delivery API); :all lists everything using draft data when present (admin).
-ONLY-STATUS narrows to one value of the status column -- \"draft\", \"published\" or
-\"published+draft\" -- which is the admin list's status filter; it is the badge the
-list shows, so the three choices are the three badges. A QUERY-LIMIT of NIL lists
-every row."
+(defmethod list-contents (space model schema-model query &key (status :published) only-status)
   (let ((column (data-column status)))
     (multiple-value-bind (where-sql where-params) (build-where (query-filters query) schema-model column)
       (let* ((base (format nil "FROM contents WHERE space = ? AND model = ? AND ~a~@[~a~]~@[ AND ~a~]"
@@ -187,11 +163,10 @@ every row."
                           (append params (list (or (query-limit query) -1) (query-offset query))))))
         (values (mapcar #'row->content rows) total)))))
 
-(defun count-contents (space model)
+(defmethod count-contents (space model)
   (col (fetch-one "SELECT COUNT(*) AS n FROM contents WHERE space = ? AND model = ?" space model) "n"))
 
-(defun unique-value-taken-p (space model field value &key exclude-id)
-  "True when another content of MODEL already uses VALUE for FIELD (in draft or published data)."
+(defmethod unique-value-taken-p (space model field value &key exclude-id)
   (let ((expr (format nil "json_extract(~~a, '$.~a')" field)))
     (and (fetch-one (format nil "SELECT 1 FROM contents WHERE space = ? AND model = ? AND id != ?
                                  AND (~a = ? OR ~a = ?) LIMIT 1"
@@ -199,14 +174,11 @@ every row."
                     space model (or exclude-id "") value value)
          t)))
 
-(defun space-contents (space)
-  "Every content of SPACE, oldest first: what an export carries."
+(defmethod space-contents (space)
   (mapcar #'row->content
           (fetch "SELECT * FROM contents WHERE space = ? ORDER BY created_at, id" space)))
 
-(defun import-content (content)
-  "Insert CONTENT as it is, every column included, and record no revision: the
-importer brings the content's history along with it."
+(defmethod import-content (content)
   (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         (content-id content) (content-space content) (content-model content)

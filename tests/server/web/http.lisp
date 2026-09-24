@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/server/web/http
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/web/api-support #:*secret* #:*management-key* #:*api-key* #:request #:admin #:delivery #:setup-api #:reset-api)
-  (:import-from #:koya-server/web/app #:*app*)
+  (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema #:make-webhook)
@@ -73,7 +73,7 @@
                    :request-uri "/api/v1/website/blog" :url-scheme "http" :remote-addr "127.0.0.1"
                    :headers (alist-hash-table `(("x-koya-delivery-key" . ,*api-key*)) :test 'equal)
                    :content-type nil :content-length nil :raw-body nil)))
-    (destructuring-bind (status headers body) (funcall *app* env)
+    (destructuring-bind (status headers body) (funcall (app) env)
       (declare (ignore body))
       (ok (= status 200))
       (ok (string= (getf headers :cache-control) "no-store") "delivery responses are not cached by intermediaries"))))
@@ -105,7 +105,7 @@
 
 (defun raw-request (method path headers)
   "The whole Lack response, headers included, which REQUEST does not return."
-  (funcall *app* (list :request-method method :script-name "" :path-info path :query-string ""
+  (funcall (app) (list :request-method method :script-name "" :path-info path :query-string ""
                        :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                        :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
                        :headers (alist-hash-table headers :test 'equal)

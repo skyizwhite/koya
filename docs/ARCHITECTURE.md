@@ -77,9 +77,12 @@ web  ──▶  usecases  ──▶  domain
 - `usecases/` uses `domain/` and its ports. It raises the errors in
   `domain/errors`, which say what went wrong without an HTTP status, and names
   who is making a change from `*actor*` (`usecases/actor`).
-- A port is a package of declared functions. `infra/` defines them in the
-  port's own package, so a use case calls `find-content` without knowing that
-  SQLite answers it. `koya-server/main` is the only module that loads `infra/`.
+- A port is a package of generic functions, each with the lambda list and the
+  documentation that are its contract. `infra/` adds the one method each has,
+  so a use case calls `find-content` without knowing that SQLite answers it.
+  `koya-server/main` is the only module that loads `infra/`, and it refuses to
+  load while a port has no method. The web app is built on first use (`app`),
+  not when its file loads, so nothing calls a port before infra is there.
 - `web/` reads the request, calls use cases, and draws or words the result. It
   turns a domain error into a status in one place (`error-status` in
   `web/http`). The auth guards bind `*actor*`. The web never reaches a port or

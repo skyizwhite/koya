@@ -5,12 +5,14 @@
            #:+session-seconds+))
 (in-package #:koya-server/usecases/ports/sessions)
 
-;;; Where the owner's session is kept between requests. See ports/store for what
-;;; a port is.
+;;; Where the owner's session is kept between requests.
 
-(declaim (ftype function make-session-store purge-expired-sessions))
+(defgeneric make-session-store ()
+  (:documentation "A Lack session store that keeps sessions across restarts."))
 
-;; (make-session-store): a Lack session store.
+(defgeneric purge-expired-sessions ()
+  (:documentation "Forget the sessions that have run out. Called at startup; a session that has
+run out is refused whether or not it is still kept."))
 
 (defparameter +session-seconds+ (* 24 3600)
   "How long a session lives, in the cookie and in the store. Using a session

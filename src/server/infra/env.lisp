@@ -23,12 +23,10 @@
   (or (env name) (error "Environment variable ~a is not set" name)))
 
 (defun koya-env () (env "KOYA_ENV" "production"))
-(defun dev-mode-p () (string= (koya-env) "dev"))
-(defun owner-secret () (required-env "KOYA_SECRET"))
+(defmethod dev-mode-p () (string= (koya-env) "dev"))
+(defmethod owner-secret () (required-env "KOYA_SECRET"))
 (defun db-path () (env "KOYA_DB_PATH" "./data/koya.db"))
 (defun media-dir () (env "KOYA_MEDIA_DIR" "./data/media"))
 (defun server-port () (parse-integer (env "KOYA_PORT" "3100")))
-(defun public-url ()
-  "The public URL of this server: absolute media URLs and the same-origin check
-use it. Defaults to localhost on the port actually served."
+(defmethod public-url ()
   (env "KOYA_BASE_URL" (format nil "http://localhost:~a" (server-port))))

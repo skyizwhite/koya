@@ -34,6 +34,7 @@
                "koya-tests/server/web/pages/content-list"
                "koya-tests/server/web/pages/editor"
                "koya-tests/server/web/pages/space-import"
+               "koya-tests/server/main"
                "koya-tests/server/layers"
                "koya-tests/client")
   :perform (test-op (o c) (symbol-call :rove :run c :style :dot)))

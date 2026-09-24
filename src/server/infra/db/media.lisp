@@ -21,18 +21,17 @@
               :width (col row "width") :height (col row "height")
               :alt (col row "alt") :created-at (col row "created_at")))
 
-(defun insert-media (space &key filename mime size width height (alt "") (id (make-ulid)) created-at)
+(defmethod insert-media (space &key filename mime size width height (alt "") (id (make-ulid)) created-at)
   (exec "INSERT INTO media (id, space, filename, mime, size, width, height, alt, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         id space filename mime size width height alt (or created-at (now-iso)))
   (find-media space id))
 
-(defun find-media (space id)
+(defmethod find-media (space id)
   (let ((row (fetch-one "SELECT * FROM media WHERE space = ? AND id = ?" space id)))
     (and row (row->media row))))
 
-(defun find-media-by-ids (space ids)
-  "Hash of id -> media for those of IDS that are in SPACE's library."
+(defmethod find-media-by-ids (space ids)
   (let ((table (make-hash-table :test 'equal))
         (ids (remove-duplicates ids :test #'equal)))
     (when ids
@@ -51,25 +50,23 @@
                                                     (write-char c out))))))
       (values "" '())))
 
-(defun list-media (space &key search (limit 60) (offset 0))
-  "Newest first. SEARCH matches the file name."
+(defmethod list-media (space &key search (limit 60) (offset 0))
   (multiple-value-bind (where params) (search-clause search)
     (mapcar #'row->media
             (apply #'fetch (format nil "SELECT * FROM media WHERE space = ?~a ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?" where)
                    space (append params (list limit offset))))))
 
-(defun space-media (space)
-  "Every media of SPACE, oldest first."
+(defmethod space-media (space)
   (mapcar #'row->media (fetch "SELECT * FROM media WHERE space = ? ORDER BY created_at, id" space)))
 
-(defun count-media (space &key search)
+(defmethod count-media (space &key search)
   (multiple-value-bind (where params) (search-clause search)
     (col (apply #'fetch-one (format nil "SELECT COUNT(*) AS n FROM media WHERE space = ?~a" where) space params) "n")))
 
-(defun update-media (space id &key alt)
+(defmethod update-media (space id &key alt)
   (when alt
     (exec "UPDATE media SET alt = ? WHERE space = ? AND id = ?" alt space id))
   (find-media space id))
 
-(defun delete-media (space id)
+(defmethod delete-media (space id)
   (exec "DELETE FROM media WHERE space = ? AND id = ?" space id))
