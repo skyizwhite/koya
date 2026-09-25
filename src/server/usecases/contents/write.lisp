@@ -118,23 +118,31 @@ and only PUBLISHED-AT applies."
          (published-at (check-published-at published-at))
          (revised-at (check-timestamp "revisedAt" revised-at)))
     (fill-defaults model data)
-    (let ((existing (and (eq (model-kind model) :object) (find-object-content space-name model-name))))
-      (cond ((and existing publish) (publish space model (content-id existing) data :published-at published-at))
-            (existing (update-draft space model (content-id existing) data :replace t))
-            (t
-             (let ((made (with-transaction
-                           (check-content space-name model data)
-                           (let ((content (new-content (or (check-new-id id) (make-ulid)) space-name model-name data
-                                                       :publish publish
-                                                       :created-at created-at :updated-at updated-at
-                                                       :published-at published-at :revised-at revised-at)))
-                             (insert-content content)
-                             (record-revision (content-id content) (if publish "publish" "draft") data :by *actor*)
-                             content))))
-               (if publish
-                   (notify space model (content-id made) :publish :new (published-view space model made))
-                   (notify space model (content-id made) :draft :new (draft-view space model made)))
-               made))))))
+    ;; whether the object model has its content already is read in the same
+    ;; transaction as the write, or two creates at once would each find none
+    (multiple-value-bind (content event old)
+        (with-transaction
+          (let ((existing (and (eq (model-kind model) :object) (find-object-content space-name model-name))))
+            (cond ((and existing publish)
+                   (multiple-value-bind (live old) (publish-now space model (content-id existing) data published-at)
+                     (values live :publish old)))
+                  (existing
+                   (multiple-value-bind (saved outcome) (update-draft-now space model (content-id existing) data t)
+                     (values saved (and (eq outcome :saved) :draft))))
+                  (t
+                   (check-content space-name model data)
+                   (let ((content (new-content (or (check-new-id id) (make-ulid)) space-name model-name data
+                                               :publish publish
+                                               :created-at created-at :updated-at updated-at
+                                               :published-at published-at :revised-at revised-at)))
+                     (insert-content content)
+                     (record-revision (content-id content) (if publish "publish" "draft") data :by *actor*)
+                     (values content (if publish :publish :draft)))))))
+      (case event
+        (:publish (notify space model (content-id content) :publish :old old :new (published-view space model content)))
+        (:draft (notify space model (content-id content) :draft
+                        :old (published-view space model content) :new (draft-view space model content))))
+      content)))
 
 (defun update-draft (space model id patch &key replace)
   "Save a draft: PATCH is merged onto the current draft (or published data) unless
@@ -142,38 +150,42 @@ REPLACE. Returns the content and what came of it: :SAVED; :UNCHANGED when that i
 what the content holds already, and nothing is written; or :PUBLISHED when it is
 the published data again, and the draft is dropped -- a draft that changes nothing
 is none, and would only leave a discard with nothing to show in the history."
-  (let ((space-name space)
-        (model-name (model-name model)))
-    (multiple-value-bind (saved outcome)
-        (with-transaction
-          (let* ((content (resolve-content space-name model-name id))
-                 (current (content-data content :draft t))
-                 (live (content-published content))
-                 (data (if replace patch (merge-data current patch))))
-            (cond ((json-equal data current) (values content :unchanged))
-                  ((and live (json-equal data live))
-                   (values (store (discarded content) "discard" live) :published))
-                  (t
-                   (check-content space-name model data :exclude-id id)
-                   (values (store (drafted content data) "draft" data) :saved)))))
-      (when (eq outcome :saved)
-        (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved)))
-      (values saved outcome))))
+  (multiple-value-bind (saved outcome)
+      (with-transaction (update-draft-now space model id patch replace))
+    (when (eq outcome :saved)
+      (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved)))
+    (values saved outcome)))
+
+(defun update-draft-now (space model id patch replace)
+  "UPDATE-DRAFT's write, inside the caller's transaction; the caller tells the
+webhooks once it is over."
+  (let* ((content (resolve-content space (model-name model) id))
+         (current (content-data content :draft t))
+         (live (content-published content))
+         (data (if replace patch (merge-data current patch))))
+    (cond ((json-equal data current) (values content :unchanged))
+          ((and live (json-equal data live))
+           (values (store (discarded content) "discard" live) :published))
+          (t
+           (check-content space model data :exclude-id id)
+           (values (store (drafted content data) "draft" data) :saved)))))
 
 (defun publish (space model id &optional data &key published-at)
   "Publish DATA, or the current draft. PUBLISHED-AT (ISO 8601) overrides the publish date. Fires webhooks."
-  (let ((space-name space)
-        (model-name (model-name model))
-        (published-at (check-published-at published-at)))
+  (let ((published-at (check-published-at published-at)))
     (multiple-value-bind (live old)
-        (with-transaction
-          (let* ((content (resolve-content space-name model-name id))
-                 (data (or data (content-data content :draft t))))
-            (check-content space-name model data :exclude-id id)
-            (values (store (published content data :published-at published-at) "publish" data)
-                    (published-view space model content))))
+        (with-transaction (publish-now space model id data published-at))
       (notify space model id :publish :old old :new (published-view space model live))
       live)))
+
+(defun publish-now (space model id data published-at)
+  "PUBLISH's write, inside the caller's transaction: (values CONTENT OLD-VIEW),
+the view being what the webhooks are told was live before."
+  (let* ((content (resolve-content space (model-name model) id))
+         (data (or data (content-data content :draft t))))
+    (check-content space model data :exclude-id id)
+    (values (store (published content data :published-at published-at) "publish" data)
+            (published-view space model content))))
 
 (defun check-unreferenced (space-name model-name id verb)
   "Refuse with a CONFLICT coded in_use while another content refers to ID: taking
@@ -221,17 +233,19 @@ it away would leave that content pointing at nothing."
   (let ((space-name space)
         (model-name (model-name model)))
     (let ((old (with-transaction
-                 (let ((content (resolve-content space-name model-name id)))
+                 (let* ((content (resolve-content space-name model-name id))
+                        (old (published-view space model content)))
                    (check-unreferenced space-name model-name (content-id content) "delete")
                    (delete-content id)
-                   (published-view space model content)))))
+                   old))))
       (when old (notify space model id :delete :old old))
       t)))
 
 (defun draft-key (space-name model-name id)
   "The draft key of content ID, for previews, made on first use."
   (resolve-model space-name model-name)
-  (let* ((content (resolve-content space-name model-name id))
-         (keyed (keyed content)))
-    (unless (eq keyed content) (update-content keyed))
-    (content-draft-key keyed)))
+  (with-transaction
+    (let* ((content (resolve-content space-name model-name id))
+           (keyed (keyed content)))
+      (unless (eq keyed content) (update-content keyed))
+      (content-draft-key keyed))))

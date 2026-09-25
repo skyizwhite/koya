@@ -14,6 +14,7 @@
   (:import-from #:koya-server/usecases/ports/store
                 #:call-with-transaction #:store-reachable-p)
   (:export #:*db*
+           #:*on-rollback*
            #:connect-db
            #:disconnect-db
            #:with-db
@@ -51,8 +52,17 @@
      (unless *db* (error "Database is not connected"))
      ,@body))
 
+(defvar *on-rollback* '()
+  "Functions called, with nothing, when a transaction is unwound: what was read
+inside it and kept -- the schema cache -- may be of rows that never were.")
+
 (defmacro with-db-transaction (&body body)
-  `(with-db (with-transaction *db* ,@body)))
+  `(with-db
+     (let ((done nil))
+       (unwind-protect
+            (multiple-value-prog1 (with-transaction *db* ,@body)
+              (setf done t))
+         (unless done (mapc #'funcall *on-rollback*))))))
 
 (defmethod call-with-transaction (thunk)
   (with-db-transaction (funcall thunk)))

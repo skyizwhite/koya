@@ -76,7 +76,8 @@ web  ──▶  usecases  ──▶  domain
           ports  ◀── defines ──  infra
 ```
 
-- `domain/` depends on `koya/core` alone. What a write makes of a content --
+- `domain/` depends on `koya/core` alone, and on the libraries that give it
+  randomness and hashes. What a write makes of a content --
   drafted, published, unpublished, discarded -- is a function there that
   returns the content as it then is; a use case hands that to the store and
   records the event in the history, and the store keeps what it is handed.
@@ -110,7 +111,9 @@ web  ──▶  usecases  ──▶  domain
 What only one page needs to draw -- its URLs, a badge's class, how a value
 reads there -- stays in that page's file.
 
-`tests/server/layers.lisp` fails when a file imports from a layer further out.
+`tests/server/layers.lisp` fails when a file imports from a layer further out,
+or a library that belongs to another layer: `dbi` outside `infra/`, `ningle`
+outside `web/`.
 See `adr/2026-09-25-the-server-is-layered-and-depends-inward.md`.
 
 ## Storage
@@ -143,6 +146,11 @@ A transaction holds the lock for its extent, so nothing reads while a write is
 under way -- an import of a large space is a pause for every request. This is
 the price of one process and no connection pool, and it is what lets a use
 case read and then write without another request slipping in between.
+
+A space's schema is read from its rows once and kept in memory until a deploy
+or a deletion replaces it, or a transaction rolls back (`infra/db/schema-store`):
+every content delivered, every reference resolved and every label drawn asks
+for a model, and parsing the models each time was most of the work of a page.
 
 ## Stack
 

@@ -1,6 +1,7 @@
 (defpackage #:koya-server/infra/db/schema-store
   (:use #:cl)
-  (:import-from #:koya-server/infra/db/connection #:*db* #:exec #:fetch #:col #:with-db #:with-db-transaction)
+  (:import-from #:koya-server/infra/db/connection
+                #:*db* #:*on-rollback* #:exec #:fetch #:col #:with-db #:with-db-transaction)
   (:import-from #:koya/core/schema
                 #:make-schema #:schema-webhooks #:schema-models #:webhook->jobject
                 #:jobject->webhook #:model-name #:model-kind #:model->jobject #:jobject->model
@@ -31,7 +32,8 @@
 ;;; replaces it: every content delivered, every reference resolved and every
 ;;; label drawn asks for a model, and parsing the models each time was most of
 ;;; the work of a page. The cache is the connection's, so a test that opens a
-;;; fresh database starts empty.
+;;; fresh database starts empty; and it is dropped whole when a transaction
+;;; rolls back, since what was read inside it may be of rows that never were.
 
 (defvar *schemas* (cons nil (make-hash-table :test 'equal))
   "(connection . hash of space name -> schema, or :none for a name that is no space).")
@@ -43,6 +45,11 @@
 
 (defun forget-schema (space-name)
   (with-db (remhash space-name (schema-cache))))
+
+(defun forget-schemas ()
+  (with-db (clrhash (schema-cache))))
+
+(pushnew 'forget-schemas *on-rollback*)
 
 (defun load-space-models (space-name)
   (mapcar (lambda (row) (jobject->model (parse-json (col row "definition"))))
@@ -156,7 +163,7 @@ rename names its model by the new name."
   (with-db-transaction
     (progn
       ;; first, and again once written: what a rename reads in between must be
-      ;; the rows, and a transaction that rolls back must leave the cache empty
+      ;; the rows, and the cache must not keep what this replaces
       (forget-schema space-name)
       (apply-renames space-name changes)
       ;; in the transaction: a deploy that rolls back must not be in the log
