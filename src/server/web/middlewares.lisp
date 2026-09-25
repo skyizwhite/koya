@@ -1,10 +1,8 @@
 (defpackage #:koya-server/web/middlewares
   (:use #:cl)
   (:import-from #:koya-server/domain/media #:+max-upload-bytes+)
-  (:import-from #:smart-buffer)
   (:export #:+temporary-file-header+
            #:*temporary-file-middleware*
-           #:*body-file-middleware*
            #:*cache-control-middleware*
            #:*delivery-cors-middleware*
            #:*body-limit-middleware*))
@@ -16,73 +14,6 @@
 
 (defun prefix-p (prefix path)
   (and (>= (length path) (length prefix)) (string= prefix path :end2 (length prefix))))
-
-;;; Woo reads a request's whole body before the app sees it, and one past a
-;;; megabyte goes to a file under smart-buffer's temporary directory. It hands
-;;; the app that file open and neither closes nor deletes it: left alone, every
-;;; large body -- a media upload, or anything anyone posts -- stays on the disk.
-;;; A body Woo never finished reading, because the sender went away, never
-;;; reaches the app at all; those files are swept once they have been still for
-;;; +STALE-BODY-SECONDS+.
-
-(defparameter +stale-body-seconds+ 3600
-  "How long a body file goes unwritten before it is taken for abandoned. Woo writes
-to it as the body arrives, so one still arriving is never this still.")
-
-(defparameter +sweep-seconds+ 600
-  "The least time between two sweeps: one is started by a request, not a timer.")
-
-(defvar *last-sweep* 0)
-
-(defun body-file (stream)
-  "The file Woo left a body in, when STREAM reads one, or NIL for a body held in
-memory, or read from the socket as Hunchentoot does."
-  (let ((path (and (typep stream 'file-stream) (ignore-errors (pathname stream))))
-        (directory (namestring smart-buffer::*temporary-directory*)))
-    (and path (prefix-p directory (namestring path)) path)))
-
-(defun sweep-body-files (&optional (now (get-universal-time)))
-  "Delete the body files no one has written to for +STALE-BODY-SECONDS+."
-  (let ((directory smart-buffer::*temporary-directory*))
-    (when (uiop:directory-exists-p directory)
-      (dolist (file (uiop:directory-files directory))
-        (when (< (or (file-write-date file) now) (- now +stale-body-seconds+))
-          ;; another request may be sweeping too
-          (ignore-errors (delete-file file)))))))
-
-(defun sweep-now-and-then ()
-  (let ((now (get-universal-time)))
-    (when (> (- now *last-sweep*) +sweep-seconds+)
-      (setf *last-sweep* now)
-      (sweep-body-files now))))
-
-(defun remove-body-file (stream)
-  (let ((path (body-file stream)))
-    (when path
-      (close stream)
-      (uiop:delete-file-if-exists path))))
-
-(defparameter *body-file-middleware*
-  (lambda (app)
-    (lambda (env)
-      ;; taken now: lack wraps the body in a stream of its own, in ENV itself
-      (let ((body (getf env :raw-body))
-            (response nil))
-        (sweep-now-and-then)
-        (unwind-protect
-             (setf response
-                   (let ((answer (funcall app env)))
-                     (if (functionp answer)
-                         ;; a delayed answer may read the body until it is done
-                         (lambda (responder)
-                           (unwind-protect (funcall answer responder)
-                             (remove-body-file body)))
-                         answer)))
-          (unless (functionp response)
-            (remove-body-file body))))))
-  "Deletes the file Woo buffered a request's body in, once the request is answered,
-and now and then the files of bodies that never arrived whole. Installed
-outermost, so it runs whatever answered.")
 
 (defparameter *cache-control-middleware*
   (lambda (app)
@@ -141,9 +72,8 @@ parts. A space archive is uploaded in pieces smaller than this.")
                         (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message)))))
             (funcall app env)))))
   "Rejects oversized bodies by Content-Length, before any parser allocates for them.
-Woo has read the body by then, up to smart-buffer's own limit of a gigabyte.
-That limit is not lowered to this one: past it Woo signals an error it does not
-catch, which stops the server.")
+Woo has read the body by then, up to smart-buffer's own limit of a gigabyte,
+past which it answers 413 itself.")
 
 ;;; A page may answer with a file it made for the one answer, such as a space's
 ;;; archive, and that nothing needs once it is sent. It says so with the header

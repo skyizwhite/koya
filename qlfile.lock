@@ -30,6 +30,10 @@
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git")
   :version "git-0bada4eafa7264b82c86d71c621fac5128440c67"))
+("woo" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/skyizwhite/woo.git" :branch "fix/body-buffer-limit-and-files")
+  :version "git-7a120fd5b2d41bbe516c050c1210e41f5e3f3042"))
 ("clack-errors" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
