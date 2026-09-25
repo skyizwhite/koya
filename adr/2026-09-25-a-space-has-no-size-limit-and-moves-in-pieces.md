@@ -38,9 +38,10 @@ counting contents and their history against it would refuse writes.
   the offset it names; one that does not follow is refused with where the
   upload stands. A last action imports the upload in one transaction, as
   before, and a bar shows the upload and then that the server is at work.
-- **Every request body is under the ordinary limit**, and Woo is told so:
-  smart-buffer's disk limit is `+max-body-bytes+`. The special route for an
-  import body, `archive-path`, is gone.
+- **Every request body is under the ordinary limit.** The special route for an
+  import body, `archive-path`, is gone. Woo's own limit stays smart-buffer's
+  gigabyte: past it Woo signals an error it does not catch, which stops the
+  server, so lowering it to ours would let any request of 21 MB do that.
 - **Archives are kept in `archives/` beside the database**, on the volume, since
   one is as large as a space. What an export or an upload leaves behind a day or
   more ago is deleted when the next one starts.
@@ -55,4 +56,3 @@ counting contents and their history against it would refuse writes.
 - An import interrupted by a restart starts again: action URLs change with the
   process. The upload it left is deleted a day later.
 - `archives/` may be left out of backups.
-- A request body anyone sends is held to 21 MB on the disk, where it was 1 GB.

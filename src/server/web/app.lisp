@@ -24,8 +24,7 @@
                 #:make-json-app)
   (:import-from #:koya-server/web/middlewares
                 #:*body-file-middleware* #:*temporary-file-middleware* #:*body-limit-middleware*
-                #:*cache-control-middleware* #:*delivery-cors-middleware* #:+max-body-bytes+)
-  (:import-from #:smart-buffer)
+                #:*cache-control-middleware* #:*delivery-cors-middleware*)
   (:import-from #:koya-server/usecases/auth #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/web/auth
                 #:*admin-auth-middleware* #:*actions-auth-middleware* #:*pages-auth-middleware*)
@@ -87,9 +86,6 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
 
 (defun build-app ()
   (clear-middlewares *page-app*)
-  ;; Woo reads a whole body before the app sees it, spilling it to a file past a
-  ;; megabyte; this bounds that file, for any request, signed in or not
-  (setf smart-buffer:*default-disk-limit* +max-body-bytes+)
   (install-middleware *page-app* *body-file-middleware*)
   (install-middleware *page-app* *temporary-file-middleware*)
   (install-middleware *page-app* (with-args *clack-error-middleware* :debug (dev-mode-p)))

@@ -2,8 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-server/domain/media #:+max-upload-bytes+)
   (:import-from #:smart-buffer)
-  (:export #:+max-body-bytes+
-           #:+temporary-file-header+
+  (:export #:+temporary-file-header+
            #:*temporary-file-middleware*
            #:*body-file-middleware*
            #:*cache-control-middleware*
@@ -113,7 +112,9 @@ parts. A space archive is uploaded in pieces smaller than this.")
                         (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message)))))
             (funcall app env)))))
   "Rejects oversized bodies by Content-Length, before any parser allocates for them.
-Woo has read the body by then, but only up to +MAX-BODY-BYTES+ too (web/app).")
+Woo has read the body by then, up to smart-buffer's own limit of a gigabyte.
+That limit is not lowered to this one: past it Woo signals an error it does not
+catch, which stops the server.")
 
 ;;; A page may answer with a file it made for the one answer, such as a space's
 ;;; archive, and that nothing needs once it is sent. It says so with the header
