@@ -1,6 +1,7 @@
 (defpackage #:koya-tests/server/usecases/contents/write
   (:use #:cl #:rove)
-  (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db #:fetch-one #:col)
+  (:import-from #:koya-server/infra/db/connection
+                #:connect-db #:disconnect-db #:fetch-one #:col #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
   (:import-from #:koya-server/usecases/ports/spaces #:save-schema #:find-model)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
@@ -43,7 +44,7 @@
 
 (teardown (disconnect-db))
 
-(defhook :before (koya-server/infra/db/connection:exec "DELETE FROM contents"))
+(defhook :before (exec "DELETE FROM contents"))
 
 (defvar *read-eval-probe* nil "Set by a hostile filter value if the reader ever evaluates it.")
 

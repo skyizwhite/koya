@@ -5,14 +5,16 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-contents #:list-revisions #:count-revisions #:get-content)
+                #:list-contents #:list-revisions #:count-revisions #:get-content
+                #:unpublish-content #:delete-content)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-published #:content-draft #:content-id #:slugify)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:koya-server/domain/revision #:revision-id #:revision-event #:revision-by)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya/core/json #:jget)
+  (:import-from #:koya/core/schema
+                #:make-field #:make-model #:make-schema #:field-name #:model-fields)
+  (:import-from #:koya/core/json #:jget #:jobject)
   (:import-from #:koya-server/usecases/ports/media #:insert-media #:delete-media)
   (:import-from #:koya-server/usecases/contents/write #:create)
   (:import-from #:koya-server/usecases/contents/lookup #:resolve-model))
@@ -258,17 +260,17 @@
     ;; the media is gone, an option and a field are taken out of the schema. The
     ;; two contents go past the guard that keeps a referenced content: this one
     ;; still refers to them, and a revision is what outlives that
-    (koya-server/usecases/ports/contents:unpublish-content unpublished)
-    (koya-server/usecases/ports/contents:delete-content deleted)
+    (unpublish-content unpublished)
+    (delete-content deleted)
     (delete-media "website" media)
     (save-schema "website"
                  (make-schema :models (list (make-model "blog" :list
-                                                        (remove-if (lambda (f) (member (koya/core/schema:field-name f) '("count") :test #'string=))
+                                                        (remove-if (lambda (f) (member (field-name f) '("count") :test #'string=))
                                                                    (mapcar (lambda (f)
-                                                                             (if (string= (koya/core/schema:field-name f) "category")
+                                                                             (if (string= (field-name f) "category")
                                                                                  (make-field :category :select :options '("tech" "other"))
                                                                                  f))
-                                                                           (koya/core/schema:model-fields (blog-model))))
+                                                                           (model-fields (blog-model))))
                                                         :label :title
                                                         :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
                                                         :public-url "https://site.test/blog/{CONTENT_ID}")
@@ -327,7 +329,7 @@
                   (nth-value 1 (request :get (format nil "/s/website/m/blog/~a/history" pointer))))
           "and the history's")
       (save-schema "website"
-                   (make-schema :models (list (make-model "blog" :list (koya/core/schema:model-fields (blog-model)))
+                   (make-schema :models (list (make-model "blog" :list (model-fields (blog-model)))
                                               (make-model "about" :object (list (make-field :body :richtext))))))
       (unwind-protect
            (let ((body (list-body)))
@@ -347,9 +349,9 @@
 (deftest a-referenced-content-is-not-deleted-from-the-editor
   (exec "DELETE FROM contents")
   (multiple-value-bind (space model) (resolve-model "website" "blog")
-    (let* ((target (content-id (create space model (koya/core/json:jobject "title" "Target") :publish t)))
+    (let* ((target (content-id (create space model (jobject "title" "Target") :publish t)))
            (path (format nil "/s/website/m/blog/~a" target)))
-      (create space model (koya/core/json:jobject "title" "Refers" "related" (vector target)) :publish t)
+      (create space model (jobject "title" "Refers" "related" (vector target)) :publish t)
       (multiple-value-bind (status body headers) (edit path :form '(("action" . "delete")))
         (ok (= status 409))
         (ok (equal (getf headers :hx-reswap) "none") "the editor stays as it is")
@@ -389,14 +391,14 @@
           (ok (= status 200))
           (ok (search "Nothing to save." body)))
         (ok (= (count-revisions id) before) "no revision")
-        (ok (string= (koya-server/domain/content:content-status (get-content id)) "published") "and no draft")))
+        (ok (string= (content-status (get-content id)) "published") "and no draft")))
     (testing "a draft taken back to the published data is dropped, and the history says so"
       (edit path :form '(("action" . "save") ("f-title" . "Changed") ("f-slug" . "live")))
-      (ok (string= (koya-server/domain/content:content-status (get-content id)) "published+draft"))
+      (ok (string= (content-status (get-content id)) "published+draft"))
       (multiple-value-bind (status body) (edit path :form (cons '("action" . "save") form))
         (ok (= status 200))
         (ok (search "Back to the published version" body)))
-      (ok (string= (koya-server/domain/content:content-status (get-content id)) "published") "the draft is gone")
+      (ok (string= (content-status (get-content id)) "published") "the draft is gone")
       (ok (string= (revision-event (first (list-revisions id))) "discard")
           "and it went as a discard, which has something to show"))
     (testing "a restore is marked unsaved"

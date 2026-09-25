@@ -7,13 +7,16 @@
                 #:space-webhooks #:space-webhook-secret)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/keys
-                #:create-delivery-key #:list-delivery-keys #:create-management-key)
+                #:create-delivery-key #:list-delivery-keys #:create-management-key
+                #:space-for-delivery-key #:space-for-management-key)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-published #:content-draft #:content-id
                 #:content-draft-key #:content-created-at #:content-published-at)
   (:import-from #:koya-server/usecases/ports/media
                 #:list-media #:media-file-path #:write-media-file #:delete-media-file)
-  (:import-from #:koya-server/domain/media #:media-id #:media-filename #:media-space #:media-mime)
+  (:import-from #:koya-server/domain/media
+                #:media-id #:media-filename #:media-space #:media-mime #:media-alt
+                #:+max-upload-bytes+)
   (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
   (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya/core/schema #:make-webhook)
@@ -130,8 +133,8 @@
             "and its webhook secret, which the site checks")
         (ok (= sent 0) "and nothing is sent to them"))
       (testing "the site's keys still work"
-        (ok (string= (koya-server/usecases/ports/keys:space-for-delivery-key delivery-key) "archive"))
-        (ok (string= (koya-server/usecases/ports/keys:space-for-management-key management-key) "archive"))
+        (ok (string= (space-for-delivery-key delivery-key) "archive"))
+        (ok (string= (space-for-management-key management-key) "archive"))
         (ok (equal (mapcar (lambda (k) (getf k :label)) (list-delivery-keys "archive")) '("site"))))
       (testing "contents keep their ids, state, draft, timestamps and history"
         (let ((tag-content (get-content tag))
@@ -149,7 +152,7 @@
         (let ((copy (find (media-id media) (list-media "archive") :key #'media-id :test #'string=)))
           (ok copy)
           (ok (string= (media-filename copy) "cover.png"))
-          (ok (string= (koya-server/domain/media:media-alt copy) "A cover"))
+          (ok (string= (media-alt copy) "A cover"))
           (ok (equalp (alexandria:read-file-into-byte-vector (media-file-path (media-space copy) (media-id copy) (media-mime copy))) (png-bytes 4 5)))))
       (testing "the import is in the deploy log, named for whoever made it"
         (ok (equal (mapcar #'deploy-by (list-deploys "archive")) '("owner"))))
@@ -236,7 +239,7 @@
         (ok (null (archive-files stale)) "the one given up a day ago is gone")
         (ok (= (length (archive-files ".upload")) (1- count)) "and so is the one just finished")))
     (testing "a file larger than an upload may be is refused before it is read"
-      (let ((koya-server/domain/media:+max-upload-bytes+ 10))
+      (let ((+max-upload-bytes+ 10))
         (ok (string= (nth-value 1 (import-archive octets)) "/")))
       (ok (search "larger than an upload may be" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive")))

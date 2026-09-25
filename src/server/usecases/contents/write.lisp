@@ -1,7 +1,7 @@
 (defpackage #:koya-server/usecases/contents/write
   (:use #:cl)
   (:import-from #:koya/core/schema
-                #:model-kind #:model-fields #:field-name #:field-option)
+                #:model-kind #:model-fields #:field-name #:field-option #:model-name)
   (:import-from #:koya/core/validate
                 #:validate-content #:validation-error #:blank-value-p #:content-id-p)
   (:import-from #:koya/core/time
@@ -56,7 +56,7 @@
       (when (field-option field :unique)
         (multiple-value-bind (value found) (gethash (field-name field) data)
           (when (and found (not (blank-value-p value))
-                     (unique-value-taken-p space-name (koya/core/schema:model-name model) (field-name field) value
+                     (unique-value-taken-p space-name (model-name model) (field-name field) value
                                            :exclude-id exclude-id))
             (setf errors (append errors (list (list :field (field-name field) :code "unique"
                                                     :message "must be unique"))))))))
@@ -100,7 +100,7 @@ PUBLISHED-AT and REVISED-AT (ISO 8601) may be given explicitly, e.g. when
 importing. For object-kind models the single existing content is updated instead,
 and only PUBLISHED-AT applies."
   (let* ((space-name space)
-         (model-name (koya/core/schema:model-name model))
+         (model-name (model-name model))
          (created-at (check-timestamp "createdAt" created-at))
          (updated-at (check-timestamp "updatedAt" updated-at))
          (published-at (check-published-at published-at))
@@ -132,7 +132,7 @@ what the content holds already, and nothing is written; or :PUBLISHED when it is
 the published data again, and the draft is dropped -- a draft that changes nothing
 is none, and would only leave a discard with nothing to show in the history."
   (let* ((space-name space)
-         (model-name (koya/core/schema:model-name model))
+         (model-name (model-name model))
          (content (resolve-content space-name model-name id))
          (current (content-data content :draft t))
          (published (content-published content))
@@ -150,7 +150,7 @@ is none, and would only leave a discard with nothing to show in the history."
 (defun publish (space model id &optional data &key published-at)
   "Publish DATA, or the current draft. PUBLISHED-AT (ISO 8601) overrides the publish date. Fires webhooks."
   (let* ((space-name space)
-         (model-name (koya/core/schema:model-name model))
+         (model-name (model-name model))
          (content (resolve-content space-name model-name id))
          (data (or data (content-data content :draft t)))
          (published-at (check-published-at published-at))
@@ -172,7 +172,7 @@ it away would leave that content pointing at nothing."
 
 (defun unpublish (space model id)
   (let* ((space-name space)
-         (model-name (koya/core/schema:model-name model))
+         (model-name (model-name model))
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
     (let ((result (with-transaction
@@ -186,7 +186,7 @@ it away would leave that content pointing at nothing."
 (defun discard (space model id)
   "Throw away the draft of a published content. No webhook: what is published does not change."
   (let* ((space-name space)
-         (model-name (koya/core/schema:model-name model))
+         (model-name (model-name model))
          (content (resolve-content space-name model-name id)))
     (unless (content-published content)
       (fail 'conflict "Only a published content has a draft to discard; delete it instead" :code "not_published"))
@@ -194,7 +194,7 @@ it away would leave that content pointing at nothing."
 
 (defun destroy (space model id)
   (let* ((space-name space)
-         (model-name (koya/core/schema:model-name model))
+         (model-name (model-name model))
          (content (resolve-content space-name model-name id))
          (old (published-view space model content)))
     (with-transaction

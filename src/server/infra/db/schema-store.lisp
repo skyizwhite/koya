@@ -2,10 +2,9 @@
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:col #:with-db-transaction)
   (:import-from #:koya/core/schema
-                #:make-schema #:schema-webhooks #:schema-models
-                #:webhook->jobject #:jobject->webhook
-                #:model-name #:model-kind #:model->jobject #:jobject->model #:check-schema
-                #:model-forget-renames)
+                #:make-schema #:schema-webhooks #:schema-models #:webhook->jobject
+                #:jobject->webhook #:model-name #:model-kind #:model->jobject #:jobject->model
+                #:check-schema #:model-forget-renames #:schema-model)
   (:import-from #:koya/core/json
                 #:parse-json #:to-json)
   (:import-from #:koya/core/diff
@@ -55,7 +54,7 @@
 
 (defmethod find-model (space-name model-name)
   (let ((schema (load-schema space-name)))
-    (and schema (koya/core/schema:schema-model schema model-name))))
+    (and schema (schema-model schema model-name))))
 
 (defun new-secret () (byte-array-to-hex-string (random-data 24)))
 

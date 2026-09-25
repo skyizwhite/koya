@@ -3,9 +3,10 @@
   (:import-from #:koya/config
                 #:defwebhooks #:defmodel #:webhook #:current-schema #:clear-schema #:find-model)
   (:import-from #:koya/core/schema
-                #:schema-models #:schema-webhooks #:schema-model
-                #:model-field #:model-kind #:field-option #:field-type #:schema-error
-                #:model-preview-url #:model-public-url #:model-label))
+                #:schema-models #:schema-webhooks #:schema-model #:model-field #:model-kind
+                #:field-option #:field-type #:schema-error #:model-preview-url #:model-public-url
+                #:model-label #:model-name #:webhook-url #:model-was #:field-was #:webhook-label
+                #:webhook-only))
 (in-package #:koya-tests/config)
 
 (defhook :before (clear-schema))
@@ -27,7 +28,7 @@
   (let* ((schema (current-schema))
          (blog (schema-model schema "blog")))
     (ok (equal (schema-webhooks schema) '((:label "hook" :url "https://example.com/hook"))))
-    (ok (equal (mapcar #'koya/core/schema:model-name (schema-models schema)) '("blog" "tag" "about")))
+    (ok (equal (mapcar #'model-name (schema-models schema)) '("blog" "tag" "about")))
     (ok (eq (model-kind (schema-model schema "tag")) :list))
     (ok (signals (macroexpand-1 '(defmodel nokind () (title :text))) 'error) ":kind is required")
     (ok (signals (macroexpand-1 '(defmodel badkind (:kind :table) (title :text))) 'error) ":kind must be :list or :object")
@@ -49,19 +50,19 @@
   (ok (model-field (find-model 'blog) 'body))
   (defwebhooks (webhook "x" "https://x"))
   (ok (= (length (schema-models (current-schema))) 1) "setting the webhooks keeps the models")
-  (ok (equal (mapcar #'koya/core/schema:webhook-url (schema-webhooks (current-schema))) '("https://x"))))
+  (ok (equal (mapcar #'webhook-url (schema-webhooks (current-schema))) '("https://x"))))
 
 (deftest renaming-a-model-in-the-repl
   (defmodel post (:kind :list) (title :text) (lede :text))
-  (ok (equal (mapcar #'koya/core/schema:model-name (schema-models (current-schema))) '("post")))
+  (ok (equal (mapcar #'model-name (schema-models (current-schema))) '("post")))
   ;; the same form, edited into its renamed self and evaluated again
   (defmodel article (:kind :list :was post) (title :text) (subtitle :text :was lede))
   (let ((models (schema-models (current-schema))))
-    (ok (equal (mapcar #'koya/core/schema:model-name models) '("article"))
+    (ok (equal (mapcar #'model-name models) '("article"))
         "the definition it renames goes with it, or the schema would declare both")
-    (ok (string= (koya/core/schema:model-was (first models)) "post")
+    (ok (string= (model-was (first models)) "post")
         "and the deploy is still told where the contents are")
-    (ok (string= (koya/core/schema:field-was (model-field (first models) "subtitle")) "lede")))
+    (ok (string= (field-was (model-field (first models) "subtitle")) "lede")))
   (testing "a model that is still declared is still an error"
     (defmodel post (:kind :list) (title :text))
     (ok (signals (current-schema) 'schema-error))))
@@ -71,14 +72,14 @@
   (defwebhooks (webhook "revalidate" "https://site/revalidate")
                (webhook "preview" "https://preview/hook" :only 'blog)
                (webhook "index" "https://search/hook" :only '(blog tag)))
-  (ok (signals (eval '(defwebhooks "https://x")) 'koya/core/schema:schema-error) "a bare URL is not a webhook")
+  (ok (signals (eval '(defwebhooks "https://x")) 'schema-error) "a bare URL is not a webhook")
   (defmodel blog (:kind :list) (title :text))
   (defmodel tag (:kind :list) (name :text))
   (let ((hooks (schema-webhooks (current-schema))))
-    (ok (equal (mapcar #'koya/core/schema:webhook-label hooks) '("revalidate" "preview" "index")))
-    (ok (null (koya/core/schema:webhook-only (first hooks))) "no :only means every model")
-    (ok (equal (koya/core/schema:webhook-only (second hooks)) '("blog")))
-    (ok (equal (koya/core/schema:webhook-only (third hooks)) '("blog" "tag"))))
+    (ok (equal (mapcar #'webhook-label hooks) '("revalidate" "preview" "index")))
+    (ok (null (webhook-only (first hooks))) "no :only means every model")
+    (ok (equal (webhook-only (second hooks)) '("blog")))
+    (ok (equal (webhook-only (third hooks)) '("blog" "tag"))))
   (testing ":only is checked against the models, once the schema is whole"
     (defwebhooks (webhook "ghost" "https://g" :only 'nowhere))
     (ok (signals (current-schema) 'schema-error)))

@@ -9,7 +9,8 @@
   (:import-from #:koya-server/usecases/ports/keys #:list-delivery-keys)
   (:import-from #:koya-server/usecases/settings/two-factor #:enable-totp #:disable-totp)
   (:import-from #:koya-server/domain/totp #:totp)
-  (:import-from #:koya-server/usecases/auth #:clear-login-failures))
+  (:import-from #:koya-server/usecases/auth #:clear-login-failures)
+  (:import-from #:koya-server/web/pages/settings #:begin-two-factor-action))
 (in-package #:koya-tests/server/web/pages/login)
 
 (setup (setup-pages) (log-in))
@@ -122,13 +123,14 @@
       (ok (= 403 (post-login :form `(("secret" . ,*secret*)) :headers '(("origin" . "https://evil.example"))))
           "another site cannot log a browser in")
       (ok (null *cookie*) "and no session was made")
+      ;; named in full: LOG-IN here is the tests' own
       (ok (= 400 (request-url :post (koya-server/web/pages/login:log-in) :form `(("secret" . ,*secret*))
                               :headers '(("origin" . "http://localhost:3000"))))
           "a plain form post is not an action")
       (ok (= 404 (request :post "/login" :form `(("secret" . ,*secret*)) :headers '(("origin" . "http://localhost:3000"))))
           "the page itself takes no posts"))
     (testing "no other action is open"
-      (ok (= 401 (call-action :post (koya-server/web/pages/settings:begin-two-factor-action)))))))
+      (ok (= 401 (call-action :post (begin-two-factor-action)))))))
 
 (deftest login-lockout
   (let ((*cookie* nil))

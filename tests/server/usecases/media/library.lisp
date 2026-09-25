@@ -1,6 +1,6 @@
 (defpackage #:koya-tests/server/usecases/media/library
   (:use #:cl #:rove)
-  (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db)
+  (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
   (:import-from #:koya-server/usecases/ports/spaces #:save-schema #:delete-space)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
@@ -13,8 +13,8 @@
                 #:store-upload #:remove-media #:remove-space-media #:media-references
                 #:media-reference-counts)
   (:import-from #:koya-server/domain/media
-                #:media-id #:media-space #:media-filename #:media-mime #:media-width #:media-height
-                #:media-alt)
+                #:media-id #:media-space #:media-filename #:media-mime #:media-width
+                #:media-height #:media-alt #:+max-upload-bytes+)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code #:conflict #:rejected #:too-large)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
@@ -118,7 +118,7 @@ Returns (values octets content-type)."
       (ok (= (gethash (media-id media) (media-reference-counts "website" (list (media-id media)))) 2)
           "the library's counts agree"))
     (testing "only the fields in the schema count"
-      (koya-server/infra/db/connection:exec "DELETE FROM contents")
+      (exec "DELETE FROM contents")
       (create-content "website" "blog" (parse-json (format nil "{\"title\": \"~a\"}" (media-id media))))
       (ok (= (media-references "website" (media-id media)) 0) "a text field mentioning the id is not a use")
       (create-content "website" "blog" (parse-json (format nil "{\"title\": \"z\", \"cover\": \"~a\"}" (media-id media))))
@@ -135,7 +135,7 @@ Returns (values octets content-type)."
       (ok (equal "in_use" (handler-case (progn (remove-media media) nil) (conflict (e) (koya-error-code e))))
           "a file in use stays")
       (ok (find-media "website" (media-id media)))
-      (koya-server/infra/db/connection:exec "DELETE FROM contents")
+      (exec "DELETE FROM contents")
       (remove-media media)
       (ok (null (find-media "website" (media-id media))))
       (ok (null (probe-file (media-path media))) "file gone"))))
@@ -144,7 +144,7 @@ Returns (values octets content-type)."
   (flet ((refusal (thunk) (handler-case (progn (funcall thunk) nil) (koya-error (e) (type-of e)))))
     (ok (eq 'rejected (refusal (lambda () (store-upload "website" (bytes 1 2 3) :filename "x.bin")))) "unknown type")
     (ok (eq 'rejected (refusal (lambda () (store-upload "website" (bytes) :filename "x.png")))) "empty")
-    (ok (eq 'too-large (refusal (lambda () (store-upload "website" (make-array (1+ koya-server/domain/media:+max-upload-bytes+)
+    (ok (eq 'too-large (refusal (lambda () (store-upload "website" (make-array (1+ +max-upload-bytes+)
                                                                        :element-type '(unsigned-byte 8) :initial-element 0)
                                                 :filename "big.png"))))
         "too large")))

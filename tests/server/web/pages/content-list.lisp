@@ -275,7 +275,7 @@
             (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
           ;; a title is required, so a draft saved without one cannot be published
-          (koya-server/usecases/ports/contents:save-draft three (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal))
+          (save-draft three (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal))
           (let ((body (nth-value 1 (bulk "publish" (list one three)))))
             (ok (search "Published 1 content. 1 could not be: title is required." body)
                 "the field that stopped it, not the condition's own report"))

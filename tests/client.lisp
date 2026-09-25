@@ -8,12 +8,12 @@
   (:import-from #:koya/config #:defmodel #:clear-schema #:current-schema)
   (:import-from #:koya/core/schema #:schema-models #:model-name)
   (:import-from #:koya/client
-                #:configure #:koya-error #:koya-error-status #:koya-error-code
-                #:pull #:get-list #:get-item #:get-object
-                #:list-contents #:get-content #:create-content #:update-content
-                #:publish-content #:unpublish-content #:discard-draft #:delete-content #:draft-key
-                #:list-delivery-keys #:delete-delivery-key #:webhook-secret
-                #:list-media #:get-media #:upload-media #:update-media #:delete-media)
+                #:configure #:koya-error #:koya-error-status #:koya-error-code #:pull #:get-list
+                #:get-item #:get-object #:list-contents #:get-content #:create-content
+                #:update-content #:publish-content #:unpublish-content #:discard-draft
+                #:delete-content #:draft-key #:list-delivery-keys #:delete-delivery-key
+                #:webhook-secret #:list-media #:get-media #:upload-media #:update-media
+                #:delete-media #:deploy)
   (:import-from #:koya-tests/server/usecases/media/library #:png-bytes #:*media-root*))
 (in-package #:koya-tests/client)
 
@@ -47,9 +47,10 @@
   (clear-schema))
 
 (deftest deploy-plan-pull
+  ;; named in full: rove has a PLAN of its own
   (let ((changes (koya/client:plan :stream (make-broadcast-stream))))
     (ok (= (length changes) 9) "everything is new"))
-  (let ((applied (koya/client:deploy :stream (make-broadcast-stream))))
+  (let ((applied (deploy :stream (make-broadcast-stream))))
     (ok (= (length applied) 9)))
   (ok (null (koya/client:plan :stream (make-broadcast-stream))) "nothing left to change")
   (let ((remote (pull)))
@@ -61,15 +62,15 @@
   (testing "destructive push without confirmation is refused"
     (clear-schema)
     (defmodel blog (:kind :list) (title :text :required t))
-    (ok (null (koya/client:deploy :confirm nil :stream (make-broadcast-stream))))
+    (ok (null (deploy :confirm nil :stream (make-broadcast-stream))))
     (ok (= (length (schema-models (pull))) 3) "untouched")
-    (ok (koya/client:deploy :force t :stream (make-broadcast-stream)))
+    (ok (deploy :force t :stream (make-broadcast-stream)))
     (ok (= (length (schema-models (pull))) 1))
     ;; restore
     (defmodel blog (:kind :list) (title :text :required t) (body :richtext) (tags :reference :model tag :many t) (cover :media))
     (defmodel tag (:kind :list) (name :text :required t))
     (defmodel about (:kind :object) (body :richtext))
-    (koya/client:deploy :force t :stream (make-broadcast-stream))))
+    (deploy :force t :stream (make-broadcast-stream))))
 
 (deftest contents-and-delivery
   (configure :delivery-key (create-delivery-key "website" :label "client"))
@@ -159,6 +160,7 @@
           (ok (= (getf (list-media) :total-count) 0)))))
     (testing "delivery keys"
       (ok (= (length (list-delivery-keys)) 1))
+      ;; named in full: CREATE-DELIVERY-KEY here is the server's, which sets the tests up
       (multiple-value-bind (key id) (koya/client:create-delivery-key :label "extra")
         (ok (stringp key))
         (ok (= (length (list-delivery-keys)) 2))

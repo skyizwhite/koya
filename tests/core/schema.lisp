@@ -1,13 +1,12 @@
 (defpackage #:koya-tests/core/schema
   (:use #:cl #:rove)
   (:import-from #:koya/core/schema
-                #:make-field #:make-model #:make-schema
-                #:field-name #:field-type #:field-option #:field-was
-                #:model-field #:model-kind #:model-was #:model-forget-renames
-                #:schema-model #:schema-webhooks
-                #:model-preview-url #:model-public-url #:model-label #:make-webhook #:webhook-only #:webhook-covers-p
-                #:schema-error #:schema-errors #:check-schema
-                #:schema->jobject #:jobject->schema)
+                #:make-field #:make-model #:make-schema #:field-name #:field-type #:field-option
+                #:field-was #:model-field #:model-kind #:model-was #:model-forget-renames
+                #:schema-model #:schema-webhooks #:model-preview-url #:model-public-url
+                #:model-label #:make-webhook #:webhook-only #:webhook-covers-p #:schema-error
+                #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
+                #:model-options)
   (:import-from #:koya/core/json
                 #:to-json #:parse-json #:jget))
 (in-package #:koya-tests/core/schema)
@@ -57,7 +56,7 @@
           "the events older schemas carried are dropped on load")
       (ok (equal (second (schema-webhooks wire)) '(:label "https://m" :url "https://m" :only ("m")))
           "a label defaults to the URL on the wire, and :only survives it")
-      (ok (null (koya/core/schema:model-options (schema-model wire "m")))
+      (ok (null (model-options (schema-model wire "m")))
           "a webhooks key left on a model by an older schema is ignored"))
     (testing ":only"
       (ok (null (webhook-only (make-webhook "a" "https://a"))) "absent means every model")
