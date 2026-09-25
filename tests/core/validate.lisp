@@ -39,6 +39,12 @@
   (ok (equal (codes "{\"title\": \"  \", \"eventAt\": null}")
              '(("title" . "required") ("eventAt" . "required")))
       "blank and null count as missing")
+  (let ((model (make-model "note" :list (list (make-field :body :richtext :required t)))))
+    (ok (equal (mapcar (lambda (e) (getf e :code))
+                       (validate-content model (parse-json "{\"body\": \"<p><br></p>\"}")))
+               '("required"))
+        "an emptied rich text document is missing too, whoever sends it")
+    (ok (null (validate-content model (parse-json "{\"body\": \"<p>a</p>\"}")))))
   (testing "partial skips missing fields"
     (ok (null (validate-content *model* (parse-json "{}") :partial t)))
     (ok (equal (mapcar (lambda (e) (getf e :code))

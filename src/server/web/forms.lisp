@@ -3,8 +3,10 @@
   (:import-from #:koya/core/schema #:model-fields #:field-name #:field-type #:field-many-p)
   (:import-from #:koya/core/json
                 #:json-null)
+  (:import-from #:koya/core/validate
+                #:blank-for-field-p)
   (:import-from #:cl-ppcre
-                #:split #:scan)
+                #:split)
   (:import-from #:koya-server/domain/timezone #:iso->local-input #:local-input->iso)
   (:import-from #:koya-server/usecases/settings/timezone #:display-timezone)
   (:import-from #:koya-server/web/http
@@ -68,9 +70,9 @@ except booleans which are always present (unchecked = false)."
            ;; stored as the editor sent it (see koya-editor.js), but for the CRLF
            ;; a form submission turns its line breaks into -- not trimmed, as the
            ;; other fields are, or an untouched field would lose the whitespace
-           ;; around it. Quill reports an empty document as <p></p> or <p><br></p>.
+           ;; around it. An emptied document is blank, as core/validate has it.
            (let ((html (and raw (remove #\Return (first (form-values params name))))))
-             (when (and html (not (scan "^(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" html)))
+             (when (and html (not (blank-for-field-p field html)))
                (setf (gethash (field-name field) data) html))))
           (t
            (when raw (setf (gethash (field-name field) data) raw))))))

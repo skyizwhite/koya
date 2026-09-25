@@ -37,13 +37,20 @@
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
       (and (json-array-p value) (zerop (length value)))))
 
+(defun empty-richtext-p (value)
+  "True for the HTML an editor leaves behind an emptied document: nothing but
+empty paragraphs, each holding at most a line break, as Quill writes <p><br></p>."
+  (and (stringp value) (scan "^\\s*(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" value) t))
+
 (defun blank-for-field-p (field value)
-  "Blank means 'no value given': null, a whitespace-only string, and an empty array
-on a :many field. JSON false (NIL) is a value, so a text field set to false is a
-type error rather than an omission; the same goes for [] on a single-value field."
+  "Blank means 'no value given': null, a whitespace-only string, an empty array
+on a :many field, and on a :richtext field the HTML of an emptied document. JSON
+false (NIL) is a value, so a text field set to false is a type error rather than
+an omission; the same goes for [] on a single-value field."
   (or (json-null-p value)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
-      (and (field-many-p field) (json-array-p value) (zerop (length value)))))
+      (and (field-many-p field) (json-array-p value) (zerop (length value)))
+      (and (eq (field-type field) :richtext) (empty-richtext-p value))))
 
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
