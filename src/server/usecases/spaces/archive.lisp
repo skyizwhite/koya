@@ -15,9 +15,9 @@
                 #:stored-delivery-keys #:import-delivery-key #:stored-management-keys
                 #:import-management-key)
   (:import-from #:koya-server/usecases/ports/contents
-                #:space-contents #:import-content #:content-history #:import-revision)
+                #:space-contents #:insert-content #:content-history #:record-revision)
   (:import-from #:koya-server/domain/content
-                #:make-content #:content-id #:content-model #:content-published #:content-draft
+                #:make-content #:status-of #:content-id #:content-model #:content-published #:content-draft
                 #:content-draft-key #:content-created-at #:content-updated-at
                 #:content-published-at #:content-revised-at)
   (:import-from #:koya-server/domain/revision
@@ -180,7 +180,8 @@ missing: an archive without it would not restore."
     (unless (or published draft) (fail "Content ~a has neither published data nor a draft" id))
     (unless (json-array-p revisions) (fail "The revisions of content ~a must be an array" id))
     (list
-     (make-content :id id :space space :model model :published published :draft draft
+     (make-content :id id :space space :model model :status (status-of published draft)
+                   :published published :draft draft
                    :draft-key (and draft (string-field object "draftKey"))
                    :created-at (string-field object "createdAt" :required t)
                    :updated-at (string-field object "updatedAt" :required t)
@@ -325,9 +326,9 @@ whatever came of it."
                                    :size (getf m :size) :width (getf m :width) :height (getf m :height)
                                    :alt (getf m :alt) :created-at (getf m :created-at)))
              (loop :for (content revisions) :in contents
-                   :do (import-content content)
+                   :do (insert-content content)
                        (dolist (r revisions)
-                         (import-revision (content-id content) (getf r :event) (getf r :data)
+                         (record-revision (content-id content) (getf r :event) (getf r :data)
                                           :by (getf r :by) :created-at (getf r :created-at)))))
            (setf done t))
       (unless done

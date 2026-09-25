@@ -2,15 +2,14 @@
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/domain/revision
-                #:make-revision #:revision-data)
+                #:make-revision)
   (:import-from #:koya/core/time
                 #:now-iso)
   (:import-from #:koya/core/json
-                #:parse-json #:to-json #:json-equal)
+                #:parse-json #:to-json)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-revisions #:count-revisions #:find-revision #:content-history
-                #:import-revision)
-  (:export #:record-revision))
+                #:record-revision #:list-revisions #:count-revisions #:find-revision
+                #:content-history))
 (in-package #:koya-server/infra/db/content-revisions)
 
 ;;; One row per write to a content (domain/revision). Rows go with their content
@@ -24,19 +23,9 @@
                  :by (col row "written_by")
                  :created-at (col row "created_at")))
 
-(defun latest-revision (content-id)
-  (let ((row (fetch-one "SELECT * FROM content_revisions WHERE content_id = ? ORDER BY id DESC LIMIT 1"
-                        content-id)))
-    (and row (row->revision row))))
-
-(defun record-revision (content-id event data &key (by ""))
-  "Store DATA as what EVENT left content CONTENT-ID with. A draft save that
-changes nothing against the newest revision records nothing."
-  (unless (and (string= event "draft")
-               (let ((latest (latest-revision content-id)))
-                 (and latest (json-equal (revision-data latest) data))))
-    (exec "INSERT INTO content_revisions (content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?)"
-          content-id event (to-json data) (or by "") (now-iso))))
+(defmethod record-revision (content-id event data &key (by "") created-at)
+  (exec "INSERT INTO content_revisions (content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?)"
+        content-id event (to-json data) (or by "") (or created-at (now-iso))))
 
 (defun where (published-only)
   (format nil "content_id = ?~:[~; AND event = 'publish'~]" published-only))
@@ -59,7 +48,3 @@ changes nothing against the newest revision records nothing."
 (defmethod content-history (content-id)
   (mapcar #'row->revision
           (fetch "SELECT * FROM content_revisions WHERE content_id = ? ORDER BY id" content-id)))
-
-(defmethod import-revision (content-id event data &key (by "") created-at)
-  (exec "INSERT INTO content_revisions (content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?)"
-        content-id event (to-json data) (or by "") (or created-at (now-iso))))

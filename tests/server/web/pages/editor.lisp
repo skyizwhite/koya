@@ -6,9 +6,9 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:list-revisions #:count-revisions #:get-content
-                #:unpublish-content #:delete-content)
+                #:update-content #:delete-content)
   (:import-from #:koya-server/domain/content
-                #:content-status #:content-published #:content-draft #:content-id #:slugify)
+                #:content-status #:content-published #:content-draft #:content-id #:slugify #:unpublished)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:koya-server/domain/revision #:revision-id #:revision-event #:revision-by)
@@ -260,7 +260,7 @@
     ;; the media is gone, an option and a field are taken out of the schema. The
     ;; two contents go past the guard that keeps a referenced content: this one
     ;; still refers to them, and a revision is what outlives that
-    (unpublish-content unpublished)
+    (update-content (unpublished (get-content unpublished)))
     (delete-content deleted)
     (delete-media "website" media)
     (replace-schema "website"

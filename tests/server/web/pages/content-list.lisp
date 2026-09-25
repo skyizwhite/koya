@@ -2,9 +2,9 @@
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/web/pages/support #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
-  (:import-from #:koya-server/usecases/ports/contents #:list-contents #:save-draft #:get-content)
+  (:import-from #:koya-server/usecases/ports/contents #:list-contents #:get-content #:update-content)
   (:import-from #:koya-server/domain/content
-                #:content-status #:content-id #:content-draft-key #:content-published)
+                #:content-status #:content-id #:content-draft-key #:content-published #:drafted)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:koya-server/domain/media #:media-id)
@@ -274,8 +274,9 @@
                 "the URL keeps the search and the filter")
             (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
-          ;; a title is required, so a draft saved without one cannot be published
-          (save-draft three (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal))
+          ;; a title is required, so a draft without one cannot be published: one
+          ;; saved before the field was, put there as the store holds it
+          (update-content (drafted (get-content three) (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal)))
           (let ((body (nth-value 1 (bulk "publish" (list one three)))))
             (ok (search "Published 1 content. 1 could not be: title is required." body)
                 "the field that stopped it, not the condition's own report"))

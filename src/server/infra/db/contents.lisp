@@ -3,37 +3,25 @@
   (:import-from #:koya-server/infra/db/connection
                 #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
   (:import-from #:koya-server/infra/db/content-query #:build-where #:build-order-by)
-  (:import-from #:koya-server/domain/errors
-                #:fail #:not-found #:conflict)
   (:import-from #:koya-server/domain/query
                 #:query-limit #:query-offset #:query-orders #:query-filters)
   (:import-from #:koya-server/domain/content
                 #:make-content #:content-id #:content-published #:content-draft #:content-draft-key
                 #:content-space #:content-model
                 #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
-                #:status-of)
-  (:import-from #:koya/core/ulid
-                #:make-ulid)
-  (:import-from #:koya/core/time
-                #:now-iso)
-  (:import-from #:koya-server/infra/db/content-revisions #:record-revision)
+                #:content-status)
   (:import-from #:koya/core/json
                 #:parse-json #:to-json)
-  (:import-from #:ironclad
-                #:random-data #:byte-array-to-hex-string)
   (:import-from #:koya-server/usecases/ports/contents
-                #:create-content #:save-draft #:publish-content #:unpublish-content
-                #:discard-draft #:delete-content #:get-content #:find-content
-                #:find-contents-by-ids #:list-contents #:count-contents #:ensure-draft-key
-                #:find-object-content #:unique-value-taken-p #:space-contents #:import-content
+                #:insert-content #:update-content #:delete-content #:get-content #:find-content
+                #:find-contents-by-ids #:list-contents #:count-contents
+                #:find-object-content #:unique-value-taken-p #:space-contents
                 #:contents-mentioning))
 (in-package #:koya-server/infra/db/contents)
 
-;;; Content rows, the published and draft data stored as JSON.
-;;;
-;;; Every write records a revision in the same transaction (content-revisions);
-;;; BY names who made it, as usecases/actor's *ACTOR* does. IMPORT-CONTENT is
-;;; the exception: an imported content brings its own history.
+;;; Content rows, the published and draft data stored as JSON. A row is written
+;;; as the content it is handed; what a write makes of a content is the
+;;; domain's, and its revision the use case's.
 
 (defun row->content (row)
   (flet ((json (name) (let ((v (col row name))) (and v (parse-json v)))))
@@ -43,11 +31,7 @@
                   :created-at (col row "created_at") :updated-at (col row "updated_at")
                   :published-at (col row "published_at") :revised-at (col row "revised_at"))))
 
-(defun missing (id)
-  (fail 'not-found (format nil "Content ~a does not exist" id)))
-
-(defun new-draft-key ()
-  (byte-array-to-hex-string (random-data 16)))
+(defun json-column (value) (and value (to-json value)))
 
 (defmethod get-content (id)
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ?" id)))
@@ -67,61 +51,23 @@
   (let ((row (fetch-one "SELECT * FROM contents WHERE id = ? AND space = ? AND model = ?" id space model)))
     (and row (row->content row))))
 
-(defmethod create-content (space model data &key publish (id (make-ulid))
-                                                 created-at updated-at published-at revised-at by)
-  (let ((now (now-iso)))
-    (with-db-transaction
-      (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            id space model (if publish "published" "draft")
-            (and publish (to-json data)) (and (not publish) (to-json data))
-            (and (not publish) (new-draft-key))
-            (or created-at now) (or updated-at now)
-            (and publish (or published-at now)) (and publish (or revised-at now)))
-      (record-revision id (if publish "publish" "draft") data :by by))
-    (get-content id)))
+(defmethod insert-content (content)
+  (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        (content-id content) (content-space content) (content-model content) (content-status content)
+        (json-column (content-published content)) (json-column (content-draft content))
+        (content-draft-key content)
+        (content-created-at content) (content-updated-at content)
+        (content-published-at content) (content-revised-at content)))
 
-(defmethod save-draft (id data &key by)
-  (let ((content (or (get-content id) (missing id))))
-    (with-db-transaction
-      (exec "UPDATE contents SET draft = ?, draft_key = ?, status = ?, updated_at = ? WHERE id = ?"
-            (to-json data) (new-draft-key) (status-of (content-published content) t) (now-iso) id)
-      (record-revision id "draft" data :by by))
-    (get-content id)))
-
-(defmethod publish-content (id &optional data &key published-at by)
-  (let* ((content (or (get-content id) (missing id)))
-         (data (or data (content-draft content) (content-published content)))
-         (now (now-iso)))
-    (with-db-transaction
-      (exec "UPDATE contents SET published = ?, draft = NULL, draft_key = NULL, status = 'published', updated_at = ?,
-               published_at = COALESCE(?, published_at, ?), revised_at = ? WHERE id = ?"
-            (to-json data) now published-at now now id)
-      (record-revision id "publish" data :by by))
-    (get-content id)))
-
-(defmethod unpublish-content (id &key by)
-  (let* ((content (or (get-content id) (missing id)))
-         (data (or (content-draft content) (content-published content))))
-    (with-db-transaction
-      (exec "UPDATE contents SET published = NULL, draft = ?, draft_key = ?, status = 'draft', updated_at = ?, published_at = NULL WHERE id = ?"
-            (to-json data) (new-draft-key) (now-iso) id)
-      ;; unpublishing what was never live changes nothing the history tells
-      (when (content-published content)
-        (record-revision id "unpublish" data :by by)))
-    (get-content id)))
-
-(defmethod discard-draft (id &key by)
-  (let ((content (or (get-content id) (missing id))))
-    (unless (content-published content)
-      (fail 'conflict "Only a published content has a draft to discard; delete it instead"
-            :code "not_published"))
-    (with-db-transaction
-      (exec "UPDATE contents SET draft = NULL, draft_key = NULL, status = 'published', updated_at = ? WHERE id = ?"
-            (now-iso) id)
-      (when (content-draft content)
-        (record-revision id "discard" (content-published content) :by by)))
-    (get-content id)))
+(defmethod update-content (content)
+  (exec "UPDATE contents SET status = ?, published = ?, draft = ?, draft_key = ?, updated_at = ?,
+           published_at = ?, revised_at = ? WHERE id = ?"
+        (content-status content)
+        (json-column (content-published content)) (json-column (content-draft content))
+        (content-draft-key content) (content-updated-at content)
+        (content-published-at content) (content-revised-at content)
+        (content-id content)))
 
 (defmethod delete-content (id)
   ;; its revisions go with it, ON DELETE CASCADE
@@ -134,13 +80,6 @@
                                  exclude-id)
                  space (append (and exclude-id (list exclude-id))
                                (let ((like (format nil "%~a%" needle))) (list like like))))))
-
-(defmethod ensure-draft-key (id)
-  (let ((content (or (get-content id) (missing id))))
-    (or (content-draft-key content)
-        (let ((key (new-draft-key)))
-          (exec "UPDATE contents SET draft_key = ? WHERE id = ?" key id)
-          key))))
 
 (defmethod find-object-content (space model)
   (let ((row (fetch-one "SELECT * FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" space model)))
@@ -184,14 +123,3 @@
 (defmethod space-contents (space)
   (mapcar #'row->content
           (fetch "SELECT * FROM contents WHERE space = ? ORDER BY created_at, id" space)))
-
-(defmethod import-content (content)
-  (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        (content-id content) (content-space content) (content-model content)
-        (status-of (content-published content) (content-draft content))
-        (let ((v (content-published content))) (and v (to-json v)))
-        (let ((v (content-draft content))) (and v (to-json v)))
-        (content-draft-key content)
-        (content-created-at content) (content-updated-at content)
-        (content-published-at content) (content-revised-at content)))

@@ -17,7 +17,8 @@
                 #:schema-webhooks #:schema-models #:model-name #:model-field
                 #:schema->jobject)
   (:import-from #:koya-server/usecases/ports/contents
-                #:create-content #:get-content #:list-revisions)
+                #:get-content #:list-revisions)
+  (:import-from #:koya-server/usecases/contents/write #:create)
   (:import-from #:koya/core/diff
                 #:destructive-changes-p)
   (:import-from #:koya-server/usecases/ports/sessions #:make-session-store)
@@ -128,8 +129,8 @@
   (replace-schema "magazine"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text)
                                                                         (make-field :lede :text))))))
-  (let ((published (create-content "magazine" "post" (jobject "title" "One" "lede" "First words") :publish t))
-        (drafted (create-content "magazine" "post" (jobject "title" "Two" "lede" "Later words"))))
+  (let ((published (create "magazine" (find-model "magazine" "post") (jobject "title" "One" "lede" "First words") :publish t))
+        (drafted (create "magazine" (find-model "magazine" "post") (jobject "title" "Two" "lede" "Later words"))))
     (let ((changes (replace-schema "magazine"
                                 (make-schema :models (list (make-model "article" :list
                                                                        (list (make-field :title :text)

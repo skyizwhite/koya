@@ -7,26 +7,22 @@
            #:list-contents
            #:count-contents
            #:space-contents
-           #:create-content
-           #:save-draft
-           #:publish-content
-           #:unpublish-content
-           #:discard-draft
+           #:insert-content
+           #:update-content
            #:delete-content
-           #:import-content
-           #:ensure-draft-key
            #:unique-value-taken-p
            #:contents-mentioning
+           #:record-revision
            #:list-revisions
            #:count-revisions
            #:find-revision
-           #:content-history
-           #:import-revision))
+           #:content-history))
 (in-package #:koya-server/usecases/ports/contents)
 
-;;; Contents (domain/content) and the revision each write leaves
-;;; (domain/revision). A write records its revision itself, naming whoever BY
-;;; says.
+;;; Contents (domain/content) and the revisions their writes leave
+;;; (domain/revision). The store keeps a content as it is handed one: what a
+;;; write makes of a content is decided in the domain, and whether it is an
+;;; event of its history in the use case, which records it.
 
 (defgeneric get-content (id)
   (:documentation "The content ID in whichever space and model it is, or NIL."))
@@ -51,37 +47,15 @@ filters its draft data where it has one. ONLY-STATUS narrows to one of
 (defgeneric space-contents (space)
   (:documentation "Every content of SPACE, oldest first: what an export carries."))
 
-(defgeneric create-content (space model data &key publish id created-at updated-at published-at revised-at by)
-  (:documentation "Insert DATA as a new content. With PUBLISH it is published immediately,
-otherwise saved as a draft. The system timestamps default to now; imports may
-supply any of CREATED-AT, UPDATED-AT, PUBLISHED-AT and REVISED-AT (ISO 8601).
-PUBLISHED-AT and REVISED-AT are only stored when publishing."))
+(defgeneric insert-content (content)
+  (:documentation "Store CONTENT, a new one, as it is: every field, its draft key and its
+timestamps included."))
 
-(defgeneric save-draft (id data &key by)
-  (:documentation "Replace the draft of content ID with DATA. A fresh draft key is issued each time,
-so old preview links stop working."))
-
-(defgeneric publish-content (id &optional data &key published-at by)
-  (:documentation "Publish DATA (or the current draft, or re-publish the published data) and clear the draft.
-PUBLISHED-AT overrides the publish date; otherwise the first publish date is kept."))
-
-(defgeneric unpublish-content (id &key by)
-  (:documentation "Take content ID off the delivery API, keeping its data as a draft."))
-
-(defgeneric discard-draft (id &key by)
-  (:documentation "Drop the draft of the published content ID, so it shows its published data
-again. Not for a content that has never been published: there would be nothing
-left."))
+(defgeneric update-content (content)
+  (:documentation "Store CONTENT, which is already there, as it is now."))
 
 (defgeneric delete-content (id)
   (:documentation "Delete content ID and its revisions."))
-
-(defgeneric import-content (content)
-  (:documentation "Insert CONTENT as it is, every column included, and record no revision: the
-importer brings the content's history along with it."))
-
-(defgeneric ensure-draft-key (id)
-  (:documentation "Return the draft key of content ID, generating one on first use."))
 
 (defgeneric unique-value-taken-p (space model field value &key exclude-id)
   (:documentation "True when another content of MODEL already uses VALUE for FIELD (in draft or published data)."))
@@ -92,6 +66,11 @@ the string NEEDLE anywhere: every content that can refer to it, and possibly
 some that do not (NEEDLE may appear in any field, and _ in it matches any
 character). What they refer to is domain/references's to say."))
 
+(defgeneric record-revision (content-id event data &key by created-at)
+  (:documentation "Append what EVENT left content CONTENT-ID with, written by BY. CREATED-AT
+is now unless the revision was written elsewhere: an import brings a content's
+history along, oldest first, so it keeps its order."))
+
 (defgeneric list-revisions (content-id &key published-only limit offset)
   (:documentation "Newest first. PUBLISHED-ONLY keeps the publishes: the versions that were live."))
 
@@ -101,7 +80,3 @@ character). What they refer to is domain/references's to say."))
 
 (defgeneric content-history (content-id)
   (:documentation "Every revision of CONTENT-ID, oldest first."))
-
-(defgeneric import-revision (content-id event data &key by created-at)
-  (:documentation "Append a revision as it was written elsewhere. Imported oldest first, so the
-ids keep the order they had."))

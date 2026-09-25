@@ -7,10 +7,12 @@
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/contents
-                #:create-content #:save-draft #:publish-content #:unpublish-content
-                #:delete-content #:get-content #:find-content #:list-contents #:ensure-draft-key
-                #:find-object-content #:unique-value-taken-p #:discard-draft #:list-revisions
+                #:get-content #:find-content #:list-contents
+                #:find-object-content #:unique-value-taken-p #:list-revisions
                 #:count-revisions #:find-revision)
+  (:import-from #:koya-server/usecases/contents/write
+                #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key)
+  (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
                 #:content-published-at #:content-revised-at #:content-draft-key)
@@ -50,44 +52,49 @@
 (defvar *read-eval-probe* nil "Set by a hostile filter value if the reader ever evaluates it.")
 
 (defun data (json) (parse-json json))
+(defun blog () (find-model "website" "blog"))
+(defun make (json &rest args)
+  "A blog content of the data JSON, through the use case: what a page or the API does."
+  (apply #'create "website" (blog) (data json) args))
 (defun q (&rest kv) (parse-query (loop :for (k v) :on kv :by #'cddr :collect (cons k v))))
 (defun titles (contents) (mapcar (lambda (c) (jget (content-published c) "title")) contents))
 
 (deftest lifecycle
-  (let ((c (create-content "website" "blog" (data "{\"title\": \"Draft one\"}"))))
+  (let ((c (make "{\"title\": \"Draft one\"}")))
     (ok (string= (content-status c) "draft"))
     (ok (null (content-published c)))
     (ok (string= (jget (content-draft c) "title") "Draft one"))
     (ok (null (content-published-at c)))
-    (let ((p (publish-content (content-id c))))
+    (let ((p (publish "website" (blog) (content-id c))))
       (ok (string= (content-status p) "published"))
       (ok (string= (jget (content-published p) "title") "Draft one"))
       (ok (null (content-draft p)))
       (ok (content-published-at p))
-      (let ((d (save-draft (content-id c) (data "{\"title\": \"Edited\"}"))))
+      (let ((d (update-draft "website" (blog) (content-id c) (data "{\"title\": \"Edited\"}"))))
         (ok (string= (content-status d) "published+draft"))
         (ok (string= (jget (content-published d) "title") "Draft one") "published untouched by a draft save")
         (ok (string= (jget (content-draft d) "title") "Edited"))
-        (let ((p2 (publish-content (content-id c))))
+        (let ((p2 (publish "website" (blog) (content-id c))))
           (ok (string= (jget (content-published p2) "title") "Edited") "publish promotes the draft")
           (ok (string= (content-published-at p2) (content-published-at p)) "first publish date is kept")
           (ok (string>= (content-revised-at p2) (content-revised-at p)))
-          (let ((u (unpublish-content (content-id c))))
+          (let ((u (unpublish "website" (blog) (content-id c))))
             (ok (string= (content-status u) "draft"))
             (ok (null (content-published u)))
-            (ok (string= (jget (content-draft u) "title") "Edited") "unpublish keeps the data as draft"))))
-      (delete-content (content-id c))
+            (ok (string= (jget (content-draft u) "title") "Edited") "unpublish keeps the data as draft")
+            (ok (string= (content-status (get-content (content-id c))) "draft") "and that is what is stored"))))
+      (destroy "website" (blog) (content-id c))
       (ng (get-content (content-id c))))))
 
 (deftest every-write-leaves-a-revision
-  (let* ((c (create-content "website" "blog" (data "{\"title\": \"One\"}") :by "owner"))
+  (let* ((c (let ((*actor* "owner")) (make "{\"title\": \"One\"}")))
          (id (content-id c)))
-    (save-draft id (data "{\"title\": \"Two\"}") :by "key:ci")
-    (save-draft id (data "{\"title\": \"Two\"}"))
-    (publish-content id)
-    (save-draft id (data "{\"title\": \"Three\"}"))
-    (discard-draft id)
-    (unpublish-content id)
+    (let ((*actor* "key:ci")) (update-draft "website" (blog) id (data "{\"title\": \"Two\"}")))
+    (update-draft "website" (blog) id (data "{\"title\": \"Two\"}"))
+    (publish "website" (blog) id)
+    (update-draft "website" (blog) id (data "{\"title\": \"Three\"}"))
+    (discard "website" (blog) id)
+    (unpublish "website" (blog) id)
     (let ((revisions (list-revisions id)))
       (ok (equal (mapcar #'revision-event revisions) '("unpublish" "discard" "draft" "publish" "draft" "draft"))
           "newest first; the second save of the same data is not an event")
@@ -100,52 +107,56 @@
       (ok (= (count-revisions id :published-only t) 1))
       (ok (equal (mapcar #'revision-event (list-revisions id :published-only t)) '("publish"))))
     (testing "what changes nothing that was live is not an event"
-      (let* ((draft (create-content "website" "blog" (data "{\"title\": \"Never live\"}")))
-             (live (create-content "website" "blog" (data "{\"title\": \"Live\"}") :publish t)))
-        (unpublish-content (content-id draft))
+      (let* ((draft (make "{\"title\": \"Never live\"}"))
+             (live (make "{\"title\": \"Live\"}" :publish t)))
+        (unpublish "website" (blog) (content-id draft))
         (ok (equal (mapcar #'revision-event (list-revisions (content-id draft))) '("draft"))
             "unpublishing a content that was never published")
-        (discard-draft (content-id live))
+        (ok (signals (discard "website" (blog) (content-id draft)) 'error)
+            "a content that was never published has no draft to discard, only itself")
+        (discard "website" (blog) (content-id live))
         (ok (equal (mapcar #'revision-event (list-revisions (content-id live))) '("publish"))
             "discarding a draft that is not there")))
     (testing "a revision belongs to its content"
-      (let ((other (create-content "website" "blog" (data "{\"title\": \"Other\"}"))))
+      (let ((other (make "{\"title\": \"Other\"}")))
         (ng (find-revision (content-id other) (revision-id (first (list-revisions id)))))))
     (testing "deleting the content deletes its history"
-      (delete-content id)
+      (destroy "website" (blog) id)
       (ok (zerop (col (fetch-one "SELECT COUNT(*) AS n FROM content_revisions WHERE content_id = ?" id) "n"))))))
 
 (deftest draft-keys
-  (let* ((c (create-content "website" "blog" (data "{\"title\": \"x\"}")))
+  (let* ((c (make "{\"title\": \"x\"}"))
          (key (content-draft-key c)))
     (ok (= (length key) 32) "a draft gets a key on creation")
-    (ok (string= key (ensure-draft-key (content-id c))) "ensure returns the current key")
-    (let ((saved (save-draft (content-id c) (data "{\"title\": \"y\"}"))))
+    (ok (string= key (draft-key "website" "blog" (content-id c))) "asking for it returns the current key")
+    (let ((saved (update-draft "website" (blog) (content-id c) (data "{\"title\": \"y\"}"))))
       (ok (string/= (content-draft-key saved) key) "every draft save rotates the key")
-      (ok (null (content-draft-key (publish-content (content-id c)))) "publishing clears it")
-      (ok (content-draft-key (unpublish-content (content-id c))) "unpublishing issues a new one"))
-    (let ((p (create-content "website" "blog" (data "{\"title\": \"pub\"}") :publish t)))
+      (ok (null (content-draft-key (publish "website" (blog) (content-id c)))) "publishing clears it")
+      (ok (content-draft-key (unpublish "website" (blog) (content-id c))) "unpublishing issues a new one"))
+    (let ((p (make "{\"title\": \"pub\"}" :publish t)))
       (ok (null (content-draft-key p)) "published content has no key")
-      (ok (= (length (ensure-draft-key (content-id p))) 32) "but one can be generated on demand"))))
+      (let ((made (draft-key "website" "blog" (content-id p))))
+        (ok (= (length made) 32) "but one can be made on demand")
+        (ok (string= made (content-draft-key (get-content (content-id p)))) "and is kept")))))
 
 (deftest object-content
   (ng (find-object-content "website" "about"))
-  (create-content "website" "about" (data "{\"body\": \"hi\"}") :publish t)
+  (create "website" (find-model "website" "about") (data "{\"body\": \"hi\"}") :publish t)
   (ok (string= (jget (content-published (find-object-content "website" "about")) "body") "hi")))
 
 (deftest uniqueness
-  (let ((c (create-content "website" "blog" (data "{\"title\": \"Taken\"}") :publish t)))
+  (let ((c (make "{\"title\": \"Taken\"}" :publish t)))
     (ok (unique-value-taken-p "website" "blog" "title" "Taken"))
     (ng (unique-value-taken-p "website" "blog" "title" "Taken" :exclude-id (content-id c)) "the content itself does not count")
     (ng (unique-value-taken-p "website" "blog" "title" "Free"))
-    (save-draft (content-id (create-content "website" "blog" (data "{\"title\": \"z\"}"))) (data "{\"title\": \"In draft\"}"))
+    (update-draft "website" (blog) (content-id (make "{\"title\": \"z\"}")) (data "{\"title\": \"In draft\"}"))
     (ok (unique-value-taken-p "website" "blog" "title" "In draft") "drafts count too")))
 
 (deftest listing
-  (create-content "website" "blog" (data "{\"title\": \"Alpha\", \"count\": 1, \"featured\": true, \"tags\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"], \"day\": \"2026-01-01\"}") :publish t)
-  (create-content "website" "blog" (data "{\"title\": \"Beta\", \"count\": 5, \"featured\": false, \"tags\": [], \"day\": \"2026-02-01\"}") :publish t)
-  (create-content "website" "blog" (data "{\"title\": \"Gamma\", \"count\": 10, \"day\": \"2026-03-01\"}") :publish t)
-  (create-content "website" "blog" (data "{\"title\": \"Hidden draft\"}"))
+  (make "{\"title\": \"Alpha\", \"count\": 1, \"featured\": true, \"tags\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"], \"day\": \"2026-01-01\"}" :publish t)
+  (make "{\"title\": \"Beta\", \"count\": 5, \"featured\": false, \"tags\": [], \"day\": \"2026-02-01\"}" :publish t)
+  (make "{\"title\": \"Gamma\", \"count\": 10, \"day\": \"2026-03-01\"}" :publish t)
+  (make "{\"title\": \"Hidden draft\"}")
   (let ((model (find-model "website" "blog")))
     (testing "published only, newest first, total count"
       (multiple-value-bind (contents total) (list-contents "website" "blog" model (q))
@@ -191,7 +202,7 @@
 
 (deftest listing-without-a-limit
   (dotimes (i 12)
-    (create-content "website" "blog" (data (format nil "{\"title\": \"Post ~a\"}" i))))
+    (make (format nil "{\"title\": \"Post ~a\"}" i)))
   (let ((model (find-model "website" "blog")))
     (multiple-value-bind (contents total) (list-contents "website" "blog" model (make-query :limit nil) :status :all)
       (ok (= total 12))
@@ -200,10 +211,10 @@
         "one made without a limit keeps the default")))
 
 (deftest listing-by-status
-  (create-content "website" "blog" (data "{\"title\": \"Live\"}") :publish t)
-  (let ((both (create-content "website" "blog" (data "{\"title\": \"Live with a draft\"}") :publish t)))
-    (save-draft (content-id both) (data "{\"title\": \"Live with a draft\", \"count\": 1}")))
-  (create-content "website" "blog" (data "{\"title\": \"Only a draft\"}"))
+  (make "{\"title\": \"Live\"}" :publish t)
+  (let ((both (make "{\"title\": \"Live with a draft\"}" :publish t)))
+    (update-draft "website" (blog) (content-id both) (data "{\"title\": \"Live with a draft\", \"count\": 1}")))
+  (make "{\"title\": \"Only a draft\"}")
   (let ((model (find-model "website" "blog")))
     (flet ((titles-with (status)
              ;; the draft's title when there is one, as the admin list shows it

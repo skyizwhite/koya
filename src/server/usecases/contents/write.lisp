@@ -8,6 +8,8 @@
                 #:parse-iso)
   (:import-from #:koya/core/json
                 #:json-null #:json-equal)
+  (:import-from #:koya/core/ulid
+                #:make-ulid)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:invalid-input)
   (:import-from #:koya-server/usecases/ports/store
@@ -17,14 +19,14 @@
   (:import-from #:koya-server/usecases/contents/lookup
                 #:resolve-model #:resolve-content)
   (:import-from #:koya-server/usecases/ports/contents
-                #:create-content #:save-draft #:publish-content #:unpublish-content
-                #:delete-content #:discard-draft #:find-object-content
-                #:unique-value-taken-p #:get-content #:ensure-draft-key)
+                #:insert-content #:update-content #:delete-content #:record-revision
+                #:find-object-content #:unique-value-taken-p #:get-content)
   (:import-from #:koya-server/usecases/contents/references
                 #:content-references)
   (:import-from #:koya-server/domain/content
-                #:content-id #:content-published #:content-data
-                #:merge-data #:fill-defaults #:fill-slugs)
+                #:content-id #:content-published #:content-draft #:content-draft-key #:content-data
+                #:merge-data #:fill-defaults #:fill-slugs
+                #:new-content #:drafted #:published #:unpublished #:discarded #:keyed)
   (:import-from #:koya-server/usecases/contents/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks/notify #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor
@@ -40,7 +42,9 @@
 (in-package #:koya-server/usecases/contents/write)
 
 ;;; Content operations shared by the admin API and the admin UI: lookup,
-;;; validation, persistence and webhook notification.
+;;; validation, persistence and webhook notification. What a write makes of a
+;;; content is the domain's (domain/content); this decides whether it may
+;;; happen, hands the result to the store and records it in the history.
 ;;;
 ;;; Each write runs inside WITH-TRANSACTION, which holds the store, so a
 ;;; uniqueness check and the insert after it cannot interleave with another
@@ -94,6 +98,12 @@ NAME otherwise."
                    :old old
                    :new new))
 
+(defun store (content event data)
+  "Keep CONTENT as it now is, and EVENT, what left it so, in its history."
+  (update-content content)
+  (record-revision (content-id content) event data :by *actor*)
+  content)
+
 (defun create (space model data &key publish id created-at updated-at published-at revised-at)
   "Create a content. ID and the system timestamps CREATED-AT, UPDATED-AT,
 PUBLISHED-AT and REVISED-AT (ISO 8601) may be given explicitly, e.g. when
@@ -108,12 +118,12 @@ and only PUBLISHED-AT applies."
     (with-transaction
       (check-content space-name model (fill-defaults model data))
       (flet ((insert ()
-               (let ((content (apply #'create-content space-name model-name data
-                                     :publish publish
-                                     :created-at created-at :updated-at updated-at
-                                     :published-at published-at :revised-at revised-at
-                                     :by *actor*
-                                     (and (check-new-id id) (list :id id)))))
+               (let ((content (new-content (or (check-new-id id) (make-ulid)) space-name model-name data
+                                           :publish publish
+                                           :created-at created-at :updated-at updated-at
+                                           :published-at published-at :revised-at revised-at)))
+                 (insert-content content)
+                 (record-revision (content-id content) (if publish "publish" "draft") data :by *actor*)
                  (if publish
                      (notify space model (content-id content) :publish :new (published-view space model content))
                      (notify space model (content-id content) :draft :new (draft-view space model content)))
@@ -135,15 +145,15 @@ is none, and would only leave a discard with nothing to show in the history."
          (model-name (model-name model))
          (content (resolve-content space-name model-name id))
          (current (content-data content :draft t))
-         (published (content-published content))
+         (live (content-published content))
          (data (if replace patch (merge-data current patch))))
     (cond ((json-equal data current) (values content :unchanged))
-          ((and published (json-equal data published))
-           (values (discard-draft id :by *actor*) :published))
+          ((and live (json-equal data live))
+           (values (store (discarded content) "discard" live) :published))
           (t
            (with-transaction
              (check-content space-name model data :exclude-id id)
-             (let ((saved (save-draft id data :by *actor*)))
+             (let ((saved (store (drafted content data) "draft" data)))
                (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved))
                (values saved :saved)))))))
 
@@ -157,9 +167,9 @@ is none, and would only leave a discard with nothing to show in the history."
          (old (published-view space model content)))
     (with-transaction
       (check-content space-name model data :exclude-id id)
-      (let ((published (publish-content id data :published-at published-at :by *actor*)))
-        (notify space model id :publish :old old :new (published-view space model published))
-        published))))
+      (let ((live (store (published content data :published-at published-at) "publish" data)))
+        (notify space model id :publish :old old :new (published-view space model live))
+        live))))
 
 (defun check-unreferenced (space-name model-name id verb)
   "Refuse with a CONFLICT coded in_use while another content refers to ID: taking
@@ -179,7 +189,12 @@ it away would leave that content pointing at nothing."
                     ;; a draft is out of the delivery API already; unpublishing it takes nothing away
                     (when (content-published content)
                       (check-unreferenced space-name model-name (content-id content) "unpublish"))
-                    (unpublish-content id :by *actor*))))
+                    (let ((next (unpublished content)))
+                      (update-content next)
+                      ;; unpublishing what was never live changes nothing the history tells
+                      (when (content-published content)
+                        (record-revision id "unpublish" (content-draft next) :by *actor*))
+                      next))))
       (when old (notify space model id :unpublish :old old))
       result)))
 
@@ -190,7 +205,11 @@ it away would leave that content pointing at nothing."
          (content (resolve-content space-name model-name id)))
     (unless (content-published content)
       (fail 'conflict "Only a published content has a draft to discard; delete it instead" :code "not_published"))
-    (discard-draft (content-id content) :by *actor*)))
+    (let ((next (discarded content)))
+      (update-content next)
+      (when (content-draft content)
+        (record-revision id "discard" (content-published content) :by *actor*))
+      next)))
 
 (defun destroy (space model id)
   (let* ((space-name space)
@@ -206,4 +225,7 @@ it away would leave that content pointing at nothing."
 (defun draft-key (space-name model-name id)
   "The draft key of content ID, for previews, made on first use."
   (resolve-model space-name model-name)
-  (ensure-draft-key (content-id (resolve-content space-name model-name id))))
+  (let* ((content (resolve-content space-name model-name id))
+         (keyed (keyed content)))
+    (unless (eq keyed content) (update-content keyed))
+    (content-draft-key keyed)))

@@ -76,7 +76,10 @@ web  ──▶  usecases  ──▶  domain
           ports  ◀── defines ──  infra
 ```
 
-- `domain/` depends on `koya/core` alone.
+- `domain/` depends on `koya/core` alone. What a write makes of a content --
+  drafted, published, unpublished, discarded -- is a function there that
+  returns the content as it then is; a use case hands that to the store and
+  records the event in the history, and the store keeps what it is handed.
 - `usecases/` uses `domain/` and its ports. It raises the errors in
   `domain/errors`, which say what went wrong without an HTTP status, and names
   who is making a change from `*actor*` (`usecases/actor`).

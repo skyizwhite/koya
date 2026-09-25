@@ -23,7 +23,10 @@
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-revisions #:count-revisions #:get-content #:create-content #:save-draft)
+                #:list-revisions #:count-revisions #:get-content)
+  (:import-from #:koya-server/usecases/ports/spaces #:find-model)
+  (:import-from #:koya-server/usecases/contents/write #:create #:update-draft)
+  (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-async*)
   (:import-from #:koya-server/domain/revision #:revision-event)
   (:import-from #:koya/core/json #:jget)
   (:import-from #:alexandria #:alist-hash-table)
@@ -83,15 +86,19 @@
                         (uiop:directory-files directory)))))
 
 (deftest a-space-is-exported-and-imported-again
+  ;; the space is filled the way its owner fills it, which sets off its webhook:
+  ;; answered here, in this thread, so the test hears nothing of it
+  (let ((*webhook-async* nil)
+        (*webhook-sender* (lambda (&rest args) (declare (ignore args)) (values 200 "" nil))))
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))
   (create-space "archive")
   (replace-schema "archive" (archive-schema))
   (let* ((media (store-upload "archive" (png-bytes 4 5) :filename "cover.png" :alt "A cover"))
-         (tag (content-id (create-content "archive" "tag" (alist-hash-table '(("name" . "lisp")) :test 'equal)
+         (tag (content-id (create "archive" (find-model "archive" "tag") (alist-hash-table '(("name" . "lisp")) :test 'equal)
                                           :publish t :id "tag-1" :created-at "2020-01-01T00:00:00.000Z"
                                           :published-at "2020-01-02T00:00:00.000Z")))
-         (post (content-id (create-content "archive" "post"
+         (post (content-id (create "archive" (find-model "archive" "post")
                                            (alist-hash-table `(("title" . "Old") ("cover" . ,(media-id media))
                                                                ("tags" . ,(vector tag)))
                                                              :test 'equal)
@@ -101,9 +108,11 @@
          (management-key (create-management-key "archive" :label "repl"))
          (sent 0)
          octets)
-    (save-draft post (alist-hash-table `(("title" . "New")
-                                         ("body" . ,(format nil "<p><img src=\"/media/archive/~a.png\"></p>" (media-id media))))
-                                       :test 'equal))
+    (update-draft "archive" (find-model "archive" "post") post
+                  (alist-hash-table `(("title" . "New")
+                                      ("body" . ,(format nil "<p><img src=\"/media/archive/~a.png\"></p>" (media-id media))))
+                                    :test 'equal)
+                  :replace t)
     (testing "the space page offers the export"
       (let ((body (nth-value 1 (request :get "/s/archive"))))
         (ok (search "href=\"/s/archive/export\"" body))
@@ -257,4 +266,4 @@
     (testing "the import dialog is on the spaces page"
       (let ((page (nth-value 1 (request :get "/"))))
         (ok (search (format nil "data-import-begin=\"~a\"" (begin-import-action)) page))
-        (ok (search "data-import-piece-bytes=" page))))))
+        (ok (search "data-import-piece-bytes=" page)))))))
