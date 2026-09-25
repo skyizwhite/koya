@@ -39,6 +39,17 @@ handlers.
 - Migrations are forward-only and apply themselves at startup. After adding one,
   run `(koya-server:write-schema-snapshot)` — a test fails while `schema.sql` is
   stale.
+- **The server depends inward**: `domain/` ← `usecases/` ← `infra/`, `web/`.
+  A store keeps what a use case decided and decides nothing; a use case returns
+  data and `web/` makes the JSON. `tests/server/layers.lisp` checks the
+  direction.
+- **Guards are where things are mounted**, deny by default. A page or an action
+  does nothing about who is asking; what is open says so with `public-path`.
+- **A page answers GET; every change is a `defaction`.**
+- **`docs/openapi.yaml` changes with the API** — the TypeScript client is
+  generated from it.
+- **`koya` is MIT, `koya-server` is AGPL.** Moving a file across that line is a
+  licensing change (see the ADR for which files).
 - Comments carry what the code cannot: a constraint, a trap, a reason. Not a
   restatement of the lines below them, and not how the code came to be — that is
   what git and `adr/` are for.
