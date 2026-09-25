@@ -213,6 +213,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+// An upload form's files are checked against its <template data-upload-limit>
+// (ui/media/grid) before htmx sends them. Too large, the choice is cleared and
+// the template's toast shown. In the capture phase on the document, so the
+// input's own change listener, htmx's, never hears of it.
+document.addEventListener("change", (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || input.type !== "file") return;
+  const limit = input.form?.querySelector("template[data-upload-limit]");
+  if (!limit) return;
+  const total = Array.from(input.files).reduce((sum, file) => sum + file.size, 0);
+  if (total <= Number(limit.dataset.uploadLimit)) return;
+  event.stopPropagation();
+  input.value = "";
+  document.getElementById("toast")?.replaceWith(limit.content.cloneNode(true));
+}, true);
+
 // A <dialog data-show-modal> that htmx swaps in opens itself as a modal: the
 // server draws a dialog's contents for what it shows (the media preview), and an
 // element swapped in cannot be opened by the button that asked for it.

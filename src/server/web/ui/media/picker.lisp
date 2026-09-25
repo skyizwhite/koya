@@ -8,7 +8,7 @@
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/web/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/ui/media/grid #:~media-grid #:~pick-cards)
+  (:import-from #:koya-server/web/ui/media/grid #:~media-grid #:~pick-cards #:~upload-limit)
   (:export #:media-picker
            #:media-picker-more
            #:media-picker-upload
@@ -46,6 +46,7 @@ come as the last row scrolls into view.")
          (label :class "btn" (~icon :name :upload) "Upload…"
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
          (span :class "text-muted" "PNG, JPEG, GIF or WebP. Uploaded files are added to the library.")
+         (~upload-limit)
          (when error (hsx (span :class "text-danger" error))))
        (~media-grid :items items :more more)))))
 

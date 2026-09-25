@@ -10,7 +10,7 @@
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-server/web/presenters #:media-url #:media->jobject)
   (:import-from #:koya-server/usecases/media/library
-                #:store-upload #:remove-media #:remove-space-media #:media-references
+                #:store-upload #:store-uploads #:remove-media #:remove-space-media #:media-references
                 #:media-reference-counts)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-space #:media-filename #:media-mime #:media-width
@@ -147,7 +147,13 @@ Returns (values octets content-type)."
     (ok (eq 'too-large (refusal (lambda () (store-upload "website" (make-array (1+ +max-upload-bytes+)
                                                                        :element-type '(unsigned-byte 8) :initial-element 0)
                                                 :filename "big.png"))))
-        "too large")))
+        "too large")
+    (ok (eq 'too-large (refusal (lambda () (store-uploads "website"
+                                                          (loop :repeat 2
+                                                                :collect (list (make-array (1+ (floor +max-upload-bytes+ 2))
+                                                                                           :element-type '(unsigned-byte 8) :initial-element 0)
+                                                                               "half.png"))))))
+        "files each under the limit, but not together")))
 
 (deftest deleting-a-space-takes-its-files
   ;; the rows go with the space through the foreign key; the files are the admin

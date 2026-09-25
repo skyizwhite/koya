@@ -382,7 +382,8 @@ selection, **Delete** appears and asks first. A file some
 content still uses is refused as it is singly; the rest of the selection goes,
 and the message says how many could not and why.
 
-- **Upload** takes PNG, JPEG, GIF and WebP, several at once, up to 20 MB each.
+- **Upload** takes PNG, JPEG, GIF and WebP, several at once, up to 20 MB each and
+  20 MB per upload; a choice past that is refused in the page, before it is sent.
   The type is decided by reading the file's leading bytes, not by what the browser
   claims. Files are stored under `KOYA_MEDIA_DIR/{space}/` and served at
   `/media/{space}/{id}.{ext}` with a long immutable cache.
@@ -483,7 +484,7 @@ on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key = 'totp
 | Webhook deliveries kept | the newest 200 per space |
 | Schema deploys kept | the newest 100 per space |
 | Response body stored per delivery | 4000 characters |
-| Upload size and types | 20 MB; PNG, JPEG, GIF, WebP |
+| Upload size and types | 20 MB each and per upload; PNG, JPEG, GIF, WebP |
 | Session lifetime | 24 hours, stored in the database |
 | Login lockout | 5 failures per address per 5 minutes |
 

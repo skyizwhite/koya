@@ -190,11 +190,12 @@ with `POST /admin/api/schema/{space}/plan`: see [SCHEMA.md](SCHEMA.md), and
 ## Media
 
 `POST /admin/api/media/{space}` takes `multipart/form-data` with one or more
-`file` parts and an optional `alt`: PNG, JPEG, GIF or WebP up to 20 MB each, the
-type decided by the file's leading bytes. The answer is `{"media": [...]}`; put a
-media object's `id` in a `media` field. A media still used by a content, in a
-`media` or `richtext` field of the current schema, cannot be deleted
-(`409 in_use`); a value left in a field a deploy removed does not count.
+`file` parts and an optional `alt`: PNG, JPEG, GIF or WebP, up to 20 MB each and
+20 MB together, the type decided by the file's leading bytes. The answer is
+`{"media": [...]}`; put a media object's `id` in a `media` field. A media still
+used by a content, in a `media` or `richtext` field of the current schema, cannot
+be deleted (`409 in_use`); a value left in a field a deploy removed does not
+count.
 
 ## Errors
 
@@ -212,7 +213,7 @@ that is answered with `413` and a plain-text body before koya reads it.
 | 403 | `forbidden` | a key of another space, or a cross-origin write |
 | 404 | `not_found` | no such space, model, content or media |
 | 409 | `conflict` `destructive_changes` `in_use` `not_published` | refused as things stand |
-| 413 | `too_large` | a file over 20 MB |
+| 413 | `too_large` | images over 20 MB, alone or together |
 | 422 | `validation_failed` `empty_file` `unsupported_type` | the content or file is not acceptable |
 | 500 | `internal_error` | the message is only detailed with `KOYA_ENV=dev` |
 

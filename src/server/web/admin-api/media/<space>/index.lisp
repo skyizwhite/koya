@@ -6,7 +6,7 @@
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
   (:import-from #:koya-server/web/presenters #:media->jobject)
-  (:import-from #:koya-server/usecases/media/library #:store-upload #:list-media #:count-media)
+  (:import-from #:koya-server/usecases/media/library #:store-uploads #:list-media #:count-media)
   (:export #:@get #:@post #:require-space))
 (in-package #:koya-server/web/admin-api/media/<space>/index)
 
@@ -31,7 +31,6 @@
          (files (uploaded-files params "file"))
          (alt (or (form-field params "alt") "")))
     (when (null files) (fail-api 400 "bad_request" "Send the image as a multipart field named \"file\""))
-    (let ((stored (loop :for (bytes filename) :in files
-                        :collect (store-upload space bytes :filename filename :alt alt))))
+    (let ((stored (store-uploads space files :alt alt)))
       (ok-status 201)
       (jobject "media" (map 'vector #'media->jobject stored)))))

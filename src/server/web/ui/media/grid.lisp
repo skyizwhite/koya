@@ -1,10 +1,13 @@
 (defpackage #:koya-server/web/ui/media/grid
   (:use #:cl #:hsx)
   (:import-from #:koya-server/domain/media
-                #:media-id #:media-filename #:media-width #:media-height #:media-alt)
+                #:media-id #:media-filename #:media-width #:media-height #:media-alt #:+max-upload-bytes+)
+  (:import-from #:koya-server/usecases/media/library #:upload-limit-message)
+  (:import-from #:koya-server/web/ui/toast #:~toast)
   (:import-from #:koya-server/web/presenters #:media-url)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:export #:~media-grid
+           #:~upload-limit
            #:~pick-cards
            #:~thumb
            #:dimensions
@@ -12,7 +15,8 @@
 (in-package #:koya-server/web/ui/media/grid)
 
 ;;; What the library page and the picker share: a thumbnail, its size in words,
-;;; and the picker's grid. The library's own cards and preview are on its page.
+;;; the limit on an upload, and the picker's grid. The library's own cards and
+;;; preview are on its page.
 
 (defun human-size (bytes)
   (cond ((< bytes 1024) (format nil "~a B" bytes))
@@ -23,6 +27,14 @@
   (if (and (media-width media) (media-height media))
       (format nil "~a×~a" (media-width media) (media-height media))
       "?"))
+
+(defcomp ~upload-limit ()
+  "Put in an upload form: what koya-editor.js checks the chosen files against before
+they are sent, and the toast it shows when they are too large. The server's 413
+would not do: it answers before the body is read and closes the connection, and
+a browser still sending takes that for a reset and shows nothing."
+  (hsx (template :data-upload-limit (princ-to-string +max-upload-bytes+)
+         (~toast :message (upload-limit-message) :kind :error))))
 
 (defcomp ~thumb (&key media)
   (hsx (img :src (media-url media :absolute nil) :alt (media-alt media) :loading "lazy" :decoding "async"

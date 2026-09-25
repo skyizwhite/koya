@@ -21,7 +21,7 @@
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast-oob #:action-refusal)
-  (:import-from #:koya-server/web/ui/media/grid #:~thumb #:dimensions #:human-size)
+  (:import-from #:koya-server/web/ui/media/grid #:~thumb #:dimensions #:human-size #:~upload-limit)
   (:export #:@get #:media-page-url
            #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt))
 (in-package #:koya-server/web/pages/s/<space>/media)
@@ -103,7 +103,8 @@ joins the selection form."
          (label :class "btn" (~icon :name :upload) "Upload"
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp"
                   :multiple t :class "hidden"))
-         (span :class "text-muted" "PNG, JPEG, GIF or WebP, several at once."))
+         (span :class "text-muted" "PNG, JPEG, GIF or WebP, several at once.")
+         (~upload-limit))
        (if (null items)
            (hsx (~empty-state (if (plusp (length q)) "No file matches." "No media yet. Upload an image above.")))
            (hsx
@@ -198,7 +199,7 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
 (defun upload (space files)
   (handler-case
       (cond ((null files) (values "Choose at least one image." :error))
-            (t (values (format nil "Uploaded ~a file~:p." (store-uploads space files)) :ok)))
+            (t (values (format nil "Uploaded ~a file~:p." (length (store-uploads space files))) :ok)))
     (koya-error (e) (values (koya-error-message e) :error))))
 
 (defun delete-one (space id)

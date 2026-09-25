@@ -556,9 +556,9 @@ paths:
       summary: Upload images
       description: |
         `multipart/form-data` with one or more `file` parts and an optional `alt`
-        applied to all of them. PNG, JPEG, GIF and WebP, up to 20 MB each, decided
-        by the file's leading bytes; the part's Content-Type is ignored. The whole
-        request body is limited to 21 MB.
+        applied to all of them. PNG, JPEG, GIF and WebP, up to 20 MB each and 20 MB
+        together, decided by the file's leading bytes; the part's Content-Type is
+        ignored. The whole request body is limited to 21 MB.
       security: [{ managementKey: [] }]
       requestBody:
         required: true
@@ -589,7 +589,7 @@ paths:
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
         "413":
-          description: "`too_large`: a file over 20 MB. A body over 21 MB gets 413 in plain text, with no error object."
+          description: "`too_large`: images over 20 MB, alone or together. A body over 21 MB gets 413 in plain text, with no error object."
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }

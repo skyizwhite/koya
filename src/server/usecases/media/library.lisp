@@ -21,6 +21,7 @@
                 #:make-ulid)
   (:export #:store-upload
            #:store-uploads
+           #:upload-limit-message
            #:remove-media
            #:remove-each
            #:remove-space-media
@@ -56,12 +57,16 @@ the contents whose data holds the id are read."
     (count-if (lambda (content) (mentioned-ids content fields (list id)))
               (contents-mentioning space id))))
 
+(defun upload-limit-message ()
+  (let ((mb (floor +max-upload-bytes+ (* 1024 1024))))
+    (format nil "Images are limited to ~a MB each, and ~a MB per upload" mb mb)))
+
 (defun store-upload (space bytes &key filename (alt ""))
   "Accept BYTES as a new media of SPACE: sniff the type, write the file, insert the
 row. Signals REJECTED or TOO-LARGE for data the library does not take."
   (when (zerop (length bytes)) (fail 'rejected "The uploaded file is empty" :code "empty_file"))
   (when (> (length bytes) +max-upload-bytes+)
-    (fail 'too-large (format nil "Files are limited to ~a MB" (floor +max-upload-bytes+ (* 1024 1024)))))
+    (fail 'too-large (upload-limit-message)))
   (multiple-value-bind (mime width height) (sniff-image bytes)
     (unless mime (fail 'rejected "Only PNG, JPEG, GIF and WebP images are accepted" :code "unsupported_type"))
     ;; the file first: a failed write (disk full) must not leave a row whose URL 404s
@@ -74,11 +79,13 @@ row. Signals REJECTED or TOO-LARGE for data the library does not take."
           (ignore-errors (delete-media-file space id mime))
           (error e))))))
 
-(defun store-uploads (space files)
-  "Store each of FILES, each a list (octets filename). Signals for the first that
-is refused; the ones before it are kept."
-  (dolist (file files (length files))
-    (store-upload space (first file) :filename (second file))))
+(defun store-uploads (space files &key (alt ""))
+  "Store each of FILES, each a list (octets filename), and return the new media.
+FILES together are held to the limit of one file, and refused whole past it.
+Otherwise signals for the first that is refused; the ones before it are kept."
+  (when (> (reduce #'+ files :key (lambda (file) (length (first file)))) +max-upload-bytes+)
+    (fail 'too-large (upload-limit-message)))
+  (mapcar (lambda (file) (store-upload space (first file) :filename (second file) :alt alt)) files))
 
 (defun remove-media (media)
   "Delete the row and the file. A missing file is not an error; a file some
