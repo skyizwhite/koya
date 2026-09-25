@@ -1,9 +1,10 @@
 (defpackage #:koya-tests/server/usecases/contents/write
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:fetch-one #:col #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema #:find-model)
+  (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/contents
                 #:create-content #:save-draft #:publish-content #:unpublish-content
@@ -37,7 +38,7 @@
   (connect-db ":memory:")
   (migrate)
   (create-space "website")
-  (save-schema "website"
+  (replace-schema "website"
                (make-schema :models (list (blog-model)
                                           (make-model "tag" :list (list (make-field :name :text)))
                                           (make-model "about" :object (list (make-field :body :richtext)))))))

@@ -1,9 +1,10 @@
 (defpackage #:koya-tests/server/web/pages/deploys
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-tests/server/web/pages/support #:post-login #:*secret* #:*cookie* #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/deploys #:browse-deploys)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema #:delete-space #:list-deploys)
+  (:import-from #:koya-server/usecases/ports/spaces #:delete-space #:list-deploys)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/keys #:create-management-key)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
@@ -20,10 +21,10 @@
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))
   (create-space "deployed")
-  (save-schema "deployed"
+  (replace-schema "deployed"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text)))))
                :by "key:ci")
-  (save-schema "deployed"
+  (replace-schema "deployed"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t))))))
   (unwind-protect
        (progn
@@ -42,7 +43,7 @@
              (ok (search "(management key: ci)" body) "a stored key:ci is read out in words")
              (ok (search "destructive" body))))
          (testing "a deploy with no key behind it was the owner's"
-           (save-schema "deployed"
+           (replace-schema "deployed"
                         (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t)
                                                                                   (make-field :body :richtext)))))
                         :by "owner")

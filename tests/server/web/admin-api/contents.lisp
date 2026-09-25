@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/server/web/admin-api/contents
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-tests/server/web/api-support #:*webhooks* #:admin #:delivery #:webhook-events #:setup-api #:reset-api #:test-schema)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya/core/json #:jobject #:jget #:json-null #:jkeys))
@@ -203,12 +203,12 @@
                       "id")))
       (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Keeps an id" "tags" (vector tag))))
       (ok (= 409 (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag))))
-      (save-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text :required t)))
+      (replace-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text :required t)))
                                                         (make-model "tag" :list (list (make-field :name :text :required t)))
                                                         (make-model "about" :object (list (make-field :body :richtext))))))
       (unwind-protect
            (ok (= 200 (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag))))
-        (save-schema "website" (test-schema))))))
+        (replace-schema "website" (test-schema))))))
 
 (deftest a-patch-that-changes-nothing-writes-nothing
   (let ((id (jget (nth-value 1 (admin :post "/admin/api/contents/website/tag"

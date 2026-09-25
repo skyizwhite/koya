@@ -83,6 +83,9 @@ web  ──▶  usecases  ──▶  domain
 - A port is a package of generic functions, each with the lambda list and the
   documentation that are its contract. `infra/` adds the one method each has,
   so a use case calls `find-content` without knowing that SQLite answers it.
+  A port keeps what it is given and decides nothing: a deploy's changes are
+  found by the use case and handed to `save-schema` with the schema. See
+  `adr/2026-09-25-the-store-saves-what-a-use-case-decided.md`.
   `koya-server/main` is the only module that loads `infra/`, and it refuses to
   load while a port has no method. The web app is built on first use (`app`),
   not when its file loads, so nothing calls a port before infra is there.

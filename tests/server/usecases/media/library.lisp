@@ -1,8 +1,9 @@
 (defpackage #:koya-tests/server/usecases/media/library
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema #:delete-space)
+  (:import-from #:koya-server/usecases/ports/spaces #:delete-space)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/contents #:create-content)
   (:import-from #:koya-server/usecases/ports/media
@@ -64,7 +65,7 @@ Returns (values octets content-type)."
   (connect-db ":memory:")
   (migrate)
   (create-space "website")
-  (save-schema "website"
+  (replace-schema "website"
                (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
                                                                          (make-field :cover :media)
                                                                          (make-field :body :richtext)))))))
@@ -123,11 +124,11 @@ Returns (values octets content-type)."
       (ok (= (media-references "website" (media-id media)) 0) "a text field mentioning the id is not a use")
       (create-content "website" "blog" (parse-json (format nil "{\"title\": \"z\", \"cover\": \"~a\"}" (media-id media))))
       (ok (= (media-references "website" (media-id media)) 1))
-      (save-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
+      (replace-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
                                                                                          (make-field :body :richtext))))))
       (ok (= (media-references "website" (media-id media)) 0) "a field removed by a deploy leaves its value unread")
       (ok (= (gethash (media-id media) (media-reference-counts "website" (list (media-id media)))) 0))
-      (save-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
+      (replace-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
                                                                                          (make-field :cover :media)
                                                                                          (make-field :body :richtext))))))
       (ok (= (media-references "website" (media-id media)) 1) "and counts again once the field is back"))

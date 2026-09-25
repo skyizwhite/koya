@@ -1,8 +1,8 @@
 (defpackage #:koya-tests/server/usecases/webhooks/notify
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-tests/server/web/api-support #:*webhooks* #:test-schema #:admin #:webhook-events #:setup-api #:reset-api)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya-server/infra/db/webhook-deliveries #:+max-response-chars+)
   (:import-from #:koya-server/usecases/ports/webhooks #:+deliveries-kept+)
   (:import-from #:koya-server/usecases/ports/webhooks #:list-deliveries #:count-deliveries)
@@ -31,7 +31,7 @@
                                                                     (make-field :cover :media)))
                                      (make-model "tag" :list (list (make-field :name :text :required t)))
                                      (make-model "about" :object (list (make-field :body :richtext)))))))
-    (save-schema "website" with-hooks)
+    (replace-schema "website" with-hooks)
     (unwind-protect
          (flet ((sent () (mapcar (lambda (w) (list (first w) (jget (second w) "event"))) (reverse *webhooks*))))
            (multiple-value-bind (status json) (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Draft")))
@@ -63,7 +63,7 @@
                                                  :body (jobject "data" (jobject "name" "lisp")))) "id")))
                (ok (equal (sent) '(("https://example.com/hook" "draft"))))
                (admin :delete (format nil "/admin/api/contents/website/tag/~a" id)))))
-      (save-schema "website" (test-schema)))))
+      (replace-schema "website" (test-schema)))))
 
 (deftest delete-published-webhook
   (let ((post-id nil))

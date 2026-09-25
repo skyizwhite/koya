@@ -1,9 +1,9 @@
 (defpackage #:koya-tests/server/web/pages/webhooks
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-tests/server/web/pages/support #:blog-model #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/webhooks #:browse-deliveries)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya-server/usecases/ports/webhooks #:record-delivery)
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya/core/schema #:make-webhook)
@@ -21,7 +21,7 @@
                                            (make-model "about" :object (list (make-field :body :richtext)))))))
     (unwind-protect
          (progn
-           (save-schema "website" hooked)
+           (replace-schema "website" hooked)
            (exec "DELETE FROM webhook_deliveries")
            (record-delivery "website" :label "revalidate" :url "https://site.test/api/revalidate"
                                       :model "blog" :event "publish" :content-id "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -45,9 +45,9 @@
                                                                           :only '(blog)))
                                             :models (list (blog-model)
                                                           (make-model "about" :object (list (make-field :body :richtext)))))))
-               (save-schema "website" narrow)
+               (replace-schema "website" narrow)
                (unwind-protect (request :get "/s/website/m/about/new")
-                 (save-schema "website" hooked)))
+                 (replace-schema "website" hooked)))
                (ok (= status 200))
                (ng (search "/s/website/webhooks?model=about" body))))
            (testing "a model page links to the log narrowed to that model"
@@ -104,7 +104,7 @@
                  (ok (search "<option value=\"blog\" selected" body)))))
            (multiple-value-bind (status) (request :get "/s/nope/webhooks")
              (ok (= status 404))))
-      (save-schema "website"
+      (replace-schema "website"
                    (make-schema :models (list (blog-model)
                                               (make-model "about" :object (list (make-field :body :richtext))))))
       (exec "DELETE FROM webhook_deliveries")))

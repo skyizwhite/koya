@@ -36,11 +36,12 @@ webhook log and the deploy log. The media files themselves are removed by the ca
 (defgeneric load-schema (space-name)
   (:documentation "The schema of SPACE-NAME -- its webhooks and models -- or NIL when no such space."))
 
-(defgeneric save-schema (space-name schema &key by)
-  (:documentation "Replace the schema of SPACE-NAME with SCHEMA. Models that disappear are deleted
-(their contents go with them); models and fields declared with :WAS are renamed,
-content included. BY names whoever is deploying, for the log. Returns the list of
-changes applied."))
+(defgeneric save-schema (space-name schema changes &key by)
+  (:documentation "Store SCHEMA as the schema of SPACE-NAME, and log CHANGES as a deploy by BY,
+in one transaction. CHANGES is what the caller found between the stored schema
+and SCHEMA (core/diff); the renames in it are carried through to the stored
+content, and a model that is no longer there is deleted with its contents.
+Nothing is decided here: the caller checked SCHEMA and chose to apply it."))
 
 (defgeneric find-model (space-name model-name))
 

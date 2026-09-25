@@ -7,8 +7,10 @@
   (:import-from #:koya-server/usecases/actor
                 #:*actor*)
   (:import-from #:koya-server/usecases/ports/spaces
-                #:load-schema #:save-schema #:find-space #:insert-space #:space-webhook-secret
+                #:load-schema #:find-space #:insert-space #:space-webhook-secret
                 #:set-webhook-secret)
+  (:import-from #:koya-server/usecases/schema/deploy
+                #:replace-schema)
   (:import-from #:koya-server/usecases/ports/keys
                 #:stored-delivery-keys #:import-delivery-key #:stored-management-keys
                 #:import-management-key)
@@ -314,7 +316,7 @@ whatever came of it."
              ;; checked again inside: another import may have made it since
              (check-target space)
              (unless (find-space space) (insert-space space))
-             (save-schema space schema :by by)
+             (replace-schema space schema :by by)
              (when secret (set-webhook-secret space secret))
              (dolist (k delivery-keys) (apply #'import-delivery-key space k))
              (dolist (k management-keys) (apply #'import-management-key space k))

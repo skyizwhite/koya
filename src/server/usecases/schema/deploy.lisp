@@ -1,5 +1,7 @@
 (defpackage #:koya-server/usecases/schema/deploy
   (:use #:cl)
+  (:import-from #:koya/core/schema
+                #:check-schema)
   (:import-from #:koya/core/diff
                 #:diff-schemas #:destructive-changes-p)
   (:import-from #:koya-server/domain/errors
@@ -11,6 +13,7 @@
   (:export #:space-schema
            #:plan
            #:deploy
+           #:replace-schema
            #:list-deploys
            #:count-deploys
            #:+deploys-kept+))
@@ -32,14 +35,28 @@
   "The changes a deploy of SCHEMA to space NAME would make. Changes nothing."
   (diff-schemas (load-schema (existing-space name)) schema))
 
+(defun changes-of (space schema)
+  "What making SCHEMA the schema of SPACE would change. Signals SCHEMA-ERROR for
+a schema that is inconsistent, before anything is compared."
+  (check-schema schema)
+  (diff-schemas (load-schema space) schema))
+
+(defun replace-schema (space schema &key (by *actor*))
+  "Make SCHEMA the schema of SPACE, whatever that changes, and return the changes:
+what a deploy does once it is allowed to, and what an import does to a space
+that has nothing to lose."
+  (let ((changes (changes-of space schema)))
+    (save-schema space schema changes :by by)
+    changes))
+
 (defun deploy (name schema &key force)
   "Make SCHEMA the schema of space NAME, and return the changes that took. A
 deploy that would destroy something signals a CONFLICT coded
 destructive_changes, whose details are the changes, unless FORCE."
   (let* ((space (existing-space name))
-         (changes (diff-schemas (load-schema space) schema)))
+         (changes (changes-of space schema)))
     (when (and (destructive-changes-p changes) (not force))
       (fail 'conflict "Schema deploy contains destructive changes; retry with force=true"
             :code "destructive_changes" :details changes))
-    (save-schema space schema :by *actor*)
+    (save-schema space schema changes :by *actor*)
     changes))

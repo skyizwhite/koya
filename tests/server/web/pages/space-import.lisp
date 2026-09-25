@@ -1,9 +1,9 @@
 (defpackage #:koya-tests/server/web/pages/space-import
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-tests/server/web/pages/support #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-server/usecases/ports/spaces
-                #:save-schema #:find-space #:delete-space #:list-deploys #:load-schema
+  (:import-from #:koya-server/usecases/ports/spaces #:find-space #:delete-space #:list-deploys #:load-schema
                 #:space-webhooks #:space-webhook-secret)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/keys
@@ -86,7 +86,7 @@
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))
   (create-space "archive")
-  (save-schema "archive" (archive-schema))
+  (replace-schema "archive" (archive-schema))
   (let* ((media (store-upload "archive" (png-bytes 4 5) :filename "cover.png" :alt "A cover"))
          (tag (content-id (create-content "archive" "tag" (alist-hash-table '(("name" . "lisp")) :test 'equal)
                                           :publish t :id "tag-1" :created-at "2020-01-01T00:00:00.000Z"
@@ -163,7 +163,7 @@
         (ok (search "is not empty" (nth-value 1 (request :get "/"))))
         (ok (= (length (list-deploys "archive")) 1) "and nothing changed"))
       (testing "a space whose models went but whose media stayed is not empty"
-        (save-schema "archive" (make-schema))
+        (replace-schema "archive" (make-schema))
         (let ((path (let ((m (find (media-id media) (list-media "archive") :key #'media-id :test #'string=)))
                       (media-file-path (media-space m) (media-id m) (media-mime m)))))
           (multiple-value-bind (status location) (import-archive octets)
@@ -184,7 +184,7 @@
         (delete-space "archive")
         (remove-space-media "archive")
         (create-space "archive")
-        (save-schema "archive" (make-schema :webhooks (list (make-webhook "old" "https://old.test/hook"))))
+        (replace-schema "archive" (make-schema :webhooks (list (make-webhook "old" "https://old.test/hook"))))
         (ok (string= (nth-value 1 (import-archive octets)) "/s/archive"))
         (ok (get-content post))
         (ok (equal (mapcar #'webhook-url (space-webhooks "archive")) '("https://site.test/hook")))

@@ -1,9 +1,9 @@
 (defpackage #:koya-tests/server/web/pages/editor
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id>/history #:browse-history)
   (:import-from #:koya-tests/server/web/pages/support #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:list-revisions #:count-revisions #:get-content
                 #:unpublish-content #:delete-content)
@@ -263,7 +263,7 @@
     (unpublish-content unpublished)
     (delete-content deleted)
     (delete-media "website" media)
-    (save-schema "website"
+    (replace-schema "website"
                  (make-schema :models (list (make-model "blog" :list
                                                         (remove-if (lambda (f) (member (field-name f) '("count") :test #'string=))
                                                                    (mapcar (lambda (f)
@@ -312,7 +312,7 @@
       (edit url  :form '(("action" . "delete")))
       (ok (= (count-revisions id) 0))
       (ok (= (request :get (format nil "~a/history" url)) 404))))
-  (save-schema "website"
+  (replace-schema "website"
                (make-schema :models (list (blog-model)
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
 
@@ -328,7 +328,7 @@
       (ok (search ">Pointer</a>"
                   (nth-value 1 (request :get (format nil "/s/website/m/blog/~a/history" pointer))))
           "and the history's")
-      (save-schema "website"
+      (replace-schema "website"
                    (make-schema :models (list (make-model "blog" :list (model-fields (blog-model)))
                                               (make-model "about" :object (list (make-field :body :richtext))))))
       (unwind-protect
@@ -341,7 +341,7 @@
                    "and so is the option that picks it")
                (ok (search (format nil "title=\"~a\">~a</span>" pointer pointer) editor)
                    "and the crumb")))
-        (save-schema "website"
+        (replace-schema "website"
                      (make-schema :models (list (blog-model)
                                                 (make-model "about" :object (list (make-field :body :richtext))))))))))
 

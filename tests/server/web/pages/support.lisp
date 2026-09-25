@@ -1,10 +1,10 @@
 (defpackage #:koya-tests/server/web/pages/support
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id> #:editor-action)
   (:import-from #:koya-server/infra/db/connection #:connect-db)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-tests/server/usecases/media/library #:*media-root* #:multipart-body)
   (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-async*)
@@ -140,7 +140,7 @@ override those: the first of a name is the one the table keeps."
   (connect-db ":memory:")
   (migrate)
   (create-space "website")
-  (save-schema "website"
+  (replace-schema "website"
                (make-schema :models (list (blog-model)
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
 

@@ -1,9 +1,9 @@
 (defpackage #:koya-tests/server/web/http
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-tests/server/web/api-support #:*secret* #:*management-key* #:*api-key* #:request #:admin #:delivery #:setup-api #:reset-api)
   (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-server/usecases/ports/spaces #:save-schema)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema #:make-webhook)
   (:import-from #:koya-server/web/http #:origin-allowed-p)
   (:import-from #:koya/core/json #:jobject #:jget)
@@ -84,7 +84,7 @@
     (ok (string= (jget json "error" "code") "unauthorized")))
   (multiple-value-bind (status) (delivery "/api/v1/website/blog" :key "koya_wrong")
     (ok (= status 401)))
-  (save-schema "website"
+  (replace-schema "website"
                (make-schema :webhooks (list (make-webhook "hook" "https://example.com/hook"))
                             :models (list (make-model "blog" :list (list (make-field :title :text :required t :unique t)
                                                                          (make-field :body :richtext)

@@ -4,11 +4,9 @@
   (:import-from #:koya/core/schema
                 #:make-schema #:schema-webhooks #:schema-models #:webhook->jobject
                 #:jobject->webhook #:model-name #:model-kind #:model->jobject #:jobject->model
-                #:check-schema #:model-forget-renames #:schema-model)
+                #:model-forget-renames #:schema-model)
   (:import-from #:koya/core/json
                 #:parse-json #:to-json)
-  (:import-from #:koya/core/diff
-                #:diff-schemas)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
   (:import-from #:koya/core/time
                 #:now-iso)
@@ -128,11 +126,9 @@ rename names its model by the new name."
       (:rename-field (rename-content-field space-name (getf change :model)
                                            (getf change :from) (getf change :field))))))
 
-(defmethod save-schema (space-name schema &key (by ""))
-  (check-schema schema)
+(defmethod save-schema (space-name schema changes &key (by ""))
   (with-db-transaction
-    (let* ((old (load-schema space-name))
-           (changes (diff-schemas old schema)))
+    (progn
       (apply-renames space-name changes)
       ;; in the transaction: a deploy that rolls back must not be in the log
       (record-deploy space-name changes :by by)
@@ -148,5 +144,4 @@ rename names its model by the new name."
                        ON CONFLICT(space, name) DO UPDATE SET kind = excluded.kind,
                          definition = excluded.definition, position = excluded.position"
                       space-name (model-name model) (string-downcase (symbol-name (model-kind model)))
-                      (to-json (model->jobject (model-forget-renames model))) position))
-      changes)))
+                      (to-json (model->jobject (model-forget-renames model))) position)))))

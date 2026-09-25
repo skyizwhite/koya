@@ -1,11 +1,12 @@
 (defpackage #:koya-tests/server/infra/db
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/infra/db/migrations #:migrate #:current-version)
   (:import-from #:koya-server/infra/db/schema-dump #:migrated-snapshot #:read-snapshot)
   (:import-from #:koya-server/usecases/ports/spaces
-                #:load-schema #:save-schema #:find-model #:list-spaces #:delete-space
+                #:load-schema #:find-model #:list-spaces #:delete-space
                 #:find-space #:list-deploys #:count-deploys)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/domain/deploy
@@ -70,7 +71,7 @@
     (ok (signals (create-space "My Space") 'error))
     (ok (signals (create-space "website") 'error)))
   (testing "deleting takes the space's models with it"
-    (save-schema "shop" (schema-b))
+    (replace-schema "shop" (schema-b))
     (delete-space "shop")
     (ng (find-space "shop"))
     (ok (null (load-schema "shop")))
@@ -79,7 +80,7 @@
 (deftest schema-round-trip
   (create-space "site")
   (ok (null (schema-models (load-schema "site"))) "empty at first")
-  (let ((changes (save-schema "site" (schema-a))))
+  (let ((changes (replace-schema "site" (schema-a))))
     (ok (= (length changes) 6))
     (ok (string= (to-json (schema->jobject (load-schema "site")))
                  (to-json (schema->jobject (schema-a))))))
@@ -88,16 +89,16 @@
     (ng (find-model "site" "nope"))
     (ng (find-model "nope" "blog")))
   (testing "saving again with no change is a no-op"
-    (ok (null (save-schema "site" (schema-a)))))
+    (ok (null (replace-schema "site" (schema-a)))))
   (testing "removed models are applied"
-    (save-schema "site" (schema-b))
+    (replace-schema "site" (schema-b))
     (let ((loaded (load-schema "site")))
       (ok (equal (mapcar #'model-name (schema-models loaded)) '("blog")))
       (ok (null (schema-webhooks loaded)))
       (ok (model-field (find-model "site" "blog") "eventAt"))
       (ng (model-field (find-model "site" "blog") "body"))))
   (testing "an empty schema leaves the space with no models"
-    (save-schema "site" (make-schema))
+    (replace-schema "site" (make-schema))
     (ok (null (schema-models (load-schema "site"))))
     (ok (find-space "site") "the space itself stays")
     (ok (null (fetch "SELECT * FROM models")))))
@@ -124,12 +125,12 @@
 
 (deftest a-rename-carries-the-content-with-it
   (create-space "magazine")
-  (save-schema "magazine"
+  (replace-schema "magazine"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text)
                                                                         (make-field :lede :text))))))
   (let ((published (create-content "magazine" "post" (jobject "title" "One" "lede" "First words") :publish t))
         (drafted (create-content "magazine" "post" (jobject "title" "Two" "lede" "Later words"))))
-    (let ((changes (save-schema "magazine"
+    (let ((changes (replace-schema "magazine"
                                 (make-schema :models (list (make-model "article" :list
                                                                        (list (make-field :title :text)
                                                                              (make-field :subtitle :text :was :lede))
@@ -153,7 +154,7 @@
         (ng (jget data "lede"))))
     (testing "the stored schema keeps the shape, not the rename"
       (ok (null (search "\"was\"" (to-json (schema->jobject (load-schema "magazine"))))))
-      (ok (null (save-schema "magazine"
+      (ok (null (replace-schema "magazine"
                              (make-schema :models (list (make-model "article" :list
                                                                     (list (make-field :title :text)
                                                                           (make-field :subtitle :text :was :lede))
@@ -162,10 +163,10 @@
 
 (deftest a-deploy-leaves-a-record
   (create-space "logged")
-  (save-schema "logged"
+  (replace-schema "logged"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text)))))
                :by "key:ci")
-  (save-schema "logged"
+  (replace-schema "logged"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t))))))
   (let ((deploys (list-deploys "logged")))
     (ok (= (count-deploys "logged") 2))
@@ -186,7 +187,7 @@
                   (change-description (first (deploy-changes second-deploy))))
           "the log says which option moved and where to, not only that one did")))
   (testing "a deploy that changed nothing is not an event"
-    (save-schema "logged"
+    (replace-schema "logged"
                  (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t))))))
     (ok (= (count-deploys "logged") 2)))
   (testing "the log goes with the space"
