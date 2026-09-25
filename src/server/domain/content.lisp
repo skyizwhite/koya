@@ -38,7 +38,11 @@
 ;;; NIL; STATUS follows from which of them there are (STATUS-OF).
 
 (defstruct content
-  id space model status published draft draft-key created-at updated-at published-at revised-at)
+  id space model published draft draft-key created-at updated-at published-at revised-at)
+
+(defun content-status (content)
+  "One of +STATUSES+, told from what the content holds."
+  (status-of (content-published content) (content-draft content)))
 
 (defun content-data (content &key draft)
   "The published data, or with DRAFT the draft data falling back to published."
@@ -62,30 +66,28 @@
 (defun new-draft-key ()
   (byte-array-to-hex-string (random-data 16)))
 
-(defun settled (content &key (now (now-iso)))
-  "CONTENT with its status told from its data, and touched at NOW."
-  (setf (content-status content) (status-of (content-published content) (content-draft content))
-        (content-updated-at content) now)
+(defun touched (content now)
+  (setf (content-updated-at content) now)
   content)
 
 (defun new-content (id space model data &key publish (now (now-iso)) created-at updated-at published-at revised-at)
   "A content as it is first written: DATA published, with PUBLISH, or its draft
 under a fresh key. The system timestamps default to NOW; an import gives its own."
-  (settled (make-content :id id :space space :model model
+  (touched (make-content :id id :space space :model model
                          :published (and publish data)
                          :draft (and (not publish) data)
                          :draft-key (and (not publish) (new-draft-key))
                          :created-at (or created-at now)
                          :published-at (and publish (or published-at now))
                          :revised-at (and publish (or revised-at now)))
-           :now (or updated-at now)))
+           (or updated-at now)))
 
 (defun drafted (content data &key (now (now-iso)))
   "CONTENT with DATA as its draft, under a fresh key."
   (let ((next (copy-content content)))
     (setf (content-draft next) data
           (content-draft-key next) (new-draft-key))
-    (settled next :now now)))
+    (touched next now)))
 
 (defun published (content data &key (now (now-iso)) published-at)
   "CONTENT with DATA live and no draft. The first publish date is kept unless
@@ -96,7 +98,7 @@ PUBLISHED-AT replaces it; the revision date is NOW."
           (content-draft-key next) nil
           (content-published-at next) (or published-at (content-published-at content) now)
           (content-revised-at next) now)
-    (settled next :now now)))
+    (touched next now)))
 
 (defun unpublished (content &key (now (now-iso)))
   "CONTENT taken off the air: what was live becomes its draft unless it has one,
@@ -106,14 +108,14 @@ under a fresh key, and it has no publish date."
           (content-draft-key next) (new-draft-key)
           (content-published next) nil
           (content-published-at next) nil)
-    (settled next :now now)))
+    (touched next now)))
 
 (defun discarded (content &key (now (now-iso)))
   "CONTENT without its draft: what is live is all there is."
   (let ((next (copy-content content)))
     (setf (content-draft next) nil
           (content-draft-key next) nil)
-    (settled next :now now)))
+    (touched next now)))
 
 (defun keyed (content)
   "CONTENT with a draft key, made now if it had none: a preview link for a

@@ -5,6 +5,7 @@
   (:import-from #:koya-server/usecases/keys
                 #:space-webhook-secret #:create-delivery-key #:list-delivery-keys)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
+  (:import-from #:koya-server/domain/key #:key-id #:key-label #:key-created-at)
   (:export #:@get #:@post))
 (in-package #:koya-server/web/admin-api/keys/<space>/index)
 
@@ -14,7 +15,7 @@
     name))
 
 (defun key->jobject (key)
-  (jobject "id" (getf key :id) "label" (getf key :label) "createdAt" (getf key :created-at)))
+  (jobject "id" (key-id key) "label" (key-label key) "createdAt" (key-created-at key)))
 
 (defun @get (params)
   (let ((space (require-space params)))

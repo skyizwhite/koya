@@ -1,6 +1,7 @@
 (defpackage #:koya-server/infra/db/delivery-keys
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/domain/key #:make-key)
   (:import-from #:koya/core/ulid
                 #:make-ulid)
   (:import-from #:koya/core/time
@@ -31,7 +32,7 @@ fail to match, not fail to hash."
     (values key id)))
 
 (defmethod list-delivery-keys (space)
-  (mapcar (lambda (row) (list :id (col row "id") :label (col row "label") :created-at (col row "created_at")))
+  (mapcar (lambda (row) (make-key :id (col row "id") :label (col row "label") :created-at (col row "created_at")))
           (fetch "SELECT id, label, created_at FROM delivery_keys WHERE space = ? ORDER BY created_at" space)))
 
 (defmethod delete-delivery-key (space id)
@@ -43,8 +44,8 @@ fail to match, not fail to hash."
          (and row (col row "space")))))
 
 (defmethod stored-delivery-keys (space)
-  (mapcar (lambda (row) (list :id (col row "id") :hash (col row "key_hash")
-                              :label (col row "label") :created-at (col row "created_at")))
+  (mapcar (lambda (row) (make-key :id (col row "id") :hash (col row "key_hash")
+                                  :label (col row "label") :created-at (col row "created_at")))
           (fetch "SELECT * FROM delivery_keys WHERE space = ? ORDER BY created_at" space)))
 
 (defmethod import-delivery-key (space &key id hash label created-at)

@@ -6,6 +6,7 @@
                 #:list-delivery-keys #:delete-delivery-key #:create-management-key
                 #:list-management-keys #:delete-management-key)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
+  (:import-from #:koya-server/domain/key #:key-id #:key-label #:key-created-at)
   (:import-from #:koya-server/web/http #:path-param #:param)
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/document #:set-title)
@@ -57,15 +58,15 @@
                  (loop :for key :in keys :collect
                    (hsx (tr
                           (td :class "py-2 pl-4 pr-4 font-medium"
-                            (if (string= (getf key :label) "")
+                            (if (string= (key-label key) "")
                                 (hsx (span :class "text-muted" "(no label)"))
-                                (getf key :label)))
-                          (td :class "py-2 pr-4 whitespace-nowrap text-muted" (short-time (getf key :created-at)))
+                                (key-label key)))
+                          (td :class "py-2 pr-4 whitespace-nowrap text-muted" (short-time (key-created-at key)))
                           (td :class "py-2 pl-4 pr-4 text-right"
                             (form :hx-post (delete-key :space space :kind kind)
                                   :hx-target (format nil "#~a" (section-id kind)) :hx-swap "outerHTML"
                                   :hx-confirm "Delete this key? Whatever uses it stops working."
-                              (input :type "hidden" :name "id" :value (getf key :id))
+                              (input :type "hidden" :name "id" :value (key-id key))
                               ;; the cell is narrow, so the icon stands for the label
                               (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete key"
                                 (~icon :name :delete)))))))))))))

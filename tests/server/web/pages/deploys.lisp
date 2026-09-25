@@ -1,10 +1,11 @@
 (defpackage #:koya-tests/server/web/pages/deploys
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
   (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-tests/server/web/pages/support #:post-login #:*secret* #:*cookie* #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/deploys #:browse-deploys)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-server/usecases/ports/spaces #:delete-space #:list-deploys)
+  (:import-from #:koya-server/usecases/ports/spaces #:delete-space)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/keys #:create-management-key)
   (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)

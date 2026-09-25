@@ -15,15 +15,15 @@
            #:import-management-key))
 (in-package #:koya-server/usecases/ports/keys)
 
-;;; The keys of a space: delivery keys read its published content, management
-;;; keys drive the admin API for it. Only a key's hash is kept; the plaintext is
-;;; returned once, when it is made.
+;;; The keys of a space (domain/key): delivery keys read its published content,
+;;; management keys drive the admin API for it. Only a key's hash is kept; the
+;;; plaintext is returned once, when it is made.
 
 (defgeneric create-delivery-key (space &key label)
   (:documentation "Create a key for SPACE. Returns (values plaintext-key id)."))
 
 (defgeneric list-delivery-keys (space)
-  (:documentation "Plists (:id :label :created-at) of the keys of SPACE."))
+  (:documentation "The keys of SPACE, oldest first, without their hashes."))
 
 (defgeneric delete-delivery-key (space id))
 
@@ -31,8 +31,7 @@
   (:documentation "The space name KEY grants access to, or NIL."))
 
 (defgeneric stored-delivery-keys (space)
-  (:documentation "Plists (:id :hash :label :created-at) of the keys of SPACE as stored, for an
-export: the hash is all there is, and all a moved key needs."))
+  (:documentation "The keys of SPACE as stored, hashes included, for an export."))
 
 (defgeneric import-delivery-key (space &key id hash label created-at))
 
@@ -40,7 +39,7 @@ export: the hash is all there is, and all a moved key needs."))
   (:documentation "Create a key for SPACE. Returns (values plaintext-key id)."))
 
 (defgeneric list-management-keys (space)
-  (:documentation "Plists (:id :label :created-at) of the keys of SPACE, oldest first."))
+  (:documentation "The keys of SPACE, oldest first, without their hashes."))
 
 (defgeneric delete-management-key (space id))
 
@@ -52,7 +51,6 @@ export: the hash is all there is, and all a moved key needs."))
 key answers with the empty string it was made with."))
 
 (defgeneric stored-management-keys (space)
-  (:documentation "Plists (:id :hash :label :created-at) of the keys of SPACE as stored, for an
-export: the hash is all there is, and all a moved key needs."))
+  (:documentation "The keys of SPACE as stored, hashes included, for an export."))
 
 (defgeneric import-management-key (space &key id hash label created-at))

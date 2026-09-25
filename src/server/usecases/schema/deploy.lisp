@@ -7,7 +7,9 @@
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:not-found)
   (:import-from #:koya-server/usecases/ports/spaces
-                #:find-space #:load-schema #:save-schema #:list-deploys #:count-deploys #:+deploys-kept+)
+                #:find-space #:load-schema #:save-schema)
+  (:import-from #:koya-server/usecases/ports/deploys
+                #:list-deploys #:count-deploys #:+deploys-kept+)
   (:import-from #:koya-server/usecases/actor
                 #:*actor*)
   (:export #:space-schema

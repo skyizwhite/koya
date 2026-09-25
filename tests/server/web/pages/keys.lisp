@@ -1,5 +1,6 @@
 (defpackage #:koya-tests/server/web/pages/keys
   (:use #:cl #:rove)
+  (:import-from #:koya-server/domain/key #:key-id #:key-label)
   (:import-from #:koya-tests/server/web/pages/support #:request #:request-url #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/keys #:create-key #:delete-key #:rotate-secret)
   (:import-from #:koya-server/usecases/ports/keys #:list-delivery-keys #:list-management-keys)
@@ -26,7 +27,7 @@
     (multiple-value-bind (status body) (request :get "/s/website/keys")
       (declare (ignore status))
       (ng (search "koya_mgmt_" body) "and never again"))
-    (let ((id (getf (first (list-management-keys "website")) :id)))
+    (let ((id (key-id (first (list-management-keys "website")))))
       (ok (= 200 (call-action :post (delete-key :space "website" :kind "management") :form `(("id" . ,id)))))
       (ok (null (list-management-keys "website")))))
   (testing "the settings page has no keys on it any more"
@@ -50,7 +51,7 @@
       (ng (search "<html" body) "a fragment, not a page"))
     (ok (= (length (list-delivery-keys "website")) 1)))
   (testing "deleting answers the section and a toast out of band"
-    (let ((id (getf (first (list-delivery-keys "website")) :id)))
+    (let ((id (key-id (first (list-delivery-keys "website")))))
       (multiple-value-bind (status body) (call-action :post (delete-key :space "website" :kind "delivery")
                                                       :form `(("id" . ,id)))
         (ok (= status 200))

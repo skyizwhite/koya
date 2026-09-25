@@ -1,6 +1,7 @@
 (defpackage #:koya-server/infra/db/management-keys
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/domain/key #:make-key)
   (:import-from #:koya-server/infra/db/delivery-keys #:hash-key)
   (:import-from #:koya/core/ulid
                 #:make-ulid)
@@ -34,7 +35,7 @@
     (values key id)))
 
 (defmethod list-management-keys (space)
-  (mapcar (lambda (row) (list :id (col row "id") :label (col row "label") :created-at (col row "created_at")))
+  (mapcar (lambda (row) (make-key :id (col row "id") :label (col row "label") :created-at (col row "created_at")))
           (fetch "SELECT id, label, created_at FROM management_keys WHERE space = ? ORDER BY created_at" space)))
 
 (defmethod delete-management-key (space id)
@@ -51,8 +52,8 @@
          (and row (col row "space")))))
 
 (defmethod stored-management-keys (space)
-  (mapcar (lambda (row) (list :id (col row "id") :hash (col row "key_hash")
-                              :label (col row "label") :created-at (col row "created_at")))
+  (mapcar (lambda (row) (make-key :id (col row "id") :hash (col row "key_hash")
+                                  :label (col row "label") :created-at (col row "created_at")))
           (fetch "SELECT * FROM management_keys WHERE space = ? ORDER BY created_at" space)))
 
 (defmethod import-management-key (space &key id hash label created-at)

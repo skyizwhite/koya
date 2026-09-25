@@ -1,6 +1,6 @@
 (defpackage #:koya-server/infra/db/schema-store
   (:use #:cl)
-  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:col #:with-db-transaction)
+  (:import-from #:koya-server/infra/db/connection #:*db* #:exec #:fetch #:col #:with-db #:with-db-transaction)
   (:import-from #:koya/core/schema
                 #:make-schema #:schema-webhooks #:schema-models #:webhook->jobject
                 #:jobject->webhook #:model-name #:model-kind #:model->jobject #:jobject->model
@@ -26,16 +26,40 @@
 ;;; contents, media, keys and webhook secret, so its life is longer than any one
 ;;; schema. A deploy addresses one existing space and changes only its models and
 ;;; webhooks.
+;;;
+;;; A schema is read from its rows once and kept until a deploy or a deletion
+;;; replaces it: every content delivered, every reference resolved and every
+;;; label drawn asks for a model, and parsing the models each time was most of
+;;; the work of a page. The cache is the connection's, so a test that opens a
+;;; fresh database starts empty.
+
+(defvar *schemas* (cons nil (make-hash-table :test 'equal))
+  "(connection . hash of space name -> schema, or :none for a name that is no space).")
+
+(defun schema-cache ()
+  (unless (eq (car *schemas*) *db*)
+    (setf *schemas* (cons *db* (make-hash-table :test 'equal))))
+  (cdr *schemas*))
+
+(defun forget-schema (space-name)
+  (with-db (remhash space-name (schema-cache))))
 
 (defun load-space-models (space-name)
   (mapcar (lambda (row) (jobject->model (parse-json (col row "definition"))))
           (fetch "SELECT definition FROM models WHERE space = ? ORDER BY position, name" space-name)))
 
-(defmethod load-schema (space-name)
+(defun read-schema (space-name)
   (let ((row (first (fetch "SELECT webhooks FROM spaces WHERE name = ?" space-name))))
     (and row
          (make-schema :webhooks (coerce (parse-json (col row "webhooks")) 'list)
                       :models (load-space-models space-name)))))
+
+(defmethod load-schema (space-name)
+  (with-db
+    (let* ((cache (schema-cache))
+           (schema (or (gethash space-name cache)
+                       (setf (gethash space-name cache) (or (read-schema space-name) :none)))))
+      (and (not (eq schema :none)) schema))))
 
 (defmethod list-spaces ()
   (mapcar (lambda (row)
@@ -72,10 +96,12 @@
   (exec "INSERT INTO spaces (name, webhooks, webhook_secret, position, created_at)
          VALUES (?, '[]', ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM spaces), ?)"
         name (new-secret) (now-iso))
+  (forget-schema name)
   name)
 
 (defmethod delete-space (name)
-  (exec "DELETE FROM spaces WHERE name = ?" name))
+  (exec "DELETE FROM spaces WHERE name = ?" name)
+  (forget-schema name))
 
 ;;; Renames. A :WAS matched by the diff is carried through to the stored content
 ;;; in the same transaction as the schema write.
@@ -129,6 +155,9 @@ rename names its model by the new name."
 (defmethod save-schema (space-name schema changes &key (by ""))
   (with-db-transaction
     (progn
+      ;; first, and again once written: what a rename reads in between must be
+      ;; the rows, and a transaction that rolls back must leave the cache empty
+      (forget-schema space-name)
       (apply-renames space-name changes)
       ;; in the transaction: a deploy that rolls back must not be in the log
       (record-deploy space-name changes :by by)
@@ -144,4 +173,5 @@ rename names its model by the new name."
                        ON CONFLICT(space, name) DO UPDATE SET kind = excluded.kind,
                          definition = excluded.definition, position = excluded.position"
                       space-name (model-name model) (string-downcase (symbol-name (model-kind model)))
-                      (to-json (model->jobject (model-forget-renames model))) position)))))
+                      (to-json (model->jobject (model-forget-renames model))) position))
+      (forget-schema space-name))))

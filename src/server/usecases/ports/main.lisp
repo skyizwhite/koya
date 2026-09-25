@@ -3,6 +3,7 @@
   (:use #:cl)
   (:import-from #:koya-server/usecases/ports/store)
   (:import-from #:koya-server/usecases/ports/spaces)
+  (:import-from #:koya-server/usecases/ports/deploys)
   (:import-from #:koya-server/usecases/ports/contents)
   (:import-from #:koya-server/usecases/ports/media)
   (:import-from #:koya-server/usecases/ports/keys)
@@ -22,6 +23,7 @@
 (defparameter +ports+
   '(#:koya-server/usecases/ports/store
     #:koya-server/usecases/ports/spaces
+    #:koya-server/usecases/ports/deploys
     #:koya-server/usecases/ports/contents
     #:koya-server/usecases/ports/media
     #:koya-server/usecases/ports/keys

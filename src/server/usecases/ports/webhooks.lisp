@@ -21,9 +21,10 @@ body; only a call that got no answer has ERROR."))
   (:documentation "Store one call's outcome, keeping only the newest +DELIVERIES-KEPT+ of SPACE."))
 
 (defgeneric list-deliveries (space &key label model limit offset)
-  (:documentation "Newest first. LABEL keeps one webhook's calls; MODEL keeps the calls a change
-to that model set off, from its own webhooks and from the space's alike. Given
-together they narrow to one webhook's calls for one model."))
+  (:documentation "Newest first, LIMIT defaulting to 50. LABEL keeps one webhook's calls; MODEL
+keeps the calls a change to that model set off, from its own webhooks and from
+the space's alike. Given together they narrow to one webhook's calls for one
+model."))
 
 (defgeneric count-deliveries (space &key label model))
 

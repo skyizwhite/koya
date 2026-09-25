@@ -18,7 +18,9 @@
 ;;; A space's library: the metadata of each file (domain/media), and the file
 ;;; itself, kept apart from it.
 
-(defgeneric insert-media (space &key filename mime size width height alt id created-at))
+(defgeneric insert-media (space &key filename mime size width height alt id created-at)
+  (:documentation "Store a media of SPACE and return it. ID and CREATED-AT are made unless an
+import brings them."))
 
 (defgeneric find-media (space id))
 
@@ -26,14 +28,15 @@
   (:documentation "Hash of id -> media for those of IDS that are in SPACE's library."))
 
 (defgeneric list-media (space &key search limit offset)
-  (:documentation "Newest first. SEARCH matches the file name."))
+  (:documentation "Newest first. SEARCH matches the file name; LIMIT defaults to 60."))
 
 (defgeneric space-media (space)
   (:documentation "Every media of SPACE, oldest first."))
 
 (defgeneric count-media (space &key search))
 
-(defgeneric update-media (space id &key alt))
+(defgeneric update-media (space id &key alt)
+  (:documentation "Set what may change about a media, and return it."))
 
 (defgeneric delete-media (space id))
 

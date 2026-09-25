@@ -26,7 +26,7 @@
 (defun row->content (row)
   (flet ((json (name) (let ((v (col row name))) (and v (parse-json v)))))
     (make-content :id (col row "id") :space (col row "space") :model (col row "model")
-                  :status (col row "status") :published (json "published") :draft (json "draft")
+                  :published (json "published") :draft (json "draft")
                   :draft-key (col row "draft_key")
                   :created-at (col row "created_at") :updated-at (col row "updated_at")
                   :published-at (col row "published_at") :revised-at (col row "revised_at"))))

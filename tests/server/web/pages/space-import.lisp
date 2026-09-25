@@ -1,9 +1,11 @@
 (defpackage #:koya-tests/server/web/pages/space-import
   (:use #:cl #:rove)
+  (:import-from #:koya-server/domain/key #:key-id #:key-label)
+  (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
   (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-tests/server/web/pages/support #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-server/usecases/ports/spaces #:find-space #:delete-space #:list-deploys #:load-schema
+  (:import-from #:koya-server/usecases/ports/spaces #:find-space #:delete-space #:load-schema
                 #:space-webhooks #:space-webhook-secret)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/keys
@@ -144,7 +146,7 @@
       (testing "the site's keys still work"
         (ok (string= (space-for-delivery-key delivery-key) "archive"))
         (ok (string= (space-for-management-key management-key) "archive"))
-        (ok (equal (mapcar (lambda (k) (getf k :label)) (list-delivery-keys "archive")) '("site"))))
+        (ok (equal (mapcar #'key-label (list-delivery-keys "archive")) '("site"))))
       (testing "contents keep their ids, state, draft, timestamps and history"
         (let ((tag-content (get-content tag))
               (post-content (get-content post)))

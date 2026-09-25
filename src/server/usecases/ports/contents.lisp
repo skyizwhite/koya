@@ -72,7 +72,8 @@ is now unless the revision was written elsewhere: an import brings a content's
 history along, oldest first, so it keeps its order."))
 
 (defgeneric list-revisions (content-id &key published-only limit offset)
-  (:documentation "Newest first. PUBLISHED-ONLY keeps the publishes: the versions that were live."))
+  (:documentation "Newest first, LIMIT defaulting to 20. PUBLISHED-ONLY keeps the publishes: the
+versions that were live."))
 
 (defgeneric count-revisions (content-id &key published-only))
 

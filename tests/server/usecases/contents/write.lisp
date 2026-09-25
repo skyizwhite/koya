@@ -1,5 +1,6 @@
 (defpackage #:koya-tests/server/usecases/contents/write
   (:use #:cl #:rove)
+  (:import-from #:koya-server/domain/key #:key-id #:key-label)
   (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:fetch-one #:col #:exec)
@@ -256,7 +257,7 @@
     (ok (string= (space-for-delivery-key key) "website"))
     (ng (space-for-delivery-key "koya_nope"))
     (ng (space-for-delivery-key nil))
-    (ok (equal (mapcar (lambda (k) (getf k :label)) (list-delivery-keys "website")) '("site")))
+    (ok (equal (mapcar #'key-label (list-delivery-keys "website")) '("site")))
     (delete-delivery-key "website" id)
     (ok (null (list-delivery-keys "website")))
     (ng (space-for-delivery-key key))))

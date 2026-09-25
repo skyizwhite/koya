@@ -1,5 +1,6 @@
 (defpackage #:koya-tests/server/infra/db
   (:use #:cl #:rove)
+  (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
   (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:exec #:fetch #:fetch-one #:col)
@@ -7,7 +8,7 @@
   (:import-from #:koya-server/infra/db/schema-dump #:migrated-snapshot #:read-snapshot)
   (:import-from #:koya-server/usecases/ports/spaces
                 #:load-schema #:find-model #:list-spaces #:delete-space
-                #:find-space #:list-deploys #:count-deploys)
+                #:find-space)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/domain/deploy
                 #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by

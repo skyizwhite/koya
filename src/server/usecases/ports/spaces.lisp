@@ -10,13 +10,10 @@
            #:space-webhooks
            #:space-webhook-secret
            #:rotate-webhook-secret
-           #:set-webhook-secret
-           #:list-deploys
-           #:count-deploys
-           #:+deploys-kept+))
+           #:set-webhook-secret))
 (in-package #:koya-server/usecases/ports/spaces)
 
-;;; Spaces, the schema deployed to each, and the log of deploys.
+;;; Spaces, and the schema deployed to each.
 
 (defgeneric list-spaces ()
   (:documentation "Every space as a plist (:name :models n), in display order."))
@@ -38,10 +35,11 @@ webhook log and the deploy log. The media files themselves are removed by the ca
 
 (defgeneric save-schema (space-name schema changes &key by)
   (:documentation "Store SCHEMA as the schema of SPACE-NAME, and log CHANGES as a deploy by BY,
-in one transaction. CHANGES is what the caller found between the stored schema
-and SCHEMA (core/diff); the renames in it are carried through to the stored
-content, and a model that is no longer there is deleted with its contents.
-Nothing is decided here: the caller checked SCHEMA and chose to apply it."))
+in one transaction (ports/deploys reads that log). CHANGES is what the caller
+found between the stored schema and SCHEMA (core/diff); the renames in it are
+carried through to the stored content, and a model that is no longer there is
+deleted with its contents. Nothing is decided here: the caller checked SCHEMA
+and chose to apply it."))
 
 (defgeneric find-model (space-name model-name))
 
@@ -57,11 +55,3 @@ models, because every content change needs them."))
 (defgeneric set-webhook-secret (space-name secret)
   (:documentation "Give SPACE-NAME the secret it had elsewhere: an imported space keeps the one
 its site already checks."))
-
-(defgeneric list-deploys (space &key limit offset)
-  (:documentation "Newest first, to the millisecond a ULID carries."))
-
-(defgeneric count-deploys (space))
-
-(defparameter +deploys-kept+ 100
-  "Deploys kept per space; older ones are dropped as new ones arrive.")
