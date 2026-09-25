@@ -16,6 +16,8 @@
                "koya-tests/server/usecases/settings/two-factor"
                "koya-tests/server/infra/db"
                "koya-tests/server/usecases/contents/write"
+               "koya-tests/server/usecases/contents/delivery"
+               "koya-tests/server/usecases/contents/revisions"
                "koya-tests/server/usecases/media/library"
                "koya-tests/server/web/http"
                "koya-tests/server/usecases/webhooks/notify"
