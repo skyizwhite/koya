@@ -72,8 +72,9 @@ parts. A space archive is uploaded in pieces smaller than this.")
                         (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message)))))
             (funcall app env)))))
   "Rejects oversized bodies by Content-Length, before any parser allocates for them.
-Woo has read the body by then, up to smart-buffer's own limit of a gigabyte,
-past which it answers 413 itself.")
+Under Woo no such body gets here: Woo is held to the same limit (web/app) and
+answers 413 itself, in plain text, before it reads a body its Content-Length
+puts past it, or once one goes past it.")
 
 ;;; A page may answer with a file it made for the one answer, such as a space's
 ;;; archive, and that nothing needs once it is sent. It says so with the header

@@ -5,7 +5,8 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
-  (:import-from #:flexi-streams #:make-in-memory-input-stream))
+  (:import-from #:flexi-streams #:make-in-memory-input-stream)
+  (:import-from #:koya-server/web/middlewares #:+max-body-bytes+))
 (in-package #:koya-tests/server/web/app)
 
 (setup (setup-pages) (log-in))
@@ -87,5 +88,7 @@
       (ok (= status 413))
       (ok (search "text/html" (getf headers :content-type)) "htmx swaps it in, so it is HTML")
       (ok (search "limited to" (first body)))
-      (ok (not (search "too_large" (first body)))))))
+      (ok (not (search "too_large" (first body)))))
+    (ok (= smart-buffer:*default-disk-limit* +max-body-bytes+)
+        "Woo holds no more of a body than the app would take")))
 

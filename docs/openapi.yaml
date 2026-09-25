@@ -26,7 +26,8 @@ info:
     Bodies use camelCase keys. Timestamps are ISO 8601 in UTC with milliseconds
     (`2026-09-20T05:04:03.123Z`). Every error is
     `{"error": {"code", "message", "details"?}}`; any route can also answer
-    `500 internal_error`, and any request body over 21 MB `413 too_large`. The
+    `500 internal_error`. A request body over 21 MB is answered with 413 and a
+    plain-text body before it is read, not with an error object. The
     schema document is specified in SCHEMA.md, and API.md walks through both
     APIs. koya-ts-sdk (https://github.com/skyizwhite/koya-ts-sdk) wraps them.
   license:
@@ -588,7 +589,7 @@ paths:
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
         "413":
-          description: "`too_large`: a file over 20 MB, or a request body over 21 MB"
+          description: "`too_large`: a file over 20 MB. A body over 21 MB gets 413 in plain text, with no error object."
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }

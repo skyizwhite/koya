@@ -1,5 +1,7 @@
 # A space has no size limit, and its archive moves in pieces
 
+Superseded by adr/2026-09-25-woo-holds-a-body-to-the-body-limit.md (Woo's own limit)
+
 *2026-09-25*
 
 ## Context
