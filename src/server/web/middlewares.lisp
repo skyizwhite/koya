@@ -21,6 +21,18 @@
 ;;; megabyte goes to a file under smart-buffer's temporary directory. It hands
 ;;; the app that file open and neither closes nor deletes it: left alone, every
 ;;; large body -- a media upload, or anything anyone posts -- stays on the disk.
+;;; A body Woo never finished reading, because the sender went away, never
+;;; reaches the app at all; those files are swept once they have been still for
+;;; +STALE-BODY-SECONDS+.
+
+(defparameter +stale-body-seconds+ 3600
+  "How long a body file goes unwritten before it is taken for abandoned. Woo writes
+to it as the body arrives, so one still arriving is never this still.")
+
+(defparameter +sweep-seconds+ 600
+  "The least time between two sweeps: one is started by a request, not a timer.")
+
+(defvar *last-sweep* 0)
 
 (defun body-file (stream)
   "The file Woo left a body in, when STREAM reads one, or NIL for a body held in
@@ -28,6 +40,21 @@ memory, or read from the socket as Hunchentoot does."
   (let ((path (and (typep stream 'file-stream) (ignore-errors (pathname stream))))
         (directory (namestring smart-buffer::*temporary-directory*)))
     (and path (prefix-p directory (namestring path)) path)))
+
+(defun sweep-body-files (&optional (now (get-universal-time)))
+  "Delete the body files no one has written to for +STALE-BODY-SECONDS+."
+  (let ((directory smart-buffer::*temporary-directory*))
+    (when (uiop:directory-exists-p directory)
+      (dolist (file (uiop:directory-files directory))
+        (when (< (or (file-write-date file) now) (- now +stale-body-seconds+))
+          ;; another request may be sweeping too
+          (ignore-errors (delete-file file)))))))
+
+(defun sweep-now-and-then ()
+  (let ((now (get-universal-time)))
+    (when (> (- now *last-sweep*) +sweep-seconds+)
+      (setf *last-sweep* now)
+      (sweep-body-files now))))
 
 (defun remove-body-file (stream)
   (let ((path (body-file stream)))
@@ -41,6 +68,7 @@ memory, or read from the socket as Hunchentoot does."
       ;; taken now: lack wraps the body in a stream of its own, in ENV itself
       (let ((body (getf env :raw-body))
             (response nil))
+        (sweep-now-and-then)
         (unwind-protect
              (setf response
                    (let ((answer (funcall app env)))
@@ -52,8 +80,9 @@ memory, or read from the socket as Hunchentoot does."
                          answer)))
           (unless (functionp response)
             (remove-body-file body))))))
-  "Deletes the file Woo buffered a request's body in, once the request is answered.
-Installed outermost, so it runs whatever answered.")
+  "Deletes the file Woo buffered a request's body in, once the request is answered,
+and now and then the files of bodies that never arrived whole. Installed
+outermost, so it runs whatever answered.")
 
 (defparameter *cache-control-middleware*
   (lambda (app)
