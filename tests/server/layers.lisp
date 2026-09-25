@@ -37,8 +37,8 @@ infra.")
                 (format nil "koya-server/~a" (subseq relative 0 (- (length relative) 5)))))
             (directory (merge-pathnames "**/*.lisp" root)))))
 
-(defun dependencies (name)
-  (remove-if-not (lambda (d) (and (stringp d) (eql 0 (search "koya-server/" d))))
+(defun dependencies (name &optional (prefix "koya-server/"))
+  (remove-if-not (lambda (d) (and (stringp d) (eql 0 (search prefix d))))
                  (asdf:system-depends-on (asdf:find-system name))))
 
 (deftest dependency-rule
@@ -51,3 +51,34 @@ infra.")
           (let ((to (layer dependency)))
             (ok (member to (rest (assoc from +allowed+)))
                 (format nil "~a (~(~a~)) may use ~a (~(~a~))" name from dependency to))))))))
+
+;;; The same rule for what is outside koya: a library that is how a request
+;;; arrives, or how a row is stored, belongs to the layer that does that. A use
+;;; case that imported one would be back to knowing HTTP or SQL, whatever its
+;;; imports from koya-server say.
+
+(defparameter +library-homes+
+  '(("dbi" :infra) ("dbd-sqlite3" :infra) ("zippy" :infra) ("dexador" :infra)
+    ("clack" :web :main) ("lack" :web :infra) ("ningle" :web) ("jingle" :web)
+    ("hsx" :web) ("woo" :main) ("hunchentoot" :main))
+  "A library and the layers that may import it. A name covers its subsystems
+and extensions: \"lack\" covers lack/request and lack-mw, \"ningle\" covers
+ningle-actions. lack is infra's as well: the session store infra keeps in the
+database speaks its protocol.")
+
+(defun library-home (dependency)
+  (assoc-if (lambda (library)
+              (or (string= library dependency)
+                  (and (< (length library) (length dependency))
+                       (string= library dependency :end2 (length library))
+                       (member (char dependency (length library)) '(#\/ #\-)))))
+            +library-homes+))
+
+(deftest libraries-stay-in-their-layer
+  (dolist (name (server-systems))
+    (let ((from (layer name)))
+      (dolist (dependency (dependencies name ""))
+        (let ((home (library-home dependency)))
+          (when home
+            (ok (member from (rest home))
+                (format nil "~a (~(~a~)) may use ~a" name from dependency))))))))

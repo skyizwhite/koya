@@ -90,7 +90,9 @@ web  ──▶  usecases  ──▶  domain
   turns a domain error into a status in one place (`error-status` in
   `web/http`). The auth guards bind `*actor*`. The web never reaches a port or
   `infra/` directly: where a use case has nothing to add, it re-exports the
-  port's function.
+  port's function. Exactly one use case does, the one the function belongs
+  with (a space's schema is `spaces/lifecycle`'s, its keys and webhook secret
+  `keys`'s), so a page has one place to import it from; a test holds it to one.
 - Use cases hand over what they found, never JSON. A content as the delivery
   API serves it is a `delivered` (`usecases/contents/delivery`): its data with
   media and the references asked for resolved. `web/presenters` makes it, a

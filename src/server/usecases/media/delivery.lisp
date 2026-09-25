@@ -3,7 +3,7 @@
   (:import-from #:koya-server/domain/image
                 #:+image-types+)
   (:import-from #:koya-server/usecases/ports/media
-                #:media-file-path)
+                #:media-file-path #:media-file-exists-p)
   (:export #:stored-file))
 (in-package #:koya-server/usecases/media/delivery)
 
@@ -13,7 +13,5 @@
 (defun stored-file (space id extension)
   "(values PATH MIME) of the file a media URL names, or NIL when there is none."
   (let ((mime (car (rassoc extension +image-types+ :test #'string=))))
-    (when mime
-      (let ((path (media-file-path space id mime)))
-        (when (probe-file path)
-          (values path mime))))))
+    (when (and mime (media-file-exists-p space id mime))
+      (values (media-file-path space id mime) mime))))
