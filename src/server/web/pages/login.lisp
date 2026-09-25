@@ -4,8 +4,6 @@
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/auth
                 #:session-login #:public-path #:session-owner-p #:local-path-p)
-  (:import-from #:koya-server/usecases/auth
-                #:login-locked-p #:note-login-failure #:clear-login-failures)
   (:import-from #:lack/request #:request-remote-addr)
   (:import-from #:koya-server/usecases/settings/two-factor #:totp-enabled-p)
   (:import-from #:koya-server/web/assets #:asset-url)
@@ -69,15 +67,13 @@
            (go-on ()
              (set-response-header :hx-redirect (or next "/"))
              (hsx (<>))))
-      (cond ((session-owner-p) (go-on))
+      (if (session-owner-p)
+          (go-on)
+          (case (session-login address (or (param params "secret") "") (param params "code"))
+            ((t) (go-on))
             ;; 403, not 429: Woo has no status line for 429 and fails to write the response
-            ((login-locked-p address) (refuse 403 "Too many attempts. Wait a few minutes and try again."))
-            ((eq (session-login (or (param params "secret") "") (param params "code")) t)
-             (clear-login-failures address)
-             (go-on))
-            (t
-             (note-login-failure address)
-             ;; one message for both factors: not saying which one was wrong
-             (refuse 401 (if (totp-enabled-p) "Wrong secret or one-time code" "Wrong secret")))))))
+            (:locked (refuse 403 "Too many attempts. Wait a few minutes and try again."))
+            ;; one message for both factors: not saying which one was wrong
+            (t (refuse 401 (if (totp-enabled-p) "Wrong secret or one-time code" "Wrong secret"))))))))
 
 (public-path (log-in))

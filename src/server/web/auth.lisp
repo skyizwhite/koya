@@ -5,9 +5,9 @@
   (:import-from #:koya-server/usecases/keys
                 #:space-for-delivery-key #:space-for-management-key #:management-key-label)
   (:import-from #:koya-server/usecases/auth
-                #:check-login)
+                #:attempt-login)
   (:import-from #:koya-server/usecases/actor
-                #:*actor*)
+                #:*actor* #:+owner+ #:key-actor)
   (:import-from #:lack/request
                 #:request-env)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri)
@@ -42,10 +42,10 @@
 (defun session-owner-p (&optional (session (ningle:context :session)))
   (and session (gethash "owner" session) t))
 
-(defun session-login (secret &optional code)
-  "Mark the current session as the owner when CHECK-LOGIN lets SECRET and CODE
-in. Returns what CHECK-LOGIN does."
-  (let ((result (check-login secret code)))
+(defun session-login (address secret &optional code)
+  "Mark the current session as the owner when ATTEMPT-LOGIN lets ADDRESS in
+with SECRET and CODE. Returns what ATTEMPT-LOGIN does."
+  (let ((result (attempt-login address secret code)))
     (when (eq result t)
       (setf (gethash "owner" (ningle:context :session)) t))
     result))
@@ -77,16 +77,14 @@ session, which reaches every space."
   (space-for-management-key (bearer-token (request-env ningle:*request*))))
 
 (defun calling-identity (env)
-  "Who ENV comes from, as *ACTOR* holds it: \"owner\" or \"key:<label>\". The
-wording a page puts around it is the page's, so it can be changed later.
-
-The owner comes first, as *ADMIN-AUTH-MIDDLEWARE* does it: a request carrying
-both a session and a key is authorised as the owner."
+  "Who ENV comes from, as *ACTOR* holds it. The owner comes first, as
+*ADMIN-AUTH-MIDDLEWARE* does it: a request carrying both a session and a key is
+authorised as the owner."
   (if (session-env-owner-p env)
-      "owner"
+      +owner+
       (let ((label (management-key-label (bearer-token env))))
         ;; nothing without one or the other gets past the middleware
-        (if label (format nil "key:~a" label) "unknown"))))
+        (if label (key-actor label) "unknown"))))
 
 (defun cross-origin-write-p (env)
   "A state-changing request whose Origin/Referer does not match this server. The

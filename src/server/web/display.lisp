@@ -2,6 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-server/domain/timezone #:format-local)
   (:import-from #:koya-server/usecases/settings/timezone #:display-timezone)
+  (:import-from #:koya-server/usecases/actor #:actor-key-label)
   (:export #:short-time
            #:caller-name))
 (in-package #:koya-server/web/display)
@@ -13,9 +14,10 @@
   (format-local iso :timezone (display-timezone)))
 
 (defun caller-name (by)
-  "\"owner\" or \"key:<label>\" as stored, in words. Kept out of the rows so that
-rewording it reaches the rows already written."
+  "An actor as stored, in words. Kept out of the rows so that rewording it
+reaches the rows already written."
   (let ((by (or by "")))
-    (cond ((string= by "key:") "(management key)")
-          ((eql 0 (search "key:" by)) (format nil "(management key: ~a)" (subseq by 4)))
-          (t by))))
+    (multiple-value-bind (label keyp) (actor-key-label by)
+      (cond ((not keyp) by)
+            ((string= label "") "(management key)")
+            (t (format nil "(management key: ~a)" label))))))

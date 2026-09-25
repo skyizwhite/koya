@@ -13,6 +13,7 @@
                 #:make-session-store #:+session-seconds+)
   (:export #:secure-string=
            #:check-login
+           #:attempt-login
            #:login-locked-p
            #:note-login-failure
            #:clear-login-failures
@@ -67,3 +68,12 @@ have been accepted."
 (defun clear-login-failures (address)
   (bordeaux-threads-2:with-lock-held (*login-failures-lock*)
     (remhash address *login-failures*)))
+
+(defun attempt-login (address secret &optional code)
+  "Whether ADDRESS gets in with SECRET and CODE: T, and its failures are
+forgotten; :LOCKED while it has failed too often, and nothing is checked; NIL
+for a wrong secret or code, which counts against it. Which of the two was
+wrong is not said, so a caller cannot learn one without the other."
+  (cond ((login-locked-p address) :locked)
+        ((eq (check-login secret code) t) (clear-login-failures address) t)
+        (t (note-login-failure address) nil)))
