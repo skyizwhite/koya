@@ -7,6 +7,7 @@
                 #:model-name #:model-preview-url #:model-public-url)
   (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents/lookup #:find-content #:resolve-model)
+  (:import-from #:koya-server/web/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
@@ -15,9 +16,9 @@
   (:import-from #:koya-server/usecases/contents/write
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
   (:import-from #:koya-server/web/http
-                #:path-param #:error-status #:param)
+                #:path-param #:param)
   (:import-from #:koya-server/domain/errors
-                #:koya-error #:koya-error-message #:not-found)
+                #:koya-error #:not-found)
   (:import-from #:koya-server/web/forms #:form->data)
   (:import-from #:koya-server/usecases/contents/labels #:reference-options)
   (:import-from #:koya-server/web/display #:short-time)
@@ -26,7 +27,7 @@
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/ui/toast #:set-toast #:~toast-oob #:action-refusal)
+  (:import-from #:koya-server/web/ui/toast #:set-toast #:~toast-oob #:action-refusal #:action-refused)
   (:import-from #:koya-server/web/pages/s/<space>/webhooks #:webhook-log-url)
   (:import-from #:koya-server/usecases/media/library #:find-media)
   (:import-from #:koya-server/web/ui/content/field-input #:~field-input)
@@ -239,9 +240,9 @@ was being read at: what it offered is now saved or left behind."
 (defaction editor-action :post (params)
   (let* ((space (param params "space"))
          (op (or (param params "op") "save"))
-         (model (and space (find-space space) (find-model space (or (param params "model") ""))))
+         (model (target-model params))
          (id (param params "id"))
-         (content (and model id (not (new-p id)) (find-content space (model-name model) id))))
+         (content (and model id (not (new-p id)) (target-content params model))))
     (cond
       ((null model) (action-refusal "Model not found." 404))
       ((and (null content) (not (and (equal id "new") (member op '("save" "publish") :test #'string=))))
@@ -275,4 +276,4 @@ was being read at: what it offered is now saved or left behind."
              (hsx (~editor :space space :model model :content content :data data
                            :errors (validation-error-errors e))))
            ;; refused as things stand, such as a delete while other contents refer to this one
-           (koya-error (e) (action-refusal (koya-error-message e) (error-status e)))))))))
+           (koya-error (e) (action-refused e))))))))

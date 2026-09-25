@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/ui/layout
   (:use #:cl #:hsx)
   (:import-from #:jingle
-                #:set-response-header)
+                #:set-response-header #:set-response-status)
   (:import-from #:ningle-actions
                 #:defaction)
   (:import-from #:koya-server/web/auth
@@ -15,6 +15,7 @@
   (:import-from #:koya-server/web/ui/toast
                 #:~toast #:take-toast)
   (:export #:~layout
+           #:~missing
            #:~footer
            #:logout))
 (in-package #:koya-server/web/ui/layout)
@@ -80,3 +81,9 @@
          (hsx (~toast :message message :kind kind)))
        children)
      (~footer))))
+
+(defcomp ~missing (&key what space)
+  "The page for a URL that names a WHAT -- a space, a model -- that is not there,
+answered 404, inside SPACE's frame when the space itself exists."
+  (set-response-status 404)
+  (hsx (~layout :space space (h1 :class "text-xl font-bold" (format nil "~a not found" what)))))

@@ -6,11 +6,16 @@
                 #:context)
   (:import-from #:koya/core/json
                 #:json-array)
+  (:import-from #:koya-server/domain/errors
+                #:koya-error-message)
+  (:import-from #:koya-server/web/http
+                #:error-status)
   (:export #:set-toast
            #:take-toast
            #:~toast
            #:~toast-oob
-           #:action-refusal))
+           #:action-refusal
+           #:action-refused))
 (in-package #:koya-server/web/ui/toast)
 
 ;;; What came of what was done. An action that answers in place sends it out of
@@ -60,3 +65,8 @@ MESSAGE shows as the toast. htmx 4 swaps an error response in, so the reswap say
   (set-response-status status)
   (set-response-header :hx-reswap "none")
   (hsx (~toast-oob :message message :kind :error)))
+
+(defun action-refused (condition)
+  "ACTION-REFUSAL for a KOYA-ERROR: its message, under the status its kind is
+answered with everywhere (web/http)."
+  (action-refusal (koya-error-message condition) (error-status condition)))

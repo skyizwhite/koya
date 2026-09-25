@@ -13,8 +13,8 @@
   (:import-from #:koya-server/web/display #:short-time #:caller-name)
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/document #:set-title)
-  (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state)
+  (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:export #:@get #:deploys-url #:browse-deploys))
@@ -63,25 +63,16 @@
   (let* ((pages (last-page (count-deploys space)))
          (page (min page pages))
          (items (list-deploys space :limit +page-size+ :offset (page-offset page))))
-    (flet ((page-link (n)
-             (hsx (a :href (deploys-url space :page n)
-                     :hx-get (browse-deploys :space space :page n) :hx-target "#deploys" :hx-swap "outerHTML"
-                     :class "btn"
-                     (if (< n page)
-                         (hsx (<> (~icon :name :prev) "Previous"))
-                         (hsx (<> "Next" (~icon :name :next))))))))
-      (hsx
-       (div :id "deploys"
-         (if (null items)
-             (hsx (~empty-state "Nothing has been deployed yet."))
-             (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                    (loop :for deploy :in items :collect
-                      (hsx (~deploy :deploy deploy))))))
-         (when (> pages 1)
-           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                  (when (> page 1) (page-link (1- page)))
-                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                  (when (< page pages) (page-link (1+ page)))))))))))
+    (hsx
+     (div :id "deploys"
+       (if (null items)
+           (hsx (~empty-state "Nothing has been deployed yet."))
+           (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                  (loop :for deploy :in items :collect
+                    (hsx (~deploy :deploy deploy))))))
+       (~pager :page page :pages pages :target "#deploys"
+               :href (lambda (n) (deploys-url space :page n))
+               :browse (lambda (n) (browse-deploys :space space :page n)))))))
 
 (defcomp ~deploys-page (&key space page)
   (hsx
@@ -101,9 +92,7 @@
 
 (defun @get (params)
   (let ((space (path-param params :space)))
-    (cond ((null (find-space space))
-           (set-response-status 404)
-           (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
+    (cond ((null (find-space space)) (hsx (~missing :what "Space")))
           (t
            (set-title (format nil "Schema Deploys · ~a · koya" space))
            (hsx (~deploys-page :space space :page (page-number params)))))))

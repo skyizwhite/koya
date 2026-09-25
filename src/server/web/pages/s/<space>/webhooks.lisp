@@ -18,8 +18,8 @@
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/urls #:space-url #:content-url)
   (:import-from #:koya-server/web/document #:set-title)
-  (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state)
+  (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:export #:@get #:webhook-log-url #:browse-deliveries))
@@ -169,33 +169,24 @@ option it silently replaces with the first one, which here reads \"All\"."
          (page (min page pages))
          (items (list-deliveries space :label label :model model
                                        :limit +page-size+ :offset (page-offset page))))
-    (flet ((page-link (n)
-             (hsx (a :href (webhook-log-url space :label label :model model :page n)
-                     :hx-get (browse-deliveries :space space :label (or label "") :model (or model "") :page n)
-                     :hx-target "#deliveries" :hx-swap "outerHTML" :class "btn"
-                     (if (< n page)
-                         (hsx (<> (~icon :name :prev) "Previous"))
-                         (hsx (<> "Next" (~icon :name :next))))))))
-      (hsx
-       (div :id "deliveries"
-         (when (filtered-p label model)
-           (hsx (p :class "-mt-3 mb-3 text-sm"
-                  (a :href (webhook-log-url space)
-                     :hx-get (browse-deliveries :space space :clear "1") :hx-target "#deliveries" :hx-swap "outerHTML"
-                     :class "text-muted hover:text-fg hover:underline"
-                    "Clear the filters"))))
-         (if (null items)
-             (hsx (~empty-state (if (filtered-p label model)
-                                    "Nothing matches these filters."
-                                    "Nothing has been delivered yet.")))
-             (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                    (loop :for delivery :in items :collect
-                      (hsx (li (~delivery :space space :delivery delivery)))))))
-         (when (> pages 1)
-           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                  (when (> page 1) (page-link (1- page)))
-                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                  (when (< page pages) (page-link (1+ page)))))))))))
+    (hsx
+     (div :id "deliveries"
+       (when (filtered-p label model)
+         (hsx (p :class "-mt-3 mb-3 text-sm"
+                (a :href (webhook-log-url space)
+                   :hx-get (browse-deliveries :space space :clear "1") :hx-target "#deliveries" :hx-swap "outerHTML"
+                   :class "text-muted hover:text-fg hover:underline"
+                  "Clear the filters"))))
+       (if (null items)
+           (hsx (~empty-state (if (filtered-p label model)
+                                  "Nothing matches these filters."
+                                  "Nothing has been delivered yet.")))
+           (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                  (loop :for delivery :in items :collect
+                    (hsx (li (~delivery :space space :delivery delivery)))))))
+       (~pager :page page :pages pages :target "#deliveries"
+               :href (lambda (n) (webhook-log-url space :label label :model model :page n))
+               :browse (lambda (n) (browse-deliveries :space space :label (or label "") :model (or model "") :page n)))))))
 
 (defcomp ~log-page (&key space schema label model page)
   (hsx
@@ -225,9 +216,7 @@ option it silently replaces with the first one, which here reads \"All\"."
 (defun @get (params)
   (let* ((name (path-param params :space))
          (schema (load-schema name)))
-    (cond ((null schema)
-           (set-response-status 404)
-           (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
+    (cond ((null schema) (hsx (~missing :what "Space")))
           (t
            (set-title (format nil "Webhooks · ~a · koya" name))
            (hsx (~log-page :space name

@@ -2,13 +2,13 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/http #:param #:error-status)
+  (:import-from #:koya-server/web/http #:param)
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/ui/toast #:set-toast #:~toast-oob #:action-refusal)
+  (:import-from #:koya-server/web/ui/toast #:set-toast #:~toast-oob #:action-refusal #:action-refused)
   (:import-from #:lack/request #:request-content)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/usecases/spaces/archive #:begin-import #:continue-import #:finish-import)
@@ -129,7 +129,7 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
 (defun make-space (params)
   "(values MESSAGE ERROR). A bad or taken name signals; its message is what the owner needs."
   (handler-case (values (format nil "Space ~a created." (create-space (or (param params "name") ""))) nil)
-    (error (e) (values nil (princ-to-string e)))))
+    (koya-error (e) (values nil (koya-error-message e)))))
 
 (defun import-archive (id)
   "The location to go to after importing the archive upload ID collected."
@@ -174,9 +174,6 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
 ;;; next one how much has arrived, and the last where to go next, in
 ;;; HX-Redirect; the toast waits there.
 
-(defun refused (condition)
-  (action-refusal (koya-error-message condition) (error-status condition)))
-
 (defaction begin-import-action :post (params)
   (declare (ignore params))
   (hsx (<> (begin-import))))
@@ -186,7 +183,7 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
     (handler-case
         (hsx (<> (princ-to-string (continue-import (param params "id") offset
                                                    (request-content ningle:*request*)))))
-      (koya-error (e) (refused e)))))
+      (koya-error (e) (action-refused e)))))
 
 (defaction finish-import-action :post (params)
   (set-response-header :hx-redirect (import-archive (param params "id")))

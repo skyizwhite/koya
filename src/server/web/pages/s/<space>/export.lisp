@@ -6,7 +6,7 @@
   (:import-from #:koya-server/usecases/spaces/archive
                 #:export-space #:archive-file-name #:archive-error)
   (:import-from #:koya-server/web/urls #:space-url)
-  (:import-from #:koya-server/web/ui/layout #:~layout)
+  (:import-from #:koya-server/web/ui/layout #:~missing)
   (:import-from #:koya-server/web/ui/toast #:set-toast)
   (:import-from #:koya-server/web/middlewares #:+temporary-file-header+)
   (:export #:@get))
@@ -23,8 +23,7 @@
 (defun @get (params)
   (let ((name (path-param params :space)))
     (if (null (find-space name))
-        (progn (set-response-status 404)
-               (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
+        (hsx (~missing :what "Space"))
         (handler-case
             (list 200 (list :content-type "application/zip"
                             :content-disposition (format nil "attachment; filename=\"~a\"" (archive-file-name name))

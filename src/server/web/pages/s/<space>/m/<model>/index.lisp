@@ -8,6 +8,7 @@
                 #:webhook-covers-p)
   (:import-from #:koya/core/json #:json-null)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space #:find-model #:space-webhooks)
+  (:import-from #:koya-server/web/target #:target-model)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-data #:+statuses+ #:content-label)
   (:import-from #:koya-server/web/http #:path-param #:redirect-to #:param #:form-values #:blank-p)
@@ -15,8 +16,8 @@
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/urls #:content-url #:model-url)
   (:import-from #:koya-server/web/document #:set-title)
-  (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state)
+  (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast-oob #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
@@ -234,62 +235,53 @@ Each button is an action on the selection form's boxes."
          (page (getf state :page))
          (search-text (getf state :search-text))
          (status (getf state :status)))
-    (flet ((page-link (n)
-             (hsx (a :href (list-url space model-name :search-text search-text :status status
-                                                      :sort-key (getf state :sort-key) :page n)
-                     :hx-get (browse-url space model-name state :page n) :hx-target "#contents" :hx-swap "outerHTML"
-                     :class "btn"
-                     (if (< n page)
-                         (hsx (<> (~icon :name :prev) "Previous"))
-                         (hsx (<> "Next" (~icon :name :next))))))))
-      (hsx
-       (div :id "contents"
-         (when (filtered-p state)
-           (hsx (p :class "-mt-3 mb-3 text-sm"
-                  (a :href (list-url space model-name :sort-key (getf state :sort-key))
-                     :hx-get (browse-url space model-name state :search-text "" :status "" :page 1 :clear t)
-                     :hx-target "#contents" :hx-swap "outerHTML"
-                     :class "text-muted hover:text-fg hover:underline"
-                    "Clear the search and filter"))))
-         (if (null contents)
-             (hsx (~empty-state (cond ((not (blank-p search-text)) "Nothing matches this search.")
-                                      ((not (blank-p status)) "No contents with this status.")
-                                      (t "No contents yet."))))
-             (hsx (form :data-bulk t
-                    (~bulk-bar :space space :model model-name :state state)
-                    (div :class "overflow-x-auto rounded-md border border-line bg-panel"
-                      (table :class "w-full text-sm"
-                        (thead (tr :class "border-b border-line text-left text-muted"
-                                 (th :class "py-2 pl-4 pr-2"
-                                   (input :type "checkbox" :data-bulk-all t
-                                          :aria-label "Select every content on this page"))
-                                 (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
+    (hsx
+     (div :id "contents"
+       (when (filtered-p state)
+         (hsx (p :class "-mt-3 mb-3 text-sm"
+                (a :href (list-url space model-name :sort-key (getf state :sort-key))
+                   :hx-get (browse-url space model-name state :search-text "" :status "" :page 1 :clear t)
+                   :hx-target "#contents" :hx-swap "outerHTML"
+                   :class "text-muted hover:text-fg hover:underline"
+                  "Clear the search and filter"))))
+       (if (null contents)
+           (hsx (~empty-state (cond ((not (blank-p search-text)) "Nothing matches this search.")
+                                    ((not (blank-p status)) "No contents with this status.")
+                                    (t "No contents yet."))))
+           (hsx (form :data-bulk t
+                  (~bulk-bar :space space :model model-name :state state)
+                  (div :class "overflow-x-auto rounded-md border border-line bg-panel"
+                    (table :class "w-full text-sm"
+                      (thead (tr :class "border-b border-line text-left text-muted"
+                               (th :class "py-2 pl-4 pr-2"
+                                 (input :type "checkbox" :data-bulk-all t
+                                        :aria-label "Select every content on this page"))
+                               (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
+                               (loop :for field :in fields :collect
+                                 (hsx (~column-header :space space :model model-name :field field :state state)))
+                               (th)))
+                      (tbody :class "divide-y divide-line"
+                        (loop :for content :in contents :collect
+                          ;; the whole row opens the editor: the link in its last cell
+                          ;; covers the row, and the box sits above it
+                          (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
+                                 (td :class "relative z-10 py-2 pl-4 pr-2"
+                                   (input :type "checkbox" :name "id" :data-bulk-item t
+                                          :value (content-id content)
+                                          :aria-label (format nil "Select ~a" (content-label content model))))
+                                 (td :class "py-2 pr-4 whitespace-nowrap"
+                                   (~status-badge :status (content-status content)))
                                  (loop :for field :in fields :collect
-                                   (hsx (~column-header :space space :model model-name :field field :state state)))
-                                 (th)))
-                        (tbody :class "divide-y divide-line"
-                          (loop :for content :in contents :collect
-                            ;; the whole row opens the editor: the link in its last cell
-                            ;; covers the row, and the box sits above it
-                            (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
-                                   (td :class "relative z-10 py-2 pl-4 pr-2"
-                                     (input :type "checkbox" :name "id" :data-bulk-item t
-                                            :value (content-id content)
-                                            :aria-label (format nil "Select ~a" (content-label content model))))
-                                   (td :class "py-2 pr-4 whitespace-nowrap"
-                                     (~status-badge :status (content-status content)))
-                                   (loop :for field :in fields :collect
-                                     (hsx (~preview-cell :field field :content content :ref-labels ref-labels :media media)))
-                                   (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent"
-                                     (a :href (content-url space model-name (content-id content))
-                                        :class "after:absolute after:inset-0"
-                                        :aria-label (format nil "Open ~a" (content-label content model))
-                                       "›")))))))))))
-         (when (> pages 1)
-           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                  (when (> page 1) (page-link (1- page)))
-                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                  (when (< page pages) (page-link (1+ page)))))))))))
+                                   (hsx (~preview-cell :field field :content content :ref-labels ref-labels :media media)))
+                                 (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent"
+                                   (a :href (content-url space model-name (content-id content))
+                                      :class "after:absolute after:inset-0"
+                                      :aria-label (format nil "Open ~a" (content-label content model))
+                                     "›")))))))))))
+       (~pager :page page :pages pages :target "#contents"
+               :href (lambda (n) (list-url space model-name :search-text search-text :status status
+                                                            :sort-key (getf state :sort-key) :page n))
+               :browse (lambda (n) (browse-url space model-name state :page n)))))))
 
 (defcomp ~list-page (&key space model state contents total pages)
   (let ((model-name (model-name model)))
@@ -331,9 +323,7 @@ count, the sort the filters send, and the URL the list is now read at."
   (let* ((space (path-param params :space))
          (model-name (path-param params :model))
          (model (and (find-space space) (find-model space model-name))))
-    (cond ((null model)
-           (set-response-status 404)
-           (hsx (~layout :space space (h1 :class "text-xl font-bold" "Model not found"))))
+    (cond ((null model) (hsx (~missing :what "Model" :space (find-space space))))
           ((eq (model-kind model) :object)
            (let ((content (find-object-content space model-name)))
              (redirect-to (content-url space model-name (if content (content-id content) "new")) 302)))
@@ -364,7 +354,7 @@ count, the sort the filters send, and the URL the list is now read at."
 
 (defaction bulk-contents :post (params)
   (let* ((space (param params "space"))
-         (model (and space (find-space space) (find-model space (or (param params "model") ""))))
+         (model (target-model params))
          (op (param params "op"))
          (ids (form-values params "id")))
     (cond ((or (null model) (not (bulk-action-p op)))
@@ -380,7 +370,7 @@ count, the sort the filters send, and the URL the list is now read at."
 
 (defaction browse-contents :get (params)
   (let* ((space (param params "space"))
-         (model (and space (find-space space) (find-model space (or (param params "model") "")))))
+         (model (target-model params)))
     (if (and model (eq (model-kind model) :list))
         (answer-list space model (read-state params model) :clear (equal (param params "clear") "1"))
         (action-refusal "Unknown model." 404))))

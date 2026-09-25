@@ -17,8 +17,8 @@
   (:import-from #:koya-server/web/display #:short-time)
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/document #:set-title)
-  (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state)
+  (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast-oob #:action-refusal)
   (:import-from #:koya-server/web/ui/media/grid #:~thumb #:dimensions #:human-size #:~upload-limit)
@@ -125,18 +125,9 @@ joins the selection form."
                 (loop :for media :in items :collect
                   (hsx (~media-card :space space :media media :search search :page page
                                     :references (gethash (media-id media) references 0))))))))
-       (when (> pages 1)
-         (flet ((page-link (n)
-                  (hsx (a :href (library-url space :search search :page n)
-                          :hx-get (browse-media :space space :q q :page n) :hx-target "#library" :hx-swap "outerHTML"
-                          :class "btn"
-                          (if (< n page)
-                              (hsx (<> (~icon :name :prev) "Previous"))
-                              (hsx (<> "Next" (~icon :name :next))))))))
-           (hsx (nav :class "mt-8 flex items-center justify-center gap-3 text-sm"
-                  (when (> page 1) (page-link (1- page)))
-                  (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
-                  (when (< page pages) (page-link (1+ page)))))))))))
+       (~pager :page page :pages pages :target "#library"
+               :href (lambda (n) (library-url space :search search :page n))
+               :browse (lambda (n) (browse-media :space space :q q :page n)))))))
 
 (defcomp ~media-count (&key space search oob)
   (hsx (span :id "media-count" :class "ml-3 text-base font-normal text-muted" :hx-swap-oob (and oob "true")
@@ -284,7 +275,7 @@ CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
 
 (defun @get (params)
   (let ((space (let ((name (path-param params :space))) (and (find-space name) name))))
-    (cond ((null space) (set-response-status 404) (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
+    (cond ((null space) (hsx (~missing :what "Space")))
           (t (set-title (format nil "Media · ~a · koya" space))
              (hsx (~layout :space space :crumbs (list (cons "Media" nil))
                     (~library-header :space space :search (param params "q"))

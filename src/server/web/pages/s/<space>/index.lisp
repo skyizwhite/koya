@@ -9,7 +9,7 @@
   (:import-from #:koya-server/web/http #:path-param)
   (:import-from #:koya-server/web/urls #:model-url #:space-url)
   (:import-from #:koya-server/web/document #:set-title)
-  (:import-from #:koya-server/web/ui/layout #:~layout)
+  (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/ui/icon #:~icon #:~model-icon)
   (:import-from #:koya-server/web/pages/s/<space>/webhooks #:webhook-log-url)
@@ -20,9 +20,7 @@
 (defun @get (params)
   (let* ((name (path-param params :space))
          (schema (load-schema name)))
-    (cond ((null schema)
-           (set-response-status 404)
-           (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
+    (cond ((null schema) (hsx (~missing :what "Space")))
           (t
            (set-title (format nil "~a · koya" name))
            (hsx
