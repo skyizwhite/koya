@@ -137,6 +137,13 @@ it is stale.
 Ids are ULIDs. A model's fields are not columns: they are keys in the JSON, so
 changing a schema never changes a table.
 
+One connection, and one lock around every statement and every transaction
+(`infra/db/connection`): the process, not SQLite, is what serialises access.
+A transaction holds the lock for its extent, so nothing reads while a write is
+under way -- an import of a large space is a pause for every request. This is
+the price of one process and no connection pool, and it is what lets a use
+case read and then write without another request slipping in between.
+
 ## Stack
 
 SBCL with package-inferred systems — a file under `src/` is a package — and
