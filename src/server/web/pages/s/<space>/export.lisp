@@ -8,12 +8,13 @@
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/toast #:set-toast)
+  (:import-from #:koya-server/web/middlewares #:+temporary-file-header+)
   (:export #:@get))
 (in-package #:koya-server/web/pages/s/<space>/export)
 
-;;; The space as a zip download (usecases/spaces/archive). Its files are read into
-;;; memory and the archive is built there before it is sent, so the process holds
-;;; about twice the archive's size.
+;;; The space as a zip download (usecases/spaces/archive). The archive is written
+;;; to a file and sent from there, then deleted (*TEMPORARY-FILE-MIDDLEWARE*):
+;;; it holds the webhook secret and every draft.
 ;;;
 ;;; The link to it carries no download attribute: Content-Disposition makes the
 ;;; zip a download on its own, and a failure -- a redirect to the space page with
@@ -25,11 +26,10 @@
         (progn (set-response-status 404)
                (hsx (~layout (h1 :class "text-xl font-bold" "Space not found"))))
         (handler-case
-            (let ((octets (export-space name)))
-              (list 200 (list :content-type "application/zip"
-                              :content-length (length octets)
-                              :content-disposition (format nil "attachment; filename=\"~a\"" (archive-file-name name)))
-                    octets))
+            (list 200 (list :content-type "application/zip"
+                            :content-disposition (format nil "attachment; filename=\"~a\"" (archive-file-name name))
+                            +temporary-file-header+ "1")
+                  (export-space name))
           (archive-error (e)
             (set-toast (princ-to-string e) :error)
             (redirect-to (space-url name)))))))

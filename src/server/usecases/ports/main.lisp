@@ -10,6 +10,7 @@
   (:import-from #:koya-server/usecases/ports/settings)
   (:import-from #:koya-server/usecases/ports/sessions)
   (:import-from #:koya-server/usecases/ports/config)
+  (:import-from #:koya-server/usecases/ports/archives)
   (:export #:+ports+
            #:unimplemented-ports))
 (in-package #:koya-server/usecases/ports)
@@ -26,7 +27,8 @@
     #:koya-server/usecases/ports/webhooks
     #:koya-server/usecases/ports/settings
     #:koya-server/usecases/ports/sessions
-    #:koya-server/usecases/ports/config)
+    #:koya-server/usecases/ports/config
+    #:koya-server/usecases/ports/archives)
   "The packages of the ports. A new port is imported above and named here.")
 
 (defun unimplemented-ports (&optional (ports +ports+))

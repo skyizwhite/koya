@@ -1,7 +1,7 @@
 (defpackage #:koya-server/usecases/spaces/archive
   (:use #:cl)
   (:import-from #:koya-server/domain/errors
-                #:invalid-input #:too-large)
+                #:invalid-input #:conflict #:not-found)
   (:import-from #:koya-server/usecases/ports/store
                 #:with-transaction)
   (:import-from #:koya-server/usecases/actor
@@ -21,11 +21,14 @@
   (:import-from #:koya-server/domain/revision
                 #:revision-event #:revision-data #:revision-by #:revision-created-at)
   (:import-from #:koya-server/usecases/ports/media
-                #:space-media #:insert-media #:count-media #:read-media-file #:write-media-file
+                #:space-media #:insert-media #:count-media #:media-file-exists-p #:write-media-file
                 #:delete-media-file)
+  (:import-from #:koya-server/usecases/ports/archives
+                #:write-archive #:create-upload #:upload-size #:append-to-upload #:delete-upload
+                #:call-with-upload #:archive-entry-size #:archive-entry-bytes #:purge-stale-archives)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-space #:media-filename #:media-mime #:media-size #:media-width
-                #:media-height #:media-alt #:media-created-at)
+                #:media-height #:media-alt #:media-created-at #:+max-upload-bytes+)
   (:import-from #:koya-server/domain/image #:sniff-image #:image-extension)
   (:import-from #:koya/core/schema
                 #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p)
@@ -37,15 +40,13 @@
                 #:scan)
   (:import-from #:babel
                 #:string-to-octets #:octets-to-string)
-  (:import-from #:org.shirakumo.zippy
-                #:zip-file #:zip-entry #:compress-zip #:open-zip-file #:entries #:file-name
-                #:entry-to-vector)
+  (:import-from #:bordeaux-threads-2)
   (:export #:export-space
-           #:import-space
-           #:import-space-stream
+           #:begin-import
+           #:continue-import
+           #:finish-import
            #:archive-file-name
-           #:archive-error
-           #:+max-archive-bytes+))
+           #:archive-error))
 (in-package #:koya-server/usecases/spaces/archive)
 
 ;;; A space as one zip: space.json -- the schema, every content with its draft,
@@ -57,11 +58,12 @@
 ;;; Keys are stored as SHA-256 and move as that, so the archive holds no key
 ;;; that can be used; it does hold the webhook secret and every draft, so it is
 ;;; to be kept as privately as the database itself.
+;;;
+;;; A space has no size limit, so neither has its archive: the files are copied
+;;; into it and out of it one at a time (ports/archives), and an import arrives
+;;; in pieces. What is held in memory is space.json and one file.
 
 (defparameter +archive-version+ 1)
-
-(defparameter +max-archive-bytes+ (* 512 1024 1024)
-  "Largest archive /import accepts. It carries every media file of a space.")
 
 (defparameter +media-id-pattern+ "^[0-9A-Z]{26}\\z"
   "What STORE-UPLOAD makes, and what /media/ serves. An archive's ids become file
@@ -116,20 +118,10 @@ names, so nothing else is accepted.")
   (jobject "id" (getf key :id) "keyHash" (getf key :hash)
            "label" (getf key :label) "createdAt" (getf key :created-at)))
 
-(defun zip-to-octets (entries)
-  "ENTRIES written as a zip, read back as octets. zippy writes to a file, so it
-goes through a temporary one."
-  (uiop:with-temporary-file (:pathname path :type "zip")
-    (compress-zip (make-instance 'zip-file :entries (coerce entries 'vector))
-                  path :if-exists :supersede)
-    (with-open-file (in path :element-type '(unsigned-byte 8))
-      (let ((octets (make-array (file-length in) :element-type '(unsigned-byte 8))))
-        (read-sequence octets in)
-        octets))))
-
 (defun export-space (space)
-  "The archive of SPACE as zip octets. Signals ARCHIVE-ERROR when the file of a
-media is missing: an archive without it would not restore."
+  "The archive of SPACE, written to a file whose pathname is returned; the caller
+deletes it once it is sent. Signals ARCHIVE-ERROR when the file of a media is
+missing: an archive without it would not restore."
   (let* ((schema (or (load-schema space) (fail "Space ~a not found" space)))
          (media (space-media space))
          (document (jobject "koyaExport" +archive-version+
@@ -141,36 +133,27 @@ media is missing: an archive without it would not restore."
                             "webhookSecret" (space-webhook-secret space)
                             "deliveryKeys" (map 'vector #'key->jobject (stored-delivery-keys space))
                             "managementKeys" (map 'vector #'key->jobject (stored-management-keys space)))))
-    (zip-to-octets
-     (cons (make-instance 'zip-entry :file-name "space.json"
-                                     :content (string-to-octets (to-json document) :encoding :utf-8))
-           (loop :for m :in media
-                 :for bytes := (or (read-media-file (media-space m) (media-id m) (media-mime m))
-                                   (fail "The file of ~a (~a) is missing from the media library"
-                                         (media-filename m) (media-id m)))
-                 ;; images are compressed already; deflating them again only costs time
-                 :collect (make-instance 'zip-entry :file-name (media-entry-name (media-id m) (media-mime m))
-                                                    :content bytes :compression-method :store))))))
+    (dolist (m media)
+      (unless (media-file-exists-p (media-space m) (media-id m) (media-mime m))
+        (fail "The file of ~a (~a) is missing from the media library" (media-filename m) (media-id m))))
+    (purge-stale-archives)
+    (write-archive (cons (cons "space.json" (string-to-octets (to-json document) :encoding :utf-8))
+                         (mapcar (lambda (m) (cons (media-entry-name (media-id m) (media-mime m)) m))
+                                 media)))))
 
 ;;; --- Import -------------------------------------------------------------------
 ;;;
-;;; Read from a file, one entry at a time: an archive holds every media file of
-;;; a space, and the heap is not the place for all of them at once.
+;;; An archive arrives in pieces (BEGIN-IMPORT, CONTINUE-IMPORT) and is read once
+;;; whole (FINISH-IMPORT), one file at a time.
 
-(defun archive-entries (zip)
-  (let ((entries (make-hash-table :test 'equal)))
-    (loop :for entry :across (entries zip)
-          :do (setf (gethash (file-name entry) entries) entry))
-    entries))
-
-(defun read-document (entries)
-  (let ((json (or (gethash "space.json" entries) (fail "The archive has no space.json"))))
-    (let ((document (handler-case (parse-json (octets-to-string (entry-to-vector json) :encoding :utf-8))
-                      (error () (fail "space.json is not valid JSON")))))
-      (unless (hash-table-p document) (fail "space.json must be an object"))
-      (unless (eql (jget document "koyaExport") +archive-version+)
-        (fail "Unsupported archive version ~s (expected ~a)" (jget document "koyaExport") +archive-version+))
-      document)))
+(defun read-document (archive)
+  (let* ((json (or (archive-entry-bytes archive "space.json") (fail "The archive has no space.json")))
+         (document (handler-case (parse-json (octets-to-string json :encoding :utf-8))
+                     (error () (fail "space.json is not valid JSON")))))
+    (unless (hash-table-p document) (fail "space.json must be an object"))
+    (unless (eql (jget document "koyaExport") +archive-version+)
+      (fail "Unsupported archive version ~s (expected ~a)" (jget document "koyaExport") +archive-version+))
+    document))
 
 (defun string-field (object key &key required)
   (let ((value (nullable (jget object key))))
@@ -210,8 +193,8 @@ media is missing: an archive without it would not restore."
                         :created-at (string-field r "createdAt" :required t)))
           revisions))))
 
-(defun parse-media (object entries)
-  "The media row as a plist with the zip :entry holding its file, which is
+(defun parse-media (object archive)
+  "The media row as a plist with the :entry naming its file in ARCHIVE, which is
 checked the way an upload is. The bytes are not kept: they are read again when
 the file is written."
   (unless (hash-table-p object) (fail "Each media must be an object"))
@@ -219,15 +202,19 @@ the file is written."
          (mime (string-field object "mime" :required t)))
     (unless (scan +media-id-pattern+ id) (fail "~s is not a media id" id))
     (unless (image-extension mime) (fail "Media ~a is ~a, which is not an accepted image type" id mime))
-    (let* ((entry (or (gethash (media-entry-name id mime) entries)
-                      (fail "The archive has no file for media ~a" id)))
-           (bytes (entry-to-vector entry)))
-      (multiple-value-bind (sniffed width height) (sniff-image bytes)
-        (unless (equal sniffed mime) (fail "The file of media ~a is not the ~a it says it is" id mime))
-        (list :id id :mime mime :entry entry :size (length bytes) :width width :height height
-              :filename (or (string-field object "filename") "upload")
-              :alt (or (string-field object "alt") "")
-              :created-at (string-field object "createdAt" :required t))))))
+    (let* ((entry (media-entry-name id mime))
+           (size (or (archive-entry-size archive entry) (fail "The archive has no file for media ~a" id))))
+      ;; before reading it: an upload is never larger, and a file that says it is
+      ;; would be held whole
+      (when (> size +max-upload-bytes+)
+        (fail "The file of media ~a is larger than an upload may be" id))
+      (let ((bytes (archive-entry-bytes archive entry)))
+        (multiple-value-bind (sniffed width height) (sniff-image bytes)
+          (unless (equal sniffed mime) (fail "The file of media ~a is not the ~a it says it is" id mime))
+          (list :id id :mime mime :entry entry :size (length bytes) :width width :height height
+                :filename (or (string-field object "filename") "upload")
+                :alt (or (string-field object "alt") "")
+                :created-at (string-field object "createdAt" :required t)))))))
 
 (defun parse-keys (document key)
   "The keys under KEY of space.json as plists for IMPORT-*-KEY."
@@ -253,51 +240,76 @@ keys. Its webhooks and webhook secret are the archive's to replace."
                  (stored-management-keys space)))
     (fail "Space ~a is not empty. Import into a new space, or one with no models, media or keys." space)))
 
-(defun write-media-files (space media written)
+(defun write-media-files (space archive media written)
   "Write every file, pushing each media onto the list in the cons WRITTEN once its
 file is made, so a caller that fails later takes away only what this import
 made. A file already there is an error, never replaced: it may be another
 import's."
   (dolist (m media)
-    (unless (write-media-file space (getf m :id) (getf m :mime) (entry-to-vector (getf m :entry)) :new t)
+    (unless (write-media-file space (getf m :id) (getf m :mime) (archive-entry-bytes archive (getf m :entry))
+                              :new t)
       (fail "The file of media ~a is already in the media library" (getf m :id)))
     (push m (car written))))
 
-(defun import-space (source &key (by *actor*))
-  "Make the space in the archive SOURCE -- a pathname, or octets -- again: its
-schema, contents with their history, and media. Returns the space's name.
-Nothing is sent to its webhooks. Signals ARCHIVE-ERROR (or a schema error) and
-changes nothing when the archive is malformed or the space is not empty."
-  (multiple-value-bind (zip streams) (handler-case (open-zip-file source)
-                                       (error () (fail "This file is not a zip archive")))
-    (unwind-protect (import-from-zip zip :by by)
-      (mapc #'close streams))))
+(defvar *uploads-lock* (bordeaux-threads-2:make-lock :name "koya-uploads")
+  "Held while a piece is checked and added, and while an upload is imported, so
+no two requests work on one upload at once.")
 
-(defun import-from-zip (zip &key by)
-  (let* ((entries (archive-entries zip))
-         (document (read-document entries))
+(defun no-such-import (id)
+  (error 'not-found :message (format nil "There is no import ~a; start again" id)))
+
+(defun begin-import ()
+  "Start an import. Returns the id its pieces are sent under."
+  (purge-stale-archives)
+  (create-upload))
+
+(defun continue-import (id offset octets)
+  "Add OCTETS to import ID. OFFSET is where they go: pieces arrive in order, and one
+sent twice, or one that skipped ahead, is refused with a CONFLICT that says where
+the import stands."
+  (bordeaux-threads-2:with-lock-held (*uploads-lock*)
+    (let ((size (or (upload-size id) (no-such-import id))))
+      (unless (eql offset size)
+        (error 'conflict :message (format nil "The import has ~a bytes; a piece at ~a does not follow them"
+                                          size offset)))
+      (append-to-upload id octets)
+      (+ size (length octets)))))
+
+(defun finish-import (id &key (by *actor*))
+  "Make the space in the archive import ID collected again: its schema, contents
+with their history, and media. Returns the space's name. Nothing is sent to its
+webhooks. Signals ARCHIVE-ERROR (or a schema error) and changes nothing when the
+archive is malformed or the space is not empty. The upload is gone afterwards,
+whatever came of it."
+  (bordeaux-threads-2:with-lock-held (*uploads-lock*)
+    (unless (upload-size id) (no-such-import id))
+    (unwind-protect (call-with-upload id (lambda (archive) (import-from-archive archive :by by)))
+      (delete-upload id))))
+
+(defun import-from-archive (archive &key by)
+  (let* ((document (read-document archive))
          (space (string-field document "space" :required t))
          (schema (jobject->schema (jget document "schema"))))
     (unless (slug-name-p space) (fail "~s is not a space name" space))
     (check-target space)
-    (import-into space schema
+    (import-into space archive schema
                  (map 'list (lambda (o) (parse-content o space schema))
                       (or (nullable (jget document "contents")) #()))
-                 (map 'list (lambda (o) (parse-media o entries))
+                 (map 'list (lambda (o) (parse-media o archive))
                       (or (nullable (jget document "media")) #()))
                  :secret (string-field document "webhookSecret")
                  :delivery-keys (parse-keys document "deliveryKeys")
                  :management-keys (parse-keys document "managementKeys")
                  :by by)))
 
-(defun import-into (space schema contents media &key secret delivery-keys management-keys by)
+(defun import-into (space archive schema contents media &key secret delivery-keys management-keys by)
   ;; the files first, as an upload does: a failed write must not leave rows
   ;; whose URLs 404; a failed transaction takes the files away again
   (let ((written (list '()))
         (done nil))
     (unwind-protect
          (progn
-           (write-media-files space media written)
+           (write-media-files space archive media written)
            (with-transaction
              ;; checked again inside: another import may have made it since
              (check-target space)
@@ -320,25 +332,3 @@ changes nothing when the archive is malformed or the space is not empty."
         (dolist (m (car written))
           (delete-media-file space (getf m :id) (getf m :mime)))))
     space))
-
-;;; An archive sent as a request body is copied to a file and read from there,
-;;; so it is never held in memory whole.
-
-(defun copy-to-file (in path)
-  "Copy IN to PATH, refusing more than the import limit: a chunked body has no
-Content-Length for the middleware to check."
-  (with-open-file (out path :direction :output :element-type '(unsigned-byte 8) :if-exists :supersede)
-    (let ((buffer (make-array 65536 :element-type '(unsigned-byte 8))))
-      (loop :for n := (read-sequence buffer in)
-            :for total := n :then (+ total n)
-            :while (plusp n)
-            :do (when (> total +max-archive-bytes+)
-                  (error 'too-large :message (format nil "The archive is larger than ~a MB"
-                                                     (floor +max-archive-bytes+ (* 1024 1024)))))
-                (write-sequence buffer out :end n)))))
-
-(defun import-space-stream (in &key (by *actor*))
-  "IMPORT-SPACE for the archive read from the stream IN."
-  (uiop:with-temporary-file (:pathname path :type "zip")
-    (copy-to-file in path)
-    (import-space path :by by)))

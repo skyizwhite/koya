@@ -2,19 +2,20 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/http #:param)
+  (:import-from #:koya-server/web/http #:param #:error-status)
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:set-toast #:~toast-oob #:action-refusal)
-  (:import-from #:lack/request #:request-env)
-  (:import-from #:koya-server/usecases/spaces/archive #:import-space-stream)
+  (:import-from #:lack/request #:request-content)
+  (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
+  (:import-from #:koya-server/usecases/spaces/archive #:begin-import #:continue-import #:finish-import)
   (:import-from #:koya-server/usecases/spaces/lifecycle
                 #:create-space #:remove-space #:list-spaces #:find-space)
-  (:import-from #:koya-server/web/middlewares #:archive-path)
-  (:export #:@get #:create-space-action #:delete-space-action #:import-space-action))
+  (:export #:@get #:create-space-action #:delete-space-action
+           #:begin-import-action #:continue-import-action #:finish-import-action))
 (in-package #:koya-server/web/pages/index)
 
 ;;; The spaces. A space owns the contents, media, keys and webhook secret, so it
@@ -76,12 +77,19 @@ taking up the page."
          (~dialog-close :dialog "new-space" "Cancel")
          (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create space"))))))
 
+(defparameter +import-piece-bytes+ (* 16 1024 1024)
+  "How much of an archive one request carries: under the body limit
+(web/middlewares), which it has to pass, and small enough to send again.")
+
 (defcomp ~import-space-dialog ()
   "A space archive from a space's Export. koya-editor.js sends the chosen file to
-the import action as the request body (see IMPORT-SPACE-ACTION)."
+the import actions in pieces (see BEGIN-IMPORT-ACTION)."
   (hsx
    (dialog :id "import-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :data-import (import-space-action)
+     (form :data-import-begin (begin-import-action)
+           :data-import-continue (continue-import-action)
+           :data-import-finish (finish-import-action)
+           :data-import-piece-bytes (princ-to-string +import-piece-bytes+)
        (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
          (h2 :class "font-semibold" "Import space")
          (button :type "button" :commandfor "import-space" :command "close" :class "btn btn-icon" :aria-label "Close"
@@ -93,7 +101,10 @@ the import action as the request body (see IMPORT-SPACE-ACTION)."
          (p :class "mt-2 text-xs text-muted"
             "A zip from a space's " (strong "Export") ". The space is made again under its own name, "
             "with its models, webhooks, contents, history, media and keys. A space of that name must not "
-            "exist yet, or must be empty: no models, media or keys. Nothing is sent to the webhooks."))
+            "exist yet, or must be empty: no models, media or keys. Nothing is sent to the webhooks.")
+         (div :class "mt-4 hidden" :data-import-progress t
+           (progress :class "w-full" :max "100")
+           (p :class "mt-1 text-xs text-muted" :data-import-status t)))
        (p :class "hidden px-4 pb-3 text-sm text-danger" :data-import-error t)
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
          (~dialog-close :dialog "import-space" "Cancel")
@@ -120,12 +131,12 @@ the import action as the request body (see IMPORT-SPACE-ACTION)."
   (handler-case (values (format nil "Space ~a created." (create-space (or (param params "name") ""))) nil)
     (error (e) (values nil (princ-to-string e)))))
 
-(defun import-archive (body)
-  "The location to go to after importing the archive in the stream BODY."
+(defun import-archive (id)
+  "The location to go to after importing the archive upload ID collected."
   ;; every condition: a bad archive can fail in the zip reader, the schema
   ;; check or the database, and each one's message is what the owner needs
   (handler-case
-      (let ((space (import-space-stream body)))
+      (let ((space (finish-import id)))
         (set-toast (format nil "Space ~a imported." space))
         (space-url space))
     (error (e)
@@ -157,23 +168,29 @@ the import action as the request body (see IMPORT-SPACE-ACTION)."
 
 ;;; A space archive from Export, made into a space again (usecases/spaces/archive).
 ;;;
-;;; The dialog sends the file itself as an application/zip body (koya-editor.js),
-;;; not as a multipart form, which lack would hold in memory several times over.
-;;; ARCHIVE-PATH has *BODY-LIMIT-MIDDLEWARE* set that body aside unread; it is
-;;; copied to a file here, once the owner is known, and read from there.
-;;;
-;;; The answer is where to go next, in HX-Redirect; the toast waits there.
+;;; koya-editor.js sends the file in pieces of +IMPORT-PIECE-BYTES+, each where it
+;;; goes, so no request is larger than any other and a space has no size an
+;;; import cannot take. The first answer is the id the pieces go under, each
+;;; next one how much has arrived, and the last where to go next, in
+;;; HX-Redirect; the toast waits there.
 
-(defaction import-space-action :post (params)
+(defun refused (condition)
+  (action-refusal (koya-error-message condition) (error-status condition)))
+
+(defaction begin-import-action :post (params)
   (declare (ignore params))
-  (let ((body (getf (request-env ningle:*request*) :koya.import-body)))
-    (set-response-header :hx-redirect
-                         (if body
-                             (import-archive body)
-                             (progn (set-toast "Choose an archive to import." :error) "/")))
-    (hsx (<>))))
+  (hsx (<> (begin-import))))
 
-(archive-path (import-space-action))
+(defaction continue-import-action :post (params)
+  (let ((offset (ignore-errors (parse-integer (or (param params "offset") "")))))
+    (handler-case
+        (hsx (<> (princ-to-string (continue-import (param params "id") offset
+                                                   (request-content ningle:*request*)))))
+      (koya-error (e) (refused e)))))
+
+(defaction finish-import-action :post (params)
+  (set-response-header :hx-redirect (import-archive (param params "id")))
+  (hsx (<>)))
 
 ;;; --- Page ---------------------------------------------------------------------
 

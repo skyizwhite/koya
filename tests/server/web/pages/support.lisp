@@ -41,6 +41,22 @@
               :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
               :public-url "https://site.test/blog/{CONTENT_ID}"))
 
+(defun answer (response)
+  "RESPONSE as (status headers body), calling it when it is delayed, as a server
+does. A file it sends is read as the server would read it, before the responder
+returns: the file may be deleted then."
+  (if (functionp response)
+      (let (answer)
+        (funcall response
+                 (lambda (res)
+                   (destructuring-bind (status headers &optional body) res
+                     (setf answer (list status headers
+                                        (if (pathnamep body)
+                                            (alexandria:read-file-into-byte-vector body)
+                                            body))))))
+        answer)
+      response))
+
 (defun request (method path &key form multipart json body content-type headers query)
   "Returns (values status body-string headers-plist). FORM is urlencoded; MULTIPART
 is a list of parts for MULTIPART-BODY; JSON is a string sent as the body, for the
@@ -72,7 +88,7 @@ admin API, which the session reaches as well as a management key does."
         (setf (getf env :content-type) "application/json"
               (getf env :content-length) (length octets)
               (getf env :raw-body) (make-in-memory-input-stream octets))))
-    (destructuring-bind (status response-headers body) (funcall (app) env)
+    (destructuring-bind (status response-headers body) (answer (funcall (app) env))
       (let ((set-cookie (getf response-headers :set-cookie)))
         (when set-cookie
           (setf *set-cookie* set-cookie
@@ -117,6 +133,8 @@ override those: the first of a name is the one the table keeps."
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
   (setf (uiop:getenv "KOYA_BASE_URL") "http://localhost:3000")
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
+  ;; the database is in memory; this is where space archives go, beside it
+  (setf (uiop:getenv "KOYA_DB_PATH") (namestring (merge-pathnames "koya.db" *media-root*)))
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (connect-db ":memory:")

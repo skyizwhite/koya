@@ -5,7 +5,7 @@
   (:import-from #:koya-server/domain/image
                 #:image-extension)
   (:import-from #:koya-server/usecases/ports/media
-                #:media-file-path #:read-media-file #:write-media-file #:delete-media-file
+                #:media-file-path #:media-file-exists-p #:write-media-file #:delete-media-file
                 #:delete-space-media-files))
 (in-package #:koya-server/infra/media-files)
 
@@ -18,13 +18,8 @@
 (defmethod media-file-path (space id mime)
   (merge-pathnames (format nil "~a/~a.~a" space id (image-extension mime)) (media-root)))
 
-(defmethod read-media-file (space id mime)
-  (let ((path (media-file-path space id mime)))
-    (when (probe-file path)
-      (with-open-file (in path :element-type '(unsigned-byte 8))
-        (let ((bytes (make-array (file-length in) :element-type '(unsigned-byte 8))))
-          (read-sequence bytes in)
-          bytes)))))
+(defmethod media-file-exists-p (space id mime)
+  (and (probe-file (media-file-path space id mime)) t))
 
 (defmethod write-media-file (space id mime bytes &key new)
   (let ((path (media-file-path space id mime)))

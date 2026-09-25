@@ -6,6 +6,7 @@
   ;; loaded for the methods they add to the ports
   (:import-from #:koya-server/infra/media-files)
   (:import-from #:koya-server/infra/webhook-sender)
+  (:import-from #:koya-server/infra/archives)
   (:export #:db-path
            #:server-port
            #:open-store
@@ -14,5 +15,5 @@
 (in-package #:koya-server/infra)
 
 ;;; Every port's implementation -- the store, the media files, sending webhooks,
-;;; the environment -- loaded together, and what koya-server/main needs to start
+;;; space archives, the environment -- loaded together, and what koya-server/main needs to start
 ;;; them. Imported by its file name, koya-server/infra/main.

@@ -30,9 +30,10 @@ COPY . /app
 RUN qlot install
 
 # The heap the executable gets is the one this process starts with: the saved
-# image keeps its runtime options and reads none from its own command line.
-# An export holds its files and the zip made of them at once, so twice the
-# largest archive an import takes (512 MB), and room for the rest.
+# image keeps its runtime options and reads none from its own command line. It
+# is named here so that it is not whatever the build image's SBCL defaults to;
+# nothing in koya needs more than a few uploads' worth at once, whatever the size
+# of a space.
 RUN qlot exec sbcl --dynamic-space-size 2048 --non-interactive \
       --eval '(ql:quickload "koya-server")' \
       --eval '(koya-server:save-executable "/app/koya")'

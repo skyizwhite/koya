@@ -6,7 +6,7 @@
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
-  (:import-from #:koya-server/web/pages/index #:import-space-action))
+  (:import-from #:koya-server/web/middlewares #:+max-body-bytes+))
 (in-package #:koya-tests/server/web/app)
 
 (setup (setup-pages) (log-in))
@@ -89,13 +89,6 @@
       (ok (search "text/html" (getf headers :content-type)) "htmx swaps it in, so it is HTML")
       (ok (search "limited to" (first body)))
       (ok (not (search "too_large" (first body)))))
-    (testing "an import may be larger, but not without end"
-      (ok (/= 413 (first (huge-post nil :path (import-space-action) :mb 100 :content-type "application/zip")))
-          "a space archive carries every media file")
-      (ok (= 413 (first (huge-post nil :path (import-space-action) :mb 100)))
-          "but only as the body itself: lack would hold a multipart one in memory")
-      (destructuring-bind (status headers body) (huge-post nil :path (import-space-action) :content-type "application/zip")
-        (ok (= status 413))
-        (ok (search "text/html" (getf headers :content-type)) "a form post, so it is HTML")
-        (ok (search "limited to 512 MB" (first body)))))))
+    (ok (= smart-buffer:*default-disk-limit* +max-body-bytes+)
+        "Woo holds no more of a body than the app would take")))
 

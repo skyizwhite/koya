@@ -288,16 +288,32 @@ onEach("iframe[data-fit-content]", (frame) => {
   if (frame.contentDocument && frame.contentDocument.readyState === "complete") fit();
 });
 
-// Import: the archive goes to the import action ([data-import]) as the request
-// body itself, not as a multipart form, so the server can copy it to disk instead
-// of holding it in memory. htmx sends forms only, so this is a fetch that says it
-// is htmx, as an action requires. The answer names the page to go to in
-// HX-Redirect, where the result waits as a toast.
+// Import: the archive goes to the import actions in pieces, each a request of
+// its own that says where in the file it goes ([data-import-*] on the form).
+// However large the space, no request is larger than a piece, and the server
+// writes each one to the end of the upload. htmx sends forms only, so these are
+// fetches that say they are htmx, as an action requires. The last answer names
+// the page to go to in HX-Redirect, where the result waits as a toast.
 document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("form[data-import]").forEach((form) => {
+  document.querySelectorAll("form[data-import-begin]").forEach((form) => {
     const error = form.querySelector("[data-import-error]");
+    const progress = form.querySelector("[data-import-progress]");
+    const bar = progress.querySelector("progress");
+    const status = progress.querySelector("[data-import-status]");
     const submit = form.querySelector("button[type=submit]");
     const label = submit.innerHTML;
+    const pieceBytes = Number(form.dataset.importPieceBytes);
+    const post = async (url, body) => {
+      const response = await fetch(url, {
+        method: "POST",
+        body,
+        headers: { "Content-Type": "application/octet-stream", "HX-Request": "true" },
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(new DOMParser().parseFromString(text, "text/html").body.textContent);
+      return { text, response };
+    };
+    const megabytes = (n) => `${(n / 1048576).toFixed(1)} MB`;
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const file = form.querySelector("input[type=file]").files[0];
@@ -305,18 +321,27 @@ document.addEventListener("DOMContentLoaded", () => {
       submit.disabled = true;
       submit.textContent = "Importing…";
       error.classList.add("hidden");
+      progress.classList.remove("hidden");
+      bar.max = file.size || 1;
+      bar.value = 0;
       try {
-        const response = await fetch(form.dataset.import, {
-          method: "POST",
-          body: file,
-          headers: { "Content-Type": "application/zip", "HX-Request": "true" },
-        });
-        const text = await response.text();
-        if (!response.ok) throw new Error(new DOMParser().parseFromString(text, "text/html").body.textContent);
+        const id = (await post(form.dataset.importBegin)).text.trim();
+        for (let offset = 0; offset < file.size; offset += pieceBytes) {
+          status.textContent = `Uploading ${megabytes(offset)} of ${megabytes(file.size)}`;
+          const url = `${form.dataset.importContinue}?id=${encodeURIComponent(id)}&offset=${offset}`;
+          await post(url, file.slice(offset, offset + pieceBytes));
+          bar.value = Math.min(offset + pieceBytes, file.size);
+        }
+        // the import itself is one step the server takes whole; the site waits
+        // for it, and so does this bar
+        bar.removeAttribute("value");
+        status.textContent = "Making the space. The server answers nothing else until it is done.";
+        const { response } = await post(`${form.dataset.importFinish}?id=${encodeURIComponent(id)}`);
         window.location.href = response.headers.get("HX-Redirect") || "/";
       } catch (e) {
         error.textContent = e.message || "The import could not be sent.";
         error.classList.remove("hidden");
+        progress.classList.add("hidden");
         submit.disabled = false;
         submit.innerHTML = label;
       }

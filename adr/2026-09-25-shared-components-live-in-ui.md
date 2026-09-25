@@ -1,5 +1,7 @@
 # Shared components live in ui/, a page's own stay with it
 
+Superseded by adr/2026-09-25-a-space-has-no-size-limit-and-moves-in-pieces.md (how the import action takes its body)
+
 *2026-09-25*
 
 ## Context

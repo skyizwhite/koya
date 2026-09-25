@@ -12,7 +12,7 @@
                 #:content-status #:content-published #:content-draft #:content-id
                 #:content-draft-key #:content-created-at #:content-published-at)
   (:import-from #:koya-server/usecases/ports/media
-                #:list-media #:media-file-path #:read-media-file #:write-media-file #:delete-media-file)
+                #:list-media #:media-file-path #:write-media-file #:delete-media-file)
   (:import-from #:koya-server/domain/media #:media-id #:media-filename #:media-space #:media-mime)
   (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
   (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
@@ -28,7 +28,9 @@
   (:import-from #:koya-server/usecases/media/library
                 #:store-upload #:remove-space-media)
   (:import-from #:koya/core/schema #:schema-models #:model-name #:webhook-url)
-  (:import-from #:koya-server/web/pages/index #:import-space-action))
+  (:import-from #:koya-server/web/pages/index
+                #:begin-import-action #:continue-import-action #:finish-import-action)
+  (:import-from #:koya-server/infra/env #:archive-dir))
 (in-package #:koya-tests/server/web/pages/space-import)
 
 (setup (setup-pages) (log-in))
@@ -47,12 +49,35 @@
 (defparameter +as-htmx+ '(("origin" . "http://localhost:3000") ("hx-request" . "true"))
   "What the import dialog's fetch sends: an action answers htmx requests only.")
 
-(defun import-archive (octets)
-  "Send OCTETS to the import action as the import dialog does; (values status next-location)."
-  (multiple-value-bind (status body headers)
-      (request :post (import-space-action) :headers +as-htmx+ :body octets :content-type "application/zip")
-    (declare (ignore body))
-    (values status (getf headers :hx-redirect))))
+(defun post-piece (url &optional (octets (make-array 0 :element-type '(unsigned-byte 8))) (headers +as-htmx+))
+  "POST OCTETS to the action at URL as the import dialog does. (values status body headers)."
+  (let ((q (position #\? url)))
+    (request :post (subseq url 0 q) :query (and q (subseq url (1+ q))) :headers headers
+                                    :body octets :content-type "application/octet-stream")))
+
+(defun begin ()
+  (string-trim '(#\Space #\Newline) (nth-value 1 (post-piece (begin-import-action)))))
+
+(defun piece-url (id offset)
+  (format nil "~a?id=~a&offset=~a" (continue-import-action) id offset))
+
+(defun import-archive (octets &key (pieces 3))
+  "Send OCTETS to the import actions in PIECES pieces, as the import dialog does;
+(values status next-location) of the last answer."
+  (let ((id (begin))
+        (size (max 1 (ceiling (length octets) pieces))))
+    (loop :for offset :from 0 :below (length octets) :by size
+          :do (post-piece (piece-url id offset) (subseq octets offset (min (length octets) (+ offset size)))))
+    (multiple-value-bind (status body headers) (post-piece (format nil "~a?id=~a" (finish-import-action) id))
+      (declare (ignore body))
+      (values status (getf headers :hx-redirect)))))
+
+(defun archive-files (pattern)
+  "The files in the archive directory whose names contain PATTERN."
+  (let ((directory (archive-dir)))
+    (and (uiop:directory-exists-p directory)
+         (remove-if-not (lambda (file) (search pattern (file-namestring file)))
+                        (uiop:directory-files directory)))))
 
 (deftest a-space-is-exported-and-imported-again
   (setf *cookie* nil)
@@ -174,7 +199,8 @@
       (ok (string= (nth-value 1 (import-archive octets)) "/"))
       (ok (search "already in the media library" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive"))
-      (ok (equalp (read-media-file "archive" (media-id media) "image/png") (png-bytes 1 1))
+      (ok (equalp (alexandria:read-file-into-byte-vector (media-file-path "archive" (media-id media) "image/png"))
+                  (png-bytes 1 1))
           "the file that was there is as it was")
       (remove-space-media "archive"))
     (testing "a space whose file has gone is not exported, and says why"
@@ -187,20 +213,45 @@
       (ok (search "missing from the media library" (nth-value 1 (request :get "/s/archive"))))
       (delete-space "archive")
       (remove-space-media "archive"))
-    (testing "a multipart post is not an import"
-      (ok (string= (getf (nth-value 2 (request :post (import-space-action) :headers +as-htmx+
-                                               :multipart (list (list "file" "a.zip" "application/zip" octets))))
-                         :hx-redirect)
-                   "/"))
-      (ok (search "Choose an archive" (nth-value 1 (request :get "/"))))
+    (testing "pieces go where they say, in order"
+      (let ((id (begin)))
+        (ok (= 409 (post-piece (piece-url id 5) (subseq octets 0 5))) "one that skips ahead is refused")
+        (ok (search "has 0 bytes" (nth-value 1 (post-piece (piece-url id 5) (subseq octets 0 5))))
+            "and says where the import stands")
+        (ok (= 200 (post-piece (piece-url id 0) (subseq octets 0 5))))
+        (ok (= 409 (post-piece (piece-url id 0) (subseq octets 0 5))) "one sent twice is refused")
+        (ok (string= (string-trim '(#\Space) (nth-value 1 (post-piece (piece-url id 5) (subseq octets 5 9))))
+                     "9")
+            "the next one is taken, and the answer is how much has arrived")))
+    (testing "an import that was never begun is not found"
+      (ok (= 404 (post-piece (piece-url "01ARZ3NDEKTSV4RRFFQ69G5FAV" 0) (subseq octets 0 5))))
+      (ok (= 404 (post-piece (piece-url "../../etc/passwd" 0) (subseq octets 0 5))) "nor is a path"))
+    (testing "an import is gone once it is finished, and one given up is cleared a day later"
+      (let ((stale (begin))
+            (count (length (archive-files ".upload"))))
+        (sb-posix:utime (merge-pathnames (format nil "~a.upload" stale) (archive-dir))
+                        (- (get-universal-time) #.(encode-universal-time 0 0 0 1 1 1970 0) (* 2 24 3600))
+                        (- (get-universal-time) #.(encode-universal-time 0 0 0 1 1 1970 0) (* 2 24 3600)))
+        (ok (string= (nth-value 1 (import-archive (string-to-octets "not a zip"))) "/"))
+        (ok (null (archive-files stale)) "the one given up a day ago is gone")
+        (ok (= (length (archive-files ".upload")) (1- count)) "and so is the one just finished")))
+    (testing "a file larger than an upload may be is refused before it is read"
+      (let ((koya-server/domain/media:+max-upload-bytes+ 10))
+        (ok (string= (nth-value 1 (import-archive octets)) "/")))
+      (ok (search "larger than an upload may be" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive")))
+    (testing "an export leaves nothing behind"
+      (ok (string= (nth-value 1 (import-archive octets)) "/s/archive"))
+      (ok (= 200 (request :get "/s/archive/export")))
+      (ok (null (archive-files "export-")) "the archive is deleted once it is sent")
+      (delete-space "archive")
+      (remove-space-media "archive"))
     (testing "an import from another site is refused"
-      (ok (= 403 (request :post (import-space-action) :headers '(("origin" . "https://evil.test") ("hx-request" . "true"))
-                                           :body octets :content-type "application/zip")))
-      (ng (find-space "archive"))
-      (ok (= 400 (request :post (import-space-action) :headers '(("origin" . "http://localhost:3000"))
-                                           :body octets :content-type "application/zip"))
+      (ok (= 403 (post-piece (begin-import-action) nil '(("origin" . "https://evil.test") ("hx-request" . "true")))))
+      (ok (= 400 (post-piece (begin-import-action) nil '(("origin" . "http://localhost:3000"))))
           "nor is a plain post: an action answers htmx only")
       (ng (find-space "archive")))
     (testing "the import dialog is on the spaces page"
-      (ok (search (format nil "data-import=\"~a\"" (import-space-action)) (nth-value 1 (request :get "/")))))))
+      (let ((page (nth-value 1 (request :get "/"))))
+        (ok (search (format nil "data-import-begin=\"~a\"" (begin-import-action)) page))
+        (ok (search "data-import-piece-bytes=" page))))))

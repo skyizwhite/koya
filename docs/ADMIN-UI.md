@@ -88,6 +88,9 @@ made and deleted.
   must be empty: no models, media or keys (its webhooks and secret are
   replaced). Otherwise the import is refused and nothing changes. Nothing is
   sent to the webhooks. The schema it brings is in the space's deploy log.
+  The file goes up in pieces, however large it is, and a bar shows how much has
+  arrived; then the server makes the space in one step, and answers nothing
+  else, the delivery API included, until it is done.
 
 ![The spaces, and where a new one is made](img/spaces.png)
 

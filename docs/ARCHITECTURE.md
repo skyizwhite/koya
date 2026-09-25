@@ -41,10 +41,11 @@ src/
       settings/       ;   timezone, two-factor
                       ;   and actor, auth, keys, system at the top
       ports/          ; what the use cases need from outside: store, spaces,
-                      ; contents, media, keys, webhooks, settings, sessions, config,
-                      ; and main, which lists them and finds any left unimplemented
+                      ; contents, media, keys, webhooks, archives, settings, sessions,
+                      ; config, and main, which lists them and finds any left
+                      ; unimplemented
     infra/            ; the ports, implemented: main (all of infra, as main loads it),
-                      ; env, media-files, webhook-sender, and
+                      ; env, media-files, webhook-sender, archives, and
       db/             ;   main, connection, migrations, schema.sql, one file per table
     web/              ; the way in: app, middlewares, http, auth, presenters,
                       ; forms, media, paging, display, urls, assets, document
@@ -160,8 +161,12 @@ of band into the layout's `#toast`; a result on another page is an `HX-Redirect`
 with the toast in the session. A path declared with `public-path` (`web/auth`)
 needs no session: the login page and its action, and `/health`; `/assets/` is
 open as well, since the login page is drawn with it. A path declared with
-`archive-path` (`web/middlewares`) takes a space archive as its body, set aside
-unread; the import is the only one. Searching, filtering, sorting and
+A space's archive moves whatever its size. The export writes it to a file under
+`archives/` beside the database and sends it from there; the page marks the
+answer with `+temporary-file-header+`, and `*temporary-file-middleware*` deletes
+the file once the server has it. The import dialog uploads the zip in pieces to
+three actions, which add each to the end of a file there and then import it in
+one transaction. Searching, filtering, sorting and
 paging a list are actions as well, answered with `HX-Replace-Url` so the page's
 URL still carries that state for its GET to draw. See
 `adr/2026-09-25-pages-answer-get-and-every-change-is-an-action.md` and
@@ -174,9 +179,9 @@ published to `ghcr.io/skyizwhite/koya` by the Image workflow. The Dockerfile bui
 `koya-server` and saves it with `(koya-server:save-executable)`, and the runtime
 image holds that executable, `assets/` and the C libraries it opens — no
 Quicklisp, sources or compiler. Migrations apply themselves at startup. The
-executable's heap is fixed when it is saved, at 2048 MB: it reads no runtime
-options when it starts, and an export holds twice the largest archive an import
-takes.
+executable's heap is fixed when it is saved, at 2048 MB, since it reads no
+runtime options when it starts; no size of space needs more, as archives move
+through files one media file at a time.
 
 Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
 `KOYA_PORT` and `KOYA_ENV`. `GET /health` is unauthenticated and touches the database.

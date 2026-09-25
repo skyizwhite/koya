@@ -201,9 +201,10 @@ port 3100 and keeps everything under `/data`; mount a persistent volume there.
 `docker stop`; migrations apply themselves at startup.
 
 **Back up the whole `/data` directory**: it holds the database and the uploaded
-media. To move one space to another server, use **Export** on its page and
-**Import** on the new server's spaces page; its keys come along, so the site's
-`.env` keeps working.
+media. `/data/archives` holds only an export on its way out or an import on its
+way in, and a backup may leave it out. To move one space to another server, use
+**Export** on its page and **Import** on the new server's spaces page, whatever
+its size; its keys come along, so the site's `.env` keeps working.
 
 ## License
 

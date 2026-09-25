@@ -2,6 +2,7 @@
 
 Superseded by adr/2026-09-25-lists-are-read-in-place-and-the-url-follows.md (what lives in the query string)
 Superseded by adr/2026-09-25-shared-components-live-in-ui.md (where the media picker and the space import live)
+Superseded by adr/2026-09-25-a-space-has-no-size-limit-and-moves-in-pieces.md (how the import action takes its body)
 
 *2026-09-25*
 

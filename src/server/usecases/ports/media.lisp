@@ -9,7 +9,7 @@
            #:update-media
            #:delete-media
            #:media-file-path
-           #:read-media-file
+           #:media-file-exists-p
            #:write-media-file
            #:delete-media-file
            #:delete-space-media-files))
@@ -40,8 +40,7 @@
 (defgeneric media-file-path (space id mime)
   (:documentation "Where the file of media ID is kept, whether or not it is there."))
 
-(defgeneric read-media-file (space id mime)
-  (:documentation "The bytes of the file of media ID, or NIL when it is not there."))
+(defgeneric media-file-exists-p (space id mime))
 
 (defgeneric write-media-file (space id mime bytes &key new)
   (:documentation "Write BYTES as the file of media ID and return true. With NEW, a file that is

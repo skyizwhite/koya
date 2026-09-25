@@ -1,5 +1,7 @@
 # A space moves as one zip, through the admin UI
 
+Superseded by adr/2026-09-25-a-space-has-no-size-limit-and-moves-in-pieces.md (how the archive is built and sent, and its size)
+
 *2026-09-23*
 
 ## Context
