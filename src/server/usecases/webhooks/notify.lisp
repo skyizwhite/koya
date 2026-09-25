@@ -1,19 +1,18 @@
 (defpackage #:koya-server/usecases/webhooks/notify
   (:use #:cl)
-  (:import-from #:koya/core/json
-                #:jobject #:to-json #:json-null)
   (:import-from #:koya/core/schema
                 #:model-name #:webhook-covers-p
                 #:webhook-label #:webhook-url)
   (:import-from #:koya-server/usecases/ports/spaces #:space-webhooks)
   (:import-from #:koya-server/usecases/ports/webhooks #:record-delivery #:send-webhook)
+  (:import-from #:koya-server/usecases/ports/presenters #:webhook-payload)
   (:import-from #:bordeaux-threads-2
                 #:make-thread)
   (:export #:notify-webhooks
            #:*webhook-async*))
 (in-package #:koya-server/usecases/webhooks/notify)
 
-;;; Content change notifications:
+;;; Content change notifications, whose body web/presenters makes:
 ;;; {"space": SPACE, "model": MODEL, "id": ID, "event": "publish"|"unpublish"|"delete"|"draft",
 ;;;  "contents": {"old": {...}|null, "new": {...}|null}}
 ;;; Every webhook gets every event for every model it covers ("only" narrows it),
@@ -61,7 +60,8 @@ failed write may stop the hooks queued behind it."
 
 (defun notify-webhooks (space-name model id event &key old new (async *webhook-async*) secret)
   "Send EVENT (one of +EVENTS+) for content ID to the webhooks of the space named
-SPACE-NAME and of MODEL (a model struct). SECRET, when given, is sent as the
+SPACE-NAME and of MODEL (a model struct). OLD and NEW are the content before and
+after, delivered (usecases/contents/delivery). SECRET, when given, is sent as the
 X-KOYA-WEBHOOK-KEY header so receivers can authenticate the call. Delivery is
 asynchronous unless ASYNC is NIL."
   (assert (member event +events+))
@@ -70,11 +70,7 @@ asynchronous unless ASYNC is NIL."
     (when hooks
       (let* ((model-name (model-name model))
              (event-name (string-downcase (symbol-name event)))
-             (payload (to-json (jobject "space" space-name
-                                        "model" model-name
-                                        "id" id
-                                        "event" event-name
-                                        "contents" (jobject "old" (or old json-null) "new" (or new json-null))))))
+             (payload (webhook-payload space-name model-name id event old new)))
         (flet ((send ()
                  (dolist (hook hooks)
                    (send-and-log hook space-name model-name id event-name payload headers))))

@@ -6,7 +6,7 @@
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
-  (:import-from #:koya-server/usecases/media/delivery #:media-url)
+  (:import-from #:koya-server/web/presenters #:media-url)
   (:import-from #:koya-server/usecases/media/library
                 #:remove-media #:store-uploads #:remove-each #:list-media #:count-media
                 #:find-media #:update-media #:media-reference-counts)

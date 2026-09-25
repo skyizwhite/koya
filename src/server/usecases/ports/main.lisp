@@ -11,6 +11,7 @@
   (:import-from #:koya-server/usecases/ports/sessions)
   (:import-from #:koya-server/usecases/ports/config)
   (:import-from #:koya-server/usecases/ports/archives)
+  (:import-from #:koya-server/usecases/ports/presenters)
   (:export #:+ports+
            #:unimplemented-ports))
 (in-package #:koya-server/usecases/ports)
@@ -28,7 +29,8 @@
     #:koya-server/usecases/ports/settings
     #:koya-server/usecases/ports/sessions
     #:koya-server/usecases/ports/config
-    #:koya-server/usecases/ports/archives)
+    #:koya-server/usecases/ports/archives
+    #:koya-server/usecases/ports/presenters)
   "The packages of the ports. A new port is imported above and named here.")
 
 (defun unimplemented-ports (&optional (ports +ports+))

@@ -25,7 +25,7 @@
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-published #:content-data
                 #:merge-data #:fill-defaults #:fill-slugs)
-  (:import-from #:koya-server/usecases/contents/delivery #:content->jobject)
+  (:import-from #:koya-server/usecases/contents/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks/notify #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor
                 #:*actor*)
@@ -82,11 +82,11 @@ NAME otherwise."
 
 (defun published-view (space model content)
   (and (content-published content)
-       (content->jobject content model space)))
+       (deliver content model space)))
 
 (defun draft-view (space model content)
   "The draft (or, without one, published) data as the delivery API would show it."
-  (content->jobject content model space :draft t))
+  (deliver content model space :draft t))
 
 (defun notify (space model id event &key old new)
   (notify-webhooks space model id event

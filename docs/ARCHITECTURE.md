@@ -42,8 +42,8 @@ src/
                       ;   and actor, auth, keys, system at the top
       ports/          ; what the use cases need from outside: store, spaces,
                       ; contents, media, keys, webhooks, archives, settings, sessions,
-                      ; config, and main, which lists them and finds any left
-                      ; unimplemented
+                      ; config, presenters (the web's to implement), and main,
+                      ; which lists them and finds any left unimplemented
     infra/            ; the ports, implemented: main (all of infra, as main loads it),
                       ; env, media-files, webhook-sender, archives, and
       db/             ;   main, connection, migrations, schema.sql, one file per table
@@ -91,6 +91,13 @@ web  ──▶  usecases  ──▶  domain
   `web/http`). The auth guards bind `*actor*`. The web never reaches a port or
   `infra/` directly: where a use case has nothing to add, it re-exports the
   port's function.
+- Use cases hand over what they found, never JSON. A content as the delivery
+  API serves it is a `delivered` (`usecases/contents/delivery`): its data with
+  media and the references asked for resolved. `web/presenters` makes it, a
+  media, a content of the admin API and a deploy's changes into what the wire
+  carries: the names, the nulls, the URLs. A webhook carries the delivery shape
+  too, so the web implements the one port that is not infra's,
+  `ports/presenters`, whose `webhook-payload` the use case sends.
 
 What only one page needs to draw -- its URLs, a badge's class, how a value
 reads there -- stays in that page's file.

@@ -1,7 +1,7 @@
 (defpackage #:koya-server/usecases/schema/deploy
   (:use #:cl)
   (:import-from #:koya/core/diff
-                #:diff-schemas #:destructive-changes-p #:change->jobject)
+                #:diff-schemas #:destructive-changes-p)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:not-found)
   (:import-from #:koya-server/usecases/ports/spaces
@@ -35,11 +35,11 @@
 (defun deploy (name schema &key force)
   "Make SCHEMA the schema of space NAME, and return the changes that took. A
 deploy that would destroy something signals a CONFLICT coded
-destructive_changes, listing the changes, unless FORCE."
+destructive_changes, whose details are the changes, unless FORCE."
   (let* ((space (existing-space name))
          (changes (diff-schemas (load-schema space) schema)))
     (when (and (destructive-changes-p changes) (not force))
       (fail 'conflict "Schema deploy contains destructive changes; retry with force=true"
-            :code "destructive_changes" :details (map 'vector #'change->jobject changes)))
+            :code "destructive_changes" :details changes))
     (save-schema space schema :by *actor*)
     changes))

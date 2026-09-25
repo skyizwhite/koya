@@ -11,6 +11,7 @@
   "The layer of the koya-server system NAME."
   (flet ((under (prefix) (eql 0 (search prefix name))))
     (cond ((under "koya-server/domain/") :domain)
+          ((string= name "koya-server/usecases/ports/presenters") :presenter-ports)
           ((under "koya-server/usecases/ports/") :ports)
           ((under "koya-server/usecases/") :usecases)
           ((under "koya-server/infra/") :infra)
@@ -19,13 +20,15 @@
 
 (defparameter +allowed+
   '((:domain :domain)
-    (:ports :domain :ports)
-    (:usecases :domain :ports :usecases)
+    (:ports :domain :ports :presenter-ports)
+    (:presenter-ports :domain)
+    (:usecases :domain :ports :presenter-ports :usecases)
     (:infra :domain :ports :infra)
-    (:web :domain :usecases :web)
-    (:main :domain :ports :usecases :infra :web))
+    (:web :domain :usecases :presenter-ports :web)
+    (:main :domain :ports :presenter-ports :usecases :infra :web))
   "What each layer may depend on. The web reaches ports through the use cases
-only, and nothing but main reaches infra.")
+only, but for the one it implements, ports/presenters; nothing but main reaches
+infra.")
 
 (defun server-systems ()
   (let ((root (asdf:system-relative-pathname "koya-server" "src/server/")))

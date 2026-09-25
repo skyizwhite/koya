@@ -5,7 +5,7 @@
                 #:path-param #:param #:fail-api #:ok-status #:uploaded-files #:form-field)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
-  (:import-from #:koya-server/usecases/media/delivery #:media->jobject)
+  (:import-from #:koya-server/web/presenters #:media->jobject)
   (:import-from #:koya-server/usecases/media/library #:store-upload #:list-media #:count-media)
   (:export #:@get #:@post #:require-space))
 (in-package #:koya-server/web/admin-api/media/<space>/index)

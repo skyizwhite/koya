@@ -5,9 +5,9 @@
            #:store-reachable-p))
 (in-package #:koya-server/usecases/ports/store)
 
-;;; A port is a set of generic functions a use case calls and infra implements:
-;;; the use case depends on the port's package alone, and infra adds the one
-;;; method each generic has. What a function promises is its documentation
+;;; A port is a set of generic functions a use case calls and infra implements
+;;; (the web, for ports/presenters): the use case depends on the port's package
+;;; alone, and the implementation adds the one method each generic has. What a function promises is its documentation
 ;;; here; how it keeps that promise is infra's. koya-server/main loads infra, and
 ;;; refuses to load while a generic has no method.
 

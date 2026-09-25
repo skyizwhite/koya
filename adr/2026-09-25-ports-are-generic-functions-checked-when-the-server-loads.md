@@ -1,5 +1,7 @@
 # Ports are generic functions, and the server checks they are all implemented when it loads
 
+Superseded by adr/2026-09-25-use-cases-hand-over-data-and-the-web-makes-json.md (who implements a port)
+
 *2026-09-25*
 
 ## Context

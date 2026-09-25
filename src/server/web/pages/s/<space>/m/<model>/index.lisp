@@ -25,7 +25,7 @@
   (:import-from #:koya-server/usecases/contents/labels #:reference-labels)
   (:import-from #:koya-server/usecases/contents/bulk #:bulk-action-p #:apply-to-each)
   (:import-from #:koya-server/web/forms #:number->string)
-  (:import-from #:koya-server/usecases/media/delivery #:media-url)
+  (:import-from #:koya-server/web/presenters #:media-url)
   (:import-from #:koya-server/web/pages/s/<space>/webhooks #:webhook-log-url)
   (:import-from #:koya-server/domain/media #:media-alt)
   (:export #:@get #:bulk-contents #:browse-contents))

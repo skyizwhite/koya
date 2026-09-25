@@ -8,7 +8,7 @@
   (:import-from #:koya-server/usecases/ports/media
                 #:find-media #:list-media #:count-media #:update-media #:media-file-path)
   (:import-from #:koya-server/domain/image #:sniff-image)
-  (:import-from #:koya-server/usecases/media/delivery #:media-url #:media->jobject)
+  (:import-from #:koya-server/web/presenters #:media-url #:media->jobject)
   (:import-from #:koya-server/usecases/media/library
                 #:store-upload #:remove-media #:remove-space-media #:media-references
                 #:media-reference-counts)

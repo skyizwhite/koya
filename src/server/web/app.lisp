@@ -29,6 +29,9 @@
   (:import-from #:koya-server/usecases/auth #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/web/auth
                 #:*admin-auth-middleware* #:*actions-auth-middleware* #:*pages-auth-middleware*)
+  ;; loaded for the method it adds to ports/presenters, which webhooks need
+  ;; whether or not a route has loaded it
+  (:import-from #:koya-server/web/presenters)
   (:import-from #:koya-server/web/document
                 #:~document #:page-title)
   (:export #:app
