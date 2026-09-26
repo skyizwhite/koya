@@ -1,6 +1,6 @@
 
 (defsystem "koya-sdk"
-  :version "0.12.0"
+  :version "0.12.1"
   :description "koya - a small headless CMS in Common Lisp (SDK: the schema DSL and the HTTP client)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
   :license "MIT"
