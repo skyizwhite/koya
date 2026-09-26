@@ -8,12 +8,12 @@
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/ui/layout #:~missing)
   (:import-from #:koya-server/web/ui/toast #:set-toast)
-  (:import-from #:koya-server/web/middlewares #:+temporary-file-header+)
+  (:import-from #:lack-mw #:+temporary-file-header+)
   (:export #:@get))
 (in-package #:koya-server/web/pages/s/<space>/export)
 
 ;;; The space as a zip download (usecases/spaces/archive). The archive is written
-;;; to a file and sent from there, then deleted (*TEMPORARY-FILE-MIDDLEWARE*):
+;;; to a file and sent from there, then deleted (lack-mw's *TEMPORARY-FILE*):
 ;;; it holds the webhook secret and every draft.
 ;;;
 ;;; The link to it carries no download attribute: Content-Disposition makes the
