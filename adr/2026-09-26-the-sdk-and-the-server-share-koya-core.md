@@ -33,8 +33,7 @@ Three systems, one directory each under `src/`:
 
 The packages follow the systems: `koya` becomes `koya-sdk`, `koya/config` and
 `koya/client` become `koya-sdk/config` and `koya-sdk/client`, and
-`koya/core/...` becomes `koya-core/...`. The tests keep their layout and names:
-`tests/core/` for the core, `tests/server/` for the server, the SDK's at the top.
+`koya/core/...` becomes `koya-core/...`.
 
 ## Consequences
 

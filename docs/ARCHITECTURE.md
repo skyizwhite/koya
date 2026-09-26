@@ -59,7 +59,7 @@ src/
                       ;   elements at the top; content/ and media/ below
       api/            ;   the delivery API
       admin-api/      ;   the admin API
-tests/                ; mirrors src/: core/, server/, and the SDK at the top
+tests/                ; mirrors src/: core/, sdk/, server/
 assets/               ; style/ (Tailwind in and out), js/
 ```
 

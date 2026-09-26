@@ -1,4 +1,4 @@
-(defpackage #:koya-tests/client
+(defpackage #:koya-tests/sdk/client
   (:use #:cl #:rove)
   (:import-from #:koya-server #:start #:stop)
   (:import-from #:koya-server/usecases/ports/keys #:create-delivery-key #:create-management-key)
@@ -15,7 +15,7 @@
                 #:webhook-secret #:list-media #:get-media #:upload-media #:update-media
                 #:delete-media #:deploy)
   (:import-from #:koya-tests/server/usecases/media/library #:png-bytes #:*media-root*))
-(in-package #:koya-tests/client)
+(in-package #:koya-tests/sdk/client)
 
 (defparameter *port* 3987)
 (defparameter *secret* "client-test-secret")

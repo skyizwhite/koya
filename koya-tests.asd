@@ -9,7 +9,7 @@
                "koya-tests/core/schema"
                "koya-tests/core/validate"
                "koya-tests/core/diff"
-               "koya-tests/config"
+               "koya-tests/sdk/config"
                "koya-tests/server/domain/totp"
                "koya-tests/server/domain/timezone"
                "koya-tests/server/domain/references"
@@ -39,5 +39,5 @@
                "koya-tests/server/web/pages/space-import"
                "koya-tests/server/usecases/ports/main"
                "koya-tests/server/layers"
-               "koya-tests/client")
+               "koya-tests/sdk/client")
   :perform (test-op (o c) (symbol-call :rove :run c :style :dot)))

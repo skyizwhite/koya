@@ -22,10 +22,6 @@ Only the directories move. The packages are still `koya`, `koya/core/...` and
 `koya-server/...`, since a package-inferred system names its packages from the
 path under its `:pathname`, not from the path under `src/`.
 
-The tests keep their layout: the library's tests stay at the top of `tests/` and
-the server's under `tests/server/`, so the `koya-tests/...` packages keep their
-names too.
-
 ## Consequences
 
 The licensing ADR's list of MIT files (`src/main.lisp`, `src/client.lisp`,

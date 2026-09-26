@@ -1,4 +1,4 @@
-(defpackage #:koya-tests/config
+(defpackage #:koya-tests/sdk/config
   (:use #:cl #:rove)
   (:import-from #:koya-sdk/config
                 #:defwebhooks #:defmodel #:webhook #:current-schema #:clear-schema #:find-model)
@@ -7,7 +7,7 @@
                 #:field-option #:field-type #:schema-error #:model-preview-url #:model-public-url
                 #:model-label #:model-name #:webhook-url #:model-was #:field-was #:webhook-label
                 #:webhook-only))
-(in-package #:koya-tests/config)
+(in-package #:koya-tests/sdk/config)
 
 (defhook :before (clear-schema))
 (defhook :after (clear-schema))
