@@ -4,7 +4,7 @@ git cl-jingle https://github.com/dnaeon/cl-jingle.git
 git hsx https://github.com/skyizwhite/hsx.git
 git ningle-fbr https://github.com/skyizwhite/ningle-fbr.git
 git ningle-actions https://github.com/skyizwhite/ningle-actions.git
-git lack-mw https://github.com/skyizwhite/lack-mw.git :tag v0.1.0
+git lack-mw https://github.com/skyizwhite/lack-mw.git :tag v0.2.0
 git okite https://github.com/skyizwhite/okite.git
 git woo https://github.com/skyizwhite/woo.git :branch fix/body-buffer-limit-and-files
 ql clack-errors

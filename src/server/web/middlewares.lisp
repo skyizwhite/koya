@@ -3,15 +3,18 @@
   (:import-from #:lack-mw
                 #:with-args #:*cache-control* #:*cors* #:*body-limit*)
   (:import-from #:koya-server/domain/media #:+max-upload-bytes+)
-  (:export #:*cache-control-middleware*
+  (:export #:+temporary-file-header+
+           #:*temporary-file-middleware*
+           #:*cache-control-middleware*
            #:*delivery-cors-middleware*
            #:*body-limit-middleware*
            #:+max-body-bytes+))
 (in-package #:koya-server/web/middlewares)
 
-;;; koya's settings for the lack-mw middlewares app.lisp installs. Two stay with
-;;; what they are built from: the auth guards in web/auth, which share its key and
-;;; session checks, and *media-middleware* in web/media, which serves the library's files.
+;;; The middlewares app.lisp installs: koya's settings for lack-mw's, and
+;;; *temporary-file-middleware* below. Two stay with what they are built from:
+;;; the auth guards in web/auth, which share its key and session checks, and
+;;; *media-middleware* in web/media, which serves the library's files.
 
 (defparameter *cache-control-middleware*
   (with-args *cache-control*
@@ -54,3 +57,25 @@ parts. A space archive is uploaded in pieces smaller than this.")
 Under Woo no such body gets here: Woo is held to the same limit (web/app) and
 answers 413 itself, in plain text, before it reads a body its Content-Length
 puts past it, or once one goes past it.")
+
+;;; A page may answer with a file it made for the one answer, such as a space's
+;;; archive, and that nothing needs once it is sent. It says so with the header
+;;; below, which goes no further than here. The file is deleted once the server
+;;; has it: Woo opens the file before it returns and sends from what it opened,
+;;; and Hunchentoot sends it whole before it returns.
+
+(defparameter +temporary-file-header+ :x-koya-temporary-file)
+
+(defparameter *temporary-file-middleware*
+  (lambda (app)
+    (lambda (env)
+      (let ((response (funcall app env)))
+        (if (and (listp response) (getf (second response) +temporary-file-header+))
+            (destructuring-bind (status headers file) response
+              (remf headers +temporary-file-header+)
+              (lambda (responder)
+                (unwind-protect (funcall responder (list status headers file))
+                  (uiop:delete-file-if-exists file))))
+            response))))
+  "Deletes the file a response marked with +TEMPORARY-FILE-HEADER+ sends, once the
+server has it. Installed outside everything that reads a response as a list.")

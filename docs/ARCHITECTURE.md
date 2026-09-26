@@ -200,7 +200,7 @@ needs no session: the login page and its action, and `/health`; `/assets/` is
 open as well, since the login page is drawn with it. A path declared with
 A space's archive moves whatever its size. The export writes it to a file under
 `archives/` beside the database and sends it from there; the page marks the
-answer with `+temporary-file-header+`, and lack-mw's `*temporary-file*` deletes
+answer with `+temporary-file-header+`, and `*temporary-file-middleware*` deletes
 the file once the server has it. The import dialog uploads the zip in pieces to
 three actions, which add each to the end of a file there and then import it in
 one transaction. Searching, filtering, sorting and
