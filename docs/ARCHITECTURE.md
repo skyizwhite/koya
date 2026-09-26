@@ -178,7 +178,11 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Tests | rove (`koya-tests`) |
 
 The four apps — pages, delivery API, admin API and actions — are separate ningle
-apps mounted together, so each decides its own response type. The admin API, the
+apps mounted together, so each decides its own response type. A request first goes
+through what every answer needs (the deletion of a temporary file once sent, the
+access log, Cache-Control, the error page, the body limit), then to the app mounted at its path, which carries the
+middlewares it needs: CORS for the delivery API, the session and a guard for the
+admin API, the actions and the pages; the assets and the media need none. The admin API, the
 actions and the pages are each guarded where they are mounted
 (`*admin-auth-middleware*`, `*actions-auth-middleware*`, `*pages-auth-middleware*`),
 so a route added later is covered without checking for itself. A page asked for
@@ -196,8 +200,10 @@ request that has lost its session to the login page with `HX-Redirect`. An actio
 answers the part of the page it changed, under that part's id, and the toast out
 of band into the layout's `#toast`; a result on another page is an `HX-Redirect`
 with the toast in the session. A path declared with `public-path` (`web/auth`)
-needs no session: the login page and its action, and `/health`; `/assets/` is
-open as well, since the login page is drawn with it. A path declared with
+needs no session: the login page and its action, and `/health`. `/assets/` and
+`/media/` are served outside the session and the guards, so the login page is
+drawn with the assets and no file fetched reads the session.
+
 A space's archive moves whatever its size. The export writes it to a file under
 `archives/` beside the database and sends it from there; the page marks the
 answer with `+temporary-file-header+`, and `*temporary-file-middleware*` deletes

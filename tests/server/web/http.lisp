@@ -146,3 +146,40 @@
       (declare (ignore body))
       (ok (= status 200))
       (ng (getf headers :access-control-allow-origin)))))
+
+(deftest a-key-outside-its-space
+  (multiple-value-bind (status json)
+      (request :post "/admin/api/schema/other/plan" :body (jobject "koyaSchema" 1)
+               :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*))
+                          ("origin" . "https://evil.example")))
+    (ok (= status 403))
+    (ok (search "only reaches space website" (jget json "error" "message"))
+        "its space is checked before its origin"))
+  (ok (= 403 (admin :get "/admin/api")) "the prefix itself names no space"))
+
+(deftest trailing-slashes-on-the-apis
+  (multiple-value-bind (status json raw) (admin :get "/admin/api/me/")
+    (declare (ignore json raw))
+    (ok (= status 301) "the admin API is sent to its URL"))
+  (ok (= 401 (request :get "/admin/api/me/")) "but not without a key: nothing is said of what is there")
+  (destructuring-bind (status headers body) (funcall (app) (list :request-method :get :script-name "" :path-info "/api/v1/website/blog/"
+                                                             :query-string "limit=1" :request-uri "/api/v1/website/blog/?limit=1"
+                                                             :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                                                             :url-scheme "http" :remote-addr "127.0.0.1"
+                                                             :headers (alist-hash-table nil :test 'equal)
+                                                             :content-type nil :content-length nil :raw-body nil))
+    (declare (ignore body))
+    (ok (= status 301))
+    (ok (string= (getf headers :location) "/api/v1/website/blog?limit=1") "the query is kept"))
+  (destructuring-bind (status headers body)
+      (funcall (app) (list :request-method :options :script-name "" :path-info "/api/v1/website/blog/"
+                           :query-string "" :request-uri "/api/v1/website/blog/"
+                           :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                           :url-scheme "http" :remote-addr "127.0.0.1"
+                           :headers (alist-hash-table '(("origin" . "https://example.com")
+                                                        ("access-control-request-method" . "GET"))
+                                                      :test 'equal)
+                           :content-type nil :content-length nil :raw-body nil))
+    (declare (ignore body))
+    (ok (= status 204) "a preflight is answered whatever the slash")
+    (ok (string= (getf headers :access-control-allow-origin) "*"))))

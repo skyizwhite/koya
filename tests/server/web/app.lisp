@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/server/web/app
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/web/pages/support #:edit #:moved-to #:*cookie* #:request #:location #:setup-pages #:log-in)
-  (:import-from #:koya-server/web/app #:app)
+  (:import-from #:koya-server/web/app #:app #:*page-app*)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
@@ -65,12 +65,59 @@
     (declare (ignore body))
     (ok (= status 404))
     (ok (string= (getf headers :cache-control) "no-store") "a missing asset is not cached"))
+  (ok (= 400 (request :get "/assets/../koya-server.asd")) "nothing outside assets/ is served")
   (let ((*cookie* nil))
     (multiple-value-bind (status body headers) (request :get "/login")
       (ok (= status 200))
       (ok (string= (getf headers :cache-control) "no-store") "pages are not cached")
       (ok (search "/assets/style/dist.css?v=" body) "asset URLs carry a version")
       (ok (search "/assets/icon.svg?v=" body)))))
+
+(deftest assets-skip-the-session
+  (let* ((fetches 0)
+         (spy (defmethod lack/middleware/session/store:fetch-session :around (store sid)
+                (declare (ignore store sid))
+                (incf fetches)
+                (call-next-method))))
+    (unwind-protect
+         (progn
+           (ok (= (request :get "/assets/icon.svg") 200))
+           (ok (= fetches 0) "an asset does not read the owner's session")
+           (request :get "/s/website")
+           (ok (= fetches 1) "a page does")
+           (ok (= 404 (request :get "/assets")))
+           (ok (= 404 (request :get "/assets/")))
+           (ok (= 1 fetches) "nor does the assets' prefix"))
+      (remove-method #'lack/middleware/session/store:fetch-session spy))))
+
+(deftest an-error-is-logged-and-not-cached
+  (setf (ningle:route *page-app* "/probe-page-that-fails")
+        (lambda (params) (declare (ignore params)) (error "The probe fails")))
+  (let* ((status nil)
+         (body nil)
+         (headers nil)
+         (errors (make-string-output-stream))
+         (log (with-output-to-string (*standard-output*)
+                (let ((*error-output* errors))
+                  (multiple-value-setq (status body headers)
+                    (request :get "/probe-page-that-fails"))))))
+    (ok (= status 500))
+    (ok (search "Internal Server Error" body))
+    (ok (search "The probe fails" (get-output-stream-string errors)) "the error itself is logged")
+    (ok (string= (getf headers :cache-control) "no-store") "an error page is not cached")
+    (ok (search "\"GET /probe-page-that-fails HTTP/1.1\" 500" log) "and is in the access log")))
+
+(deftest a-trailing-slash
+  (multiple-value-bind (status body headers) (request :get "/s/website/")
+    (declare (ignore body))
+    (ok (= status 301) "a page is sent to its URL")
+    (ok (string= (location headers) "/s/website")))
+  (multiple-value-bind (status body headers) (request :get "/api/v1/website/blog/")
+    (declare (ignore body))
+    (ok (= status 301) "so is the delivery API")
+    (ok (string= (location headers) "/api/v1/website/blog"))
+    (ok (string= (getf headers :access-control-allow-origin) "*")
+        "with CORS headers, so a page on another origin can follow it")))
 
 (deftest body-size-limit
   (flet ((huge-post (headers &key (path "/login") (mb 3000) (content-type "multipart/form-data; boundary=x"))

@@ -28,8 +28,8 @@
   :version "git-dded9e78b94113dd64ab341c586b93ac7b9dcc9f"))
 ("lack-mw" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git" :tag "v0.2.0")
-  :version "git-fe06d9b88b423dc9d58d4c929dfdbe335a4b256b"))
+  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git" :tag "v0.3.0")
+  :version "git-5d3a1da4709b534861f6c2958bca32ec493d5d1f"))
 ("okite" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/okite.git")
@@ -38,10 +38,6 @@
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/woo.git" :branch "fix/body-buffer-limit-and-files")
   :version "git-7a120fd5b2d41bbe516c050c1210e41f5e3f3042"))
-("clack-errors" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2019-08-13"))
 ("cl-dotenv" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)

@@ -4,7 +4,7 @@
                 #:stored-file)
   (:import-from #:cl-ppcre
                 #:scan-to-strings)
-  (:export #:*media-middleware*))
+  (:export #:media-app))
 (in-package #:koya-server/web/media)
 
 (defparameter +media-path-pattern+ "^([a-z][a-z0-9-]*)/([0-9A-Z]{26})\\.(png|jpg|gif|webp)\\z"
@@ -19,12 +19,8 @@
           ;; ids are never reused, so a URL always names the same bytes
           (list 200 (list :content-type mime :cache-control "public, max-age=31536000, immutable") path))))))
 
-(defparameter *media-middleware*
-  (lambda (app)
-    (lambda (env)
-      (let ((path (getf env :path-info)))
-        (if (and (> (length path) 7) (string= "/media/" path :end2 7))
-            (or (media-file-response (subseq path 7))
-                (list 404 (list :content-type "text/plain") (list "Not Found")))
-            (funcall app env)))))
-  "Serves the media library's files under /media/.")
+(defun media-app (env)
+  "Serves the media library's files, mounted at /media."
+  ;; the mount hands over the path below /media, which starts with its /
+  (or (media-file-response (subseq (getf env :path-info) 1))
+      (list 404 (list :content-type "text/plain") (list "Not Found"))))

@@ -53,7 +53,7 @@
               (getf env :raw-body) (make-in-memory-input-stream octets))))
     (destructuring-bind (status response-headers body) (funcall (app) env)
       (if (pathnamep body)
-          ;; a file response (see *media-middleware*): hand back the headers and the path
+          ;; a file response (see MEDIA-APP): hand back the headers and the path
           (values status response-headers body)
           (let ((text (apply #'concatenate 'string (if (listp body) body (list body)))))
             (values status (and (plusp (length text)) (ignore-errors (parse-json text))) text))))))

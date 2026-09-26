@@ -11,10 +11,9 @@
            #:+max-body-bytes+))
 (in-package #:koya-server/web/middlewares)
 
-;;; The middlewares app.lisp installs: koya's settings for lack-mw's, and
-;;; *temporary-file-middleware* below. Two stay with what they are built from:
-;;; the auth guards in web/auth, which share its key and session checks, and
-;;; *media-middleware* in web/media, which serves the library's files.
+;;; Middlewares app.lisp stacks: koya's settings for lack-mw's, and
+;;; *temporary-file-middleware* below. The auth guards stay in web/auth, which
+;;; they share its key and session checks with.
 
 (defparameter *cache-control-middleware*
   (with-args *cache-control*
@@ -23,7 +22,7 @@
     ;; pages and both APIs are per-request and often per-owner
     :default "no-store")
   "Cache-Control for everything that did not set one: immutable assets, no-store otherwise.
-/media/ sets its own (see *media-middleware*).")
+/media/ sets its own (see MEDIA-APP).")
 
 ;; A delivery key reads only what is published, so a page on any origin may use one;
 ;; answering with "*" rather than the caller's origin keeps the answer the same for

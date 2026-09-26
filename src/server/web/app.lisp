@@ -1,20 +1,20 @@
 (defpackage #:koya-server/web/app
   (:use #:cl)
   (:import-from #:jingle
-                #:make-app #:install-middleware #:clear-middlewares #:static-path #:configure #:set-response-header)
+                #:make-app #:set-response-header)
   (:import-from #:ningle
                 #:process-response)
   (:import-from #:ningle-fbr
                 #:set-routes)
   (:import-from #:ningle-actions
-                #:*actions-app* #:*actions-middleware*)
+                #:*actions-app*)
+  (:import-from #:lack/app/file
+                #:lack-app-file)
   (:import-from #:lack-mw
-                #:with-args #:*trim-trailing-slash*
+                #:with-args #:*trim-trailing-slash* #:*recovery*
                 #:*mount* #:*session* #:*accesslog* #:make-cookie-state)
-  (:import-from #:clack-errors
-                #:*clack-error-middleware*)
   (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
-  (:import-from #:koya-server/web/media #:*media-middleware*)
+  (:import-from #:koya-server/web/media #:media-app)
   (:import-from #:koya-server/web/http
                 #:make-json-app)
   (:import-from #:koya-server/web/middlewares
@@ -78,34 +78,37 @@ other sites cannot post with it, Secure when the site is served over HTTPS."
                      :secure (and (>= (length (public-url)) 8) (string-equal "https://" (public-url) :end2 8))))
 
 (defun build-app ()
-  (clear-middlewares *page-app*)
+  "The whole app: middlewares every request goes through, then each app mounted
+with the middlewares it needs. The pages app answers what no mount takes."
   ;; Woo reads a whole body before the app sees it, spilling it to a file past a
   ;; megabyte; this bounds that file, for any request, signed in or not
   (setf smart-buffer:*default-disk-limit* +max-body-bytes+)
-  (install-middleware *page-app* *temporary-file-middleware*)
-  (install-middleware *page-app* (with-args *clack-error-middleware* :debug (dev-mode-p)))
-  (install-middleware *page-app* *body-limit-middleware*)
-  (install-middleware *page-app* *cache-control-middleware*)
-  (install-middleware *page-app* *accesslog*)
-  ;; media and the delivery API need no session; keeping them outside the session
-  ;; middleware also keeps the in-memory store from growing with every image fetch
-  (install-middleware *page-app* *media-middleware*)
-  (install-middleware *page-app* (with-args *mount* "/api"
-                                            (lack:builder *delivery-cors-middleware* *api-app*)))
   ;; the store is the database, not the process, so a restart keeps the owner logged in
   ;; :keep-empty nil: a request that never touches its session leaves nothing behind
-  (install-middleware *page-app* (with-args *session*
-                                            :store (make-session-store)
-                                            :state (session-cookie-state)
-                                            :keep-empty nil))
-  (install-middleware *page-app* *trim-trailing-slash*)
-  (install-middleware *page-app* (with-args *mount* "/admin/api"
-                                            (lack:builder *admin-auth-middleware* *admin-api-app*)))
-  (install-middleware *page-app* *actions-auth-middleware*)
-  (install-middleware *page-app* *actions-middleware*)
-  (install-middleware *page-app* *pages-auth-middleware*)
-  (static-path *page-app* "/assets/" "assets/")
-  (configure *page-app*))
+  (let ((session (with-args *session*
+                   :store (make-session-store)
+                   :state (session-cookie-state)
+                   :keep-empty nil)))
+    (lack:builder
+     *temporary-file-middleware*
+     ;; outside *RECOVERY*, so a 500 is logged and not cached like any answer
+     *accesslog*
+     *cache-control-middleware*
+     ;; the JSON apps answer the errors of their routes themselves (web/http); an error
+     ;; in a middleware stacked on them, such as a guard's, is answered here in HTML
+     (with-args *recovery* :dev-mode (dev-mode-p))
+     *body-limit-middleware*
+     ;; CORS outside the trimming, so its redirect carries CORS headers as well
+     (with-args *mount* "/api"
+       (lack:builder *delivery-cors-middleware* *trim-trailing-slash* *api-app*))
+     ;; files need no session: none is read for them
+     (with-args *mount* "/assets" (make-instance 'lack-app-file :root #p"assets/"))
+     (with-args *mount* "/media" #'media-app)
+     (with-args *mount* "/admin/api"
+       (lack:builder *trim-trailing-slash* session *admin-auth-middleware* *admin-api-app*))
+     (with-args *mount* "/actions"
+       (lack:builder session *actions-auth-middleware* *actions-app*))
+     (lack:builder *trim-trailing-slash* session *pages-auth-middleware* *page-app*))))
 
 (defvar *app* nil)
 

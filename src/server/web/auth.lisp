@@ -10,7 +10,9 @@
                 #:*actor* #:+owner+ #:key-actor)
   (:import-from #:lack/request
                 #:request-env)
-  (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri)
+  (:import-from #:lack-mw
+                #:mw-every #:mw-some #:mw-except)
+  (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri #:url-decode)
   (:export #:calling-space
            #:*admin-auth-middleware*
            #:*actions-auth-middleware*
@@ -76,16 +78,6 @@ one is refused rather than guessed at."
 session, which reaches every space."
   (space-for-management-key (bearer-token (request-env ningle:*request*))))
 
-(defun calling-identity (env)
-  "Who ENV comes from, as *ACTOR* holds it. The owner comes first, as
-*ADMIN-AUTH-MIDDLEWARE* does it: a request carrying both a session and a key is
-authorised as the owner."
-  (if (session-env-owner-p env)
-      +owner+
-      (let ((label (management-key-label (bearer-token env))))
-        ;; nothing without one or the other gets past the middleware
-        (if label (key-actor label) "unknown"))))
-
 (defun cross-origin-write-p (env)
   "A state-changing request whose Origin/Referer does not match this server. The
 session cookie would otherwise let a page on another site drive the admin API."
@@ -93,30 +85,51 @@ session cookie would otherwise let a page on another site drive the admin API."
     (and (member (getf env :request-method) '(:post :put :patch :delete))
          (not (origin-allowed-p (gethash "origin" headers) (gethash "referer" headers) (gethash "host" headers))))))
 
-(defparameter *admin-auth-middleware*
+(defun same-origin-writes (reject)
+  "Middleware answering a CROSS-ORIGIN-WRITE-P request with (funcall REJECT)."
   (lambda (app)
     (lambda (env)
-      (let* ((owner (session-env-owner-p env))
-             (space (and (not owner) (space-for-management-key (bearer-token env)))))
-        (cond ((and (not owner) (null space))
+      (if (cross-origin-write-p env)
+          (funcall reject)
+          (funcall app env)))))
+
+(defparameter *owner-session*
+  (lambda (app)
+    (lambda (env)
+      (if (session-env-owner-p env)
+          (let ((*actor* +owner+))
+            (funcall app env))
+          ;; never sent: *ADMIN-AUTH-MIDDLEWARE* tries *MANAGEMENT-KEY* next, and
+          ;; answers with what that says
+          (json-response 401 (error-object "unauthorized" "Log in")))))
+  "The admin API for the owner's session, which reaches every space.")
+
+(defparameter *management-key*
+  (lambda (app)
+    (lambda (env)
+      (let* ((key (bearer-token env))
+             (space (space-for-management-key key)))
+        (cond ((null space)
                (json-response 401 (error-object "unauthorized" "Log in, or send a management key as a Bearer token")))
               ;; deny by default: a key reaches its own space and nothing else,
               ;; whatever route is added later
-              ((and space (not (space-path-p space (getf env :path-info))))
+              ((not (space-path-p space (getf env :path-info)))
                (json-response 403 (error-object "forbidden"
                                                 (format nil "This management key only reaches space ~a" space))))
-              ((cross-origin-write-p env)
-               (json-response 403 (error-object "forbidden" "Cross-origin request rejected")))
-              (t (let ((*actor* (calling-identity env)))
+              ;; the key may have been revoked since SPACE-FOR-MANAGEMENT-KEY read it
+              (t (let ((*actor* (let ((label (management-key-label key)))
+                                  (if label (key-actor label) "unknown"))))
                    (funcall app env)))))))
+  "The admin API for a Bearer management key, which reaches its own space.")
+
+(defparameter *admin-auth-middleware*
+  ;; the owner comes first: a request carrying both a session and a key is the owner's.
+  ;; When neither lets it in, *MANAGEMENT-KEY*'s answer, the last, is the one sent
+  (mw-every (mw-some *owner-session* *management-key*)
+            (same-origin-writes
+             (lambda () (json-response 403 (error-object "forbidden" "Cross-origin request rejected")))))
   "Lack middleware guarding the admin API: the owner's session reaches every space,
 a Bearer management key only its own, and no request writes cross-origin.")
-
-(defun actions-path-p (path)
-  ;; the prefix ningle-actions mounts under, matched as lack's mount matches it
-  (and (stringp path)
-       (or (string= path "/actions")
-           (and (> (length path) 9) (string= "/actions/" path :end2 9)))))
 
 (defun html-forbidden (message)
   (list 403 (list :content-type "text/html; charset=utf-8")
@@ -148,25 +161,47 @@ the page htmx says it was sent from. The login page checks NEXT is a local path.
         (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
         "/login")))
 
-(defparameter *actions-auth-middleware*
+(defun public-request-p (env)
+  ;; the path as asked for, decoded as path-info is: under a mount, path-info has
+  ;; lost the mount's prefix. The request line may be in absolute form (http://host/...)
+  (let ((path (ignore-errors (url-decode (or (uri-path (uri (getf env :request-uri))) "")))))
+    (and path (public-path-p path))))
+
+(defparameter *htmx-only*
   (lambda (app)
     (lambda (env)
-      (cond ((not (actions-path-p (getf env :path-info))) (funcall app env))
-            ;; an action answers a fragment of a page, never a page: a link or a
-            ;; plain form post has no business here
-            ((not (htmx-request-p env))
-             (list 400 (list :content-type "text/plain; charset=utf-8") (list "Bad Request")))
-            ((not (or (session-env-owner-p env) (public-path-p (getf env :path-info))))
-             ;; htmx follows HX-Redirect, so the owner logs in and comes back
-             (list 401 (list :content-type "text/html; charset=utf-8" :hx-redirect (login-location env))
-                   (list "<p class=\"text-sm text-danger\">Log in again to continue.</p>")))
-            ((cross-origin-write-p env) (html-forbidden "Cross-origin request rejected."))
-            (t (let ((*actor* (if (session-env-owner-p env) "owner" "")))
-                 (funcall app env))))))
+      ;; an action answers a fragment of a page, never a page: a link or a
+      ;; plain form post has no business here
+      (if (htmx-request-p env)
+          (funcall app env)
+          (list 400 (list :content-type "text/plain; charset=utf-8") (list "Bad Request"))))))
+
+(defparameter *action-session*
+  (lambda (app)
+    (lambda (env)
+      (if (session-env-owner-p env)
+          (funcall app env)
+          ;; htmx follows HX-Redirect, so the owner logs in and comes back
+          (list 401 (list :content-type "text/html; charset=utf-8" :hx-redirect (login-location env))
+                (list "<p class=\"text-sm text-danger\">Log in again to continue.</p>"))))))
+
+(defparameter *action-actor*
+  (lambda (app)
+    (lambda (env)
+      (if (session-env-owner-p env)
+          (let ((*actor* +owner+))
+            (funcall app env))
+          (funcall app env)))))
+
+(defparameter *actions-auth-middleware*
+  (mw-every *htmx-only*
+            ;; a PUBLIC-PATH skips the session only, not the other checks
+            (mw-except #'public-request-p *action-session*)
+            (same-origin-writes (lambda () (html-forbidden "Cross-origin request rejected.")))
+            *action-actor*)
   "Lack middleware guarding every ningle-actions endpoint: htmx requests only, owner
-session only (but for a PUBLIC-PATH), no cross-origin writes. Installed just
-outside *ACTIONS-MIDDLEWARE*, so an action defined later is covered without
-checking for itself.")
+session only (but for a PUBLIC-PATH), no cross-origin writes. Stacked on the
+actions app, so an action defined later is covered without checking for itself.")
 
 (defun require-delivery-key (space)
   "Signal 401/403 unless the request carries a delivery key valid for SPACE."
@@ -203,22 +238,17 @@ URL, so anything that a browser could read as another host (//evil, /\\evil) is 
         (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
         "/login")))
 
-(defun asset-path-p (path)
-  ;; the login page is drawn with them
-  (and (stringp path) (> (length path) 8) (string= "/assets/" path :end2 8)))
-
-(defparameter *pages-auth-middleware*
+(defparameter *page-session*
   (lambda (app)
     (lambda (env)
-      (let ((path (getf env :path-info)))
-        (if (or (session-env-owner-p env)
-                (public-path-p path)
-                (asset-path-p path)
-                ;; *ACTIONS-AUTH-MIDDLEWARE* has its own answer for these
-                (actions-path-p path))
-            (funcall app env)
-            (list 302 (list :location (page-login-location env)) '())))))
+      (if (session-env-owner-p env)
+          (funcall app env)
+          (list 302 (list :location (page-login-location env)) '())))))
+
+(defparameter *pages-auth-middleware*
+  (mw-except #'public-request-p *page-session*)
   "Lack middleware guarding every page: the owner's session only, but for a
-PUBLIC-PATH. Installed inside everything mounted before the pages, so a page
-defined later is covered without checking for itself, and a path that is no
-page goes to the login page as well rather than saying it does not exist.")
+PUBLIC-PATH. Stacked on the pages app, which answers whatever no other app is
+mounted at, so a page defined later is covered without checking for itself, and
+a path that is no page goes to the login page as well rather than saying it
+does not exist.")
