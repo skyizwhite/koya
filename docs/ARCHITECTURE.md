@@ -47,7 +47,8 @@ src/
       ports/          ; what the use cases need from outside: store, spaces,
                       ; deploys, contents, media, keys, webhooks, archives, settings,
                       ; sessions, config, presenters (the web's to implement), and main,
-                      ; which lists them and finds any left unimplemented
+                      ; which lists them for main to check that infra implements
+                      ; every one
     infra/            ; the ports, implemented: main (all of infra, as main loads it),
                       ; env, media-files, webhook-sender, archives, and
       db/             ;   main, connection, migrations, schema.sql, one file per table
@@ -115,9 +116,11 @@ web  ──▶  usecases  ──▶  domain
 What only one page needs to draw -- its URLs, a badge's class, how a value
 reads there -- stays in that page's file.
 
-`tests/server/layers.lisp` fails when a file imports from a layer further out,
-or a library that belongs to another layer: `dbi` outside `infra/`, `ningle`
-outside `web/`.
+`tests/server/layers.lisp` declares the layers with
+[okite](https://github.com/skyizwhite/okite) and fails when a file imports from a
+layer further out, from a library that belongs to another layer (`dbi` outside
+`infra/`, `ningle` outside `web/`), or from `koya-sdk`. `main` checks with okite,
+as it loads, that every generic function of `usecases/ports/` has a method.
 See `adr/2026-09-25-the-server-is-layered-and-depends-inward.md`.
 
 ## Storage
@@ -171,6 +174,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Client | dexador |
 | Archives | zippy (a space's export and import) |
 | Other | ironclad, local-time, cl-dotenv, Tailwind CSS v4 (standalone) |
+| Checks | okite: the ports as the server loads, the layers in the tests |
 | Tests | rove (`koya-tests`) |
 
 The four apps — pages, delivery API, admin API and actions — are separate ningle

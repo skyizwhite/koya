@@ -5,6 +5,7 @@ git hsx https://github.com/skyizwhite/hsx.git
 git ningle-fbr https://github.com/skyizwhite/ningle-fbr.git
 git ningle-actions https://github.com/skyizwhite/ningle-actions.git
 git lack-mw https://github.com/skyizwhite/lack-mw.git
+git okite https://github.com/skyizwhite/okite.git
 git woo https://github.com/skyizwhite/woo.git :branch fix/body-buffer-limit-and-files
 ql clack-errors
 ql cl-dotenv

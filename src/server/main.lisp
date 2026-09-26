@@ -9,7 +9,8 @@
   (:import-from #:koya-server/web/assets #:refresh-asset-version)
   (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/usecases/ports/config #:dev-mode-p)
-  (:import-from #:koya-server/usecases/ports/main #:unimplemented-ports)
+  (:import-from #:koya-server/usecases/ports/main #:+ports+)
+  (:import-from #:okite #:ensure-implemented)
   (:import-from #:koya-server/usecases/settings/two-factor #:totp-secret)
   (:export #:start
            #:stop
@@ -26,9 +27,7 @@
 
 ;; when this file loads, infra has: a port it leaves out would otherwise be found
 ;; only when a request first calls it
-(let ((missing (unimplemented-ports)))
-  (when missing
-    (error "Nothing in infra implements ~{~s~^, ~}" missing)))
+(ensure-implemented +ports+)
 
 (defvar *server* nil)
 

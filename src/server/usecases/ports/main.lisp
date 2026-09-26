@@ -13,8 +13,7 @@
   (:import-from #:koya-server/usecases/ports/config)
   (:import-from #:koya-server/usecases/ports/archives)
   (:import-from #:koya-server/usecases/ports/presenters)
-  (:export #:+ports+
-           #:unimplemented-ports))
+  (:export #:+ports+))
 (in-package #:koya-server/usecases/ports)
 
 ;;; Every port, for whoever loads an implementation of them to check that it is
@@ -34,13 +33,3 @@
     #:koya-server/usecases/ports/archives
     #:koya-server/usecases/ports/presenters)
   "The packages of the ports. A new port is imported above and named here.")
-
-(defun unimplemented-ports (&optional (ports +ports+))
-  "The generic functions of PORTS, package designators, that no method implements."
-  (let ((missing '()))
-    (dolist (port ports (sort missing #'string< :key #'symbol-name))
-      (do-external-symbols (symbol (find-package port))
-        (when (and (fboundp symbol)
-                   (typep (fdefinition symbol) 'generic-function)
-                   (null (sb-mop:generic-function-methods (fdefinition symbol))))
-          (push symbol missing))))))

@@ -1,6 +1,7 @@
 (defpackage #:koya-tests/server/usecases/ports/main
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/ports/main #:+ports+ #:unimplemented-ports))
+  (:import-from #:koya-server/usecases/ports/main #:+ports+)
+  (:import-from #:okite #:unimplemented-generics))
 (in-package #:koya-tests/server/usecases/ports/main)
 
 (deftest every-port-is-listed
@@ -38,13 +39,4 @@
              homes)))
 
 (deftest every-port-is-implemented
-  (ok (null (unimplemented-ports)) "infra implements every port")
-  (let ((probe (make-package "KOYA-TESTS/PORT-PROBE" :use '(#:cl))))
-    (unwind-protect
-         (let ((name (intern "UNWRITTEN" probe)))
-           (export name probe)
-           (eval `(defgeneric ,name (x)))
-           (ok (equal (unimplemented-ports (list probe)) (list name)) "a generic with no method is named")
-           (eval `(defmethod ,name (x) x))
-           (ok (null (unimplemented-ports (list probe))) "and is not once it has one"))
-      (delete-package probe))))
+  (ok (null (unimplemented-generics +ports+)) "infra implements every port"))
