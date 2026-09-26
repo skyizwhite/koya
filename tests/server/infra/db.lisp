@@ -13,14 +13,14 @@
   (:import-from #:koya-server/domain/deploy
                 #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by
                 #:change-description #:change-op)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:make-webhook
                 #:schema-webhooks #:schema-models #:model-name #:model-field
                 #:schema->jobject)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions)
   (:import-from #:koya-server/usecases/contents/write #:create)
-  (:import-from #:koya/core/diff
+  (:import-from #:koya-core/diff
                 #:destructive-changes-p)
   (:import-from #:koya-server/usecases/ports/sessions #:make-session-store)
   (:import-from #:koya-server/infra/db/sessions #:purge-expired-sessions)
@@ -30,7 +30,7 @@
                 #:revision-event #:revision-data #:revision-created-at)
   (:import-from #:lack/middleware/session/store
                 #:fetch-session #:store-session #:remove-session)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:to-json #:jobject #:jget))
 (in-package #:koya-tests/server/infra/db)
 

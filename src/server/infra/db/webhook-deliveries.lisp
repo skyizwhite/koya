@@ -3,9 +3,9 @@
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/domain/webhook-delivery
                 #:make-delivery)
-  (:import-from #:koya/core/ulid
+  (:import-from #:koya-core/ulid
                 #:make-ulid)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/webhooks
                 #:+deliveries-kept+ #:record-delivery #:list-deliveries #:count-deliveries #:find-delivery

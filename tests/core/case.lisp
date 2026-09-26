@@ -1,11 +1,11 @@
 (defpackage #:koya-tests/core/case
   (:use #:cl #:rove)
-  (:import-from #:koya/core/case
+  (:import-from #:koya-core/case
                 #:camel-key
                 #:kebab-keyword
                 #:lisp->jvalue
                 #:jvalue->lisp)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:to-json
                 #:parse-json))
 (in-package #:koya-tests/core/case)

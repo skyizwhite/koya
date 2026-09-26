@@ -1,6 +1,6 @@
 (defpackage #:koya-server/usecases/contents/listing
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type #:+system-fields+)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content)

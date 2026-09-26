@@ -1,15 +1,15 @@
 (defpackage #:koya-server/infra/db/schema-deploys
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
-  (:import-from #:koya/core/ulid
+  (:import-from #:koya-core/ulid
                 #:make-ulid)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:parse-json #:to-json)
   (:import-from #:koya-server/domain/deploy
                 #:make-deploy #:make-change)
-  (:import-from #:koya/core/diff
+  (:import-from #:koya-core/diff
                 #:change->jobject #:destructive-change-p)
   (:import-from #:koya-server/usecases/ports/deploys
                 #:+deploys-kept+ #:list-deploys #:count-deploys)

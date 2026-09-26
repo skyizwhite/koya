@@ -6,7 +6,7 @@
   (:import-from #:cl-ppcre
                 #:scan #:scan-to-strings)
   (:import-from #:bordeaux-threads-2)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:parse-iso #:format-iso)
   (:export #:find-timezone
            #:timezone-name-p
@@ -16,7 +16,7 @@
            #:local-input->iso))
 (in-package #:koya-server/domain/timezone)
 
-;;; Everything stored and served is UTC (see koya/core/time); a time is shown and
+;;; Everything stored and served is UTC (see koya-core/time); a time is shown and
 ;;; typed in a zone named the IANA way (Asia/Tokyo). The zone database is the
 ;;; system's, read from /usr/share/zoneinfo on first use; without it only UTC is
 ;;; available.

@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/contents/<space>/<model>/<id>/draft-key
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/http #:path-param)
   (:import-from #:koya-server/usecases/contents/write #:draft-key)
   (:export #:@post))

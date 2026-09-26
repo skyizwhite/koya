@@ -1,6 +1,6 @@
 (defpackage #:koya-server/infra/db/content-query
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-field #:field-type #:field-many-p)
   (:import-from #:koya-server/domain/query
                 #:bad-query)

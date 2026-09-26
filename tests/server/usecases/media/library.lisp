@@ -18,8 +18,8 @@
                 #:media-height #:media-alt #:+max-upload-bytes+)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code #:conflict #:rejected #:too-large)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya/core/json #:jget #:parse-json)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/json #:jget #:parse-json)
   (:import-from #:babel #:string-to-octets)
   (:export #:png-bytes #:*media-root* #:multipart-body))
 (in-package #:koya-tests/server/usecases/media/library)

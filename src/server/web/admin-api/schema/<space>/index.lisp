@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/admin-api/schema/<space>/index
   (:use #:cl)
-  (:import-from #:koya/core/schema #:schema->jobject #:jobject->schema)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/schema #:schema->jobject #:jobject->schema)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/domain/errors #:conflict #:koya-error-code #:koya-error-message #:koya-error-details)
   (:import-from #:koya-server/web/http #:read-json-body #:path-param #:param #:fail-api)
   (:import-from #:koya-server/web/presenters #:changes->jarray)

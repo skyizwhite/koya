@@ -1,8 +1,8 @@
 (defpackage #:koya-server/usecases/contents/delivery
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p)
-  (:import-from #:koya/core/json #:json-null)
+  (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/domain/errors
                 #:fail #:not-found)
   (:import-from #:koya-server/domain/query

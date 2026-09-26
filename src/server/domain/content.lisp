@@ -1,12 +1,12 @@
 (defpackage #:koya-server/domain/content
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-fields #:model-label #:field-name #:field-type #:field-option)
-  (:import-from #:koya/core/validate
+  (:import-from #:koya-core/validate
                 #:blank-value-p)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:json-null)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:cl-ppcre
                 #:regex-replace-all)

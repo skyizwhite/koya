@@ -9,7 +9,7 @@
   (:import-from #:koya-tests/server/usecases/media/library #:*media-root* #:multipart-body)
   (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-async*)
   (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)

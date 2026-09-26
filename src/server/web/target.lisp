@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/target
   (:use #:cl)
-  (:import-from #:koya/core/schema #:model-name)
+  (:import-from #:koya-core/schema #:model-name)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space #:find-model)
   (:import-from #:koya-server/usecases/contents/lookup #:find-content)
   (:import-from #:koya-server/web/http #:param)

@@ -11,7 +11,7 @@
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/usecases/contents/write #:create)
   (:import-from #:koya-server/usecases/contents/lookup #:resolve-model)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-tests/server/web/pages/support #:call-action)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents))
 (in-package #:koya-tests/server/web/pages/content-list)

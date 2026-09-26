@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/contents/<space>/<model>/<id>/index
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/http #:path-param #:read-json-body #:body-field #:fail-api)
   (:import-from #:koya-server/usecases/contents/write #:update-draft #:destroy)
   (:import-from #:koya-server/usecases/contents/lookup #:resolve-model #:resolve-content)

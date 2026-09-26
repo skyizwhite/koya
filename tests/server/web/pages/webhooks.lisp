@@ -6,8 +6,8 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/webhooks #:record-delivery)
   (:import-from #:koya-server/domain/content #:content-id)
-  (:import-from #:koya/core/schema #:make-webhook)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema))
+  (:import-from #:koya-core/schema #:make-webhook)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema))
 (in-package #:koya-tests/server/web/pages/webhooks)
 
 (setup (setup-pages) (log-in))

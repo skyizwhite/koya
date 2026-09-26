@@ -1,8 +1,8 @@
 (defpackage #:koya-server/web/presenters
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject #:json-null #:to-json)
-  (:import-from #:koya/core/schema #:model-fields #:field-name #:field-type)
-  (:import-from #:koya/core/diff #:change->jobject)
+  (:import-from #:koya-core/json #:jobject #:json-null #:to-json)
+  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type)
+  (:import-from #:koya-core/diff #:change->jobject)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
                 #:content-draft-key #:content-created-at #:content-updated-at

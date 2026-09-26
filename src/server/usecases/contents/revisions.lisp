@@ -1,11 +1,11 @@
 (defpackage #:koya-server/usecases/contents/revisions
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field
                 #:field-name #:field-type #:field-option #:field-required-p)
-  (:import-from #:koya/core/validate
+  (:import-from #:koya-core/validate
                 #:validate-content #:blank-value-p)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:json-array-p #:jkeys)
   (:import-from #:koya-server/usecases/ports/contents
                 #:find-content #:unique-value-taken-p

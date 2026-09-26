@@ -1,6 +1,6 @@
 (defpackage #:koya-server/domain/query
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:+system-fields+)
   (:import-from #:koya-server/domain/errors
                 #:invalid-input)

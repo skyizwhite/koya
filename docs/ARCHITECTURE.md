@@ -6,27 +6,30 @@ What koya is made of. The behaviour it exposes is in
 is in [../adr](../adr). Setting up to work on it is in
 [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Two systems, one repository
+## Three systems, one repository
 
-| System | Holds |
-|---|---|
-| `koya` | the schema DSL, the HTTP client, and `koya/core` |
-| `koya-server` | the admin UI, the delivery API, the admin API and the media store |
+| System | Holds | Licence |
+|---|---|---|
+| `koya-core` | the schema, its validation, the diff between two of them, JSON and name conversion, time, ULIDs | MIT |
+| `koya-sdk` | the schema DSL and the HTTP client, with `koya-core` re-exported | MIT |
+| `koya-server` | the admin UI, the delivery API, the admin API and the media store | AGPL |
 
-`koya/core` — the schema, its validation, the diff between two of them, JSON and
-name conversion, ULIDs — is shared, which is why one repository holds both. A
-site depends on `koya` alone; `qlot` pulls it by git.
+`koya-sdk` and `koya-server` both depend on `koya-core` and not on each other,
+which is why one repository holds all three. A site depends on `koya-sdk` alone;
+`qlot` pulls it by git.
 
 ```
-koya.asd  koya-server.asd  koya-tests.asd  qlfile  justfile  Dockerfile
+koya-core.asd  koya-sdk.asd  koya-server.asd  koya-tests.asd
+qlfile  justfile  Dockerfile
 adr/                  ; one file per design decision
 docs/                 ; this, and the documents above
 src/
-  sdk/                ; the koya system (MIT)
-    main.lisp         ; the koya package: config + client re-exported
+  core/               ; the koya-core system (MIT): schema, validate, diff, json,
+                      ; case, time, ulid, and main, which re-exports them
+  sdk/                ; the koya-sdk system (MIT)
+    main.lisp         ; the koya-sdk package: core + config + client re-exported
     config.lisp       ; defmodel / defwebhooks / current-schema
     client.lisp       ; plan / deploy / pull, get-list …, the admin API wrappers
-    core/             ; schema, validate, diff, json, case, time, ulid
   server/             ; the koya-server system (AGPL)
     main.lisp         ; the composition root: loads infra/, then web/
     domain/           ; what koya is made of: content, media, revision, deploy,
@@ -55,7 +58,7 @@ src/
                       ;   elements at the top; content/ and media/ below
       api/            ;   the delivery API
       admin-api/      ;   the admin API
-tests/                ; mirrors src/sdk/, with server/ mirroring src/server/
+tests/                ; mirrors src/: core/, server/, and the SDK at the top
 assets/               ; style/ (Tailwind in and out), js/
 ```
 
@@ -77,7 +80,7 @@ web  ──▶  usecases  ──▶  domain
           ports  ◀── defines ──  infra
 ```
 
-- `domain/` depends on `koya/core` alone, and on the libraries that give it
+- `domain/` depends on `koya-core` alone, and on the libraries that give it
   randomness and hashes. What a write makes of a content --
   drafted, published, unpublished, discarded -- is a function there that
   returns the content as it then is; a use case hands that to the store and
@@ -155,8 +158,8 @@ for a model, and parsing the models each time was most of the work of a page.
 
 ## Stack
 
-SBCL with package-inferred systems — a file under `src/sdk/` or `src/server/` is
-a package — and `qlot` for dependencies.
+SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
+`src/server/` is a package — and `qlot` for dependencies.
 
 | Layer | |
 |---|---|

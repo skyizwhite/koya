@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/web/api-support #:admin #:delivery #:setup-api #:reset-api)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya/core/json #:jobject #:jget))
+  (:import-from #:koya-core/json #:jobject #:jget))
 (in-package #:koya-tests/server/web/admin-api/keys)
 
 (setup (setup-api))

@@ -33,11 +33,11 @@
                 #:media-height #:media-alt #:media-created-at #:+max-upload-bytes+)
   (:import-from #:koya-server/domain/image #:sniff-image #:image-extension)
   (:import-from #:koya-server/domain/key #:key-id #:key-hash #:key-label #:key-created-at)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:jobject #:jget #:json-null #:json-null-p #:json-array-p #:parse-json #:to-json)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:cl-ppcre
                 #:scan)

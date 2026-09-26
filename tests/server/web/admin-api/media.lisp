@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/web/api-support #:request #:admin #:admin-upload #:delivery #:setup-api #:reset-api)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya/core/json #:jobject #:jget)
+  (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-tests/server/usecases/media/library #:png-bytes))
 (in-package #:koya-tests/server/web/admin-api/media)

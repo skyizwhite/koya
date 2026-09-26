@@ -21,8 +21,8 @@
                 #:+max-upload-bytes+)
   (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
   (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
-  (:import-from #:koya/core/schema #:make-webhook)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/schema #:make-webhook)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-revisions #:count-revisions #:get-content)
@@ -30,12 +30,12 @@
   (:import-from #:koya-server/usecases/contents/write #:create #:update-draft)
   (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-async*)
   (:import-from #:koya-server/domain/revision #:revision-event)
-  (:import-from #:koya/core/json #:jget)
+  (:import-from #:koya-core/json #:jget)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-server/usecases/media/library
                 #:store-upload #:remove-space-media)
-  (:import-from #:koya/core/schema #:schema-models #:model-name #:webhook-url)
+  (:import-from #:koya-core/schema #:schema-models #:model-name #:webhook-url)
   (:import-from #:koya-server/web/pages/index
                 #:begin-import-action #:continue-import-action #:finish-import-action)
   (:import-from #:koya-server/infra/env #:archive-dir))

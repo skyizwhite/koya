@@ -1,4 +1,4 @@
-(defpackage #:koya/core/ulid
+(defpackage #:koya-core/ulid
   (:use #:cl)
   (:import-from #:ironclad
                 #:random-data)
@@ -9,7 +9,7 @@
   (:export #:make-ulid
            #:ulid-p
            #:ulid-timestamp))
-(in-package #:koya/core/ulid)
+(in-package #:koya-core/ulid)
 
 ;;; ULID: 48-bit millisecond timestamp + 80-bit randomness, encoded as 26
 ;;; Crockford base32 characters. Lexicographically sortable by creation time.

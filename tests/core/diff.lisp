@@ -1,13 +1,13 @@
 (defpackage #:koya-tests/core/diff
   (:use #:cl #:rove)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:make-webhook)
-  (:import-from #:koya/core/diff
+  (:import-from #:koya-core/diff
                 #:diff-schemas
                 #:destructive-changes-p
                 #:format-change
                 #:change->jobject)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:jget))
 (in-package #:koya-tests/core/diff)
 

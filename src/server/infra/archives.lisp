@@ -11,7 +11,7 @@
   (:import-from #:koya-server/usecases/ports/archives
                 #:write-archive #:create-upload #:upload-size #:append-to-upload #:delete-upload
                 #:call-with-upload #:archive-entry-size #:archive-entry-bytes #:purge-stale-archives)
-  (:import-from #:koya/core/ulid
+  (:import-from #:koya-core/ulid
                 #:make-ulid)
   (:import-from #:cl-ppcre
                 #:scan)

@@ -1,6 +1,6 @@
 (defpackage #:koya-tests/server/domain/references
   (:use #:cl #:rove)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/domain/content #:make-content)
   (:import-from #:koya-server/domain/references
                 #:reference-fields #:refers-p #:media-fields #:mentioned-ids))

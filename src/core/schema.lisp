@@ -1,9 +1,9 @@
-(defpackage #:koya/core/schema
+(defpackage #:koya-core/schema
   (:use #:cl)
-  (:import-from #:koya/core/case
+  (:import-from #:koya-core/case
                 #:camel-key
                 #:kebab-keyword)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:jobject
                 #:jget
                 #:jkeys
@@ -62,7 +62,7 @@
            #:jobject->model
            #:slug-name-p
            #:field-name-p))
-(in-package #:koya/core/schema)
+(in-package #:koya-core/schema)
 
 (defparameter +schema-version+ 1)
 

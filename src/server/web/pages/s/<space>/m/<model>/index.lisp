@@ -3,10 +3,10 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:cl-ppcre #:regex-replace-all)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
                 #:webhook-covers-p)
-  (:import-from #:koya/core/json #:json-null)
+  (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space #:find-model #:space-webhooks)
   (:import-from #:koya-server/web/target #:target-model)
   (:import-from #:koya-server/domain/content

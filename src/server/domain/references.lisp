@@ -1,6 +1,6 @@
 (defpackage #:koya-server/domain/references
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:schema-models #:model-name #:model-fields #:field-name #:field-type #:field-option)
   (:import-from #:koya-server/domain/content
                 #:content-model #:content-published #:content-draft)

@@ -1,6 +1,6 @@
 (defpackage #:koya-tests/core/ulid
   (:use #:cl #:rove)
-  (:import-from #:koya/core/ulid
+  (:import-from #:koya-core/ulid
                 #:make-ulid
                 #:ulid-p
                 #:ulid-timestamp))

@@ -3,9 +3,9 @@
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/domain/revision
                 #:make-revision)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:parse-json #:to-json)
   (:import-from #:koya-server/usecases/ports/contents
                 #:record-revision #:list-revisions #:count-revisions #:find-revision

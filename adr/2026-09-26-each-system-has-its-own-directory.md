@@ -1,5 +1,7 @@
 # Each system has its own directory
 
+Superseded by adr/2026-09-26-the-sdk-and-the-server-share-koya-core.md
+
 *2026-09-26*
 
 ## Context

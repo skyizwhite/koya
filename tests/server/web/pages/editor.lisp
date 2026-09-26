@@ -12,9 +12,9 @@
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:koya-server/domain/revision #:revision-id #:revision-event #:revision-by)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:field-name #:model-fields)
-  (:import-from #:koya/core/json #:jget #:jobject)
+  (:import-from #:koya-core/json #:jget #:jobject)
   (:import-from #:koya-server/usecases/ports/media #:insert-media #:delete-media)
   (:import-from #:koya-server/usecases/contents/write #:create)
   (:import-from #:koya-server/usecases/contents/lookup #:resolve-model))

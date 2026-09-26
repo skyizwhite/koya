@@ -2,10 +2,10 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url)
-  (:import-from #:koya/core/validate #:validation-error #:validation-error-errors)
+  (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents/lookup #:find-content #:resolve-model)
   (:import-from #:koya-server/web/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content

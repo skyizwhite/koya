@@ -2,14 +2,14 @@
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection
                 #:*db* #:*on-rollback* #:exec #:fetch #:col #:with-db #:with-db-transaction)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:make-schema #:schema-webhooks #:schema-models #:webhook->jobject
                 #:jobject->webhook #:model-name #:model-kind #:model->jobject #:jobject->model
                 #:model-forget-renames #:schema-model)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:parse-json #:to-json)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)

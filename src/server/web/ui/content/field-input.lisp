@@ -1,8 +1,8 @@
 (defpackage #:koya-server/web/ui/content/field-input
   (:use #:cl #:hsx)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:field-name #:field-type #:field-option #:field-required-p #:field-many-p)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:json-null)
   (:import-from #:koya-server/web/forms #:field-param-name #:value->string)
   (:import-from #:koya-server/domain/media #:media-filename #:media-alt)

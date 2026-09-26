@@ -1,8 +1,8 @@
 (defpackage #:koya-server/usecases/schema/deploy
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:check-schema)
-  (:import-from #:koya/core/diff
+  (:import-from #:koya-core/diff
                 #:diff-schemas #:destructive-changes-p)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:not-found)

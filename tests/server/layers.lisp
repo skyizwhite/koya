@@ -52,6 +52,14 @@ infra.")
             (ok (member to (rest (assoc from +allowed+)))
                 (format nil "~a (~(~a~)) may use ~a (~(~a~))" name from dependency to))))))))
 
+;;; The server and the SDK share koya-core and nothing else: the SDK is what a
+;;; site loads, and changes for the site's sake.
+
+(deftest the-server-does-not-use-the-sdk
+  (dolist (name (server-systems))
+    (ok (null (dependencies name "koya-sdk"))
+        (format nil "~a uses koya-core, not koya-sdk" name))))
+
 ;;; The same rule for what is outside koya: a library that is how a request
 ;;; arrives, or how a row is stored, belongs to the layer that does that. A use
 ;;; case that imported one would be back to knowing HTTP or SQL, whatever its

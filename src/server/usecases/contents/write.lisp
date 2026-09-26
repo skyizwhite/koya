@@ -1,14 +1,14 @@
 (defpackage #:koya-server/usecases/contents/write
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-option #:model-name)
-  (:import-from #:koya/core/validate
+  (:import-from #:koya-core/validate
                 #:validate-content #:validation-error #:blank-value-p #:content-id-p)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:parse-iso)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:json-null #:json-equal)
-  (:import-from #:koya/core/ulid
+  (:import-from #:koya-core/ulid
                 #:make-ulid)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:invalid-input)

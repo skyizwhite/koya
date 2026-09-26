@@ -5,9 +5,9 @@
   (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-async*)
   (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
-  (:import-from #:koya/config #:defmodel #:clear-schema #:current-schema)
-  (:import-from #:koya/core/schema #:schema-models #:model-name)
-  (:import-from #:koya/client
+  (:import-from #:koya-sdk/config #:defmodel #:clear-schema #:current-schema)
+  (:import-from #:koya-core/schema #:schema-models #:model-name)
+  (:import-from #:koya-sdk/client
                 #:configure #:koya-error #:koya-error-status #:koya-error-code #:pull #:get-list
                 #:get-item #:get-object #:list-contents #:get-content #:create-content
                 #:update-content #:publish-content #:unpublish-content #:discard-draft
@@ -48,11 +48,11 @@
 
 (deftest deploy-plan-pull
   ;; named in full: rove has a PLAN of its own
-  (let ((changes (koya/client:plan :stream (make-broadcast-stream))))
+  (let ((changes (koya-sdk/client:plan :stream (make-broadcast-stream))))
     (ok (= (length changes) 9) "everything is new"))
   (let ((applied (deploy :stream (make-broadcast-stream))))
     (ok (= (length applied) 9)))
-  (ok (null (koya/client:plan :stream (make-broadcast-stream))) "nothing left to change")
+  (ok (null (koya-sdk/client:plan :stream (make-broadcast-stream))) "nothing left to change")
   (let ((remote (pull)))
     (ok (equal (mapcar #'model-name (schema-models remote)) '("blog" "tag" "about"))))
   (testing "a management key reaches its own space and no other"
@@ -161,7 +161,7 @@
     (testing "delivery keys"
       (ok (= (length (list-delivery-keys)) 1))
       ;; named in full: CREATE-DELIVERY-KEY here is the server's, which sets the tests up
-      (multiple-value-bind (key id) (koya/client:create-delivery-key :label "extra")
+      (multiple-value-bind (key id) (koya-sdk/client:create-delivery-key :label "extra")
         (ok (stringp key))
         (ok (= (length (list-delivery-keys)) 2))
         (delete-delivery-key id)

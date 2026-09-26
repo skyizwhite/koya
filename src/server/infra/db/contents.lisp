@@ -10,7 +10,7 @@
                 #:content-space #:content-model
                 #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
                 #:content-status)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:parse-json #:to-json)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:get-content #:find-content

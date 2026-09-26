@@ -13,7 +13,7 @@
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:koya-server/usecases/settings/timezone #:display-timezone-name)
   (:import-from #:cl-ppcre #:scan-to-strings)
-  (:import-from #:koya/core/json #:jget))
+  (:import-from #:koya-core/json #:jget))
 (in-package #:koya-tests/server/web/pages/settings)
 
 (setup (setup-pages) (log-in))

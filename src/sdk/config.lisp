@@ -1,6 +1,6 @@
-(defpackage #:koya/config
+(defpackage #:koya-sdk/config
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:make-field
                 #:make-model
                 #:make-webhook
@@ -14,7 +14,7 @@
            #:current-schema
            #:clear-schema
            #:find-model))
-(in-package #:koya/config)
+(in-package #:koya-sdk/config)
 
 ;;; The configuration DSL used by projects that depend on koya. A project defines
 ;;; one space's models; the space itself is made in the admin UI and named by

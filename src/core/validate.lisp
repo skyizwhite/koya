@@ -1,13 +1,13 @@
-(defpackage #:koya/core/validate
+(defpackage #:koya-core/validate
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-fields
                 #:field-name
                 #:field-type
                 #:field-option
                 #:field-required-p
                 #:field-many-p)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:json-null-p
                 #:json-array-p)
   (:import-from #:cl-ppcre
@@ -19,7 +19,7 @@
            #:validation-error-errors
            #:blank-value-p
            #:content-id-p))
-(in-package #:koya/core/validate)
+(in-package #:koya-core/validate)
 
 ;;; Validation of content data (a JSON object with camelCase keys) against a
 ;;; model. Returns a list of error plists: (:field NAME :code CODE :message MSG).

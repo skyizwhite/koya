@@ -11,8 +11,8 @@
                 #:delivery-ok #:delivery-status #:delivery-response #:delivery-error
                 #:delivery-event #:delivery-model #:delivery-label #:delivery-url
                 #:delivery-content-id #:delivery-duration-ms)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema #:make-webhook)
-  (:import-from #:koya/core/json #:jobject #:jget #:json-null))
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook)
+  (:import-from #:koya-core/json #:jobject #:jget #:json-null))
 (in-package #:koya-tests/server/usecases/webhooks/notify)
 
 (setup (setup-api))

@@ -4,7 +4,7 @@
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:load-schema)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
   (:import-from #:koya-server/usecases/webhooks/log
                 #:list-deliveries #:count-deliveries #:delivery-labels #:delivery-models

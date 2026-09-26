@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/api/v1/<space>/<model>/index
   (:use #:cl)
-  (:import-from #:koya/core/schema #:model-kind)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/schema #:model-kind)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset #:query-fields)
   (:import-from #:koya-server/web/http #:path-param #:param)
   (:import-from #:koya-server/web/auth #:require-delivery-key)

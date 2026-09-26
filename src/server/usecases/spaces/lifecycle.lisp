@@ -1,6 +1,6 @@
 (defpackage #:koya-server/usecases/spaces/lifecycle
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:slug-name-p)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:invalid-input)

@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/keys/<space>/index
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/http #:path-param #:read-json-body #:body-field #:ok-status)
   (:import-from #:koya-server/usecases/keys
                 #:space-webhook-secret #:create-delivery-key #:list-delivery-keys)

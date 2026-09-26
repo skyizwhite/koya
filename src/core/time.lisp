@@ -1,4 +1,4 @@
-(defpackage #:koya/core/time
+(defpackage #:koya-core/time
   (:use #:cl)
   (:import-from #:local-time
                 #:now
@@ -10,7 +10,7 @@
            #:iso-from-now
            #:format-iso
            #:parse-iso))
-(in-package #:koya/core/time)
+(in-package #:koya-core/time)
 
 ;;; All timestamps on the wire and in the database are ISO 8601 in UTC with
 ;;; millisecond precision, e.g. 2026-09-20T05:04:03.123Z.

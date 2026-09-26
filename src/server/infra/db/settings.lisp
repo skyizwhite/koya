@@ -1,7 +1,7 @@
 (defpackage #:koya-server/infra/db/settings
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch-one #:col)
-  (:import-from #:koya/core/time #:now-iso)
+  (:import-from #:koya-core/time #:now-iso)
   (:import-from #:koya-server/usecases/ports/settings #:get-setting #:set-setting #:delete-setting))
 (in-package #:koya-server/infra/db/settings)
 

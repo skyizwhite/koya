@@ -8,9 +8,9 @@
   (:import-from #:koya-server/usecases/ports/spaces #:delete-space)
   (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
   (:import-from #:koya-server/usecases/ports/keys #:create-management-key)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya/core/json #:to-json)
-  (:import-from #:koya/core/schema #:schema->jobject)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/json #:to-json)
+  (:import-from #:koya-core/schema #:schema->jobject)
   (:import-from #:koya-server/domain/deploy #:deploy-by))
 (in-package #:koya-tests/server/web/pages/deploys)
 

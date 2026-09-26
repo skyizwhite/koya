@@ -1,8 +1,8 @@
 (defpackage #:koya-server/domain/revision
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-fields #:field-name)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:json-equal #:jkeys)
   (:export #:revision #:make-revision
            #:revision-id #:revision-content-id #:revision-event #:revision-data

@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/me
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject #:json-null)
+  (:import-from #:koya-core/json #:jobject #:json-null)
   (:import-from #:lack/request #:request-env)
   (:import-from #:koya-server/web/auth #:session-owner-p #:calling-space)
   (:export #:@get))

@@ -1,6 +1,6 @@
 (defpackage #:koya-server/usecases/contents/labels
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-name #:model-fields
                 #:field-name #:field-type #:field-option)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)

@@ -8,7 +8,7 @@
   (:import-from #:koya-server/domain/timezone #:timezone-names #:format-local)
   (:import-from #:koya-server/usecases/settings/timezone
                 #:display-timezone-name #:display-timezone #:set-display-timezone)
-  (:import-from #:koya/core/time #:now-iso)
+  (:import-from #:koya-core/time #:now-iso)
   (:import-from #:koya-server/web/http #:param)
   (:import-from #:koya-server/web/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)

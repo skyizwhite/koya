@@ -1,9 +1,9 @@
 (defpackage #:koya-server/web/forms
   (:use #:cl)
-  (:import-from #:koya/core/schema #:model-fields #:field-name #:field-type #:field-many-p)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p)
+  (:import-from #:koya-core/json
                 #:json-null)
-  (:import-from #:koya/core/validate
+  (:import-from #:koya-core/validate
                 #:blank-for-field-p)
   (:import-from #:cl-ppcre
                 #:split)

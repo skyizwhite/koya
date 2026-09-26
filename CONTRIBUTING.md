@@ -37,14 +37,15 @@ from its **Keys** page. A site's schema reaches it with `koya deploy` from
 just test
 ```
 
-`tests/` mirrors `src/sdk/`, and `tests/server/` mirrors `src/server/`. Anything
-touching the database uses an in-memory one, and the admin UI and both APIs are
-driven through the app rather than by calling handlers.
+`tests/` mirrors `src/`: `tests/core/` and `tests/server/` the two directories of
+those names, and the SDK's tests at the top. Anything touching the database uses
+an in-memory one, and the admin UI and both APIs are driven through the app
+rather than by calling handlers.
 
 ## Where things are
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the two systems, the tables, the
-  stack, how the image is built.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the three systems, the tables,
+  the stack, how the image is built.
 - [adr/](adr) — one file per design decision, and why.
 - [AGENTS.md](AGENTS.md) — the conventions: what goes in an ADR, how comments are
   written, migrations.

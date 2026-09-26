@@ -1,4 +1,4 @@
-(defpackage #:koya/core/case
+(defpackage #:koya-core/case
   (:use #:cl)
   (:import-from #:kebab
                 #:to-camel-case
@@ -9,7 +9,7 @@
            #:object->plist
            #:jvalue->lisp
            #:lisp->jvalue))
-(in-package #:koya/core/case)
+(in-package #:koya-core/case)
 
 ;;; Conversions between the wire representation (JSON objects with camelCase
 ;;; string keys, as jzon produces them: EQUAL hash tables and vectors) and the

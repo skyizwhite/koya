@@ -1,8 +1,8 @@
 (defpackage #:koya-tests/config
   (:use #:cl #:rove)
-  (:import-from #:koya/config
+  (:import-from #:koya-sdk/config
                 #:defwebhooks #:defmodel #:webhook #:current-schema #:clear-schema #:find-model)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:schema-model #:model-field #:model-kind
                 #:field-option #:field-type #:schema-error #:model-preview-url #:model-public-url
                 #:model-label #:model-name #:webhook-url #:model-was #:field-was #:webhook-label

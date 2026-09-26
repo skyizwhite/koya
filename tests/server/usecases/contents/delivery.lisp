@@ -13,8 +13,8 @@
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/domain/errors #:not-found #:koya-error-code)
   (:import-from #:koya-server/domain/query #:parse-query #:make-query #:query-error)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya/core/json #:jobject #:jget #:json-null #:json-null-p))
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/json #:jobject #:jget #:json-null #:json-null-p))
 (in-package #:koya-tests/server/usecases/contents/delivery)
 
 ;;; What the delivery API hands the presenter: a content's data with its media

@@ -8,11 +8,11 @@
                 #:request-content)
   (:import-from #:lack/response
                 #:response-status)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:parse-json #:to-json #:jobject)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:schema-error #:schema-error-message)
-  (:import-from #:koya/core/validate
+  (:import-from #:koya-core/validate
                 #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code #:koya-error-message #:koya-error-details

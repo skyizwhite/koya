@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection
                 #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
   (:export #:migrate
            #:current-version))

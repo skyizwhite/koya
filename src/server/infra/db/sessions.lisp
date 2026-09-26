@@ -1,8 +1,8 @@
 (defpackage #:koya-server/infra/db/sessions
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch-one #:col)
-  (:import-from #:koya/core/json #:to-json #:parse-json)
-  (:import-from #:koya/core/time #:now-iso #:iso-from-now)
+  (:import-from #:koya-core/json #:to-json #:parse-json)
+  (:import-from #:koya-core/time #:now-iso #:iso-from-now)
   (:import-from #:lack/middleware/session/store
                 #:store #:fetch-session #:store-session #:remove-session)
   (:import-from #:koya-server/usecases/ports/sessions

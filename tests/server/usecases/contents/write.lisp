@@ -25,8 +25,8 @@
   (:import-from #:koya-server/domain/query
                 #:parse-query #:make-query #:query-limit #:query-offset #:query-orders
                 #:query-filters #:query-fields #:query-include #:query-error)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya/core/json #:parse-json #:jget))
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/json #:parse-json #:jget))
 (in-package #:koya-tests/server/usecases/contents/write)
 
 (defun blog-model ()

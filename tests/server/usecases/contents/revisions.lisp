@@ -9,8 +9,8 @@
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/content #:content-id)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya/core/json #:jget))
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/json #:jget))
 (in-package #:koya-tests/server/usecases/contents/revisions)
 
 ;;; What an old version becomes when it is brought back into the editor. The

@@ -1,14 +1,14 @@
-(defpackage #:koya/client
+(defpackage #:koya-sdk/client
   (:use #:cl)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:parse-json #:to-json #:jobject #:jget #:json-null)
-  (:import-from #:koya/core/case
+  (:import-from #:koya-core/case
                 #:camel-key #:jvalue->lisp #:lisp->jvalue)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:schema->jobject #:jobject->schema)
-  (:import-from #:koya/core/diff
+  (:import-from #:koya-core/diff
                 #:format-change)
-  (:import-from #:koya/config
+  (:import-from #:koya-sdk/config
                 #:current-schema)
   (:import-from #:dexador)
   (:import-from #:quri
@@ -22,7 +22,7 @@
            #:publish-content #:unpublish-content #:discard-draft #:delete-content #:draft-key
            #:create-delivery-key #:list-delivery-keys #:delete-delivery-key #:webhook-secret
            #:list-media #:get-media #:upload-media #:update-media #:delete-media))
-(in-package #:koya/client)
+(in-package #:koya-sdk/client)
 
 ;;; HTTP client for a koya server. Delivery calls need *DELIVERY-KEY*; admin calls
 ;;; (schema deploys, content management, keys, media) need *MANAGEMENT-KEY*. Both

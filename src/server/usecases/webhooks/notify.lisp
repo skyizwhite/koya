@@ -1,6 +1,6 @@
 (defpackage #:koya-server/usecases/webhooks/notify
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-name #:webhook-covers-p
                 #:webhook-label #:webhook-url)
   (:import-from #:koya-server/usecases/ports/spaces #:space-webhooks)

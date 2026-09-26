@@ -1,8 +1,8 @@
 (defpackage #:koya-server/usecases/contents/bulk
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-name)
-  (:import-from #:koya/core/validate
+  (:import-from #:koya-core/validate
                 #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/ports/contents #:find-content)
   (:import-from #:koya-server/domain/content #:content-published #:content-draft)

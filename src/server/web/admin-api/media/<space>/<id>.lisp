@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/media/<space>/<id>
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/http #:path-param #:read-json-body #:body-field #:fail-api)
   (:import-from #:koya-server/usecases/contents/lookup #:resolve-space)
   (:import-from #:koya-server/web/presenters #:media->jobject)

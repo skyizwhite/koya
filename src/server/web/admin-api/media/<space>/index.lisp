@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/media/<space>/index
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/http
                 #:path-param #:param #:fail-api #:ok-status #:uploaded-files #:form-field)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)

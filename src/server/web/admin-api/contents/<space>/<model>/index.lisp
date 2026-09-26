@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/contents/<space>/<model>/index
   (:use #:cl)
-  (:import-from #:koya/core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/http #:path-param #:read-json-body #:body-field #:fail-api #:ok-status)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
   (:import-from #:koya-server/usecases/contents/write #:create)

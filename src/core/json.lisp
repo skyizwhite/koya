@@ -1,4 +1,4 @@
-(defpackage #:koya/core/json
+(defpackage #:koya-core/json
   (:use #:cl)
   (:import-from #:com.inuoe.jzon
                 #:parse
@@ -14,7 +14,7 @@
            #:jobject
            #:jkeys
            #:json-equal))
-(in-package #:koya/core/json)
+(in-package #:koya-core/json)
 
 ;;; Thin layer over jzon. Objects are EQUAL hash tables with string keys,
 ;;; arrays are vectors, null is the symbol JSON-NULL (jzon's 'NULL), false is NIL

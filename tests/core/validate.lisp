@@ -1,10 +1,10 @@
 (defpackage #:koya-tests/core/validate
   (:use #:cl #:rove)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:make-field #:make-model)
-  (:import-from #:koya/core/validate
+  (:import-from #:koya-core/validate
                 #:validate-content)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:parse-json))
 (in-package #:koya-tests/core/validate)
 

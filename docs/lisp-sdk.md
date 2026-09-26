@@ -1,7 +1,7 @@
 # The Common Lisp SDK
 
-For a site written in Common Lisp, this repository's `koya` system is to it what
-[koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) is to a TypeScript
+For a site written in Common Lisp, this repository's `koya-sdk` system is to it
+what [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) is to a TypeScript
 site. It holds three things:
 
 - a **schema DSL** — `defmodel`, `defwebhooks`, `webhook` — that defines the
@@ -41,17 +41,18 @@ koya is not in Quicklisp; depend on the repository with qlot. In the site's
 git koya https://github.com/skyizwhite/koya.git
 ```
 
-then `qlot install` (and `qlot update koya` to pick up later changes). Add `koya`
-to the site's `.asd` `:depends-on`, and `(ql:quickload :koya)` in the REPL.
+then `qlot install` (and `qlot update koya` to pick up later changes). Add
+`koya-sdk` to the site's `.asd` `:depends-on`, and `(ql:quickload :koya-sdk)` in
+the REPL.
 
-All symbols below live in the `koya` package, which re-exports `koya/core`,
-`koya/config` and `koya/client`. The server system (`koya-server`) is a separate
-system; a site never loads it.
+All symbols below live in the `koya-sdk` package, which re-exports `koya-core`,
+`koya-sdk/config` and `koya-sdk/client`. The server (`koya-server`) is a
+separate system; a site never loads it.
 
 ## Configuration
 
 ```lisp
-(koya:configure :base-url "https://cms.example.com"
+(koya-sdk:configure :base-url "https://cms.example.com"
                 :management-key "koya_mgmt_..."  ; schema, content and media calls
                 :delivery-key "koya_..."  ; reading published content
                 :space    "website")   ; the space every call works in
@@ -62,10 +63,10 @@ call time:
 
 | Variable | Environment | Used by |
 |---|---|---|
-| `koya:*base-url*` | `KOYA_URL` | everything |
-| `koya:*management-key*` | `KOYA_MANAGEMENT_KEY` | `plan`, `deploy`, `pull`, content/keys/media management |
-| `koya:*delivery-key*` | `KOYA_DELIVERY_KEY` | `get-list`, `get-item`, `get-object` |
-| `koya:*space*` | `KOYA_SPACE` | the default for every `:space` argument |
+| `koya-sdk:*base-url*` | `KOYA_URL` | everything |
+| `koya-sdk:*management-key*` | `KOYA_MANAGEMENT_KEY` | `plan`, `deploy`, `pull`, content/keys/media management |
+| `koya-sdk:*delivery-key*` | `KOYA_DELIVERY_KEY` | `get-list`, `get-item`, `get-object` |
+| `koya-sdk:*space*` | `KOYA_SPACE` | the default for every `:space` argument |
 
 **The space is made in the admin UI first**, and both keys are then made on its
 *Keys* page. A management key belongs to that one space and reaches nothing else,
@@ -74,14 +75,14 @@ so a site's `.env` cannot touch another site's content; the owner secret
 the server's own public URL is `KOYA_BASE_URL`; the client reads `KOYA_URL`, so
 both can sit in one `.env` without colliding. A missing setting
 signals an error naming what to set. Calls that take `:space` accept a symbol or
-a string and downcase it, and default to `koya:*space*`.
+a string and downcase it, and default to `koya-sdk:*space*`.
 
 ## Defining the schema
 
 A project defines the models of one space, so no definition names the space —
-`koya:*space*` says which one a deploy goes to. Definitions are collected in an
-in-memory registry; re-evaluating a form replaces the previous definition of the
-same name, so the schema can be edited live from the REPL.
+`koya-sdk:*space*` says which one a deploy goes to. Definitions are collected in
+an in-memory registry; re-evaluating a form replaces the previous definition of
+the same name, so the schema can be edited live from the REPL.
 
 ```lisp
 ;; every model of the space, on every event; :only narrows one -- see Webhooks below
@@ -131,9 +132,9 @@ Naming rules, checked as the schema is built:
 `id`, `createdAt`, `updatedAt`, `publishedAt` and `revisedAt` are system fields
 that every content already has; declaring one is an error.
 
-Other helpers: `(koya:current-schema)` returns the validated schema built so far,
-`(koya:clear-schema)` empties the registry, and `(koya:find-model name)` looks a
-definition up.
+Other helpers: `(koya-sdk:current-schema)` returns the validated schema built so
+far, `(koya-sdk:clear-schema)` empties the registry, and
+`(koya-sdk:find-model name)` looks a definition up.
 
 ## Field types and options
 
@@ -183,8 +184,8 @@ without `:only` also covers models added later. Labels must be unique.
 
 Every webhook is sent every event — `publish`, `unpublish`, `delete` and
 `draft` — with the space's webhook secret in `X-KOYA-WEBHOOK-KEY`, which
-`(koya:webhook-secret)` returns. The payload and when each event fires are in
-[API.md, "Webhooks"](API.md#webhooks).
+`(koya-sdk:webhook-secret)` returns. The payload and when each event fires are
+in [API.md, "Webhooks"](API.md#webhooks).
 
 ## Renaming a model or a field
 
@@ -217,16 +218,16 @@ rules are in [SCHEMA.md, "Renames"](SCHEMA.md#renames).
 ## Deploying the schema
 
 ```lisp
-(koya:plan)                ; the changes a deploy would apply; prints and returns them
-(koya:deploy)              ; apply them
-(koya:deploy :force t)     ; apply without asking about destructive changes
-(koya:pull)                ; the schema the server currently stores, as a schema object
+(koya-sdk:plan)                ; the changes a deploy would apply; prints and returns them
+(koya-sdk:deploy)              ; apply them
+(koya-sdk:deploy :force t)     ; apply without asking about destructive changes
+(koya-sdk:pull)                ; the schema the server currently stores, as a schema object
 ```
 
-All four work on `koya:*space*`, or on the `:space` given to them. **The space
-must already exist**: it is made in the admin UI, and a deploy to a name that has
-none is refused with `404 not_found` rather than quietly making one, so a typo in
-`KOYA_SPACE` cannot grow a second, empty space.
+All four work on `koya-sdk:*space*`, or on the `:space` given to them. **The
+space must already exist**: it is made in the admin UI, and a deploy to a name
+that has none is refused with `404 not_found` rather than quietly making one, so
+a typo in `KOYA_SPACE` cannot grow a second, empty space.
 
 Both `plan` and `deploy` take `:schema` (defaulting to `(current-schema)`) and
 `:stream`; `deploy` also takes `:confirm` (default `t`). When a deploy would
@@ -252,12 +253,12 @@ of the management key that sent it — and is read afterwards in the admin UI at
 These need a delivery key and return published data only.
 
 ```lisp
-(koya:get-list 'blog)
-(koya:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :fields "id,title,publishedAt"))
-(koya:get-list 'blog :query '(:include "tags"))          ; embed referenced contents
-(koya:get-item 'blog "01J…")
-(koya:get-item 'blog "01J…" :query '(:draft-key "…"))    ; preview a draft
-(koya:get-object 'about)
+(koya-sdk:get-list 'blog)
+(koya-sdk:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :fields "id,title,publishedAt"))
+(koya-sdk:get-list 'blog :query '(:include "tags"))          ; embed referenced contents
+(koya-sdk:get-item 'blog "01J…")
+(koya-sdk:get-item 'blog "01J…" :query '(:draft-key "…"))    ; preview a draft
+(koya-sdk:get-object 'about)
 ```
 
 Each takes `:space` to override the default. `get-list` returns a plist:
@@ -291,7 +292,7 @@ are the same.
 `:filters` takes the delivery API's filter syntax as a string:
 
 ```lisp
-(koya:get-list 'blog :query '(:filters "title[contains]lisp[and]publishedAt[exists]"))
+(koya-sdk:get-list 'blog :query '(:filters "title[contains]lisp[and]publishedAt[exists]"))
 ```
 
 ### What comes back
@@ -306,17 +307,17 @@ are `nil` while a content is not published.
 These use the management key and see drafts as well.
 
 ```lisp
-(koya:list-contents 'blog :query '(:limit 100))   ; everything, drafts included
-(koya:get-content 'blog "01J…")
-(koya:create-content 'blog '(:title "Hello" :content "<p>…</p>"))            ; as a draft
-(koya:create-content 'blog '(:title "Hello") :publish t)
-(koya:update-content 'blog "01J…" '(:title "New title"))                     ; save a draft
-(koya:publish-content 'blog "01J…")                                          ; publish the draft
-(koya:publish-content 'blog "01J…" :data '(:title "…") :published-at "2026-09-20T10:00:00.000Z")
-(koya:unpublish-content 'blog "01J…")
-(koya:discard-draft 'blog "01J…")
-(koya:delete-content 'blog "01J…")
-(koya:draft-key 'blog "01J…")                     ; for a preview URL
+(koya-sdk:list-contents 'blog :query '(:limit 100))   ; everything, drafts included
+(koya-sdk:get-content 'blog "01J…")
+(koya-sdk:create-content 'blog '(:title "Hello" :content "<p>…</p>"))            ; as a draft
+(koya-sdk:create-content 'blog '(:title "Hello") :publish t)
+(koya-sdk:update-content 'blog "01J…" '(:title "New title"))                     ; save a draft
+(koya-sdk:publish-content 'blog "01J…")                                          ; publish the draft
+(koya-sdk:publish-content 'blog "01J…" :data '(:title "…") :published-at "2026-09-20T10:00:00.000Z")
+(koya-sdk:unpublish-content 'blog "01J…")
+(koya-sdk:discard-draft 'blog "01J…")
+(koya-sdk:delete-content 'blog "01J…")
+(koya-sdk:draft-key 'blog "01J…")                     ; for a preview URL
 ```
 
 - `list-contents` returns `(:contents (…) :total-count n :offset n :limit n)` where
@@ -337,10 +338,10 @@ These use the management key and see drafts as well.
 ## Delivery keys and the webhook secret
 
 ```lisp
-(koya:create-delivery-key :label "production site")  ; => (values "koya_…" "01J…"), shown once
-(koya:list-delivery-keys)                            ; ((:id … :label … :created-at …) …)
-(koya:delete-delivery-key "01J…")
-(koya:webhook-secret)                            ; the X-KOYA-WEBHOOK-KEY of the space
+(koya-sdk:create-delivery-key :label "production site")  ; => (values "koya_…" "01J…"), shown once
+(koya-sdk:list-delivery-keys)                            ; ((:id … :label … :created-at …) …)
+(koya-sdk:delete-delivery-key "01J…")
+(koya-sdk:webhook-secret)                            ; the X-KOYA-WEBHOOK-KEY of the space
 ```
 
 Only a key's SHA-256 is stored, so a lost key cannot be read back — delete it and
@@ -349,13 +350,13 @@ create another. A key is valid for its space alone.
 ## Media
 
 ```lisp
-(koya:upload-media #p"cover.png" :alt "Cover")
+(koya-sdk:upload-media #p"cover.png" :alt "Cover")
 ;; => (:id "01J…" :url "https://cms.example.com/media/website/01J….png" :filename "cover.png"
 ;;     :mime "image/png" :size 12345 :width 1200 :height 630 :alt "Cover" :created-at "…")
-(koya:list-media :search "cover" :limit 60 :offset 0)   ; (:media (…) :total-count n :offset n :limit n)
-(koya:get-media "01J…")                                 ; adds :references — how many contents use it
-(koya:update-media "01J…" :alt "New alt text")
-(koya:delete-media "01J…")
+(koya-sdk:list-media :search "cover" :limit 60 :offset 0)   ; (:media (…) :total-count n :offset n :limit n)
+(koya-sdk:get-media "01J…")                                 ; adds :references — how many contents use it
+(koya-sdk:update-media "01J…" :alt "New alt text")
+(koya-sdk:delete-media "01J…")
 ```
 
 PNG, JPEG, GIF and WebP up to 20 MB each; the type is decided by reading the
@@ -365,7 +366,7 @@ still uses the file, as a `:media` value or inside rich text — `get-media`'s
 
 ## Errors
 
-Anything but a 2xx signals `koya:koya-error`, with readers
+Anything but a 2xx signals `koya-sdk:koya-error`, with readers
 `koya-error-status`, `koya-error-code`, `koya-error-message` and
 `koya-error-details`.
 
@@ -377,10 +378,10 @@ it is a list of `(:field … :code … :message …)` plists (codes in
 message when the server runs with `KOYA_ENV=dev`.
 
 ```lisp
-(handler-case (koya:create-content 'blog '(:title ""))
-  (koya:koya-error (e)
-    (when (= (koya:koya-error-status e) 422)
-      (dolist (problem (koya:koya-error-details e))
+(handler-case (koya-sdk:create-content 'blog '(:title ""))
+  (koya-sdk:koya-error (e)
+    (when (= (koya-sdk:koya-error-status e) 422)
+      (dolist (problem (koya-sdk:koya-error-details e))
         (format t "~a: ~a~%" (getf problem :field) (getf problem :message))))))
 ```
 
@@ -406,20 +407,21 @@ alike for booleans, so `nil` means "off". On `update-content`, which merges,
 `nil` removes the key instead — send the whole data with `publish-content
 :data …` when a value must be written rather than dropped.
 
-Timestamps are ISO 8601 in UTC with milliseconds, e.g. `"2026-09-20T05:04:03.123Z"`.
-`koya:now-iso`, `koya:format-iso` and `koya:parse-iso` are re-exported for
-building them, and `koya:make-ulid` for generating ids.
+Timestamps are ISO 8601 in UTC with milliseconds, e.g.
+`"2026-09-20T05:04:03.123Z"`. `koya-sdk:now-iso`, `koya-sdk:format-iso` and
+`koya-sdk:parse-iso` are re-exported for building them, and `koya-sdk:make-ulid`
+for generating ids.
 
 ## The HTTP API underneath
 
-Every function above is one request to the server's JSON APIs:
-[API.md](API.md) walks through them, [openapi.yaml](openapi.yaml) specifies them
-(endpoints, parameters, response shapes, error codes) and [SCHEMA.md](SCHEMA.md)
-the schema document `deploy` sends. `(koya:pull)` is the easiest way to see a real
+Every function above is one request to the server's JSON APIs: [API.md](API.md)
+walks through them, [openapi.yaml](openapi.yaml) specifies them (endpoints,
+parameters, response shapes, error codes) and [SCHEMA.md](SCHEMA.md) the schema
+document `deploy` sends. `(koya-sdk:pull)` is the easiest way to see a real
 schema document.
 
 ## License
 
-The SDK — `koya.asd` and `src/sdk/` — is under the [MIT License](../LICENSE-MIT),
-so a site that declares its schema and reads its content with it is not bound by
-the server's AGPL.
+The SDK and the core it uses — `koya-sdk.asd`, `koya-core.asd`, `src/sdk/` and
+`src/core/` — are under the [MIT License](../LICENSE-MIT), so a site that declares
+its schema and reads its content with them is not bound by the server's AGPL.

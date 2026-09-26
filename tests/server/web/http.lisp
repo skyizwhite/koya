@@ -4,9 +4,9 @@
   (:import-from #:koya-tests/server/web/api-support #:*secret* #:*management-key* #:*api-key* #:request #:admin #:delivery #:setup-api #:reset-api)
   (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya/core/schema #:make-field #:make-model #:make-schema #:make-webhook)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook)
   (:import-from #:koya-server/web/http #:origin-allowed-p)
-  (:import-from #:koya/core/json #:jobject #:jget)
+  (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:alexandria #:alist-hash-table))
 (in-package #:koya-tests/server/web/http)
 

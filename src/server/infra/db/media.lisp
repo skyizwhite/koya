@@ -3,9 +3,9 @@
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/domain/media
                 #:make-media #:media-id)
-  (:import-from #:koya/core/ulid
+  (:import-from #:koya-core/ulid
                 #:make-ulid)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/media
                 #:insert-media #:find-media #:find-media-by-ids #:list-media #:space-media

@@ -17,7 +17,7 @@
                 #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents
                 #:contents-mentioning #:space-contents)
-  (:import-from #:koya/core/ulid
+  (:import-from #:koya-core/ulid
                 #:make-ulid)
   (:export #:store-upload
            #:store-uploads

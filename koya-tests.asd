@@ -2,7 +2,7 @@
   :class :package-inferred-system
   :pathname "tests"
   :depends-on ("rove"
-               "koya"
+               "koya-sdk"
                "koya-server"
                "koya-tests/core/ulid"
                "koya-tests/core/case"

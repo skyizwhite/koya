@@ -4,7 +4,7 @@
                 #:set-response-status #:set-response-header)
   (:import-from #:ningle
                 #:context)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:json-array)
   (:import-from #:koya-server/domain/errors
                 #:koya-error-message)

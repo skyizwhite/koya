@@ -1,20 +1,20 @@
-(defpackage #:koya/core/diff
+(defpackage #:koya-core/diff
   (:use #:cl)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:schema-webhooks #:schema-models
                 #:model-name #:model-kind #:model-fields #:model-options #:model-was
                 #:field-name #:field-type #:field-options #:field-was
                 #:forget-rename)
-  (:import-from #:koya/core/json
+  (:import-from #:koya-core/json
                 #:jobject)
-  (:import-from #:koya/core/case
+  (:import-from #:koya-core/case
                 #:camel-key)
   (:export #:diff-schemas
            #:destructive-change-p
            #:destructive-changes-p
            #:format-change
            #:change->jobject))
-(in-package #:koya/core/diff)
+(in-package #:koya-core/diff)
 
 ;;; Structural diff between two schemas, used by plan/deploy. Both sides are one
 ;;; space's schema, so a change is a plist (:op OP :model M :field F :from X :to Y);

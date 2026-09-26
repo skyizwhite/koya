@@ -3,10 +3,10 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya/core/schema
+  (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-field #:field-type #:field-option)
-  (:import-from #:koya/core/json #:json-array-p)
-  (:import-from #:koya/core/validate #:blank-value-p)
+  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/validate #:blank-value-p)
   (:import-from #:koya-server/usecases/contents/revisions #:list-revisions #:count-revisions)
   (:import-from #:koya-server/usecases/contents/lookup #:find-content #:resolve-model)
   (:import-from #:koya-server/web/target #:target-model #:target-content)

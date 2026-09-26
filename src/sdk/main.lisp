@@ -1,7 +1,7 @@
-(uiop:define-package #:koya
-  (:nicknames #:koya/main)
+(uiop:define-package #:koya-sdk
+  (:nicknames #:koya-sdk/main)
   (:use #:cl)
-  (:use-reexport #:koya/core
-                 #:koya/config
-                 #:koya/client))
-(in-package #:koya)
+  (:use-reexport #:koya-core
+                 #:koya-sdk/config
+                 #:koya-sdk/client))
+(in-package #:koya-sdk)

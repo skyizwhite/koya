@@ -2,9 +2,9 @@
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/domain/key #:make-key)
-  (:import-from #:koya/core/ulid
+  (:import-from #:koya-core/ulid
                 #:make-ulid)
-  (:import-from #:koya/core/time
+  (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string #:digest-sequence)
