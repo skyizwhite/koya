@@ -7,6 +7,6 @@
   :homepage "https://github.com/skyizwhite/koya"
   :source-control (:git "https://github.com/skyizwhite/koya.git")
   :class :package-inferred-system
-  :pathname "src"
+  :pathname "src/sdk"
   :depends-on ("koya/main")
   :in-order-to ((test-op (test-op "koya-tests"))))

@@ -26,9 +26,9 @@ up to work on koya is in CONTRIBUTING.md.
 just test
 ```
 
-`tests/` mirrors `src/`. Anything touching the database uses an in-memory one,
-and the admin UI and both APIs are driven through the app rather than by calling
-handlers.
+`tests/` mirrors `src/sdk/`, and `tests/server/` mirrors `src/server/`. Anything
+touching the database uses an in-memory one, and the admin UI and both APIs are
+driven through the app rather than by calling handlers.
 
 ## Conventions
 

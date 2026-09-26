@@ -22,11 +22,12 @@ koya.asd  koya-server.asd  koya-tests.asd  qlfile  justfile  Dockerfile
 adr/                  ; one file per design decision
 docs/                 ; this, and the documents above
 src/
-  main.lisp           ; the koya package: config + client re-exported
-  config.lisp         ; defmodel / defwebhooks / current-schema
-  client.lisp         ; plan / deploy / pull, get-list …, the admin API wrappers
-  core/               ; schema, validate, diff, json, case, time, ulid
-  server/
+  sdk/                ; the koya system (MIT)
+    main.lisp         ; the koya package: config + client re-exported
+    config.lisp       ; defmodel / defwebhooks / current-schema
+    client.lisp       ; plan / deploy / pull, get-list …, the admin API wrappers
+    core/             ; schema, validate, diff, json, case, time, ulid
+  server/             ; the koya-server system (AGPL)
     main.lisp         ; the composition root: loads infra/, then web/
     domain/           ; what koya is made of: content, media, revision, deploy,
                       ; key, webhook-delivery, references, query, errors, image,
@@ -54,7 +55,7 @@ src/
                       ;   elements at the top; content/ and media/ below
       api/            ;   the delivery API
       admin-api/      ;   the admin API
-tests/                ; mirrors src/
+tests/                ; mirrors src/sdk/, with server/ mirroring src/server/
 assets/               ; style/ (Tailwind in and out), js/
 ```
 
@@ -154,8 +155,8 @@ for a model, and parsing the models each time was most of the work of a page.
 
 ## Stack
 
-SBCL with package-inferred systems — a file under `src/` is a package — and
-`qlot` for dependencies.
+SBCL with package-inferred systems — a file under `src/sdk/` or `src/server/` is
+a package — and `qlot` for dependencies.
 
 | Layer | |
 |---|---|

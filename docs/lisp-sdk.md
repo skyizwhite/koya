@@ -420,7 +420,6 @@ schema document.
 
 ## License
 
-The SDK — `koya.asd`, `src/main.lisp`, `src/client.lisp`, `src/config.lisp`,
-`src/core.lisp` and `src/core/` — is under the [MIT License](../LICENSE-MIT), so a
-site that declares its schema and reads its content with it is not bound by the
-server's AGPL.
+The SDK — `koya.asd` and `src/sdk/` — is under the [MIT License](../LICENSE-MIT),
+so a site that declares its schema and reads its content with it is not bound by
+the server's AGPL.

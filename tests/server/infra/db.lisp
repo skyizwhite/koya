@@ -60,7 +60,7 @@
   ;; the snapshot is generated, so a mismatch means it was not regenerated after
   ;; a migration was added, never that it is the schema that is wrong
   (ok (equal (migrated-snapshot) (read-snapshot))
-      "src/server/db/schema.sql is current; regenerate it with (koya-server:write-schema-snapshot)"))
+      "src/server/infra/db/schema.sql is current; regenerate it with (koya-server:write-schema-snapshot)"))
 
 (deftest spaces-are-made-here-not-by-a-deploy
   (ok (null (load-schema "website")) "no space, no schema")
