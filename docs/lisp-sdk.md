@@ -53,9 +53,9 @@ separate system; a site never loads it.
 
 ```lisp
 (koya-sdk:configure :base-url "https://cms.example.com"
-                :management-key "koya_mgmt_..."  ; schema, content and media calls
-                :delivery-key "koya_..."  ; reading published content
-                :space    "website")   ; the space every call works in
+                    :management-key "koya_mgmt_..."  ; schema, content and media calls
+                    :delivery-key "koya_..."  ; reading published content
+                    :space    "website")   ; the space every call works in
 ```
 
 Each setting is a special variable with an environment-variable fallback, read at

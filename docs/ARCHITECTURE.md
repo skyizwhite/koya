@@ -167,6 +167,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Layer | |
 |---|---|
 | HTTP | Clack / Lack; Hunchentoot in development, Woo in production |
+| Middlewares | lack-mw: Lack's own, and the guards combined with `mw-every` / `mw-some` / `mw-except` |
 | Router | jingle (a ningle extension) + ningle-fbr |
 | Templates | hsx; ningle-actions + HTMX for everything done on a page |
 | DB | cl-dbi + dbd-sqlite3 |
@@ -178,12 +179,13 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Tests | rove (`koya-tests`) |
 
 The four apps — pages, delivery API, admin API and actions — are separate ningle
-apps mounted together, so each decides its own response type. A request first goes
-through what every answer needs (the deletion of a temporary file once sent, the
-access log, Cache-Control, the error page, the body limit), then to the app mounted at its path, which carries the
-middlewares it needs: CORS for the delivery API, the session and a guard for the
-admin API, the actions and the pages; the assets and the media need none. The admin API, the
-actions and the pages are each guarded where they are mounted
+apps mounted together, so each decides its own response type. A request first
+goes through what every answer needs (the deletion of a temporary file once sent,
+the access log, Cache-Control, the error page, the body limit), then to the app
+mounted at its path, which carries the middlewares it needs: CORS for the
+delivery API, the session and a guard for the admin API, the actions and the
+pages; the assets and the media need none. The admin API, the actions and the
+pages are each guarded where they are mounted
 (`*admin-auth-middleware*`, `*actions-auth-middleware*`, `*pages-auth-middleware*`),
 so a route added later is covered without checking for itself. A page asked for
 without the owner's session is a redirect to the login page, which comes back to
