@@ -186,11 +186,11 @@ mounted at its path, which carries the middlewares it needs: CORS for the
 delivery API, the session and a guard for the admin API, the actions and the
 pages; the assets and the media need none. The admin API, the actions and the
 pages are each guarded where they are mounted
-(`*admin-auth-middleware*`, `*actions-auth-middleware*`, `*pages-auth-middleware*`),
+(`*mw-admin-auth*`, `*mw-actions-auth*`, `*mw-pages-auth*`),
 so a route added later is covered without checking for itself. A page asked for
 without the owner's session is a redirect to the login page, which comes back to
 it; so is a path that is no page. The delivery API is mounted behind
-`*delivery-cors-middleware*`, which answers any origin; nothing else is. Woo
+`*mw-delivery-cors*`, which answers any origin; nothing else is. Woo
 reads a whole request body before any of this sees it, and is held to 21 MB: past
 that it answers 413 in plain text itself.
 
@@ -208,7 +208,7 @@ drawn with the assets and no file fetched reads the session.
 
 A space's archive moves whatever its size. The export writes it to a file under
 `archives/` beside the database and sends it from there; the page marks the
-answer with `+temporary-file-header+`, and `*temporary-file-middleware*` deletes
+answer with `+temporary-file-header+`, and `*mw-temporary-file*` deletes
 the file once the server has it. The import dialog uploads the zip in pieces to
 three actions, which add each to the end of a file there and then import it in
 one transaction. Searching, filtering, sorting and

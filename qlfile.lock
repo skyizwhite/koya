@@ -28,8 +28,8 @@
   :version "git-dded9e78b94113dd64ab341c586b93ac7b9dcc9f"))
 ("lack-mw" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git" :tag "v0.3.0")
-  :version "git-5d3a1da4709b534861f6c2958bca32ec493d5d1f"))
+  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git" :tag "v0.4.0")
+  :version "git-3fa9e3019b7c3af4133e9f44461874e8ca4f8b76"))
 ("okite" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/okite.git")

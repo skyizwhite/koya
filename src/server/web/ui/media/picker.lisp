@@ -18,7 +18,7 @@
 ;;; The media picker: a <dialog> on the editor page whose body is fetched from
 ;;; these actions with HTMX, so the same grid serves :media fields and Quill's
 ;;; image button. Selecting a card is handled in koya-editor.js. The owner
-;;; session and same-origin checks are *actions-auth-middleware*'s.
+;;; session and same-origin checks are *mw-actions-auth*'s.
 
 (defparameter +picker-size+ 12
   "Files fetched at a time: three rows of the dialog's four columns. The next ones

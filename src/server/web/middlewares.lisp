@@ -1,22 +1,22 @@
 (defpackage #:koya-server/web/middlewares
   (:use #:cl)
   (:import-from #:lack-mw
-                #:with-args #:*cache-control* #:*cors* #:*body-limit*)
+                #:with-args #:*mw-cache-control* #:*mw-cors* #:*mw-body-limit*)
   (:import-from #:koya-server/domain/media #:+max-upload-bytes+)
   (:export #:+temporary-file-header+
-           #:*temporary-file-middleware*
-           #:*cache-control-middleware*
-           #:*delivery-cors-middleware*
-           #:*body-limit-middleware*
+           #:*mw-temporary-file*
+           #:*mw-default-cache-control*
+           #:*mw-delivery-cors*
+           #:*mw-max-body*
            #:+max-body-bytes+))
 (in-package #:koya-server/web/middlewares)
 
 ;;; Middlewares app.lisp stacks: koya's settings for lack-mw's, and
-;;; *temporary-file-middleware* below. The auth guards stay in web/auth, which
+;;; *mw-temporary-file* below. The auth guards stay in web/auth, which
 ;;; they share its key and session checks with.
 
-(defparameter *cache-control-middleware*
-  (with-args *cache-control*
+(defparameter *mw-default-cache-control*
+  (with-args *mw-cache-control*
     ;; asset URLs carry ?v=<version> (see web/assets), so the file behind one never changes
     :rules '(("/assets/" "public, max-age=31536000, immutable" :status (200)))
     ;; pages and both APIs are per-request and often per-owner
@@ -27,8 +27,8 @@
 ;; A delivery key reads only what is published, so a page on any origin may use one;
 ;; answering with "*" rather than the caller's origin keeps the answer the same for
 ;; every caller, so no Vary on Origin is needed. The admin API is not mounted under this.
-(defparameter *delivery-cors-middleware*
-  (with-args *cors*
+(defparameter *mw-delivery-cors*
+  (with-args *mw-cors*
     :origin "*"
     :allow-methods '("GET")
     :allow-headers '("X-KOYA-DELIVERY-KEY")
@@ -50,8 +50,8 @@ parts. A space archive is uploaded in pieces smaller than this.")
         (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")
               (list (format nil "{\"error\":{\"code\":\"too_large\",\"message\":\"~a\"}}" message))))))
 
-(defparameter *body-limit-middleware*
-  (with-args *body-limit* :max-size +max-body-bytes+ :on-error #'too-large-response)
+(defparameter *mw-max-body*
+  (with-args *mw-body-limit* :max-size +max-body-bytes+ :on-error #'too-large-response)
   "Rejects oversized bodies, before any parser allocates for them.
 Under Woo no such body gets here: Woo is held to the same limit (web/app) and
 answers 413 itself, in plain text, before it reads a body its Content-Length
@@ -65,7 +65,7 @@ puts past it, or once one goes past it.")
 
 (defparameter +temporary-file-header+ :x-koya-temporary-file)
 
-(defparameter *temporary-file-middleware*
+(defparameter *mw-temporary-file*
   (lambda (app)
     (lambda (env)
       (let ((response (funcall app env)))

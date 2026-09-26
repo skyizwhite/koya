@@ -14,9 +14,9 @@
                 #:mw-every #:mw-some #:mw-except)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri #:url-decode)
   (:export #:calling-space
-           #:*admin-auth-middleware*
-           #:*actions-auth-middleware*
-           #:*pages-auth-middleware*
+           #:*mw-admin-auth*
+           #:*mw-actions-auth*
+           #:*mw-pages-auth*
            #:require-delivery-key
            #:public-path
            #:local-path-p
@@ -99,7 +99,7 @@ session cookie would otherwise let a page on another site drive the admin API."
       (if (session-env-owner-p env)
           (let ((*actor* +owner+))
             (funcall app env))
-          ;; never sent: *ADMIN-AUTH-MIDDLEWARE* tries *MANAGEMENT-KEY* next, and
+          ;; never sent: *MW-ADMIN-AUTH* tries *MANAGEMENT-KEY* next, and
           ;; answers with what that says
           (json-response 401 (error-object "unauthorized" "Log in")))))
   "The admin API for the owner's session, which reaches every space.")
@@ -122,7 +122,7 @@ session cookie would otherwise let a page on another site drive the admin API."
                    (funcall app env)))))))
   "The admin API for a Bearer management key, which reaches its own space.")
 
-(defparameter *admin-auth-middleware*
+(defparameter *mw-admin-auth*
   ;; the owner comes first: a request carrying both a session and a key is the owner's.
   ;; When neither lets it in, *MANAGEMENT-KEY*'s answer, the last, is the one sent
   (mw-every (mw-some *owner-session* *management-key*)
@@ -193,7 +193,7 @@ the page htmx says it was sent from. The login page checks NEXT is a local path.
             (funcall app env))
           (funcall app env)))))
 
-(defparameter *actions-auth-middleware*
+(defparameter *mw-actions-auth*
   (mw-every *htmx-only*
             ;; a PUBLIC-PATH skips the session only, not the other checks
             (mw-except #'public-request-p *action-session*)
@@ -245,7 +245,7 @@ URL, so anything that a browser could read as another host (//evil, /\\evil) is 
           (funcall app env)
           (list 302 (list :location (page-login-location env)) '())))))
 
-(defparameter *pages-auth-middleware*
+(defparameter *mw-pages-auth*
   (mw-except #'public-request-p *page-session*)
   "Lack middleware guarding every page: the owner's session only, but for a
 PUBLIC-PATH. Stacked on the pages app, which answers whatever no other app is

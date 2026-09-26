@@ -11,19 +11,19 @@
   (:import-from #:lack/app/file
                 #:lack-app-file)
   (:import-from #:lack-mw
-                #:with-args #:*trim-trailing-slash* #:*recovery*
-                #:*mount* #:*session* #:*accesslog* #:make-cookie-state)
+                #:with-args #:*mw-trim-trailing-slash* #:*mw-recovery*
+                #:*mw-mount* #:*mw-session* #:*mw-accesslog* #:make-cookie-state)
   (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
   (:import-from #:koya-server/web/media #:media-app)
   (:import-from #:koya-server/web/http
                 #:make-json-app)
   (:import-from #:koya-server/web/middlewares
-                #:*temporary-file-middleware* #:*body-limit-middleware*
-                #:*cache-control-middleware* #:*delivery-cors-middleware* #:+max-body-bytes+)
+                #:*mw-temporary-file* #:*mw-max-body*
+                #:*mw-default-cache-control* #:*mw-delivery-cors* #:+max-body-bytes+)
   (:import-from #:smart-buffer)
   (:import-from #:koya-server/usecases/auth #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/web/auth
-                #:*admin-auth-middleware* #:*actions-auth-middleware* #:*pages-auth-middleware*)
+                #:*mw-admin-auth* #:*mw-actions-auth* #:*mw-pages-auth*)
   ;; loaded for the method it adds to ports/presenters, which webhooks need
   ;; whether or not a route has loaded it
   (:import-from #:koya-server/web/presenters)
@@ -85,30 +85,30 @@ with the middlewares it needs. The pages app answers what no mount takes."
   (setf smart-buffer:*default-disk-limit* +max-body-bytes+)
   ;; the store is the database, not the process, so a restart keeps the owner logged in
   ;; :keep-empty nil: a request that never touches its session leaves nothing behind
-  (let ((session (with-args *session*
+  (let ((session (with-args *mw-session*
                    :store (make-session-store)
                    :state (session-cookie-state)
                    :keep-empty nil)))
     (lack:builder
-     *temporary-file-middleware*
-     ;; outside *RECOVERY*, so a 500 is logged and not cached like any answer
-     *accesslog*
-     *cache-control-middleware*
+     *mw-temporary-file*
+     ;; outside *MW-RECOVERY*, so a 500 is logged and not cached like any answer
+     *mw-accesslog*
+     *mw-default-cache-control*
      ;; the JSON apps answer the errors of their routes themselves (web/http); an error
      ;; in a middleware stacked on them, such as a guard's, is answered here in HTML
-     (with-args *recovery* :dev-mode (dev-mode-p))
-     *body-limit-middleware*
+     (with-args *mw-recovery* :dev-mode (dev-mode-p))
+     *mw-max-body*
      ;; CORS outside the trimming, so its redirect carries CORS headers as well
-     (with-args *mount* "/api"
-       (lack:builder *delivery-cors-middleware* *trim-trailing-slash* *api-app*))
+     (with-args *mw-mount* "/api"
+       (lack:builder *mw-delivery-cors* *mw-trim-trailing-slash* *api-app*))
      ;; files need no session: none is read for them
-     (with-args *mount* "/assets" (make-instance 'lack-app-file :root #p"assets/"))
-     (with-args *mount* "/media" #'media-app)
-     (with-args *mount* "/admin/api"
-       (lack:builder *trim-trailing-slash* session *admin-auth-middleware* *admin-api-app*))
-     (with-args *mount* "/actions"
-       (lack:builder session *actions-auth-middleware* *actions-app*))
-     (lack:builder *trim-trailing-slash* session *pages-auth-middleware* *page-app*))))
+     (with-args *mw-mount* "/assets" (make-instance 'lack-app-file :root #p"assets/"))
+     (with-args *mw-mount* "/media" #'media-app)
+     (with-args *mw-mount* "/admin/api"
+       (lack:builder *mw-trim-trailing-slash* session *mw-admin-auth* *admin-api-app*))
+     (with-args *mw-mount* "/actions"
+       (lack:builder session *mw-actions-auth* *actions-app*))
+     (lack:builder *mw-trim-trailing-slash* session *mw-pages-auth* *page-app*))))
 
 (defvar *app* nil)
 
