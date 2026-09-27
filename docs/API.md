@@ -260,8 +260,8 @@ its `only` names — and the payload says which:
 Each entry a content's history keeps is sent as its kind, and so is every
 delete; a write that changes nothing sends nothing, and neither does importing
 a space. The bodies have the delivery API's shape. `draft` and `discard` change
-only a draft, so a hook that rebuilds or revalidates a site should return early
-on them.
+only a draft; the others change what the delivery API serves. What to act on is
+up to the receiver.
 
 Every call carries the space's webhook secret, from its **Keys** page, in
 `X-KOYA-WEBHOOK-KEY`; check it before acting:
@@ -274,8 +274,7 @@ export async function POST(req: Request) {
   if (req.headers.get("x-koya-webhook-key") !== process.env.KOYA_WEBHOOK_SECRET) {
     return new Response("forbidden", { status: 403 });
   }
-  const { event, model, id } = await req.json();
-  if (event === "draft" || event === "discard") return new Response(null, { status: 204 });
+  const { model } = await req.json();
   revalidateTag(model);
   return new Response(null, { status: 204 });
 }

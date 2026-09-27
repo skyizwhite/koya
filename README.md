@@ -166,9 +166,9 @@ secret (on its **Keys** page) in `X-KOYA-WEBHOOK-KEY`:
 { "space": "website", "model": "blog", "id": "01J…", "event": "publish", "contents": { "old": null, "new": { … } } }
 ```
 
-`event` is `publish`, `unpublish`, `delete`, `draft` or `discard` — ignore
-`draft` and `discard`, which change only a draft, when you revalidate. See
-[docs/API.md](docs/API.md#webhooks).
+`event` is `publish`, `unpublish`, `delete`, `draft` or `discard`. `draft` and
+`discard` change only a draft; the others change what the delivery API serves.
+What to act on is up to the receiver. See [docs/API.md](docs/API.md#webhooks).
 
 ## Documentation
 
