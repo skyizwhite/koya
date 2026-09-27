@@ -1,5 +1,8 @@
 # A webhook is sent for every history entry
 
+Superseded by adr/2026-09-28-every-history-entry-is-sent-as-its-kind.md
+Superseded by adr/2026-09-28-the-receiver-decides-what-to-act-on.md
+
 *2026-09-28*
 
 ## Context

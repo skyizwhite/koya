@@ -1,4 +1,4 @@
-# Every webhook is sent every event
+# A webhook subscribes to nothing
 
 *2026-09-28, restating a decision of 2026-09-22*
 
@@ -10,10 +10,9 @@ say so, and the list is one more thing to read in the schema.
 ## Decision
 
 - There is nothing to subscribe to. Every webhook is sent every event; which
-  events there are is `adr/2026-09-28-a-webhook-is-sent-for-every-history-entry.md`.
-- The payload's `event` says which, and the receiver decides what to act on.
+  events there are is `adr/2026-09-28-every-history-entry-is-sent-as-its-kind.md`.
+- The payload's `event` says which.
 
 ## Consequences
 
-A receiver must look at `event`, which a revalidation hook wants to do anyway to
-ignore changes to a draft.
+A receiver that acts on some events only tells them apart by `event`.
