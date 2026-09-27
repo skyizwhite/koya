@@ -250,9 +250,10 @@ its `only` names — and the payload says which:
 | `discard` | a draft is discarded, or saved back to the published data | the draft / the published data |
 
 Each entry a content's history keeps is sent as its kind, and so is every
-delete; a write that changes nothing sends nothing. The bodies have the delivery
-API's shape. `draft` and `discard` change only a draft, so a hook that rebuilds
-or revalidates a site should return early on them.
+delete; a write that changes nothing sends nothing, and neither does importing
+a space. The bodies have the delivery API's shape. `draft` and `discard` change
+only a draft, so a hook that rebuilds or revalidates a site should return early
+on them.
 
 Every call carries the space's webhook secret, from its **Keys** page, in
 `X-KOYA-WEBHOOK-KEY`; check it before acting:
