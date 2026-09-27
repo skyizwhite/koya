@@ -134,6 +134,8 @@
     (ok (<= (count-deliveries "website") +deliveries-kept+) "the cap holds")))
 
 
+(defvar *redirect* nil)
+
 (deftest where-a-webhook-is-sent
   (let ((sent '()) (posts 0))
     (flet ((deliver-to (url)
@@ -145,7 +147,9 @@
              (let ((*webhook-sender* (lambda (url payload headers)
                                        (declare (ignore payload headers))
                                        (push (list url *address*) sent)
-                                       (values 200 "what the receiver said" nil))))
+                                       (if *redirect*
+                                           (values 302 "" nil *redirect*)
+                                           (values 200 "what the receiver said" nil)))))
                (admin :post "/admin/api/contents/website/blog"
                       :body (jobject "data" (jobject "title" (format nil "Post ~a to ~a" posts url)) "publish" t)))
              (first (list-deliveries "website"))))
@@ -169,6 +173,17 @@
                (let ((d (deliver-to "https://example.com/hook")))
                  (ok (equalp sent '(("https://example.com/hook" #(93 184 216 34)))))
                  (ok (string= (delivery-response d) "what the receiver said"))))
+             (testing "a redirect is logged with where it pointed, unless the receiver is internal"
+               (let ((*redirect* "https://www.example.com/hook"))
+                 (let ((d (deliver-to "https://example.com/hook")))
+                   (ok (null (delivery-ok d)))
+                   (ok (= (delivery-status d) 302))
+                   (ok (search "Redirected to https://www.example.com/hook" (delivery-error d)))))
+               (let ((*redirect* "http://internal-sso.local/auth?token=secret"))
+                 (let ((d (deliver-to "http://10.0.0.5/hook")))
+                   (ok (null (delivery-ok d)))
+                   (ok (search "Redirected" (delivery-error d)))
+                   (ng (search "internal-sso" (delivery-error d)) "an internal answer's Location is not kept"))))
              (testing "the call is handed the address that was checked"
                (deliver-to "http://[::1]:3000/hook")
                (ok (equalp sent '(("http://[::1]:3000/hook" #(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)))))))

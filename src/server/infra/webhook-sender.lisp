@@ -2,7 +2,8 @@
   (:use #:cl)
   (:import-from #:dexador)
   (:import-from #:usocket #:get-hosts-by-name)
-  (:import-from #:quri #:uri #:make-uri #:uri-scheme #:uri-host #:uri-port #:uri-path #:uri-query)
+  (:import-from #:quri #:uri #:make-uri #:uri-scheme #:uri-host #:uri-port #:uri-path #:uri-query
+                #:merge-uris #:render-uri)
   (:import-from #:koya-server/domain/address #:address-string)
   (:import-from #:dexador.error
                 #:http-request-failed #:response-status #:response-body)
@@ -22,14 +23,18 @@
                 (cons (cons "Host" (host-header uri)) headers))
         (values url headers))))
 
+(defun redirection (url status headers)
+  (let ((location (and (member status '(301 302 303 307 308)) (gethash "location" headers))))
+    (and location (ignore-errors (render-uri (merge-uris (uri location) (uri url)))))))
+
 (defmethod send-webhook (url payload headers address)
   (handler-case
       (multiple-value-bind (target headers) (connection-target url address headers)
-        (multiple-value-bind (body status)
+        (multiple-value-bind (body status response-headers)
             (dexador:request target :method :post
                                     :headers (cons '("Content-Type" . "application/json") headers)
                                     :content payload :connect-timeout 5 :read-timeout 10 :max-redirects 0)
-          (values status body nil)))
+          (values status body nil (redirection url status response-headers))))
     (http-request-failed (e)
       (values (response-status e) (response-body e) nil))
     (error (e)

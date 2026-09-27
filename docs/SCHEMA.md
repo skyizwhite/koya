@@ -83,7 +83,8 @@ to:
   kept, not the body.
 - A plain `http` call goes to the address that was checked, with the host in
   `Host`; an `https` call goes by name, for its certificate.
-- A redirect is not followed: it is logged as the answer.
+- A redirect is not followed: it is logged as a refusal, with the address it
+  pointed to, so the webhook's URL can be changed to go there.
 
 ## Model
 

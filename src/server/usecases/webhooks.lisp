@@ -49,15 +49,19 @@
 
 (defun send-and-log (hook space model id event payload headers)
   (let ((start (get-internal-real-time))
-        (status nil) (body nil) (failure nil))
+        (status nil) (body nil) (failure nil) (location nil))
     (handler-case
         (multiple-value-bind (reach refusal address) (url-reach (webhook-url hook))
           (if refusal
               (setf failure refusal)
               (progn
-                (multiple-value-setq (status body failure)
+                (multiple-value-setq (status body failure location)
                   (send-webhook (webhook-url hook) payload headers address))
-                (when (eq reach :internal) (setf body nil)))))
+                (when (eq reach :internal) (setf body nil location nil))
+                (when (and (null failure) (member status '(301 302 303 307 308)))
+                  (setf failure (cond ((eq reach :internal) "Redirected; where to is not kept for an internal address")
+                                      (location (format nil "Redirected to ~a; change the webhook URL to go there" location))
+                                      (t "Redirected, with no Location")))))))
       (error (e) (setf status nil body nil failure (princ-to-string e))))
     (handler-case
         (record-delivery space
