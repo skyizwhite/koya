@@ -230,3 +230,15 @@
       (ok (= status 200))
       (ok (string= (jget json "status") "published") "no draft is made"))
     (ok (null *webhooks*) "and nothing is sent")))
+
+(deftest a-discard-with-no-draft-writes-nothing
+  (let* ((made (nth-value 1 (admin :post "/admin/api/contents/website/tag"
+                                   :body (jobject "data" (jobject "name" "kept") "publish" t))))
+         (id (jget made "id")))
+    (setf *webhooks* '())
+    (sleep 0.01)
+    (multiple-value-bind (status json) (admin :post (format nil "/admin/api/contents/website/tag/~a/discard-draft" id))
+      (ok (= status 200))
+      (ok (string= (jget json "status") "published"))
+      (ok (string= (jget json "updatedAt") (jget made "updatedAt")) "the content is not touched"))
+    (ok (null *webhooks*) "and nothing is sent")))
