@@ -337,7 +337,8 @@ paths:
       tags: [contents]
       summary: Delete a content
       description: |
-        Removes both versions. Fires `delete` webhooks.
+        Removes both versions. Fires `delete` webhooks, or `discard` for a content
+        that was only a draft.
         Refused with 409 `in_use` while another content refers to it.
       security: [{ managementKey: [] }]
       responses:

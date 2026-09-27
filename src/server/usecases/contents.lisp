@@ -187,14 +187,18 @@
 (defun destroy (space model id)
   (let ((space-name space)
         (model-name (model-name model)))
-    (let ((old (with-transaction
-                 (let* ((content (resolve-content space-name model-name id))
-                        (old (published-view space model content)))
-                   (check-transition content :delete)
-                   (check-unreferenced space-name model-name (content-id content) "delete")
-                   (delete-content id)
-                   old))))
-      (notify space model id :delete :old old)
+    (multiple-value-bind (live draft)
+        (with-transaction
+          (let ((content (resolve-content space-name model-name id)))
+            (check-transition content :delete)
+            (check-unreferenced space-name model-name (content-id content) "delete")
+            (let ((live (published-view space model content))
+                  (draft (draft-view space model content)))
+              (delete-content id)
+              (values live draft))))
+      (if live
+          (notify space model id :delete :old live)
+          (notify space model id :discard :old draft))
       t)))
 
 (defun draft-key (space-name model-name id)

@@ -122,8 +122,8 @@
         (ok (eq (jget json "deleted") t)))
       (multiple-value-bind (status) (admin :get (format nil "/admin/api/contents/website/blog/~a" post-id))
         (ok (= status 404)))
-      (ok (equal (webhook-events) '("publish" "draft" "publish" "draft" "draft" "discard" "draft" "delete" "unpublish" "delete"))
-          "every entry the history records is sent with its kind, and every delete"))))
+      (ok (equal (webhook-events) '("publish" "draft" "publish" "draft" "draft" "discard" "draft" "discard" "unpublish" "discard"))
+          "every entry the history records is sent with its kind; a delete as delete while published, as discard when only a draft"))))
 
 (deftest import-style-create
   (testing "explicit id and publishedAt"

@@ -1,4 +1,4 @@
-# A webhook subscribes to nothing
+# There is nothing to subscribe to
 
 *2026-09-28, restating a decision of 2026-09-22*
 
@@ -10,7 +10,8 @@ say so, and the list is one more thing to read in the schema.
 ## Decision
 
 - There is nothing to subscribe to. Every webhook is sent every event; which
-  events there are is `adr/2026-09-28-every-history-entry-is-sent-as-its-kind.md`.
+  events there are is `adr/2026-09-28-each-history-entry-is-sent-as-its-kind.md`
+  and `adr/2026-09-28-a-deleted-draft-is-sent-as-discard.md`.
 - The payload's `event` says which.
 
 ## Consequences

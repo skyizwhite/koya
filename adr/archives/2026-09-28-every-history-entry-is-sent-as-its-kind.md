@@ -1,5 +1,8 @@
 # Every history entry is sent as its kind
 
+Superseded by adr/2026-09-28-each-history-entry-is-sent-as-its-kind.md
+Superseded by adr/2026-09-28-a-deleted-draft-is-sent-as-discard.md
+
 *2026-09-28, restating a decision of the same day*
 
 ## Context

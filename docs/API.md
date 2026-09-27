@@ -253,13 +253,15 @@ its `only` names — and the payload says which:
 |---|---|---|
 | `publish` | a content is published, first time or again | the previous published data or `null` / the new |
 | `unpublish` | a published content is taken off the delivery API | the published data / `null` |
-| `delete` | a content is deleted, published or not | the published data or `null` / `null` |
+| `delete` | a published content is deleted | the published data / `null` |
 | `draft` | a draft is saved or created | the published data or `null` / the draft |
 | `discard` | a draft is discarded, or saved back to the published data | the draft / the published data |
+| `discard` | a content that is only a draft is deleted | the draft / `null` |
 
-Each entry a content's history keeps is sent as its kind, and so is every
-delete; a write that changes nothing sends nothing, and neither does importing
-a space. The bodies have the delivery API's shape. `draft` and `discard` change
+Each entry a content's history keeps is sent as its kind. Deleting a content
+is sent as what it changes: `delete` when it was published, `discard` when it
+was only a draft. A write that changes nothing sends nothing, and neither does
+importing a space. The bodies have the delivery API's shape. `draft` and `discard` change
 only a draft; the others change what the delivery API serves. What to act on is
 up to the receiver.
 

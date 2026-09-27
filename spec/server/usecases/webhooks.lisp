@@ -100,11 +100,11 @@
                   "id")))
     (setf *webhooks* '())
     (ok (= 200 (admin :delete (format nil "/admin/api/contents/website/blog/~a" id))))
-    (ok (equal (webhook-events) '("delete")) "deleting a content never published is sent too")
+    (ok (equal (webhook-events) '("discard")) "deleting a content never published changes only a draft, so it is sent as discard")
     (let ((hook (first *webhooks*)))
       (ok (string= (jget (second hook) "id") id))
-      (ok (eq (jget (second hook) "contents" "old") json-null) "with no published data to show")
-      (ok (eq (jget (second hook) "contents" "new") json-null)))))
+      (ok (string= (jget (second hook) "contents" "old" "title") "Never out") "old is the draft that went")
+      (ok (eq (jget (second hook) "contents" "new") json-null) "and nothing is left to show"))))
 
 (deftest webhook-delivery-log
   (testing "what the receiver answered is kept"

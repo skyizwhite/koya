@@ -222,7 +222,8 @@ A content is in one of three states, shown as its badge:
   [API.md](API.md#managing-content).
 - Every entry the history keeps notifies the webhooks that cover the model,
   as its kind: a draft save, a publish, an unpublish, a discard. So does
-  deleting a content.
+  deleting a content: as a delete when it was published, as a discard when it
+  was only a draft.
 
 ## History
 
