@@ -61,8 +61,10 @@ they are made and deleted.
   refused.
 - A new space is empty: deploy a schema to it with `koya deploy` to give it
   models.
-- **Delete** asks for confirmation and then removes the space with everything in
-  it — models, contents, media, keys and the webhook log. It cannot be undone.
+- **Delete** asks for `delete <space>` to be typed, and its **Delete space**
+  button is on only while the text matches exactly. It removes the space with
+  everything in it — models, contents, media, keys and the webhook log. It
+  cannot be undone.
 - **Import**, beside **New space**, takes a zip made by a space's **Export** and
   makes that space again under its own name with everything as it was: its
   models and webhooks, every content with its draft and history, its media, its

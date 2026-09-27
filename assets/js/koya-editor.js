@@ -292,6 +292,25 @@ onEach("form[data-editor-form]", (form) => {
   update();
 });
 
+// Type to confirm: the submit button of a form with a [data-confirm-phrase]
+// input is on only while the input holds that phrase exactly. The server checks
+// it again, so this is for the owner, not a guard. Its dialog closed, the phrase
+// and the [data-confirm-error] a refusal wrote are cleared, so it opens as new.
+onEach("input[data-confirm-phrase]", (input) => {
+  const button = input.form?.querySelector("button[type=submit]");
+  const error = input.form?.querySelector("[data-confirm-error]");
+  const update = () => {
+    if (button) button.disabled = input.value !== input.dataset.confirmPhrase;
+  };
+  input.addEventListener("input", update);
+  input.closest("dialog")?.addEventListener("close", () => {
+    input.form.reset();
+    if (error) error.textContent = "";
+    update();
+  });
+  update();
+});
+
 // History: rich text is drawn in a sandboxed [data-fit-content] iframe, which
 // is as tall as its document once that has loaded -- its stylesheet included.
 onEach("iframe[data-fit-content]", (frame) => {

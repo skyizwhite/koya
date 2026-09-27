@@ -24,7 +24,49 @@
 ;;;
 ;;; Making and deleting one are actions answered in place. The dialogs open and
 ;;; close by HTML alone (commandfor, closedby), so one swapped in works like the
-;;; one it replaced.
+;;; one it replaced. Each space's delete dialog is in its row, so the list
+;;; answered after a delete takes the open one away with it.
+
+(defun delete-phrase (name)
+  "What the owner types to delete space NAME."
+  (format nil "delete ~a" name))
+
+;; each prefix differs from the others where the name starts, so no space's ids
+;; are another's: a name is a slug and can end in -phrase or -error
+(defun delete-dialog-id (name) (format nil "delete-space-~a" name))
+(defun delete-phrase-id (name) (format nil "delete-phrase-~a" name))
+(defun delete-error-id (name) (format nil "delete-error-~a" name))
+
+(defcomp ~dialog-close (&key dialog children)
+  (hsx (button :type "button" :commandfor dialog :command "close" :class "btn" children)))
+
+(defcomp ~delete-space-dialog (&key name)
+  "Deleting a space takes everything in it, so the owner types what they are
+deleting. The button waits for the phrase (data-confirm-phrase, koya-editor.js)
+and the action checks it again."
+  (let ((id (delete-dialog-id name))
+        (phrase (delete-phrase name))
+        (input (delete-phrase-id name)))
+    (hsx
+     (dialog :id id :closedby "any" :class "koya-dialog max-w-sm"
+       (form :hx-post (delete-space-action) :hx-target "#spaces" :hx-swap "outerHTML"
+         (input :type "hidden" :name "name" :value name)
+         (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
+           (h2 :class "font-semibold" "Delete space")
+           (button :type "button" :commandfor id :command "close" :class "btn btn-icon" :aria-label "Close"
+             (~icon :name :close)))
+         (div :class "px-4 py-4"
+           (p :class "text-sm"
+              "This deletes " (strong name) " with every model, content, media file and key in it. "
+              "It cannot be undone.")
+           (label :for input :class "label mt-4" "Type " (code (format nil "\"~a\"" phrase)) " to confirm")
+           (input :type "text" :id input :name "confirm" :required t :autocomplete "off"
+                  :spellcheck "false" :data-confirm-phrase phrase :class "input mt-1.5")
+           (p :id (delete-error-id name) :data-confirm-error t :class "mt-2 text-sm text-danger"))
+         (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
+           (~dialog-close :dialog id "Cancel")
+           (button :type "submit" :class "btn btn-danger" :disabled t
+             (~icon :name :delete) "Delete space")))))))
 
 (defcomp ~space-row (&key space)
   (let ((name (getf space :name)))
@@ -33,12 +75,10 @@
        (a :href (space-url name) :class "min-w-0 flex-1 hover:underline"
          (span :class "block font-semibold" name)
          (span :class "block text-sm text-muted" (format nil "~a model~:p" (getf space :models))))
-       (form :class "shrink-0"
-             :hx-post (delete-space-action) :hx-target "#spaces" :hx-swap "outerHTML"
-             :hx-confirm (format nil "Delete ~a with every model, content, media file and key in it? This cannot be undone." name)
-         (input :type "hidden" :name "name" :value name)
-         (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete space"
-           (~icon :name :delete)))))))
+       (button :type "button" :class "btn btn-danger btn-icon shrink-0" :aria-label "Delete space"
+               :commandfor (delete-dialog-id name) :command "show-modal"
+         (~icon :name :delete))
+       (~delete-space-dialog :name name)))))
 
 (defcomp ~space-list (&key spaces oob)
   (hsx
@@ -50,9 +90,6 @@
                    (code "(koya-sdk:deploy)") " from your project's REPL.")))
          (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                 (loop :for space :in spaces :collect (hsx (~space-row :space space)))))))))
-
-(defcomp ~dialog-close (&key dialog children)
-  (hsx (button :type "button" :commandfor dialog :command "close" :class "btn" children)))
 
 (defcomp ~new-space-dialog ()
   "The whole of making a space is one name, so it lives in a dialog rather than
@@ -159,9 +196,19 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
                     (~space-list :spaces (list-spaces) :oob t)
                     (~toast-oob :message message)))))))
 
+(defun delete-refusal (name message status)
+  "A refused delete, answered under the phrase: a toast would be behind the open dialog."
+  (cond ((null name) (action-refusal message status))
+        (t (set-response-status status)
+           (set-response-header :hx-retarget (format nil "#~a" (delete-error-id name)))
+           (set-response-header :hx-reswap "innerHTML")
+           (hsx (<> message)))))
+
 (defaction delete-space-action :post (params)
   (let ((name (param params "name")))
-    (cond ((null (and name (find-space name))) (action-refusal "Space not found." 404))
+    (cond ((null (and name (find-space name))) (delete-refusal name "Space not found." 404))
+          ((string/= (or (param params "confirm") "") (delete-phrase name))
+           (delete-refusal name (format nil "Type \"~a\" to delete this space." (delete-phrase name)) 422))
           (t (remove-space name)
              (hsx (<> (~space-list :spaces (list-spaces))
                       (~toast-oob :message (format nil "Space ~a deleted." name))))))))
