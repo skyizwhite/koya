@@ -20,7 +20,7 @@
            #:+deliveries-kept+))
 (in-package #:koya-server/usecases/webhooks)
 
-(defparameter +events+ '(:publish :unpublish :delete :draft))
+(defparameter +events+ '(:publish :unpublish :delete :draft :discard))
 
 (defun webhooks-for (space-name model)
   (let ((name (model-name model)))

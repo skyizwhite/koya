@@ -183,8 +183,8 @@ one to a model, or to a list of them; it takes symbols or strings, and each name
 must be a model of the schema, so a typo fails before anything is sent. A webhook
 without `:only` also covers models added later. Labels must be unique.
 
-Every webhook is sent every event — `publish`, `unpublish`, `delete` and
-`draft` — with the space's webhook secret in `X-KOYA-WEBHOOK-KEY`, which
+Every webhook is sent every event — `publish`, `unpublish`, `delete`, `draft`
+and `discard` — with the space's webhook secret in `X-KOYA-WEBHOOK-KEY`, which
 `(koya-sdk:webhook-secret)` returns. The payload and when each event fires are
 in [API.md, "Webhooks"](API.md#webhooks).
 

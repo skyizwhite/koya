@@ -176,8 +176,9 @@ POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a previ
   dropped, as `discard-draft` would.
 - Publishing takes `data` when given, else the draft, else re-publishes.
 - Creating may give `id` and the four timestamps, for imports that keep another
-  system's ids and dates. On an object model that already has its content,
-  creating updates it instead.
+  system's ids and dates. An object model holds one content: once it has it,
+  creating another is refused (`409 object_exists`), and that one is changed
+  through its id.
 - `discard-draft` needs a published version to fall back to (`409 not_published`).
 - A content another content refers to, in its published data or its draft,
   through a `reference` field of the current schema, cannot be deleted, nor
@@ -214,7 +215,7 @@ that is answered with `413` and a plain-text body before koya reads it.
 | 401 | `unauthorized` | no key, or a wrong one |
 | 403 | `forbidden` | a key of another space, or a cross-origin write |
 | 404 | `not_found` | no such space, model, content or media |
-| 409 | `conflict` `destructive_changes` `in_use` `not_published` | refused as things stand |
+| 409 | `conflict` `destructive_changes` `in_use` `not_published` `object_exists` | refused as things stand |
 | 413 | `too_large` | images over 20 MB, alone or together |
 | 422 | `validation_failed` `empty_file` `unsupported_type` | the content or file is not acceptable |
 | 500 | `internal_error` | the message is only detailed with `KOYA_ENV=dev` |
@@ -244,12 +245,14 @@ its `only` names — and the payload says which:
 |---|---|---|
 | `publish` | a content is published, first time or again | the previous published data or `null` / the new |
 | `unpublish` | a published content is taken off the delivery API | the published data / `null` |
-| `delete` | a published content is deleted (deleting an unpublished draft sends nothing) | the published data / `null` |
+| `delete` | a content is deleted, published or not | the published data or `null` / `null` |
 | `draft` | a draft is saved or created | the published data or `null` / the draft |
+| `discard` | a draft is discarded, or saved back to the published data | the draft / the published data |
 
-The bodies have the delivery API's shape. Discarding a draft sends nothing:
-what is published did not change. `draft` arrives on every save, so a hook that
-rebuilds or revalidates a site should return early on it.
+Each entry a content's history keeps is sent as its kind, and so is every
+delete; a write that changes nothing sends nothing. The bodies have the delivery
+API's shape. `draft` and `discard` change only a draft, so a hook that rebuilds
+or revalidates a site should return early on them.
 
 Every call carries the space's webhook secret, from its **Keys** page, in
 `X-KOYA-WEBHOOK-KEY`; check it before acting:
@@ -263,7 +266,7 @@ export async function POST(req: Request) {
     return new Response("forbidden", { status: 403 });
   }
   const { event, model, id } = await req.json();
-  if (event === "draft") return new Response(null, { status: 204 });
+  if (event === "draft" || event === "discard") return new Response(null, { status: 204 });
   revalidateTag(model);
   return new Response(null, { status: 204 });
 }

@@ -16,8 +16,8 @@ A small, self-hosted headless CMS for one owner and any number of sites.
 - **A typed client.** [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk)
   reads content with types generated from your schema, references embedded on
   request.
-- **Webhooks** on every publish, unpublish, delete and draft, to revalidate or
-  rebuild your site.
+- **Webhooks** on every publish, unpublish, delete, draft and discard, to
+  revalidate or rebuild your site.
 - **One Docker image**, one volume. No database server to run.
 
 ## Quick start
@@ -166,8 +166,8 @@ secret (on its **Keys** page) in `X-KOYA-WEBHOOK-KEY`:
 { "space": "website", "model": "blog", "id": "01J…", "event": "publish", "contents": { "old": null, "new": { … } } }
 ```
 
-`event` is `publish`, `unpublish`, `delete` or `draft` — ignore `draft`, which
-comes on every save, when you revalidate. See
+`event` is `publish`, `unpublish`, `delete`, `draft` or `discard` — ignore
+`draft` and `discard`, which change only a draft, when you revalidate. See
 [docs/API.md](docs/API.md#webhooks).
 
 ## Documentation

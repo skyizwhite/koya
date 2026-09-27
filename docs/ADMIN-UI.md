@@ -217,9 +217,9 @@ A content is in one of three states, shown as its badge:
 - Publishing clears the draft and updates the revised time. The original
   published time stays through later publishes.
 - Unpublishing keeps the data as a draft.
-- Publishing, unpublishing, deleting and saving a draft each notify the
-  webhooks that cover the model. Discarding a draft does not, since what is
-  published did not change.
+- Every entry the history keeps notifies the webhooks that cover the model,
+  as its kind: a draft save, a publish, an unpublish, a discard. So does
+  deleting a content.
 
 ## History
 

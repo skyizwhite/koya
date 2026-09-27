@@ -55,7 +55,20 @@
                (admin :post (format nil "/admin/api/contents/website/blog/~a/publish" id))
                (setf *webhooks* '())
                (admin :post (format nil "/admin/api/contents/website/blog/~a/discard-draft" id))
-               (ok (null (sent)) "discarding sends nothing")
+               (ok (null (sent)) "discarding with no draft records nothing and sends nothing")
+               (admin :patch (format nil "/admin/api/contents/website/blog/~a" id) :body (jobject "data" (jobject "title" "Draft 3")))
+               (setf *webhooks* '())
+               (admin :post (format nil "/admin/api/contents/website/blog/~a/discard-draft" id))
+               (ok (equal (sent) '(("https://example.com/hook" "discard") ("https://example.com/preview" "discard")))
+                   "discarding a draft is sent as discard, as its history entry is")
+               (ok (string= (jget (second (first *webhooks*)) "contents" "old" "title") "Draft 3") "old is the draft thrown away")
+               (ok (string= (jget (second (first *webhooks*)) "contents" "new" "title") "Draft 2") "new is the published data it falls back to")
+               (admin :patch (format nil "/admin/api/contents/website/blog/~a" id) :body (jobject "data" (jobject "title" "Draft 4")))
+               (setf *webhooks* '())
+               (admin :patch (format nil "/admin/api/contents/website/blog/~a" id) :body (jobject "data" (jobject "title" "Draft 2")))
+               (ok (equal (sent) '(("https://example.com/hook" "discard") ("https://example.com/preview" "discard")))
+                   "saving the published data again drops the draft, and is sent as discard too")
+               (setf *webhooks* '())
                (admin :delete (format nil "/admin/api/contents/website/blog/~a" id))
                (ok (equal (sent) '(("https://example.com/hook" "delete") ("https://example.com/preview" "delete"))))))
            (testing "a model the :only leaves out gets only the space's own hook"
@@ -81,6 +94,17 @@
       (ok (eq (jget (second hook) "contents" "new") json-null))
       (ok (= (length (cdr (assoc "X-KOYA-WEBHOOK-KEY" (third hook) :test #'string=))) 48)
           "delete webhook carries the space secret"))))
+
+(deftest delete-draft-webhook
+  (let ((id (jget (nth-value 1 (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Never out"))))
+                  "id")))
+    (setf *webhooks* '())
+    (ok (= 200 (admin :delete (format nil "/admin/api/contents/website/blog/~a" id))))
+    (ok (equal (webhook-events) '("delete")) "deleting a content never published is sent too")
+    (let ((hook (first *webhooks*)))
+      (ok (string= (jget (second hook) "id") id))
+      (ok (eq (jget (second hook) "contents" "old") json-null) "with no published data to show")
+      (ok (eq (jget (second hook) "contents" "new") json-null)))))
 
 (deftest webhook-delivery-log
   (testing "what the receiver answered is kept"

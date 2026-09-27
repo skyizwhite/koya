@@ -1,5 +1,8 @@
 # Every webhook is sent every event
 
+Superseded by adr/2026-09-28-a-webhook-is-sent-for-every-history-entry.md
+Superseded by adr/2026-09-28-every-webhook-gets-every-event.md
+
 *2026-09-27, restating a decision of 2026-09-22*
 
 ## Context

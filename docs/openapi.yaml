@@ -259,9 +259,9 @@ paths:
       description: |
         Saved as a draft unless `publish` is true. `id` and the system timestamps
         may be supplied, for imports that keep another system's ids and dates;
-        `publishedAt` and `revisedAt` are only stored when publishing. For an
-        `object` model that already has its content, that content is updated
-        (drafted, or published with `publish`) instead of a second one being made.
+        `publishedAt` and `revisedAt` are only stored when publishing. An
+        `object` model that already has its content refuses a second one; change
+        that one through its id.
       security: [{ managementKey: [] }]
       requestBody:
         required: true
@@ -279,7 +279,7 @@ paths:
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: "`conflict`: a content with this `id` already exists"
+          description: "`conflict`: a content with this `id` already exists; `object_exists`: the `object` model already has its content"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
@@ -337,7 +337,7 @@ paths:
       tags: [contents]
       summary: Delete a content
       description: |
-        Removes both versions. Fires `delete` webhooks when it was published.
+        Removes both versions. Fires `delete` webhooks.
         Refused with 409 `in_use` while another content refers to it.
       security: [{ managementKey: [] }]
       responses:
@@ -418,7 +418,7 @@ paths:
       operationId: discardAdminContentDraft
       tags: [contents]
       summary: Discard the draft of a published content
-      description: No webhook fires; what is published does not change.
+      description: Fires `discard` webhooks when there was a draft; without one, nothing is written.
       security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"

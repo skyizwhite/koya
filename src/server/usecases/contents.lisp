@@ -96,35 +96,30 @@
          (published-at (check-published-at published-at))
          (revised-at (check-timestamp "revisedAt" revised-at)))
     (fill-defaults model data)
-    (multiple-value-bind (content event old)
-        (with-transaction
-          (let ((existing (and (eq (model-kind model) :object) (find-object-content space-name model-name))))
-            (cond ((and existing publish)
-                   (multiple-value-bind (live old) (publish-now space model (content-id existing) data published-at)
-                     (values live :publish old)))
-                  (existing
-                   (multiple-value-bind (saved outcome) (update-draft-now space model (content-id existing) data t)
-                     (values saved (and (eq outcome :saved) :draft))))
-                  (t
-                   (check-content space-name model data)
-                   (let ((content (new-content (or (check-new-id id) (make-ulid)) space-name model-name data
-                                               :publish publish
-                                               :created-at created-at :updated-at updated-at
-                                               :published-at published-at :revised-at revised-at)))
-                     (insert-content content)
-                     (record-revision (content-id content) (if publish "publish" "draft") data :by *actor*)
-                     (values content (if publish :publish :draft)))))))
-      (case event
-        (:publish (notify space model (content-id content) :publish :old old :new (published-view space model content)))
-        (:draft (notify space model (content-id content) :draft
-                        :old (published-view space model content) :new (draft-view space model content))))
+    (let ((content
+            (with-transaction
+              (when (and (eq (model-kind model) :object) (find-object-content space-name model-name))
+                (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
+                      :code "object_exists"))
+              (check-content space-name model data)
+              (let ((content (new-content (or (check-new-id id) (make-ulid)) space-name model-name data
+                                          :publish publish
+                                          :created-at created-at :updated-at updated-at
+                                          :published-at published-at :revised-at revised-at)))
+                (insert-content content)
+                (record-revision (content-id content) (if publish "publish" "draft") data :by *actor*)
+                content))))
+      (if publish
+          (notify space model (content-id content) :publish :new (published-view space model content))
+          (notify space model (content-id content) :draft :new (draft-view space model content)))
       content)))
 
 (defun update-draft (space model id patch &key replace)
-  (multiple-value-bind (saved outcome)
+  (multiple-value-bind (saved outcome old)
       (with-transaction (update-draft-now space model id patch replace))
-    (when (eq outcome :saved)
-      (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved)))
+    (case outcome
+      (:saved (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved)))
+      (:published (notify space model id :discard :old old :new (published-view space model saved))))
     (values saved outcome)))
 
 (defun update-draft-now (space model id patch replace)
@@ -134,7 +129,7 @@
          (data (if replace patch (merge-data current patch))))
     (cond ((json-equal data current) (values content :unchanged))
           ((and live (json-equal data live))
-           (values (store (discarded content) "discard" live) :published))
+           (values (store (discarded content) "discard" live) :published (draft-view space model content)))
           (t
            (check-content space model data :exclude-id id)
            (values (store (drafted content data) "draft" data) :saved)))))
@@ -180,15 +175,18 @@
 (defun discard (space model id)
   (let ((space-name space)
         (model-name (model-name model)))
-    (with-transaction
-      (let ((content (resolve-content space-name model-name id)))
-        (unless (content-published content)
-          (fail 'conflict "Only a published content has a draft to discard; delete it instead" :code "not_published"))
-        (let ((next (discarded content)))
-          (update-content next)
-          (when (content-draft content)
-            (record-revision id "discard" (content-published content) :by *actor*))
-          next)))))
+    (multiple-value-bind (next old)
+        (with-transaction
+          (let ((content (resolve-content space-name model-name id)))
+            (unless (content-published content)
+              (fail 'conflict "Only a published content has a draft to discard; delete it instead" :code "not_published"))
+            (let ((next (discarded content)))
+              (update-content next)
+              (when (content-draft content)
+                (record-revision id "discard" (content-published content) :by *actor*))
+              (values next (and (content-draft content) (draft-view space model content))))))
+      (when old (notify space model id :discard :old old :new (published-view space model next)))
+      next)))
 
 (defun destroy (space model id)
   (let ((space-name space)
@@ -199,7 +197,7 @@
                    (check-unreferenced space-name model-name (content-id content) "delete")
                    (delete-content id)
                    old))))
-      (when old (notify space model id :delete :old old))
+      (notify space model id :delete :old old)
       t)))
 
 (defun draft-key (space-name model-name id)
