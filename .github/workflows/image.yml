@@ -38,7 +38,7 @@ jobs:
           load: true
           tags: koya:check
           cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }},ignore-error=true
 
       - name: Start it and ask for /health
         run: |
