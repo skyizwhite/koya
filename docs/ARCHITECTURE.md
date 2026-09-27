@@ -48,9 +48,9 @@ src/
     infra/            ; the ports, implemented: main (all of infra, as main loads it),
                       ; env, media-files, webhook-sender, archives, and
       db/             ;   main, connection, migrations, schema.sql, one file per table
-    web/              ; the way in: app, which builds it from what is below
+    web/              ; the way in: app, which mounts the routers below behind the middlewares
       lib/            ;   middlewares, http, auth, presenters, forms, media, paging,
-                      ;   display, urls, assets, document
+                      ;   display, urls, assets, document, target
       pages/          ;   the admin UI (ningle-fbr: the directory is the URL), GET only
       ui/             ;   hsx components shared by pages: layout, icon, toast,
                       ;   elements at the top; content/ and media/ below
