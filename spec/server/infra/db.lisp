@@ -81,8 +81,7 @@
   (delete-space "legacy"))
 
 (deftest schema-snapshot-matches-the-migrations
-  ;; the snapshot is generated, so a mismatch means it was not regenerated after
-  ;; a migration was added, never that it is the schema that is wrong
+
   (ok (equal (migrated-snapshot) (read-snapshot))
       "src/server/infra/db/schema.sql is current; regenerate it with (koya-server:write-schema-snapshot)"))
 
@@ -133,7 +132,6 @@
   (let ((session (make-hash-table :test 'equal)))
     (setf (gethash "owner" session) t)
     (store-session (make-session-store) "sid-1" session))
-  ;; a fresh store is what a restarted process has: the session comes from the row
   (let ((loaded (fetch-session (make-session-store) "sid-1")))
     (ok (hash-table-p loaded))
     (ok (gethash "owner" loaded) "the owner flag survives"))
@@ -197,9 +195,7 @@
   (let ((deploys (list-deploys "logged")))
     (ok (= (count-deploys "logged") 2))
     (ok (= (length deploys) 2))
-    ;; found by what they carry, not by where they sit: two rows written in the
-    ;; same millisecond carry ULIDs that do not say which came first, and a test
-    ;; writes both faster than a person could deploy twice
+
     (let ((first-deploy (find 2 deploys :key #'deploy-change-count))
           (second-deploy (find 1 deploys :key #'deploy-change-count)))
       (ok (= (deploy-change-count first-deploy) 2) "a model and the field in it")
@@ -221,7 +217,6 @@
     (ok (= (count-deploys "logged") 0))))
 
 (deftest existing-contents-start-their-history
-  ;; a database from before the history, holding what production held then
   (connect-db ":memory:")
   (let ((koya-server/infra/db/migrations::*migrations*
           (remove 9 koya-server/infra/db/migrations::*migrations* :key #'car :test #'<=)))

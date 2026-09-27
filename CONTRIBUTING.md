@@ -49,7 +49,7 @@ the app rather than by calling handlers.
   the stack, how the image is built.
 - [adr/](adr) — one file per design decision, and why.
 - [AGENTS.md](AGENTS.md) — the conventions: the spec first, what goes in an ADR,
-  no comments in `src/`, migrations.
+  no comments in `src/` or `spec/`, migrations.
 - [docs/openapi.yaml](docs/openapi.yaml) — the APIs. koya-ts-sdk is generated
   from it, so a change to an endpoint changes this document in the same commit.
 

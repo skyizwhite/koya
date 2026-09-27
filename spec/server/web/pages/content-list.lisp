@@ -20,7 +20,6 @@
 (in-package #:koya-spec/server/web/pages/content-list)
 
 (defun bulk (op ids &key (q "") (status "") (page 1))
-  "Do OP to IDS as the list's bulk bar does; (values status body)."
   (call-action :post (bulk-contents :space "website" :model "blog" :op op :q q :status status :sort "" :page page)
                :form (mapcar (lambda (id) (cons "id" id)) ids)))
 
@@ -32,7 +31,6 @@
   (let ((origin '(("origin" . "http://localhost:3000"))))
     (setf *cookie* nil)
     (post-login :form `(("secret" . ,*secret*)))
-    ;; one more than a page holds, so there are two
     (dotimes (i 21)
       (edit "/s/website/m/blog/new" :form `(("action" . "save") ("f-title" . ,(format nil "Page filler ~3,'0d" i))) :headers origin))
     (multiple-value-bind (status body) (request :get "/s/website/m/blog")
@@ -257,11 +255,9 @@
           (ok (string= (status-of one) "draft"))
           (ok (string= (status-of two) "published")))
         (testing "an action with nothing to do to a content leaves it alone and says so"
-          ;; TWO is published with no draft: publishing it again would give it a
-          ;; new revisedAt and fire a webhook for a change that did not happen
+
           (ok (search "Published 0 contents. 1 was already published." (nth-value 1 (bulk "publish" (list two)))))
-          ;; ONE is a draft: unpublishing it would reissue its draft key and break
-          ;; a preview link someone is holding
+
           (let ((key (content-draft-key (find one (list-contents "website" "blog" (blog-model)
                                                                  (parse-query query) :status :all)
                                               :key #'content-id :test #'string=))))
@@ -277,8 +273,7 @@
                 "the URL keeps the search and the filter")
             (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
-          ;; a title is required, so a draft without one cannot be published: one
-          ;; saved before the field was, put there as the store holds it
+
           (update-content (drafted (get-content three) (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal)))
           (let ((body (nth-value 1 (bulk "publish" (list one three)))))
             (ok (search "Published 1 content. 1 could not be: title is required." body)
@@ -293,7 +288,6 @@
           (ok (= 404 (bulk "burn" (list one)))))
         (testing "the page takes no posts"
           (ok (= 404 (request :post "/s/website/m/blog" :form '(("op" . "publish")) :headers origin))))))))
-
 
 (deftest bulk-actions-leave-a-referenced-content
   (exec "DELETE FROM contents")

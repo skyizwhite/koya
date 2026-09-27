@@ -14,10 +14,6 @@
                               :collect (format nil "koya-server/usecases/ports/~a" (pathname-name file)))))
         "+PORTS+ names every file of usecases/ports/")))
 
-;;; A port's function the web needs reaches it through one use case, which
-;;; re-exports it (docs/ARCHITECTURE.md). One: a page then has one place to
-;;; import it from, and the reader one place to look.
-
 (defun use-case-packages ()
   (remove-if-not (lambda (package)
                    (let ((name (package-name package)))

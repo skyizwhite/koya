@@ -57,8 +57,7 @@
         (ok (footer-p (nth-value 1 (request :get "/login"))) "the login page, before any session")))))
 
 (deftest cache-control
-  ;; icon.svg, not the stylesheet: dist.css is built by Tailwind and is not in
-  ;; the repository, so it is there only on a machine that has run `just build`
+
   (multiple-value-bind (status body headers) (request :get "/assets/icon.svg")
     (declare (ignore body))
     (ok (= status 200))

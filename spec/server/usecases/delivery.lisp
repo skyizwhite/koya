@@ -17,9 +17,6 @@
   (:import-from #:koya-core/json #:jobject #:jget #:json-null #:json-null-p))
 (in-package #:koya-spec/server/usecases/delivery)
 
-;;; What the delivery API hands the presenter: a content's data with its media
-;;; and the references it was asked for, resolved. No HTTP, no JSON.
-
 (setup
   (connect-db ":memory:")
   (migrate)

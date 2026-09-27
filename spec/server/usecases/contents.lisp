@@ -50,12 +50,11 @@
 
 (defhook :before (exec "DELETE FROM contents"))
 
-(defvar *read-eval-probe* nil "Set by a hostile filter value if the reader ever evaluates it.")
+(defvar *read-eval-probe* nil)
 
 (defun data (json) (parse-json json))
 (defun blog () (find-model "website" "blog"))
 (defun make (json &rest args)
-  "A blog content of the data JSON, through the use case: what a page or the API does."
   (apply #'create "website" (blog) (data json) args))
 (defun q (&rest kv) (parse-query (loop :for (k v) :on kv :by #'cddr :collect (cons k v))))
 (defun titles (contents) (mapcar (lambda (c) (jget (content-published c) "title")) contents))
@@ -228,7 +227,6 @@
   (make "{\"title\": \"Only a draft\"}")
   (let ((model (find-model "website" "blog")))
     (flet ((titles-with (status)
-             ;; the draft's title when there is one, as the admin list shows it
              (sort (mapcar (lambda (c) (jget (or (content-draft c) (content-published c)) "title"))
                            (list-contents "website" "blog" model (q "limit" "50")
                                           :status :all :only-status status))

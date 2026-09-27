@@ -56,7 +56,7 @@
         (let ((*cookie* nil))
           (multiple-value-bind (status) (post-login :form `(("secret" . ,*secret*)))
             (ok (= status 401)))
-          (setf *totp-last-counter* -1) ; pretend a new 30 s step has begun
+          (setf *totp-last-counter* -1)
           (multiple-value-bind (status) (post-login :form `(("secret" . ,*secret*) ("code" . ,(totp secret))))
             (ok (= status 200)))))
       (testing "disabling needs a code too"
@@ -115,7 +115,6 @@
               (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "delete")) :headers origin)))
           (ok (= 200 (call-action :post (save-timezone-action) :form '(("timezone" . "UTC")))))
           (ok (string= (display-timezone-name) "UTC") "back to UTC for the other tests")))))
-
 
 (deftest settings-are-worked-on-in-place
   (setf *cookie* nil)

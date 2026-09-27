@@ -19,7 +19,6 @@
 (in-package #:koya-spec/server/web/pages/media)
 
 (defun hx-get (url)
-  "URL as an hx-get attribute is written: hsx escapes its ampersands."
   (format nil "hx-get=\"~a\"" (cl-ppcre:regex-replace-all "&" url "&amp;")))
 
 (defun count-matches (needle haystack)
@@ -83,8 +82,8 @@
         (ok (search "data-pick-id=" body))
         (ok (search "data-pick-url=\"/media/website/" body))
         (ok (not (search "<html" body)) "a fragment, not a page")
-        ;; htmx 4 reads an unquoted from:find input as from:find plus a modifier
-        (ok (search "from:'find input'" body) "trigger selectors are quoted")
+        (ok (search "from:'find input'" body)
+            "trigger selectors are quoted, as htmx 4 reads an unquoted from:find input as from:find plus a modifier")
         (ok (search "from:'find input[type=file]'" body))
         (ok (search "hx-config=\"timeout:0\"" body) "an upload is not cut off at htmx's 60 seconds"))
       (let ((*cookie* nil))
@@ -138,8 +137,7 @@
     (flet ((upload (name)
              (call-action :post (upload-media :space "website" :q "" :page 1)
                           :multipart (list (list "file" name "image/png" (png-bytes))))
-             ;; found by name: two uploads in the same millisecond carry ULIDs
-             ;; that do not say which came first, so "the newest" is not one of them
+
              (media-id (find name (list-media "website") :key #'media-filename :test #'string=)))
            (delete-selected (&rest ids)
              (nth-value 1 (call-action :post (delete-selected-media :space "website" :q "bulk" :page 1)
@@ -172,7 +170,6 @@
               (ok (search "is used by 1 content" body) "and says which and why"))
             (ok (find kept (list-media "website") :key #'media-id :test #'string=) "the one in use is still there")
             (ng (find other (list-media "website") :key #'media-id :test #'string=))
-            ;; clear up
             (let ((content (first (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))
               (edit (format nil "/s/website/m/blog/~a" (content-id content))
                         :form '(("action" . "delete")) :headers origin))

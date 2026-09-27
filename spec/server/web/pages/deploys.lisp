@@ -70,9 +70,7 @@
       (delete-space "quiet"))))
 
 (deftest a-deploy-names-whoever-was-authorised
-  ;; the auth middleware takes the owner's session first and only then a
-  ;; management key, so a request carrying both is the owner's; the log has to
-  ;; say what the decision said
+
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))
   (create-space "witnessed")
@@ -104,7 +102,6 @@
                (ok (= status 200)))
              (ok (string= (deploy-by (first (list-deploys "by-key"))) "key:ci")))
         (delete-space "by-key")))))
-
 
 (deftest deploys-are-paged-in-place
   (log-in)

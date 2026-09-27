@@ -6,9 +6,6 @@
   (:import-from #:local-time #:+utc-zone+))
 (in-package #:koya-spec/server/domain/timezone)
 
-;;; Conversions with an explicit zone; the display zone (a setting) is covered by
-;;; the UI tests. Asia/Tokyo has no daylight saving, so the offset is always +09:00.
-
 (deftest utc
   (ok (eq (find-timezone "UTC") +utc-zone+))
   (ok (eq (find-timezone "utc") +utc-zone+) "case does not matter for UTC")

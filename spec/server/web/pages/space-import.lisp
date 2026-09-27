@@ -56,11 +56,9 @@
                                                             (make-field :tags :reference :model "tag" :many t))
                                          :label :title))))
 
-(defparameter +as-htmx+ '(("origin" . "http://localhost:3000") ("hx-request" . "true"))
-  "What the import dialog's fetch sends: an action answers htmx requests only.")
+(defparameter +as-htmx+ '(("origin" . "http://localhost:3000") ("hx-request" . "true")))
 
 (defun post-piece (url &optional (octets (make-array 0 :element-type '(unsigned-byte 8))) (headers +as-htmx+))
-  "POST OCTETS to the action at URL as the import dialog does. (values status body headers)."
   (let ((q (position #\? url)))
     (request :post (subseq url 0 q) :query (and q (subseq url (1+ q))) :headers headers
                                     :body octets :content-type "application/octet-stream")))
@@ -72,8 +70,6 @@
   (format nil "~a?id=~a&offset=~a" (continue-import-action) id offset))
 
 (defun import-archive (octets &key (pieces 3))
-  "Send OCTETS to the import actions in PIECES pieces, as the import dialog does;
-(values status next-location) of the last answer."
   (let ((id (begin))
         (size (max 1 (ceiling (length octets) pieces))))
     (loop :for offset :from 0 :below (length octets) :by size
@@ -83,7 +79,6 @@
       (values status (getf headers :hx-redirect)))))
 
 (defun declare-sizes (octets size)
-  "OCTETS, an archive, with every entry's uncompressed size in its headers set to SIZE."
   (let ((copy (copy-seq octets)))
     (flet ((put (at)
              (dotimes (i 4) (setf (aref copy (+ at i)) (ldb (byte 8 (* 8 i)) size)))))
@@ -97,15 +92,13 @@
     copy))
 
 (defun archive-files (pattern)
-  "The files in the archive directory whose names contain PATTERN."
   (let ((directory (archive-dir)))
     (and (uiop:directory-exists-p directory)
          (remove-if-not (lambda (file) (search pattern (file-namestring file)))
                         (uiop:directory-files directory)))))
 
 (deftest a-space-is-exported-and-imported-again
-  ;; the space is filled the way its owner fills it, which sets off its webhook:
-  ;; answered here, in this thread, so the test hears nothing of it
+
   (let ((*webhook-async* nil)
         (*webhook-sender* (lambda (&rest args) (declare (ignore args)) (values 200 "" nil))))
   (setf *cookie* nil)

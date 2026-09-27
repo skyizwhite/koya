@@ -13,10 +13,6 @@
   (:import-from #:koya-core/json #:jget))
 (in-package #:koya-spec/server/usecases/revisions)
 
-;;; What an old version becomes when it is brought back into the editor. The
-;;; schema and the space may have moved on: a field gone, a rule tightened, a
-;;; reference or a media no longer there. Each is a note, never a guess.
-
 (defun schema (&rest post-fields)
   (make-schema :models (list (make-model "post" :list post-fields)
                              (make-model "tag" :list (list (make-field :name :text))))))

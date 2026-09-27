@@ -17,13 +17,9 @@
   (:export #:*secret* #:*management-key* #:*api-key* #:*webhooks* #:test-schema #:request #:admin #:admin-upload #:delivery #:webhook-events #:setup-api #:reset-api))
 (in-package #:koya-spec/server/web/api-support)
 
-;;; What every file of API tests shares: an in-memory instance with the website
-;;; space and its keys, requests driven through the whole app, and the webhooks
-;;; the app would have sent.
-
 (defparameter *secret* "test-secret-long-enough-to-log-in-with")
 
-(defvar *management-key* nil "Created in SETUP; the Bearer token of every admin call.")
+(defvar *management-key* nil)
 
 (defvar *api-key* nil)
 
@@ -40,7 +36,6 @@
                              (make-model "about" :object (list (make-field :body :richtext))))))
 
 (defun request (method path &key query body headers)
-  "Call the app with a synthetic Lack env. Returns (values status parsed-json raw-body)."
   (let* ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
                     :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                     :request-uri (format nil "~a~@[?~a~]" path query) :url-scheme "http" :remote-addr "127.0.0.1"
@@ -53,7 +48,6 @@
               (getf env :raw-body) (make-in-memory-input-stream octets))))
     (destructuring-bind (status response-headers body) (funcall (app) env)
       (if (pathnamep body)
-          ;; a file response (see MEDIA-APP): hand back the headers and the path
           (values status response-headers body)
           (let ((text (apply #'concatenate 'string (if (listp body) body (list body)))))
             (values status (and (plusp (length text)) (ignore-errors (parse-json text))) text))))))
@@ -63,7 +57,6 @@
                        :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)))))
 
 (defun admin-upload (path parts)
-  "POST a multipart body as the owner. Returns (values status json)."
   (multiple-value-bind (octets content-type) (multipart-body parts)
     (let ((env (list :request-method :post :script-name "" :path-info path :query-string ""
                      :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
@@ -82,8 +75,6 @@
 (defun webhook-events () (mapcar (lambda (w) (jget (second w) "event")) (reverse *webhooks*)))
 
 (defun setup-api ()
-  "A fresh in-memory instance with the website space, its keys, and a webhook
-sender that records instead of sending, for one file of API tests."
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
   (setf (uiop:getenv "KOYA_BASE_URL") "http://localhost:3000")
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
@@ -100,7 +91,6 @@ sender that records instead of sending, for one file of API tests."
                            (values 200 "{\"revalidated\":true}" nil))))
 
 (defun reset-api ()
-  "Before each test: no contents, no delivery log, nothing sent."
   (exec "DELETE FROM contents")
   (exec "DELETE FROM webhook_deliveries")
   (setf *webhooks* '()))

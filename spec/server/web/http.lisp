@@ -107,9 +107,7 @@
     (ok (= status 404))
     (ok (string= (jget json "error" "code") "not_found"))))
 
-
 (defun raw-request (method path headers)
-  "The whole Lack response, headers included, which REQUEST does not return."
   (funcall (app) (list :request-method method :script-name "" :path-info path :query-string ""
                        :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                        :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"

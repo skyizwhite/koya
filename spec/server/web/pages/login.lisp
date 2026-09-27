@@ -136,7 +136,6 @@
       (ok (= 403 (post-login :form `(("secret" . ,*secret*)) :headers '(("origin" . "https://evil.example"))))
           "another site cannot log a browser in")
       (ok (null *cookie*) "and no session was made")
-      ;; named in full: LOG-IN here is the tests' own
       (ok (= 400 (request-url :post (koya-server/web/pages/login:log-in) :form `(("secret" . ,*secret*))
                               :headers '(("origin" . "http://localhost:3000"))))
           "a plain form post is not an action")
@@ -178,7 +177,6 @@
            (ok (null *cookie*) "and no session was made"))
       (setf (uiop:getenv "KOYA_SECRET") *secret*))
     (ok (= 200 (post-login :form `(("secret" . ,*secret*)))) "a long secret and a restart are all it takes")))
-
 
 (deftest a-failed-login-does-not-say-which-factor-was-wrong
   (let ((secret "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")

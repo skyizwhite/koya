@@ -4,7 +4,6 @@
   (:import-from #:koya-server/domain/totp #:totp))
 (in-package #:koya-spec/server/usecases/settings)
 
-;; RFC 4226 / RFC 6238 test secret: the ASCII string 12345678901234567890
 (defparameter *rfc-secret* "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")
 
 (deftest validation

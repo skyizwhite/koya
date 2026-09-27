@@ -17,14 +17,11 @@
   (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in))
 (in-package #:koya-spec/server/web/pages/support)
 
-;;; What every file of page tests shares: an in-memory instance with the website
-;;; space, and requests driven through the whole app with the owner's cookie.
-
 (defparameter *secret* "ui-secret-long-enough-to-log-in-with-it")
 
 (defvar *cookie* nil)
 
-(defvar *set-cookie* nil "The last Set-Cookie header seen, flags included.")
+(defvar *set-cookie* nil)
 
 (defun blog-model ()
   (make-model "blog" :list (list (make-field :title :text :required t)
@@ -42,9 +39,6 @@
               :public-url "https://site.test/blog/{CONTENT_ID}"))
 
 (defun answer (response)
-  "RESPONSE as (status headers body), calling it when it is delayed, as a server
-does. A file it sends is read as the server would read it, before the responder
-returns: the file may be deleted then."
   (if (functionp response)
       (let (answer)
         (funcall response
@@ -58,9 +52,6 @@ returns: the file may be deleted then."
       response))
 
 (defun request (method path &key form multipart json body content-type headers query)
-  "Returns (values status body-string headers-plist). FORM is urlencoded; MULTIPART
-is a list of parts for MULTIPART-BODY; JSON is a string sent as the body, for the
-admin API, which the session reaches as well as a management key does."
   (let* ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
                     :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                     :request-uri (format nil "~a~@[?~a~]" path query)
@@ -102,14 +93,10 @@ admin API, which the session reaches as well as a management key does."
 (defun location (headers) (getf headers :location))
 
 (defun request-url (method url &rest args)
-  "REQUEST with a URL that may carry a query string, e.g. an action endpoint."
   (let ((q (position #\? url)))
     (apply #'request method (subseq url 0 q) :query (and q (subseq url (1+ q))) args)))
 
 (defun edit (path &key form headers)
-  "Do to the content at PATH (/s/<space>/m/<model>/<id>) what the editor's button
-named by FORM's \"action\" does (save when there is none), with the rest of FORM as
-the editor's fields. (values status body headers)."
   (destructuring-bind (s space m model id) (rest (uiop:split-string path :separator "/"))
     (declare (ignore s m))
     (call-action :post (editor-action :space space :model model :id id
@@ -118,22 +105,17 @@ the editor's fields. (values status body headers)."
                  :headers headers)))
 
 (defun moved-to (headers)
-  "Where an action's answer sends the browser: another page, or this one's URL cleaned."
   (or (getf headers :hx-redirect) (getf headers :hx-replace-url)))
 
 (defun call-action (method url &rest args &key headers &allow-other-keys)
-  "Call an action as htmx does: from this server's origin, with HX-Request. HEADERS
-override those: the first of a name is the one the table keeps."
   (apply #'request-url method url
          :headers (append headers '(("hx-request" . "true") ("origin" . "http://localhost:3000")))
          (loop :for (k v) :on args :by #'cddr :unless (eq k :headers) :append (list k v))))
 
 (defun setup-pages ()
-  "A fresh in-memory instance with the website space, for one file of page tests."
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
   (setf (uiop:getenv "KOYA_BASE_URL") "http://localhost:3000")
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
-  ;; the database is in memory; this is where space archives go, beside it
   (setf (uiop:getenv "KOYA_DB_PATH") (namestring (merge-pathnames "koya.db" *media-root*)))
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
@@ -145,9 +127,7 @@ override those: the first of a name is the one the table keeps."
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
 
 (defun post-login (&rest args &key form headers)
-  "Send the login form as the page does. (values status body headers)."
   (declare (ignore form headers))
-  ;; named in full: LOG-IN here is the tests' own
   (apply #'call-action :post (koya-server/web/pages/login:log-in) args))
 
 (defun log-in ()

@@ -10,14 +10,12 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db))
 (in-package #:koya-spec/server/web/auth)
 
-;;; The pages guard: a page is the owner's without doing anything for it.
-
 (setup (setup-pages) (log-in))
 
 (teardown (disconnect-db))
 
 (defparameter +probe-path+ "/probe-page-the-guard-covers"
-  "A page added by the test and left in place: no page of koya's is at it.")
+)
 
 (deftest a-page-that-does-nothing-is-the-owners
   (setf (route *page-app* +probe-path+)
@@ -47,8 +45,7 @@
     (ok (= 200 (request :get "/assets/icon.svg")) "the login page is drawn with the assets")))
 
 (deftest a-public-action-skips-the-session-only
-  ;; the login action is a PUBLIC-PATH: it needs no session, and is guarded like
-  ;; every other action for the rest
+
   (let ((*cookie* nil))
     (ok (/= 401 (post-login :form `(("secret" . ,*secret*)))) "no session needed")
     (let ((*cookie* nil))

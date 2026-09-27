@@ -123,7 +123,9 @@ of its own, isolated, outside `ui/` outside the rest -- and fails when a file
 imports from a layer further out or a route from another route, from a library
 that belongs to another layer (`cl-dbi` outside `infra/`, `jingle` outside
 `web/`), from a library it does not list at all, or from `koya-sdk` or `ningle`
--- ningle is reached through jingle, which re-exports it. What no layer owns — koya-core, alexandria and the like — is
+-- ningle is reached through jingle, which re-exports it. `lack` is infra's as
+well as the web's, since the session store infra keeps in the database speaks
+its protocol. What no layer owns — koya-core, alexandria and the like — is
 listed as usable anywhere. `main` checks with okite,
 as it loads, that every generic function of `usecases/ports/` has a method.
 See `adr/2026-09-27-the-server-is-layered-and-depends-inward.md`.

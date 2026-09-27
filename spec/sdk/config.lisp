@@ -55,7 +55,6 @@
 (deftest renaming-a-model-in-the-repl
   (defmodel post (:kind :list) (title :text) (lede :text))
   (ok (equal (mapcar #'model-name (schema-models (current-schema))) '("post")))
-  ;; the same form, edited into its renamed self and evaluated again
   (defmodel article (:kind :list :was post) (title :text) (subtitle :text :was lede))
   (let ((models (schema-models (current-schema))))
     (ok (equal (mapcar #'model-name models) '("article"))

@@ -26,7 +26,6 @@
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (start :server :woo :port *port* :db ":memory:")
-  ;; the space is made here, as the admin UI would: a deploy never creates one
   (create-space "website")
   (configure :base-url (format nil "http://127.0.0.1:~a" *port*)
              :management-key (create-management-key "website" :label "client")
@@ -47,7 +46,6 @@
   (clear-schema))
 
 (deftest deploy-plan-pull
-  ;; named in full: rove has a PLAN of its own
   (let ((changes (koya-sdk/client:plan :stream (make-broadcast-stream))))
     (ok (= (length changes) 9) "everything is new"))
   (let ((applied (deploy :stream (make-broadcast-stream))))
@@ -66,7 +64,6 @@
     (ok (= (length (schema-models (pull))) 3) "untouched")
     (ok (deploy :force t :stream (make-broadcast-stream)))
     (ok (= (length (schema-models (pull))) 1))
-    ;; restore
     (defmodel blog (:kind :list) (title :text :required t) (body :richtext) (tags :reference :model tag :many t) (cover :media))
     (defmodel tag (:kind :list) (name :text :required t))
     (defmodel about (:kind :object) (body :richtext))
@@ -160,7 +157,6 @@
           (ok (= (getf (list-media) :total-count) 0)))))
     (testing "delivery keys"
       (ok (= (length (list-delivery-keys)) 1))
-      ;; named in full: CREATE-DELIVERY-KEY here is the server's, which sets the tests up
       (multiple-value-bind (key id) (koya-sdk/client:create-delivery-key :label "extra")
         (ok (stringp key))
         (ok (= (length (list-delivery-keys)) 2))

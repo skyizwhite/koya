@@ -52,7 +52,6 @@
         (ok (= status 200))
         (ok (= (length (jget json "applied")) 1))
         (ok (string= (jget (aref (jget json "applied") 0) "op") "add_field")))
-      ;; restore
       (admin :put "/admin/api/schema/website" :body (schema->jobject (test-schema)) :query "force=true")))
   (testing "a management key reaches its own space and no other"
     (multiple-value-bind (status json) (admin :get "/admin/api/schema/other")

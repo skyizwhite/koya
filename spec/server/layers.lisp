@@ -3,28 +3,6 @@
   (:import-from #:okite #:define-layers #:layer-violations))
 (in-package #:koya-spec/server/layers)
 
-;;; The dependency rule (docs/ARCHITECTURE.md): each layer depends on the ones
-;;; inside it and nothing further out. The web reaches ports through the use
-;;; cases only, but for the one it implements, ports/presenters; nothing but
-;;; main reaches infra.
-;;;
-;;; Inside the web, the three routers -- the admin UI's pages and the two APIs,
-;;; file-routed -- are the outermost: they use the rest of web/ (and the pages
-;;; ui/), and nothing uses them, as ningle-fbr loads each file by its path. Each
-;;; is isolated, so no route uses another: what two routes share (a URL, a
-;;; component) is in web/ or ui/.
-;;;
-;;; The same rule holds for what is outside koya: a library that is how a
-;;; request arrives, or how a row is stored, belongs to the layer that does that.
-;;; A use case that imported one would be back to knowing HTTP or SQL, whatever
-;;; its imports from koya-server say. lack is infra's as well: the session store
-;;; infra keeps in the database speaks its protocol. ningle is reached through
-;;; jingle, which re-exports it, so there is one name for the router.
-;;;
-;;; The server and the SDK share koya-core and nothing else: the SDK is what a
-;;; site loads, and changes for the site's sake. koya-core is the vocabulary of
-;;; the domain, so every layer may use it.
-
 (define-layers koya-server
   (:layers (:domain          "domain/")
            (:presenter-ports "usecases/ports/presenters")

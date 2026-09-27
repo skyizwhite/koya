@@ -174,7 +174,6 @@
 
 (deftest richtext-is-stored-as-sent
   (exec "DELETE FROM contents")
-  ;; HTML the API stored, not in the shape the editor writes
   (let* ((html (format nil "<h2 id=\"intro\">Intro</h2><p>a</p>~%<p>b</p>"))
          (id (multiple-value-bind (space model) (resolve-model "website" "blog")
                (content-id (create space model (let ((data (make-hash-table :test 'equal)))
@@ -206,7 +205,6 @@
   (ok (string= (slugify "日本語") "") "non-ascii yields empty; validation then reports it"))
 
 (defun new-blog (form)
-  "Post FORM to the new-content editor; the new content's id."
   (multiple-value-bind (status body headers) (edit "/s/website/m/blog/new" :form form)
     (declare (ignore body))
     (ok (= status 200))
@@ -257,10 +255,7 @@
         (ok (= status 200))
         (ng (search "Draft saved" body))
         (ok (search "Published" body))))
-    ;; the world moves on: a referenced content is unpublished, another deleted,
-    ;; the media is gone, an option and a field are taken out of the schema. The
-    ;; two contents go past the guard that keeps a referenced content: this one
-    ;; still refers to them, and a revision is what outlives that
+
     (update-content (unpublished (get-content unpublished)))
     (delete-content deleted)
     (delete-media "website" media)
@@ -345,7 +340,6 @@
         (replace-schema "website"
                      (make-schema :models (list (blog-model)
                                                 (make-model "about" :object (list (make-field :body :richtext))))))))))
-
 
 (deftest a-referenced-content-is-not-deleted-from-the-editor
   (exec "DELETE FROM contents")

@@ -34,14 +34,11 @@
 (defun bytes (&rest list) (coerce list '(vector (unsigned-byte 8))))
 
 (defun png-bytes (&optional (width 3) (height 2))
-  "A PNG signature and IHDR chunk: enough for the sniffer, not a whole image."
   (flet ((be32 (n) (list (ldb (byte 8 24) n) (ldb (byte 8 16) n) (ldb (byte 8 8) n) (ldb (byte 8 0) n))))
     (apply #'bytes (append '(#x89 #x50 #x4E #x47 #x0D #x0A #x1A #x0A) (be32 13) '(#x49 #x48 #x44 #x52)
                            (be32 width) (be32 height) '(8 6 0 0 0)))))
 
 (defun multipart-body (parts)
-  "PARTS: (name value) for text fields or (name filename content-type octets) for files.
-Returns (values octets content-type)."
   (let* ((boundary "----koyatest")
          (crlf (string-to-octets (format nil "~c~c" #\Return #\Linefeed)))
          (chunks '()))
@@ -80,11 +77,9 @@ Returns (values octets content-type)."
   (multiple-value-bind (mime w h) (sniff-image (bytes #x47 #x49 #x46 #x38 #x39 #x61 #x10 #x00 #x08 #x00 0))
     (ok (string= mime "image/gif")) (ok (= w 16)) (ok (= h 8)))
   (multiple-value-bind (mime w h)
-      ;; SOI, then an SOF0 segment: FF C0, length 17, precision 8, height 0x0100, width 0x0080
       (sniff-image (bytes #xFF #xD8 #xFF #xC0 #x00 #x11 #x08 #x01 #x00 #x00 #x80 #x03 0 0 0 0 0 0 0 0))
     (ok (string= mime "image/jpeg")) (ok (= w 128)) (ok (= h 256)))
   (multiple-value-bind (mime w h)
-      ;; RIFF size WEBP "VP8 " size, frame tag(3) start code(3) then width/height 14 bits each
       (sniff-image (bytes #x52 #x49 #x46 #x46 0 0 0 0 #x57 #x45 #x42 #x50 #x56 #x50 #x38 #x20 0 0 0 0
                           0 0 0 #x9D #x01 #x2A #x40 #x01 #xF0 #x00))
     (ok (string= mime "image/webp")) (ok (= w 320)) (ok (= h 240)))
@@ -157,8 +152,7 @@ Returns (values octets content-type)."
         "files each under the limit, but not together")))
 
 (deftest deleting-a-space-takes-its-files
-  ;; the rows go with the space through the foreign key; the files are the admin
-  ;; UI's job afterwards, and nothing else ever deletes a whole library
+
   (create-space "doomed")
   (let* ((kept (store-upload "website" (png-bytes) :filename "kept.png"))
          (doomed (store-upload "doomed" (png-bytes) :filename "doomed.png"))
