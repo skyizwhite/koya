@@ -197,11 +197,13 @@
         (admin :patch (format nil "/admin/api/contents/website/blog/~a" post) :body (jobject "data" (jobject "tags" #())))
         (ok (= 409 (admin :delete (format nil "/admin/api/contents/website/tag/~a" tag))) "the published data still does")
         (admin :post (format nil "/admin/api/contents/website/blog/~a/publish" post)))
-      (testing "a draft is unpublished whatever refers to it: nothing is taken away"
+      (testing "a draft that is referred to is not published, so it is refused as that, not as in use"
         (let ((draft (jget (nth-value 1 (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "draft"))))
                            "id")))
           (admin :patch (format nil "/admin/api/contents/website/blog/~a" post) :body (jobject "data" (jobject "tags" (vector tag draft))))
-          (ok (= 200 (admin :post (format nil "/admin/api/contents/website/tag/~a/unpublish" draft))))
+          (multiple-value-bind (status json) (admin :post (format nil "/admin/api/contents/website/tag/~a/unpublish" draft))
+            (ok (= status 409))
+            (ok (string= (jget json "error" "code") "not_published")))
           (ok (= 409 (admin :delete (format nil "/admin/api/contents/website/tag/~a" draft))) "but not deleted")
           (admin :patch (format nil "/admin/api/contents/website/blog/~a" post) :body (jobject "data" (jobject "tags" #())))))
       (testing "once the reference is taken out, it goes"
@@ -231,14 +233,30 @@
       (ok (string= (jget json "status") "published") "no draft is made"))
     (ok (null *webhooks*) "and nothing is sent")))
 
-(deftest a-discard-with-no-draft-writes-nothing
-  (let* ((made (nth-value 1 (admin :post "/admin/api/contents/website/tag"
-                                   :body (jobject "data" (jobject "name" "kept") "publish" t))))
-         (id (jget made "id")))
-    (setf *webhooks* '())
-    (sleep 0.01)
-    (multiple-value-bind (status json) (admin :post (format nil "/admin/api/contents/website/tag/~a/discard-draft" id))
-      (ok (= status 200))
-      (ok (string= (jget json "status") "published"))
-      (ok (string= (jget json "updatedAt") (jget made "updatedAt")) "the content is not touched"))
-    (ok (null *webhooks*) "and nothing is sent")))
+(deftest what-a-status-cannot-do-is-refused
+  (flet ((make (publish)
+           (nth-value 1 (admin :post "/admin/api/contents/website/tag"
+                               :body (jobject "data" (jobject "name" "kept") "publish" publish))))
+         (same-afterwards (made)
+           (multiple-value-bind (status json) (admin :get (format nil "/admin/api/contents/website/tag/~a" (jget made "id")))
+             (and (= status 200)
+                  (string= (jget json "updatedAt") (jget made "updatedAt"))
+                  (equal (jget json "draftKey") (jget made "draftKey"))))))
+    (testing "discarding when a published content has no draft"
+      (let ((made (make t)))
+        (setf *webhooks* '())
+        (sleep 0.01)
+        (multiple-value-bind (status json) (admin :post (format nil "/admin/api/contents/website/tag/~a/discard-draft" (jget made "id")))
+          (ok (= status 409))
+          (ok (string= (jget json "error" "code") "no_draft")))
+        (ok (same-afterwards made) "the content is not touched")
+        (ok (null *webhooks*) "and nothing is sent")))
+    (testing "unpublishing a content that is not published"
+      (let ((made (make nil)))
+        (setf *webhooks* '())
+        (sleep 0.01)
+        (multiple-value-bind (status json) (admin :post (format nil "/admin/api/contents/website/tag/~a/unpublish" (jget made "id")))
+          (ok (= status 409))
+          (ok (string= (jget json "error" "code") "not_published")))
+        (ok (same-afterwards made) "the content is not touched, and its draft key still works")
+        (ok (null *webhooks*) "and nothing is sent")))))

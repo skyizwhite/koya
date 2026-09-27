@@ -168,7 +168,16 @@ POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a previ
 }
 ```
 
-- `status` is `draft`, `published` or `published+draft`.
+- `status` is `draft`, `published` or `published+draft`, and decides what can
+  be done to the content and what it becomes. Anything else is refused with
+  `409` and nothing is written:
+
+  | `status` | save a draft | publish | unpublish | discard-draft | delete |
+  |---|---|---|---|---|---|
+  | `draft` | `draft` | `published` | `not_published` | `not_published` | gone |
+  | `published` | `published+draft` | `published` | `draft` | `no_draft` | gone |
+  | `published+draft` | `published+draft` | `published` | `draft` | `published` | gone |
+
 - Saving a draft (`PATCH`, `{"data": {…}}`) **merges** onto the current draft, or
   the published data when there is none: keys given replace, `null` removes a key.
   When the result is what the content holds already, nothing is written (no
@@ -179,7 +188,6 @@ POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a previ
   system's ids and dates. An object model holds one content: once it has it,
   creating another is refused (`409 object_exists`), and that one is changed
   through its id.
-- `discard-draft` needs a published version to fall back to (`409 not_published`).
 - A content another content refers to, in its published data or its draft,
   through a `reference` field of the current schema, cannot be deleted, nor
   unpublished while it is published (`409 in_use`, naming how many). Take the
@@ -215,7 +223,7 @@ that is answered with `413` and a plain-text body before koya reads it.
 | 401 | `unauthorized` | no key, or a wrong one |
 | 403 | `forbidden` | a key of another space, or a cross-origin write |
 | 404 | `not_found` | no such space, model, content or media |
-| 409 | `conflict` `destructive_changes` `in_use` `not_published` `object_exists` | refused as things stand |
+| 409 | `conflict` `destructive_changes` `in_use` `not_published` `no_draft` `object_exists` | refused as things stand |
 | 413 | `too_large` | images over 20 MB, alone or together |
 | 422 | `validation_failed` `empty_file` `unsupported_type` | the content or file is not acceptable |
 | 500 | `internal_error` | the message is only detailed with `KOYA_ENV=dev` |

@@ -1,5 +1,6 @@
 (defpackage #:koya-spec/server/usecases/contents
   (:use #:cl #:rove)
+  (:import-from #:koya-server/domain/errors #:conflict)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
@@ -109,14 +110,14 @@
     (testing "what changes nothing that was live is not an event"
       (let* ((draft (make "{\"title\": \"Never live\"}"))
              (live (make "{\"title\": \"Live\"}" :publish t)))
-        (unpublish "website" (blog) (content-id draft))
-        (ok (equal (mapcar #'revision-event (list-revisions (content-id draft))) '("draft"))
-            "unpublishing a content that was never published")
-        (ok (signals (discard "website" (blog) (content-id draft)) 'error)
+        (ok (signals (unpublish "website" (blog) (content-id draft)) 'conflict)
+            "a content that was never published cannot be unpublished")
+        (ok (equal (mapcar #'revision-event (list-revisions (content-id draft))) '("draft")) "and nothing is kept")
+        (ok (signals (discard "website" (blog) (content-id draft)) 'conflict)
             "a content that was never published has no draft to discard, only itself")
-        (discard "website" (blog) (content-id live))
-        (ok (equal (mapcar #'revision-event (list-revisions (content-id live))) '("publish"))
-            "discarding a draft that is not there")))
+        (ok (signals (discard "website" (blog) (content-id live)) 'conflict)
+            "a published content with no draft has none to discard")
+        (ok (equal (mapcar #'revision-event (list-revisions (content-id live))) '("publish")) "and nothing is kept")))
     (testing "a revision belongs to its content"
       (let ((other (make "{\"title\": \"Other\"}")))
         (ng (find-revision (content-id other) (revision-id (first (list-revisions id)))))))

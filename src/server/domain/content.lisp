@@ -12,6 +12,8 @@
                 #:regex-replace-all)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
+  (:import-from #:koya-server/domain/errors
+                #:fail #:conflict)
   (:export #:content #:make-content #:content-p
            #:content-id #:content-space #:content-model #:content-status
            #:content-published #:content-draft #:content-draft-key
@@ -26,6 +28,9 @@
            #:discarded
            #:keyed
            #:+statuses+
+           #:+operations+
+           #:next-status
+           #:check-transition
            #:content-label
            #:merge-data
            #:default-data
@@ -51,6 +56,42 @@
   (cond ((and published draft) "published+draft")
         (published "published")
         (t "draft")))
+
+(defparameter +operations+ '(:save :publish :unpublish :discard :delete))
+
+(defparameter +transitions+
+  '(("draft" :save "draft")
+    ("draft" :publish "published")
+    ("draft" :delete nil)
+    ("published" :save "published+draft")
+    ("published" :publish "published")
+    ("published" :unpublish "draft")
+    ("published" :delete nil)
+    ("published+draft" :save "published+draft")
+    ("published+draft" :publish "published")
+    ("published+draft" :unpublish "draft")
+    ("published+draft" :discard "published")
+    ("published+draft" :delete nil)))
+
+(defparameter +refusals+
+  '(("draft" :unpublish "not_published" "This content is not published")
+    ("draft" :discard "not_published" "Only a published content has a draft to discard; delete it instead")
+    ("published" :discard "no_draft" "This content has no draft to discard")))
+
+(defun find-entry (table status op)
+  (find-if (lambda (entry) (and (string= (first entry) status) (eq (second entry) op))) table))
+
+(defun next-status (status op)
+  (let ((entry (find-entry +transitions+ status op)))
+    (values (third entry) (and entry t))))
+
+(defun check-transition (content op)
+  (let ((status (content-status content)))
+    (multiple-value-bind (next allowed) (next-status status op)
+      (if allowed
+          next
+          (destructuring-bind (code message) (cddr (find-entry +refusals+ status op))
+            (fail 'conflict message :code code))))))
 
 (defun new-draft-key ()
   (byte-array-to-hex-string (random-data 16)))

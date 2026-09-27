@@ -331,10 +331,13 @@ These use the management key and see drafts as well.
   and `:revised-at` — everything an import from another CMS needs to keep its ids
   and dates. Ids are 1–64 characters from `A-Za-z0-9_-`; without one a ULID is
   generated. A duplicate id is a 409.
-- For an `:object` model, `create-content` updates the single existing content
-  instead of adding one.
+- An `:object` model holds one content: once it has it, `create-content` is
+  refused (`object_exists`), and that one is changed through its id.
 - Saving a draft issues a new draft key, so older preview links stop working.
-- `discard-draft` needs a published content: there would be nothing left otherwise.
+- What a content's `status` cannot do is refused with a 409 and changes nothing:
+  `unpublish-content` needs a published content (`not_published`), and
+  `discard-draft` a published content with a draft (`not_published`, `no_draft`).
+  The table is in [API.md](API.md#managing-content).
 
 ## Delivery keys and the webhook secret
 

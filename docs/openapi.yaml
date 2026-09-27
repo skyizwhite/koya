@@ -391,8 +391,9 @@ paths:
       description: |
         Takes the content off the delivery API. Its data (the draft when there is
         one) is kept as a draft with a new draft key; `publishedAt` is cleared.
-        Fires `unpublish` webhooks. A published content is refused with 409
-        `in_use` while another content refers to it.
+        Fires `unpublish` webhooks. A content that is not published is refused
+        with 409 `not_published`, and a published one with 409 `in_use` while
+        another content refers to it.
       security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -405,7 +406,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "409":
-          description: "`in_use`: other contents refer to it through a reference field of the current schema; the message names how many"
+          description: "`not_published`: the content is not published. `in_use`: other contents refer to it through a reference field of the current schema; the message names how many"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
@@ -418,7 +419,7 @@ paths:
       operationId: discardAdminContentDraft
       tags: [contents]
       summary: Discard the draft of a published content
-      description: Fires `discard` webhooks when there was a draft; without one, nothing is written.
+      description: Fires `discard` webhooks. A content with no draft is refused with 409.
       security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -434,7 +435,7 @@ paths:
         "403": { $ref: "#/components/responses/CrossOrigin" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: "`not_published`: the content has no published version to fall back to; delete it instead"
+          description: "`not_published`: the content has no published version to fall back to; delete it instead. `no_draft`: it is published with no draft to discard"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }

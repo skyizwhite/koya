@@ -217,6 +217,9 @@ A content is in one of three states, shown as its badge:
 - Publishing clears the draft and updates the revised time. The original
   published time stays through later publishes.
 - Unpublishing keeps the data as a draft.
+- The editor offers only what the status allows: **Unpublish** while published,
+  **Discard draft** while published with a draft. The full table is in
+  [API.md](API.md#managing-content).
 - Every entry the history keeps notifies the webhooks that cover the model,
   as its kind: a draft save, a publish, an unpublish, a discard. So does
   deleting a content.

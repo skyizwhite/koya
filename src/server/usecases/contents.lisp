@@ -20,7 +20,7 @@
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-published #:content-draft #:content-draft-key #:content-data
                 #:merge-data #:fill-defaults #:fill-slugs #:new-content #:drafted #:published
-                #:unpublished #:discarded #:keyed)
+                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
@@ -129,8 +129,10 @@
          (data (if replace patch (merge-data current patch))))
     (cond ((json-equal data current) (values content :unchanged))
           ((and live (json-equal data live))
+           (check-transition content :discard)
            (values (store (discarded content) "discard" live) :published (draft-view space model content)))
           (t
+           (check-transition content :save)
            (check-content space model data :exclude-id id)
            (values (store (drafted content data) "draft" data) :saved)))))
 
@@ -144,6 +146,7 @@
 (defun publish-now (space model id data published-at)
   (let* ((content (resolve-content space (model-name model) id))
          (data (or data (content-data content :draft t))))
+    (check-transition content :publish)
     (check-content space model data :exclude-id id)
     (values (store (published content data :published-at published-at) "publish" data)
             (published-view space model content))))
@@ -160,16 +163,13 @@
         (model-name (model-name model)))
     (multiple-value-bind (next old)
         (with-transaction
-          (let* ((content (resolve-content space-name model-name id))
-                 (old (published-view space model content))
-                 (next (unpublished content)))
-            (when old
-              (check-unreferenced space-name model-name (content-id content) "unpublish"))
-            (update-content next)
-            (when old
-              (record-revision id "unpublish" (content-draft next) :by *actor*))
-            (values next old)))
-      (when old (notify space model id :unpublish :old old))
+          (let ((content (resolve-content space-name model-name id)))
+            (check-transition content :unpublish)
+            (check-unreferenced space-name model-name (content-id content) "unpublish")
+            (let ((next (unpublished content)))
+              (values (store next "unpublish" (content-draft next))
+                      (published-view space model content)))))
+      (notify space model id :unpublish :old old)
       next)))
 
 (defun discard (space model id)
@@ -178,13 +178,10 @@
     (multiple-value-bind (next old)
         (with-transaction
           (let ((content (resolve-content space-name model-name id)))
-            (unless (content-published content)
-              (fail 'conflict "Only a published content has a draft to discard; delete it instead" :code "not_published"))
-            (if (content-draft content)
-                (values (store (discarded content) "discard" (content-published content))
-                        (draft-view space model content))
-                content)))
-      (when old (notify space model id :discard :old old :new (published-view space model next)))
+            (check-transition content :discard)
+            (values (store (discarded content) "discard" (content-published content))
+                    (draft-view space model content))))
+      (notify space model id :discard :old old :new (published-view space model next))
       next)))
 
 (defun destroy (space model id)
@@ -193,6 +190,7 @@
     (let ((old (with-transaction
                  (let* ((content (resolve-content space-name model-name id))
                         (old (published-view space model content)))
+                   (check-transition content :delete)
                    (check-unreferenced space-name model-name (content-id content) "delete")
                    (delete-content id)
                    old))))
@@ -211,19 +209,23 @@
   (or (find-content space-name model-name id)
       (fail 'not-found (format nil "Content ~a does not exist" id))))
 
+(defparameter +bulk-actions+
+  '(("publish" :publish publish)
+    ("unpublish" :unpublish unpublish)
+    ("delete" :delete destroy)))
+
 (defun bulk-action-function (action)
-  (cond ((equal action "publish") #'publish)
-        ((equal action "unpublish") #'unpublish)
-        ((equal action "delete") #'destroy)))
+  (let ((entry (assoc action +bulk-actions+ :test #'equal)))
+    (and entry (fdefinition (third entry)))))
 
 (defun bulk-action-p (action)
   (and (bulk-action-function action) t))
 
 (defun nothing-to-do-p (action content)
   (and content
-       (cond ((equal action "publish") (and (content-published content) (null (content-draft content))))
-             ((equal action "unpublish") (null (content-published content)))
-             (t nil))))
+       (let ((status (content-status content)))
+         (multiple-value-bind (next allowed) (next-status status (second (assoc action +bulk-actions+ :test #'equal)))
+           (or (not allowed) (equal next status))))))
 
 (defun failure-message (condition)
   (typecase condition
