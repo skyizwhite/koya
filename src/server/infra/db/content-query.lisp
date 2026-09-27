@@ -4,6 +4,8 @@
                 #:model-field #:field-type #:field-many-p)
   (:import-from #:koya-server/domain/query
                 #:bad-query)
+  (:import-from #:koya-server/domain/number
+                #:parse-decimal)
   (:export #:build-where
            #:build-order-by))
 (in-package #:koya-server/infra/db/content-query)
@@ -22,19 +24,11 @@
         (unless (model-field model name) (bad-query "unknown field ~s" name))
         (format nil "json_extract(~a, '$.~a')" column name))))
 
-(defun parse-number-strictly (string)
-  (handler-case
-      (with-standard-io-syntax
-        (let ((*read-eval* nil) (*read-default-float-format* 'double-float))
-          (multiple-value-bind (n end) (read-from-string string)
-            (and (realp n) (= end (length string)) n))))
-    (error () nil)))
-
 (defun coerce-value (name model value)
   (let ((field (model-field model name)))
     (cond ((null field) value)
           ((eq (field-type field) :number)
-           (or (parse-number-strictly value) (bad-query "~a expects a number" name)))
+           (or (parse-decimal value) (bad-query "~a expects a number" name)))
           ((eq (field-type field) :boolean)
            (cond ((string= value "true") 1) ((string= value "false") 0) (t (bad-query "~a expects true or false" name))))
           (t value))))

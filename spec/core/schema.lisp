@@ -26,6 +26,16 @@
                              :preview-url "https://x/about?draft-key={DRAFT_KEY}"
                              :public-url "https://x/about"))))
 
+(deftest url-templates-are-web-addresses
+  (dolist (url '("javascript:alert(1)" " https://x" "data:text/html,x" "//x/about" "/about" "http://" "https:x"))
+    (ok (signals (make-model "about" :object '() :preview-url url) 'schema-error) (format nil "preview ~s" url))
+    (ok (signals (make-model "about" :object '() :public-url url) 'schema-error) (format nil "public ~s" url)))
+  (ok (make-model "about" :object '() :preview-url "http://localhost:3000/about?draft-key={DRAFT_KEY}"))
+  (ok (make-model "about" :object '() :public-url "HTTPS://x/about") "the scheme is not case sensitive")
+  (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 1, \"models\": [{\"name\": \"about\", \"kind\": \"object\", \"previewUrl\": \"javascript:alert(1)\"}]}"))
+               'schema-error)
+      "nor through a deploy"))
+
 (deftest constructors
   (testing "field names are camelCased"
     (ok (string= (field-name (make-field :event-at :datetime)) "eventAt")))

@@ -7,6 +7,7 @@
                 #:blank-for-field-p)
   (:import-from #:cl-ppcre
                 #:split)
+  (:import-from #:koya-server/domain/number #:parse-decimal)
   (:import-from #:koya-server/domain/timezone #:iso->local-input #:local-input->iso)
   (:import-from #:koya-server/usecases/settings #:display-timezone)
   (:import-from #:koya-server/web/http
@@ -26,15 +27,6 @@
     (and (stringp v) (plusp (length (string-trim '(#\Space #\Tab #\Newline #\Return) v)))
          (string-trim '(#\Space #\Tab #\Newline #\Return) v))))
 
-(defun parse-number (string)
-  (handler-case
-      (let* ((*read-default-float-format* 'double-float)
-             (n (with-standard-io-syntax
-                  (let ((*read-eval* nil) (*read-default-float-format* 'double-float))
-                    (read-from-string string)))))
-        (if (realp n) n string))
-    (error () string)))
-
 (defun split-ids (string)
   (remove "" (mapcar (lambda (s) (string-trim " " s)) (split "[,\\s]+" string)) :test #'string=))
 
@@ -47,7 +39,7 @@
           (:boolean
            (setf (gethash (field-name field) data) (and raw t)))
           (:number
-           (when raw (setf (gethash (field-name field) data) (parse-number raw))))
+           (when raw (setf (gethash (field-name field) data) (or (parse-decimal raw) raw))))
           (:select
            (if (field-many-p field)
                (let ((values (remove "" (form-values params name) :test #'string=)))

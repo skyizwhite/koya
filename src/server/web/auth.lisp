@@ -33,13 +33,18 @@
 (defun session-owner-p (&optional (session (context :session)))
   (and session (gethash "owner" session) t))
 
+(defun renew-session-id ()
+  (setf (getf (getf (request-env *request*) :lack.session.options) :change-id) t))
+
 (defun session-login (address secret &optional code)
   (let ((result (attempt-login address secret code)))
     (when (eq result t)
+      (renew-session-id)
       (setf (gethash "owner" (context :session)) t))
     result))
 
 (defun session-logout ()
+  (renew-session-id)
   (remhash "owner" (context :session)))
 
 (defun session-env-owner-p (env)

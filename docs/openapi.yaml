@@ -860,10 +860,12 @@ components:
         kind: { type: string, enum: [list, object] }
         previewUrl:
           type: string
-          description: Template for the editor's preview link; `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
+          pattern: "^[Hh][Tt][Tt][Pp][Ss]?://."
+          description: Template for the editor's preview link, starting with `http://` or `https://`; `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
         publicUrl:
           type: string
-          description: Template for the editor's published page link; `{CONTENT_ID}` is substituted.
+          pattern: "^[Hh][Tt][Tt][Pp][Ss]?://."
+          description: Template for the editor's published page link, starting with `http://` or `https://`; `{CONTENT_ID}` is substituted.
         label:
           type: string
           description: |

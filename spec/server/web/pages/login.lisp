@@ -86,6 +86,20 @@
     (ok (= 302 (request :get "/")) "and the session is gone")
     (log-in)))
 
+(deftest a-login-does-not-keep-the-session-id-it-was-sent
+  (let* ((planted (format nil "lack.session=~a" (make-string 40 :initial-element #\a)))
+         (*cookie* planted))
+    (post-login :form `(("secret" . ,*secret*)))
+    (ok (string/= *cookie* planted) "the cookie after login is not the one sent")
+    (let ((*cookie* planted))
+      (ok (= 302 (request :get "/settings")) "and the planted id is not an owner session"))
+    (let ((owner *cookie*))
+      (call-action :post (logout))
+      (ok (string/= *cookie* owner) "logging out changes the id again")
+      (let ((*cookie* owner))
+        (ok (= 302 (request :get "/")) "and the owner's id is no longer a session"))))
+  (log-in))
+
 (deftest login-returns-to-the-page
   (let ((*cookie* nil))
     (multiple-value-bind (status body headers) (request :get "/s/website/media" :query "page=2")

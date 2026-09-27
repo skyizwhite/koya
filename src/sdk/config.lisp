@@ -66,8 +66,9 @@ WAS names the model this one was called before, and :WAS on a field names the
 field it was called before; a deploy renames them and moves the stored content
 with them. Both are taken literally and are dropped once the deploy has applied
 them, so PULL never brings them back.
-PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI
-where {CONTENT_ID} and {DRAFT_KEY} are substituted, e.g.
+PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI,
+starting with http:// or https://, where {CONTENT_ID} and {DRAFT_KEY} are
+substituted, e.g.
 \"https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}\".
 LABEL names the :text or :slug field whose value the admin UI shows for a
 content -- in lists, reference pickers and the history. Without one a content

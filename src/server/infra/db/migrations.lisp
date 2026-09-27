@@ -119,7 +119,18 @@
          WHERE published IS NOT NULL ORDER BY created_at"
      "INSERT INTO content_revisions (content_id, event, data, created_at)
         SELECT id, 'draft', draft, updated_at FROM contents
-         WHERE draft IS NOT NULL ORDER BY created_at")))
+         WHERE draft IS NOT NULL ORDER BY created_at")
+    (10
+     "UPDATE models SET definition = json_remove(definition, '$.previewUrl')
+       WHERE json_type(definition, '$.previewUrl') IS NOT NULL
+         AND NOT (json_type(definition, '$.previewUrl') = 'text'
+                  AND (json_extract(definition, '$.previewUrl') LIKE 'http://_%'
+                       OR json_extract(definition, '$.previewUrl') LIKE 'https://_%'))"
+     "UPDATE models SET definition = json_remove(definition, '$.publicUrl')
+       WHERE json_type(definition, '$.publicUrl') IS NOT NULL
+         AND NOT (json_type(definition, '$.publicUrl') = 'text'
+                  AND (json_extract(definition, '$.publicUrl') LIKE 'http://_%'
+                       OR json_extract(definition, '$.publicUrl') LIKE 'https://_%'))")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

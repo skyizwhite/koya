@@ -116,7 +116,8 @@ the same name, so the schema can be edited live from the REPL.
   that a deploy renames it instead of dropping it — see
   [Renaming a model or a field](#renaming-a-model-or-a-field).
 - **`:preview-url` / `:public-url`** are templates for the editor's two links.
-  `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
+  They start with `http://` or `https://`, and `{CONTENT_ID}` and `{DRAFT_KEY}`
+  are substituted.
 - **`:label`** names the `:text` or `:slug` field whose value the admin UI shows
   for a content — in the list's reference previews, the reference dropdowns and
   the history. It is taken literally, like a field name (`:label title`).

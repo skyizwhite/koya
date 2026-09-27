@@ -86,8 +86,8 @@ The payload is described in [API.md](API.md#webhooks).
 | `name` | string | `^[a-z][a-z0-9-]*$` |
 | `kind` | string | `list` (any number of contents) or `object` (exactly one) |
 | `fields` | array of [field](#field) | optional; names unique within the model |
-| `previewUrl` | string | optional; template for the editor's *Preview draft* link |
-| `publicUrl` | string | optional; template for the editor's *Published page* link |
+| `previewUrl` | string | optional; template for the editor's *Preview draft* link, starting with `http://` or `https://` |
+| `publicUrl` | string | optional; template for the editor's *Published page* link, starting with `http://` or `https://` |
 | `label` | string | optional; a `text` or `slug` field of this model, whose value the admin UI shows for a content. Without it a content is shown by its id |
 | `was` | string | optional; the name this model had, see [Renames](#renames) |
 

@@ -53,9 +53,22 @@
                                                             (make-field :event-at :datetime))))))
 
 (deftest migrations
-  (ok (= (current-version) 9))
+  (ok (= (current-version) 10))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
+
+(deftest stored-url-templates-that-are-not-web-addresses-are-dropped
+  (create-space "legacy")
+  (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
+        "legacy" "about" "object"
+        "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
+        0)
+  (exec "DELETE FROM schema_version WHERE version = 10")
+  (ok (equal (migrate) '(10)))
+  (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
+    (ng (search "previewUrl" definition))
+    (ok (search "https://x/about" definition) "a web address is kept"))
+  (delete-space "legacy"))
 
 (deftest schema-snapshot-matches-the-migrations
   ;; the snapshot is generated, so a mismatch means it was not regenerated after

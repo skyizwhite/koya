@@ -90,8 +90,10 @@ category[equals]tech[or]category[equals]life
 | `less_than` `greater_than` | for numbers and dates |
 | `exists` `not_exists` | the field has a value / is blank (takes no value) |
 
-On a `many` field, `equals` and `contains` mean "has this value". An unknown
-field in `filters`, `orders` or `include` is `400 bad_query`.
+On a `many` field, `equals` and `contains` mean "has this value". A value for a
+`number` field is a decimal of at most 64 characters, such as `42`, `-2.5` or
+`1e3`. An unknown field in `filters`, `orders` or `include`, or a number field
+given anything else, is `400 bad_query`.
 
 **Previews.** A content's draft is served by the delivery API to whoever has its
 draft key. The editor's *Preview draft* link opens the model's `previewUrl` with

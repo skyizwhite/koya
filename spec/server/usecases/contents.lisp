@@ -191,6 +191,16 @@
       (ok (signals (list-contents "website" "blog" model (q "filters" "nope[equals]1")) 'query-error))
       (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]abc")) 'query-error))
       (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]1 2")) 'query-error) "trailing garbage")
+      (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]1/3")) 'query-error) "a ratio")
+      (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]#x1f")) 'query-error) "a radix number")
+      (ok (signals (list-contents "website" "blog" model
+                                  (q "filters" (format nil "count[equals]~a" (make-string 100000 :initial-element #\())))
+                   'query-error)
+          "deep nesting is rejected, not read")
+      (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]123456789012345678901234567890")) 'query-error)
+          "an integer too large to bind")
+      (ok (equal (titles (list-contents "website" "blog" model (q "filters" "count[greater_than]4.5e0"))) '("Gamma" "Beta"))
+          "a decimal with an exponent")
       (let ((*read-eval-probe* nil))
         (ok (signals (list-contents "website" "blog" model
                                     (q "filters" "count[equals]#.(setf koya-spec/server/usecases/contents::*read-eval-probe* t)"))
