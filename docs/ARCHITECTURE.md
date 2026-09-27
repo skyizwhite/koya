@@ -118,8 +118,10 @@ reads there -- stays in that page's file.
 
 `tests/server/layers.lisp` declares the layers with
 [okite](https://github.com/skyizwhite/okite) and fails when a file imports from a
-layer further out, from a library that belongs to another layer (`dbi` outside
-`infra/`, `ningle` outside `web/`), or from `koya-sdk`. `main` checks with okite,
+layer further out, from a library that belongs to another layer (`cl-dbi` outside
+`infra/`, `ningle` outside `web/`), from a library it does not list at all, or
+from `koya-sdk`. What no layer owns — koya-core, alexandria and the like — is
+listed as usable anywhere. `main` checks with okite,
 as it loads, that every generic function of `usecases/ports/` has a method.
 See `adr/2026-09-25-the-server-is-layered-and-depends-inward.md`.
 

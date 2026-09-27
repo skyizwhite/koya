@@ -15,7 +15,8 @@
 ;;; infra keeps in the database speaks its protocol.
 ;;;
 ;;; The server and the SDK share koya-core and nothing else: the SDK is what a
-;;; site loads, and changes for the site's sake.
+;;; site loads, and changes for the site's sake. koya-core is the vocabulary of
+;;; the domain, so every layer may use it.
 
 (define-layers koya-server
   (:layers (:domain          "domain/")
@@ -31,9 +32,11 @@
           (:infra           :domain :ports)
           (:web             :domain :usecases :presenter-ports)
           (:main            :domain :ports :presenter-ports :usecases :infra :web))
-  (:libraries ("dbi" :infra) ("dbd-sqlite3" :infra) ("zippy" :infra) ("dexador" :infra)
-              ("clack" :web :main) ("lack" :web :infra) ("ningle" :web) ("jingle" :web)
-              ("hsx" :web) ("woo" :main) ("hunchentoot" :main))
+  (:libraries ("cl-dbi" :infra) ("zippy" :infra) ("dexador" :infra) ("cl-dotenv" :infra)
+              ("clack" :main) ("lack" :web :infra) ("lack-mw" :web) ("ningle" :web)
+              ("jingle" :web) ("smart-buffer" :web) ("hsx" :web) ("okite" :main))
+  (:anywhere "koya-core" "alexandria" "cl-ppcre" "babel" "ironclad" "local-time"
+             "bordeaux-threads" "quri")
   (:forbid "koya-sdk"))
 
 (deftest layers

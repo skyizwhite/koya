@@ -32,8 +32,8 @@
   :version "git-3fa9e3019b7c3af4133e9f44461874e8ca4f8b76"))
 ("okite" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/okite.git")
-  :version "git-ff32ecf2596d76e4ae55d186fae533d194ee53dc"))
+  :initargs (:remote-url "https://github.com/skyizwhite/okite.git" :tag "0.2.0")
+  :version "git-52b5d6dc28f6fb60b6527314364e3056a87c1b66"))
 ("woo" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/woo.git" :branch "fix/body-buffer-limit-and-files")
