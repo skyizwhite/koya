@@ -7,12 +7,12 @@
   (:import-from #:koya-server/infra/db/webhook-deliveries #:+max-response-chars+)
   (:import-from #:koya-server/usecases/ports/webhooks #:+deliveries-kept+)
   (:import-from #:koya-server/usecases/ports/webhooks #:list-deliveries #:count-deliveries)
-  (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
+  (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender* #:*address*)
   (:import-from #:koya-server/domain/webhook-delivery
                 #:delivery-ok #:delivery-status #:delivery-response #:delivery-error
                 #:delivery-event #:delivery-model #:delivery-label #:delivery-url
                 #:delivery-content-id #:delivery-duration-ms)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema-models)
   (:import-from #:koya-core/json #:jobject #:jget #:json-null #:parse-json))
 (in-package #:koya-spec/server/usecases/webhooks)
 
@@ -133,6 +133,46 @@
       (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" (format nil "t~a" i)) "publish" t)))
     (ok (<= (count-deliveries "website") +deliveries-kept+) "the cap holds")))
 
+
+(deftest where-a-webhook-is-sent
+  (let ((sent '()) (posts 0))
+    (flet ((deliver-to (url)
+             (setf sent '())
+             (incf posts)
+             (exec "DELETE FROM webhook_deliveries")
+             (replace-schema "website" (make-schema :webhooks (list (make-webhook "hook" url))
+                                                    :models (schema-models (test-schema))))
+             (let ((*webhook-sender* (lambda (url payload headers)
+                                       (declare (ignore payload headers))
+                                       (push (list url *address*) sent)
+                                       (values 200 "what the receiver said" nil))))
+               (admin :post "/admin/api/contents/website/blog"
+                      :body (jobject "data" (jobject "title" (format nil "Post ~a to ~a" posts url)) "publish" t)))
+             (first (list-deliveries "website"))))
+      (unwind-protect
+           (progn
+             (testing "a link-local address, such as a cloud's metadata, is never sent to"
+               (let ((d (deliver-to "http://169.254.169.254/latest/meta-data/")))
+                 (ok (null sent))
+                 (ok (null (delivery-ok d)))
+                 (ok (null (delivery-status d)))
+                 (ok (search "never sent to" (delivery-error d)))))
+             (testing "an internal address is sent to, and its answer is not kept"
+               (dolist (url '("http://127.0.0.1:3000/api/revalidate" "http://10.0.0.5/hook" "http://[::1]:3000/hook"))
+                 (let ((d (deliver-to url)))
+                   (ok (= (length sent) 1) url)
+                   (ok (eq (delivery-ok d) t))
+                   (ok (= (delivery-status d) 200))
+                   (ok (string= (delivery-url d) url) "the log names the URL as the schema has it")
+                   (ok (string= (delivery-response d) "") "the status is kept, the body is not"))))
+             (testing "a public address is sent to, and its answer is kept"
+               (let ((d (deliver-to "https://example.com/hook")))
+                 (ok (equalp sent '(("https://example.com/hook" #(93 184 216 34)))))
+                 (ok (string= (delivery-response d) "what the receiver said"))))
+             (testing "the call is handed the address that was checked"
+               (deliver-to "http://[::1]:3000/hook")
+               (ok (equalp sent '(("http://[::1]:3000/hook" #(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)))))))
+        (replace-schema "website" (test-schema))))))
 
 (deftest a-webhook-is-sent-once-the-write-is-done
   (let* ((inside '())

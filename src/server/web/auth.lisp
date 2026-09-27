@@ -5,7 +5,7 @@
   (:import-from #:koya-server/usecases/keys
                 #:space-for-delivery-key #:space-for-management-key #:management-key-label)
   (:import-from #:koya-server/usecases/auth
-                #:attempt-login)
+                #:check-login)
   (:import-from #:koya-server/usecases/actor
                 #:*actor* #:+owner+ #:key-actor)
   (:import-from #:jingle
@@ -36,8 +36,8 @@
 (defun renew-session-id ()
   (setf (getf (getf (request-env *request*) :lack.session.options) :change-id) t))
 
-(defun session-login (address secret &optional code)
-  (let ((result (attempt-login address secret code)))
+(defun session-login (secret &optional code)
+  (let ((result (check-login secret code)))
     (when (eq result t)
       (renew-session-id)
       (setf (gethash "owner" (context :session)) t))

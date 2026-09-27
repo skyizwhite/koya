@@ -9,7 +9,6 @@
   (:import-from #:koya-server/usecases/keys #:list-delivery-keys)
   (:import-from #:koya-server/usecases/settings #:enable-totp #:disable-totp)
   (:import-from #:koya-server/domain/totp #:totp)
-  (:import-from #:koya-server/usecases/auth #:clear-login-failures)
   (:import-from #:koya-server/web/pages/settings #:begin-two-factor-action))
 (in-package #:koya-spec/server/web/pages/login)
 
@@ -146,24 +145,44 @@
     (testing "no other action is open"
       (ok (= 401 (call-action :post (begin-two-factor-action)))))))
 
-(deftest login-lockout
+(deftest wrong-secrets-never-lock-the-owner-out
   (let ((*cookie* nil))
-    (clear-login-failures "127.0.0.1")
-    (dotimes (i 5)
-      (multiple-value-bind (status) (post-login :form '(("secret" . "nope")))
-        (ok (= status 401))))
-    (multiple-value-bind (status body) (post-login :form `(("secret" . ,*secret*)))
-      (ok (= status 403) "even the right secret is refused while locked")
-      (ok (search "Too many attempts" body)))
-    (clear-login-failures "127.0.0.1")
-    (multiple-value-bind (status) (post-login :form `(("secret" . ,*secret*)))
-      (ok (= status 200) "logs in again once the lock is cleared"))))
+    (dotimes (i 20)
+      (ok (= 401 (post-login :form '(("secret" . "nope"))))))
+    (ok (= 200 (post-login :form `(("secret" . ,*secret*)))) "the right secret still logs in")))
+
+(deftest a-missing-secret-is-a-short-one
+  (let ((*cookie* nil))
+    (setf (uiop:getenv "KOYA_SECRET") "")
+    (unwind-protect
+         (progn
+           (multiple-value-bind (status body) (request :get "/login")
+             (ok (= status 200))
+             (ok (search "KOYA_SECRET is shorter than 32 characters" body)))
+           (ok (= 403 (post-login :form '(("secret" . ""))))))
+      (setf (uiop:getenv "KOYA_SECRET") *secret*))))
+
+(deftest a-short-secret-turns-logging-in-off
+  (let ((*cookie* nil)
+        (short (make-string 31 :initial-element #\s)))
+    (setf (uiop:getenv "KOYA_SECRET") short)
+    (unwind-protect
+         (progn
+           (multiple-value-bind (status body) (request :get "/login")
+             (ok (= status 200))
+             (ok (search "KOYA_SECRET is shorter than 32 characters" body) "the page says why")
+             (ng (search "name=\"secret\"" body) "and asks for no secret"))
+           (multiple-value-bind (status body) (post-login :form `(("secret" . ,short)))
+             (ok (= status 403) "even the short secret itself does not log in")
+             (ok (search "KOYA_SECRET is shorter than 32 characters" body)))
+           (ok (null *cookie*) "and no session was made"))
+      (setf (uiop:getenv "KOYA_SECRET") *secret*))
+    (ok (= 200 (post-login :form `(("secret" . ,*secret*)))) "a long secret and a restart are all it takes")))
 
 
 (deftest a-failed-login-does-not-say-which-factor-was-wrong
   (let ((secret "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")
         (*cookie* nil))
-    (clear-login-failures "127.0.0.1")
     (enable-totp secret)
     (unwind-protect
          (multiple-value-bind (secret-status secret-body)
@@ -172,5 +191,4 @@
                (post-login :form `(("secret" . ,*secret*) ("code" . ,(if (string= (totp secret) "000000") "111111" "000000"))))
              (ok (= secret-status code-status 401))
              (ok (string= secret-body code-body) "a wrong secret and a wrong code read the same")))
-      (disable-totp)
-      (clear-login-failures "127.0.0.1"))))
+      (disable-totp))))

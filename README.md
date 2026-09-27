@@ -28,7 +28,7 @@ A small, self-hosted headless CMS for one owner and any number of sites.
 docker run -d --name koya \
   -p 3100:3100 \
   -v koya-data:/data \
-  -e KOYA_SECRET=change-me \
+  -e KOYA_SECRET="$(openssl rand -hex 32)" \
   -e KOYA_BASE_URL=http://localhost:3100 \
   ghcr.io/skyizwhite/koya:latest
 ```
@@ -42,7 +42,7 @@ services:
     ports: ["3100:3100"]
     volumes: ["koya-data:/data"]
     environment:
-      KOYA_SECRET: change-me
+      KOYA_SECRET: ${KOYA_SECRET:?set it to the output of openssl rand -hex 32}
       KOYA_BASE_URL: http://localhost:3100
 volumes:
   koya-data:
@@ -190,7 +190,7 @@ port 3100 and keeps everything under `/data`; mount a persistent volume there.
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `KOYA_SECRET` | yes | the admin UI's login password |
+| `KOYA_SECRET` | yes | the admin UI's login password, at least 32 characters, e.g. from `openssl rand -hex 32`. With a shorter one, or none, the server runs but logging in is off |
 | `KOYA_BASE_URL` | yes | the server's public URL, e.g. `https://cms.example.com`: media URLs, the same-origin check and the Secure cookie flag use it |
 | `KOYA_PORT` | no | listen port, default `3100` |
 | `KOYA_DB_PATH`, `KOYA_MEDIA_DIR` | no | default `/data/koya.db` and `/data/media` |

@@ -211,9 +211,14 @@
         (fail "webhook ~s: :only names the same model twice" label))
       names)))
 
+(defun web-url-p (url)
+  (or (and (> (length url) 7) (string-equal "http://" url :end2 7))
+      (and (> (length url) 8) (string-equal "https://" url :end2 8))))
+
 (defun make-webhook (label url &key only)
   (unless (and (stringp label) (plusp (length label))) (fail "webhook label must be a non-empty string, got ~s" label))
   (unless (and (stringp url) (plusp (length url))) (fail "webhook ~s: url must be a non-empty string, got ~s" label url))
+  (unless (web-url-p url) (fail "webhook ~s: url ~s must start with http:// or https://" label url))
   (let ((only (normalize-only label only)))
     (append (list :label label :url url) (and only (list :only only)))))
 
@@ -252,10 +257,6 @@
         ((stringp value) (string-downcase value))
         ((and value (symbolp value)) (string-downcase (symbol-name value)))
         (t value)))
-
-(defun web-url-p (url)
-  (or (and (> (length url) 7) (string-equal "http://" url :end2 7))
-      (and (> (length url) 8) (string-equal "https://" url :end2 8))))
 
 (defun make-model (name kind fields &key preview-url public-url label was)
   (let ((name (string-downcase (string name)))

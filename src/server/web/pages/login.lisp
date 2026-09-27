@@ -1,11 +1,12 @@
 (defpackage #:koya-server/web/pages/login
   (:use #:cl #:hsx)
   (:import-from #:jingle
-                #:set-response-status #:set-response-header #:*request* #:request-remote-addr)
+                #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/auth
                 #:session-login #:public-path #:session-owner-p #:local-path-p)
   (:import-from #:koya-server/usecases/settings #:totp-enabled-p)
+  (:import-from #:koya-server/usecases/auth #:owner-secret-long-enough-p #:+min-secret-length+)
   (:import-from #:koya-server/web/assets #:asset-url)
   (:import-from #:koya-server/web/http #:redirect-to #:param)
   (:import-from #:koya-server/web/document #:set-title)
@@ -13,6 +14,15 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:export #:@get #:log-in))
 (in-package #:koya-server/web/pages/login)
+
+(defcomp ~short-secret ()
+  (hsx
+   (div :id "login" :class "space-y-2 text-sm"
+     (p :class "text-danger"
+       (format nil "Logging in is off: KOYA_SECRET is shorter than ~a characters." +min-secret-length+))
+     (p "Set a longer one, such as the output of "
+        (code "openssl rand -hex 32")
+        ", and restart the server. Nothing else changes."))))
 
 (defcomp ~login-fields (&key error next)
   (hsx
@@ -37,7 +47,9 @@
       (h1 :class "mb-6 flex items-center gap-3 text-2xl font-bold tracking-tight"
         (img :src (asset-url "icon.svg") :alt "" :width "32" :height "32" :class "h-8 w-8 rounded-md")
         "koya")
-      (~login-fields :next next))
+      (if (owner-secret-long-enough-p)
+          (hsx (~login-fields :next next))
+          (hsx (~short-secret))))
     (~footer))))
 
 (defun next-path (params)
@@ -53,8 +65,7 @@
       (hsx (~login-page :next (next-path params)))))
 
 (defaction log-in :post (params)
-  (let ((address (request-remote-addr *request*))
-        (next (next-path params)))
+  (let ((next (next-path params)))
     (flet ((refuse (status error)
              (set-response-status status)
              (hsx (~login-fields :error error :next next)))
@@ -63,9 +74,9 @@
              (hsx (<>))))
       (if (session-owner-p)
           (go-on)
-          (case (session-login address (or (param params "secret") "") (param params "code"))
+          (case (session-login (or (param params "secret") "") (param params "code"))
             ((t) (go-on))
-            (:locked (refuse 403 "Too many attempts. Wait a few minutes and try again."))
+            (:short-secret (set-response-status 403) (hsx (~short-secret)))
             (t (refuse 401 (if (totp-enabled-p) "Wrong secret or one-time code" "Wrong secret"))))))))
 
 (public-path (log-in))

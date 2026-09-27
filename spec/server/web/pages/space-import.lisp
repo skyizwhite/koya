@@ -82,6 +82,20 @@
       (declare (ignore body))
       (values status (getf headers :hx-redirect)))))
 
+(defun declare-sizes (octets size)
+  "OCTETS, an archive, with every entry's uncompressed size in its headers set to SIZE."
+  (let ((copy (copy-seq octets)))
+    (flet ((put (at)
+             (dotimes (i 4) (setf (aref copy (+ at i)) (ldb (byte 8 (* 8 i)) size)))))
+      (loop :for i :from 0 :to (- (length copy) 4)
+            :do (cond ((and (= (aref copy i) #x50) (= (aref copy (+ i 1)) #x4b)
+                            (= (aref copy (+ i 2)) 3) (= (aref copy (+ i 3)) 4))
+                       (put (+ i 22)))
+                      ((and (= (aref copy i) #x50) (= (aref copy (+ i 1)) #x4b)
+                            (= (aref copy (+ i 2)) 1) (= (aref copy (+ i 3)) 2))
+                       (put (+ i 24))))))
+    copy))
+
 (defun archive-files (pattern)
   "The files in the archive directory whose names contain PATTERN."
   (let ((directory (archive-dir)))
@@ -251,6 +265,14 @@
         (ok (string= (nth-value 1 (import-archive (string-to-octets "not a zip"))) "/"))
         (ok (null (archive-files stale)) "the one given up a day ago is gone")
         (ok (= (length (archive-files ".upload")) (1- count)) "and so is the one just finished")))
+    (testing "an entry larger than its headers say is refused, and nothing is written past them"
+      (ok (string= (nth-value 1 (import-archive (declare-sizes octets 10))) "/"))
+      (ok (search "is not the size its headers say" (nth-value 1 (request :get "/"))))
+      (ng (find-space "archive")))
+    (testing "an entry whose headers claim a huge size is refused before anything is made for it"
+      (ok (string= (nth-value 1 (import-archive (declare-sizes octets #xfffffff0))) "/"))
+      (ok (search "larger than" (nth-value 1 (request :get "/"))))
+      (ng (find-space "archive")))
     (testing "a file larger than an upload may be is refused before it is read"
       (let ((+max-upload-bytes+ 10))
         (ok (string= (nth-value 1 (import-archive octets)) "/")))

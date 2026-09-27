@@ -234,7 +234,8 @@ runtime options when it starts; no size of space needs more, as archives move
 through files one media file at a time.
 
 Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
-`KOYA_PORT` and `KOYA_ENV`. `GET /health` is unauthenticated and touches the database.
+`KOYA_PORT` and `KOYA_ENV`. A `KOYA_SECRET` under 32 characters turns logging in
+off, and the server says so when it starts. `GET /health` is unauthenticated and touches the database.
 
 Backups are the volume's; a space's Export is the portable copy of one space.
 Assets and media are served `immutable` (their URLs carry a version, and a media

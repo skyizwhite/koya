@@ -1057,7 +1057,10 @@ components:
       required: [url]
       properties:
         label: { type: string, description: "Defaults to `url`; always present on output" }
-        url: { type: string }
+        url:
+          type: string
+          pattern: "^[Hh][Tt][Tt][Pp][Ss]?://."
+          description: Starts with `http://` or `https://`. See SCHEMA.md for which addresses are sent to.
         only:
           type: array
           description: Model names this webhook is narrowed to; absent means every model.

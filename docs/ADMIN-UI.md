@@ -38,8 +38,11 @@ started with — and, when two-factor login is on, for the current **one-time
 code** from an authenticator app. There are no user accounts: whoever knows the
 secret is the owner.
 
-- Too many failed attempts in a row lock that address out for a few minutes. The
-  message never says which of the two was wrong.
+- A failed attempt never says which of the two was wrong, and failures lock
+  nobody out: the secret is at least 32 characters, too long to guess.
+- With a `KOYA_SECRET` shorter than that, the page says so and asks for nothing;
+  the rest of the server runs as usual until a longer one is set and the server
+  restarted.
 - A session lasts a day and survives a server restart or a redeploy.
 - A page opened without a session goes to the login page and comes back to that
   page after logging in. So does a button pressed on a page left open after the
@@ -70,7 +73,9 @@ they are made and deleted.
   models and webhooks, every content with its draft and history, its media, its
   keys and its webhook secret. A site's `.env` keeps working against the new
   instance. The name must be free, or the space must be empty; otherwise the
-  import is refused and nothing changes. Nothing is sent to the webhooks. A bar
+  import is refused and nothing changes. So is an archive whose `space.json` is
+  over 100 MB or a media file over the upload limit, and one whose entries are
+  not the size their headers say. Nothing is sent to the webhooks. A bar
   shows the upload; the server then makes the space in one step and answers
   nothing else until it is done.
 
@@ -265,7 +270,8 @@ model, and carries the outcome as a badge:
 Opening a row shows the event, the URL it posted to, a link to the content that
 changed, how long the call took, the error when there was one, and the start of
 **the response body** as the receiver sent it — which is where a revalidation
-hook's own error message usually is.
+hook's own error message usually is. A receiver on a loopback or private address
+has no body here, only its status (see [SCHEMA.md](SCHEMA.md#webhook)).
 
 ![The delivery log, one row open](img/webhooks.png)
 

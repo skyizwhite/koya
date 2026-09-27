@@ -17,7 +17,7 @@
                 #:scan)
   (:import-from #:org.shirakumo.zippy
                 #:zip-file #:zip-entry #:compress-zip #:open-zip-file #:entries #:file-name
-                #:uncompressed-size #:entry-to-vector))
+                #:uncompressed-size #:decode-entry))
 (in-package #:koya-server/infra/archives)
 
 (defparameter +stale-seconds+ (* 24 3600))
@@ -87,9 +87,25 @@
   (let ((entry (gethash name (archive-entries archive))))
     (and entry (uncompressed-size entry))))
 
-(defmethod archive-entry-bytes (archive name)
+(defun entry-bytes (entry name limit)
+  (let ((size (uncompressed-size entry)))
+    (unless (and (integerp size) (<= size limit))
+      (fail 'invalid-input (format nil "~a in the archive is larger than ~a bytes" name limit)))
+    (let ((bytes (make-array size :element-type '(unsigned-byte 8)))
+          (filled 0))
+      (flet ((lie () (fail 'invalid-input (format nil "~a in the archive is not the size its headers say" name))))
+        (decode-entry (lambda (buffer start end)
+                        (when (> (+ filled (- end start)) size) (lie))
+                        (replace bytes buffer :start1 filled :start2 start :end2 end)
+                        (incf filled (- end start))
+                        end)
+                      entry)
+        (unless (= filled size) (lie)))
+      bytes)))
+
+(defmethod archive-entry-bytes (archive name limit)
   (let ((entry (gethash name (archive-entries archive))))
-    (and entry (entry-to-vector entry))))
+    (and entry (entry-bytes entry name limit))))
 
 (defmethod purge-stale-archives ()
   (let ((directory (archive-dir))

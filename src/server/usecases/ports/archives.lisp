@@ -25,6 +25,6 @@
 
 (defgeneric archive-entry-size (archive name))
 
-(defgeneric archive-entry-bytes (archive name))
+(defgeneric archive-entry-bytes (archive name limit))
 
 (defgeneric purge-stale-archives ())

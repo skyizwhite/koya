@@ -20,12 +20,9 @@
   (let ((value (uiop:getenv name)))
     (if (or (null value) (string= value "")) default value)))
 
-(defun required-env (name)
-  (or (env name) (error "Environment variable ~a is not set" name)))
-
 (defun koya-env () (env "KOYA_ENV" "production"))
 (defmethod dev-mode-p () (string= (koya-env) "dev"))
-(defmethod owner-secret () (required-env "KOYA_SECRET"))
+(defmethod owner-secret () (env "KOYA_SECRET" ""))
 (defun db-path () (env "KOYA_DB_PATH" "./data/koya.db"))
 (defun media-dir () (env "KOYA_MEDIA_DIR" "./data/media"))
 (defun archive-dir ()

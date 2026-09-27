@@ -48,7 +48,7 @@
           (:admin-api       :domain :usecases :web)
           (:main            :domain :ports :presenter-ports :usecases :infra :web))
   (:isolated :pages :api :admin-api)
-  (:libraries ("cl-dbi" :infra) ("zippy" :infra) ("dexador" :infra) ("cl-dotenv" :infra)
+  (:libraries ("cl-dbi" :infra) ("zippy" :infra) ("dexador" :infra) ("usocket" :infra) ("cl-dotenv" :infra)
               ("clack" :main) ("lack" :web :infra) ("lack-mw" :web)
               ("jingle" :web :ui :pages :admin-api)
               ("ningle-actions" :web :ui :pages) ("ningle-fbr" :web) ("smart-buffer" :web)

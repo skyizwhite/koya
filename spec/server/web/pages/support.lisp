@@ -20,7 +20,7 @@
 ;;; What every file of page tests shares: an in-memory instance with the website
 ;;; space, and requests driven through the whole app with the owner's cookie.
 
-(defparameter *secret* "ui-secret")
+(defparameter *secret* "ui-secret-long-enough-to-log-in-with-it")
 
 (defvar *cookie* nil)
 

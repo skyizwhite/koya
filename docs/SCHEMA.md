@@ -56,7 +56,7 @@ not exist is refused with `404 not_found`; it never makes one.
 | Key | Type | Rules |
 |---|---|---|
 | `label` | string | non-empty; defaults to `url` when absent on input |
-| `url` | string | non-empty; receives the POST |
+| `url` | string | starts with `http://` or `https://`; receives the POST |
 | `only` | array of string | optional; model names, each one a model of this schema, no duplicates |
 
 Every webhook belongs to the space and fires for **every model**, unless `only`
@@ -67,6 +67,23 @@ Every webhook is sent every event -- `publish`, `unpublish`, `delete` and
 `draft` -- and the payload names the event; there is nothing to subscribe to.
 Any other key on input (older schemas carried an `events` list) is ignored.
 The payload is described in [API.md](API.md#webhooks).
+
+Where a webhook is sent is checked each time, on the addresses its host resolves
+to:
+
+- A link-local, multicast, unspecified or reserved address — such as a cloud's
+  metadata address, `169.254.169.254` — is never sent to, nor are the metadata
+  addresses outside those ranges (`100.100.100.200`, `168.63.129.16`,
+  `fd00:ec2::254`); the call is logged as one that never arrived. An IPv4
+  address carried in IPv6 (`::ffff:0:0/96`, NAT64 `64:ff9b::/96` and
+  `64:ff9b:1::/48`, 6to4 `2002::/16`) is judged as itself.
+- A loopback or private address (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`,
+  `192.168.0.0/16`, `100.64.0.0/10`, `::1`, `fc00::/7`), such as a site's
+  container beside the server, is sent to, and only the status of its answer is
+  kept, not the body.
+- A plain `http` call goes to the address that was checked, with the host in
+  `Host`; an `https` call goes by name, for its certificate.
+- A redirect is not followed: it is logged as the answer.
 
 ## Model
 

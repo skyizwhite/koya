@@ -11,7 +11,7 @@ compile against: SQLite, libev and a C toolchain.
 
 ```sh
 just install          # the Tailwind binary and the Lisp dependencies
-cp .env.example .env  # set KOYA_SECRET; KOYA_PORT and KOYA_BASE_URL must agree
+cp .env.example .env  # set KOYA_SECRET (32+ characters); KOYA_PORT and KOYA_BASE_URL must agree
 just build            # the stylesheet (just watch rebuilds it on every change)
 just dev              # serves on KOYA_PORT (default 3100)
 ```

@@ -1,6 +1,7 @@
 (defpackage #:koya-server/usecases/ports/webhooks
   (:use #:cl)
   (:export #:send-webhook
+           #:resolve-host
            #:record-delivery
            #:list-deliveries
            #:count-deliveries
@@ -10,7 +11,9 @@
            #:+deliveries-kept+))
 (in-package #:koya-server/usecases/ports/webhooks)
 
-(defgeneric send-webhook (url payload headers))
+(defgeneric send-webhook (url payload headers address))
+
+(defgeneric resolve-host (host))
 
 (defgeneric record-delivery (space &key label url model event content-id ok status response error duration-ms))
 

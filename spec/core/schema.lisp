@@ -36,6 +36,12 @@
                'schema-error)
       "nor through a deploy"))
 
+(deftest webhook-urls-are-web-addresses
+  (dolist (url '("javascript:alert(1)" "ftp://x/hook" "file:///etc/passwd" "gopher://x" "//x/hook" "/hook" "http://"))
+    (ok (signals (make-webhook "hook" url) 'schema-error) url))
+  (ok (make-webhook "hook" "http://site:3000/api/revalidate"))
+  (ok (make-webhook "hook" "HTTPS://example.com/hook")))
+
 (deftest constructors
   (testing "field names are camelCased"
     (ok (string= (field-name (make-field :event-at :datetime)) "eventAt")))

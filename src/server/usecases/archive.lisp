@@ -117,8 +117,11 @@
                          (mapcar (lambda (m) (cons (media-entry-name (media-id m) (media-mime m)) m))
                                  media)))))
 
+(defparameter +max-document-bytes+ (* 100 1024 1024))
+
 (defun read-document (archive)
-  (let* ((json (or (archive-entry-bytes archive "space.json") (fail "The archive has no space.json")))
+  (let* ((json (or (archive-entry-bytes archive "space.json" +max-document-bytes+)
+                   (fail "The archive has no space.json")))
          (document (handler-case (parse-json (octets-to-string json :encoding :utf-8))
                      (error () (fail "space.json is not valid JSON")))))
     (unless (hash-table-p document) (fail "space.json must be an object"))
@@ -173,7 +176,7 @@
            (size (or (archive-entry-size archive entry) (fail "The archive has no file for media ~a" id))))
       (when (> size +max-upload-bytes+)
         (fail "The file of media ~a is larger than an upload may be" id))
-      (let ((bytes (archive-entry-bytes archive entry)))
+      (let ((bytes (archive-entry-bytes archive entry +max-upload-bytes+)))
         (multiple-value-bind (sniffed width height) (sniff-image bytes)
           (unless (equal sniffed mime) (fail "The file of media ~a is not the ~a it says it is" id mime))
           (list :id id :mime mime :entry entry :size (length bytes) :width width :height height
@@ -203,7 +206,7 @@
 
 (defun write-media-files (space archive media written)
   (dolist (m media)
-    (unless (write-media-file space (getf m :id) (getf m :mime) (archive-entry-bytes archive (getf m :entry))
+    (unless (write-media-file space (getf m :id) (getf m :mime) (archive-entry-bytes archive (getf m :entry) +max-upload-bytes+)
                               :new t)
       (fail "The file of media ~a is already in the media library" (getf m :id)))
     (push m (car written))))

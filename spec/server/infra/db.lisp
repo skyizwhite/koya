@@ -8,7 +8,7 @@
   (:import-from #:koya-server/infra/db/migrations #:migrate #:current-version)
   (:import-from #:koya-server/infra/db/schema-dump #:migrated-snapshot #:read-snapshot)
   (:import-from #:koya-server/usecases/ports/spaces
-                #:load-schema #:find-model #:list-spaces #:delete-space
+                #:load-schema #:find-model #:list-spaces #:delete-space #:space-webhooks
                 #:find-space)
   (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-server/domain/deploy
@@ -53,7 +53,7 @@
                                                             (make-field :event-at :datetime))))))
 
 (deftest migrations
-  (ok (= (current-version) 10))
+  (ok (= (current-version) 11))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -63,11 +63,21 @@
         "legacy" "about" "object"
         "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
         0)
-  (exec "DELETE FROM schema_version WHERE version = 10")
-  (ok (equal (migrate) '(10)))
+  (exec "DELETE FROM schema_version WHERE version >= 10")
+  (ok (equal (migrate) '(10 11)))
   (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
     (ng (search "previewUrl" definition))
     (ok (search "https://x/about" definition) "a web address is kept"))
+  (delete-space "legacy"))
+
+(deftest stored-webhooks-that-are-not-web-addresses-are-dropped
+  (create-space "legacy")
+  (exec "UPDATE spaces SET webhooks = ? WHERE name = 'legacy'"
+        "[{\"label\":\"bare\",\"url\":\"example.com/hook\"},{\"label\":\"site\",\"url\":\"https://x/hook\"},{\"label\":\"ftp\",\"url\":\"ftp://x/hook\"}]")
+  (exec "DELETE FROM schema_version WHERE version = 11")
+  (ok (equal (migrate) '(11)))
+  (ok (equal (mapcar (lambda (hook) (getf hook :label)) (space-webhooks "legacy")) '("site"))
+      "the space still reads, with the one hook that can be sent")
   (delete-space "legacy"))
 
 (deftest schema-snapshot-matches-the-migrations

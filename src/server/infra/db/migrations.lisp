@@ -130,7 +130,17 @@
        WHERE json_type(definition, '$.publicUrl') IS NOT NULL
          AND NOT (json_type(definition, '$.publicUrl') = 'text'
                   AND (json_extract(definition, '$.publicUrl') LIKE 'http://_%'
-                       OR json_extract(definition, '$.publicUrl') LIKE 'https://_%'))")))
+                       OR json_extract(definition, '$.publicUrl') LIKE 'https://_%'))")
+    (11
+     "UPDATE spaces SET webhooks =
+        (SELECT json_group_array(json(hook.value)) FROM json_each(spaces.webhooks) AS hook
+          WHERE json_type(hook.value, '$.url') = 'text'
+            AND (json_extract(hook.value, '$.url') LIKE 'http://_%'
+                 OR json_extract(hook.value, '$.url') LIKE 'https://_%'))
+       WHERE EXISTS (SELECT 1 FROM json_each(spaces.webhooks) AS hook
+                      WHERE NOT (json_type(hook.value, '$.url') = 'text'
+                                 AND (json_extract(hook.value, '$.url') LIKE 'http://_%'
+                                      OR json_extract(hook.value, '$.url') LIKE 'https://_%')))")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

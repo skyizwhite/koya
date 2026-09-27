@@ -2,8 +2,10 @@
   (:use #:cl)
   (:import-from #:koya-core/schema #:model-name #:webhook-covers-p #:webhook-label #:webhook-url)
   (:import-from #:koya-server/usecases/ports/spaces #:space-webhooks)
+  (:import-from #:quri #:uri #:uri-host)
+  (:import-from #:koya-server/domain/address #:addresses-reach)
   (:import-from #:koya-server/usecases/ports/webhooks
-                #:record-delivery #:send-webhook #:list-deliveries #:count-deliveries
+                #:record-delivery #:send-webhook #:resolve-host #:list-deliveries #:count-deliveries
                 #:find-delivery #:delivery-labels #:delivery-models #:+deliveries-kept+)
   (:import-from #:koya-server/usecases/ports/presenters #:webhook-payload)
   (:import-from #:bordeaux-threads-2 #:make-thread)
@@ -32,12 +34,30 @@
 (defun elapsed-ms (start)
   (round (* 1000 (- (get-internal-real-time) start)) internal-time-units-per-second))
 
+(defun url-host (url)
+  (let ((host (ignore-errors (uri-host (uri url)))))
+    (and host (plusp (length host)) (string-trim "[]" host))))
+
+(defun url-reach (url)
+  (let* ((host (url-host url))
+         (addresses (and host (resolve-host host)))
+         (reach (addresses-reach addresses)))
+    (case reach
+      ((nil) (values nil (if host (format nil "~a does not resolve" host) "The URL has no host")))
+      (:forbidden (values nil (format nil "~a is a link-local, multicast or reserved address, which is never sent to" host)))
+      (t (values reach nil (first addresses))))))
+
 (defun send-and-log (hook space model id event payload headers)
   (let ((start (get-internal-real-time))
         (status nil) (body nil) (failure nil))
     (handler-case
-        (multiple-value-setq (status body failure)
-          (send-webhook (webhook-url hook) payload headers))
+        (multiple-value-bind (reach refusal address) (url-reach (webhook-url hook))
+          (if refusal
+              (setf failure refusal)
+              (progn
+                (multiple-value-setq (status body failure)
+                  (send-webhook (webhook-url hook) payload headers address))
+                (when (eq reach :internal) (setf body nil)))))
       (error (e) (setf status nil body nil failure (princ-to-string e))))
     (handler-case
         (record-delivery space

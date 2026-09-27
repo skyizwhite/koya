@@ -21,7 +21,7 @@
 ;;; space and its keys, requests driven through the whole app, and the webhooks
 ;;; the app would have sent.
 
-(defparameter *secret* "test-secret")
+(defparameter *secret* "test-secret-long-enough-to-log-in-with")
 
 (defvar *management-key* nil "Created in SETUP; the Bearer token of every admin call.")
 

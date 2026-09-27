@@ -18,7 +18,7 @@
 (in-package #:koya-spec/sdk/client)
 
 (defparameter *port* 3987)
-(defparameter *secret* "client-test-secret")
+(defparameter *secret* "client-test-secret-long-enough-to-log-in")
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
