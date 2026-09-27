@@ -117,7 +117,6 @@
       (ok (= status 200))
       (ng (search "/s/website/webhooks" body)))))
 
-
 (deftest the-log-is-filtered-in-place
   (exec "DELETE FROM webhook_deliveries")
   (dolist (model '("blog" "blog" "about"))

@@ -4,9 +4,9 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
-  (:import-from #:koya-server/web/http #:uploaded-files #:param)
+  (:import-from #:koya-server/web/lib/http #:uploaded-files #:param)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
-  (:import-from #:koya-server/web/paging #:page-number #:last-page #:page-offset)
+  (:import-from #:koya-server/web/lib/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/media/grid #:~media-grid #:~pick-cards #:~upload-limit)
   (:export #:media-picker

@@ -104,4 +104,3 @@
         (ok (string= (jget json "error" "code") "bad_request")))
       (multiple-value-bind (status) (admin-upload "/admin/api/media/other" (list (list "file" "a.png" "image/png" (png-bytes))))
         (ok (= status 403) "a key of another space is refused before the route is reached")))))
-

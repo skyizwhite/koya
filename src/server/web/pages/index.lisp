@@ -3,9 +3,9 @@
   (:import-from #:jingle
                 #:set-response-status #:set-response-header #:*request* #:request-content)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/http #:param)
-  (:import-from #:koya-server/web/urls #:space-url)
-  (:import-from #:koya-server/web/document #:set-title)
+  (:import-from #:koya-server/web/lib/http #:param)
+  (:import-from #:koya-server/web/lib/urls #:space-url)
+  (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/ui/icon #:~icon)

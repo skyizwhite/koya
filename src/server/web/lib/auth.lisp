@@ -1,6 +1,6 @@
-(defpackage #:koya-server/web/auth
+(defpackage #:koya-server/web/lib/auth
   (:use #:cl)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/http
                 #:json-response #:error-object #:origin-allowed-p)
   (:import-from #:koya-server/usecases/keys
                 #:space-for-delivery-key #:space-for-management-key #:management-key-label)
@@ -23,7 +23,7 @@
            #:session-login
            #:session-logout
            #:session-owner-p))
-(in-package #:koya-server/web/auth)
+(in-package #:koya-server/web/lib/auth)
 
 (defun bearer-token (env)
   (let ((auth (gethash "authorization" (getf env :headers))))

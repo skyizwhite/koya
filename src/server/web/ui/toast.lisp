@@ -6,7 +6,7 @@
                 #:json-array)
   (:import-from #:koya-server/domain/errors
                 #:koya-error-message)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/http
                 #:error-status)
   (:export #:set-toast
            #:take-toast

@@ -4,9 +4,9 @@
                 #:field-name #:field-type #:field-option #:field-required-p #:field-many-p)
   (:import-from #:koya-core/json
                 #:json-null)
-  (:import-from #:koya-server/web/forms #:field-param-name #:value->string)
+  (:import-from #:koya-server/web/lib/forms #:field-param-name #:value->string)
   (:import-from #:koya-server/domain/media #:media-filename #:media-alt)
-  (:import-from #:koya-server/web/presenters #:media-url)
+  (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/usecases/settings #:display-timezone-name)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:export #:~field-input))

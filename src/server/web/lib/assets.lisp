@@ -1,10 +1,10 @@
-(defpackage #:koya-server/web/assets
+(defpackage #:koya-server/web/lib/assets
   (:use #:cl)
   (:import-from #:quri #:make-uri #:render-uri)
   (:export #:asset-url
            #:asset-version
            #:refresh-asset-version))
-(in-package #:koya-server/web/assets)
+(in-package #:koya-server/web/lib/assets)
 
 (defvar *asset-version* nil)
 

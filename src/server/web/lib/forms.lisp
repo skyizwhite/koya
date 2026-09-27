@@ -1,4 +1,4 @@
-(defpackage #:koya-server/web/forms
+(defpackage #:koya-server/web/lib/forms
   (:use #:cl)
   (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p)
   (:import-from #:koya-core/json
@@ -10,14 +10,14 @@
   (:import-from #:koya-server/domain/number #:parse-decimal)
   (:import-from #:koya-server/domain/timezone #:iso->local-input #:local-input->iso)
   (:import-from #:koya-server/usecases/settings #:display-timezone)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/http
                 #:form-values)
   (:export #:form->data
            #:field-param-name
            #:form-value
            #:value->string
            #:number->string))
-(in-package #:koya-server/web/forms)
+(in-package #:koya-server/web/lib/forms)
 
 (defun field-param-name (field)
   (format nil "f-~a" (field-name field)))
@@ -74,4 +74,3 @@
          (if (stringp value) (iso->local-input value :timezone (display-timezone)) (princ-to-string value)))
         ((eq value t) "true")
         (t (princ-to-string value))))
-

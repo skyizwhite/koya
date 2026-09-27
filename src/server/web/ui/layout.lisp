@@ -4,11 +4,11 @@
                 #:set-response-header #:set-response-status)
   (:import-from #:ningle-actions
                 #:defaction)
-  (:import-from #:koya-server/web/auth
+  (:import-from #:koya-server/web/lib/auth
                 #:session-logout)
-  (:import-from #:koya-server/web/assets
+  (:import-from #:koya-server/web/lib/assets
                 #:asset-url)
-  (:import-from #:koya-server/web/urls
+  (:import-from #:koya-server/web/lib/urls
                 #:space-url)
   (:import-from #:koya-server/web/ui/icon
                 #:~icon)

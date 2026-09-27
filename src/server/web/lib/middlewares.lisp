@@ -1,4 +1,4 @@
-(defpackage #:koya-server/web/middlewares
+(defpackage #:koya-server/web/lib/middlewares
   (:use #:cl)
   (:import-from #:lack-mw
                 #:with-args #:*mw-cache-control* #:*mw-cors* #:*mw-body-limit*)
@@ -9,7 +9,7 @@
            #:*mw-delivery-cors*
            #:*mw-max-body*
            #:+max-body-bytes+))
-(in-package #:koya-server/web/middlewares)
+(in-package #:koya-server/web/lib/middlewares)
 
 (defparameter *mw-default-cache-control*
   (with-args *mw-cache-control*

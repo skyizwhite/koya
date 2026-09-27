@@ -1,12 +1,12 @@
 (defpackage #:koya-server/web/admin-api/contents/<space>/<model>/index
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/http
                 #:path-param #:read-json-body #:body-field #:fail-api #:ok-status)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
   (:import-from #:koya-server/usecases/contents #:create)
   (:import-from #:koya-server/usecases/listing #:all-contents)
-  (:import-from #:koya-server/web/presenters #:admin-content->jobject)
+  (:import-from #:koya-server/web/lib/presenters #:admin-content->jobject)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:export #:@get #:@post))
 (in-package #:koya-server/web/admin-api/contents/<space>/<model>/index)

@@ -1,4 +1,3 @@
-
 (defsystem "koya-sdk"
   :version "0.14.1"
   :description "koya - a small headless CMS in Common Lisp (SDK: the schema DSL and the HTTP client)"

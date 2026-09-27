@@ -1,4 +1,4 @@
-(defpackage #:koya-server/web/http
+(defpackage #:koya-server/web/lib/http
   (:use #:cl)
   (:import-from #:jingle
                 #:set-response-header #:set-response-status #:get-request-header #:redirect
@@ -39,7 +39,7 @@
            #:json-response
            #:error-status
            #:ok-status))
-(in-package #:koya-server/web/http)
+(in-package #:koya-server/web/lib/http)
 
 (define-condition api-error (error)
   ((status :initarg :status :reader api-error-status)

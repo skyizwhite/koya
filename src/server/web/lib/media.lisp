@@ -1,11 +1,11 @@
-(defpackage #:koya-server/web/media
+(defpackage #:koya-server/web/lib/media
   (:use #:cl)
   (:import-from #:koya-server/usecases/media
                 #:stored-file)
   (:import-from #:cl-ppcre
                 #:scan-to-strings)
   (:export #:media-app))
-(in-package #:koya-server/web/media)
+(in-package #:koya-server/web/lib/media)
 
 (defparameter +media-path-pattern+ "^([a-z][a-z0-9-]*)/([0-9A-Z]{26})\\.(png|jpg|gif|webp)\\z")
 

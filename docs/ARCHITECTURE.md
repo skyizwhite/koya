@@ -48,8 +48,9 @@ src/
     infra/            ; the ports, implemented: main (all of infra, as main loads it),
                       ; env, media-files, webhook-sender, archives, and
       db/             ;   main, connection, migrations, schema.sql, one file per table
-    web/              ; the way in: app, middlewares, http, auth, presenters,
-                      ; forms, media, paging, display, urls, assets, document
+    web/              ; the way in: app, which builds it from what is below
+      lib/            ;   middlewares, http, auth, presenters, forms, media, paging,
+                      ;   display, urls, assets, document
       pages/          ;   the admin UI (ningle-fbr: the directory is the URL), GET only
       ui/             ;   hsx components shared by pages: layout, icon, toast,
                       ;   elements at the top; content/ and media/ below
@@ -98,14 +99,14 @@ web  ──▶  usecases  ──▶  domain
   not when its file loads, so nothing calls a port before infra is there.
 - `web/` reads the request, calls use cases, and draws or words the result. It
   turns a domain error into a status in one place (`error-status` in
-  `web/http`). The auth guards bind `*actor*`. The web never reaches a port or
+  `web/lib/http`). The auth guards bind `*actor*`. The web never reaches a port or
   `infra/` directly: where a use case has nothing to add, it re-exports the
   port's function. Exactly one use case does, the one the function belongs
   with (a space's schema is `schema`'s, its keys and webhook secret
   `keys`'s), so a page has one place to import it from; a test holds it to one.
 - Use cases hand over what they found, never JSON. A content as the delivery
   API serves it is a `delivered` (`usecases/delivery`): its data with
-  media and the references asked for resolved. `web/presenters` makes it, a
+  media and the references asked for resolved. `web/lib/presenters` makes it, a
   media, a content of the admin API and a deploy's changes into what the wire
   carries: the names, the nulls, the URLs. A webhook carries the delivery shape
   too, so the web implements the one port that is not infra's,
@@ -115,7 +116,7 @@ What only one page needs to draw -- its URLs, a badge's class, how a value
 reads there -- stays in that page's file. The three routers -- the pages and
 both APIs -- are the outermost part of the web: they use the rest of `web/` (and
 the pages `ui/`), and nothing uses them, another route included. A URL two pages link to is in
-`web/urls`. See `adr/2026-09-27-routes-do-not-import-one-another.md`.
+`web/lib/urls`. See `adr/2026-09-27-routes-do-not-import-one-another.md`.
 
 `spec/server/layers.lisp` declares the layers with
 [okite](https://github.com/skyizwhite/okite) -- in `web/`, each router a layer
@@ -208,7 +209,7 @@ through htmx requests only, from the owner's session and this origin, and sends 
 request that has lost its session to the login page with `HX-Redirect`. An action
 answers the part of the page it changed, under that part's id, and the toast out
 of band into the layout's `#toast`; a result on another page is an `HX-Redirect`
-with the toast in the session. A path declared with `public-path` (`web/auth`)
+with the toast in the session. A path declared with `public-path` (`web/lib/auth`)
 needs no session: the login page and its action, and `/health`. `/assets/` and
 `/media/` are served outside the session and the guards, so the login page is
 drawn with the assets and no file fetched reads the session.

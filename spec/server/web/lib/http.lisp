@@ -1,4 +1,4 @@
-(defpackage #:koya-spec/server/web/http
+(defpackage #:koya-spec/server/web/lib/http
   (:use #:cl #:rove)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-spec/server/web/api-support
@@ -7,10 +7,10 @@
   (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook)
-  (:import-from #:koya-server/web/http #:origin-allowed-p)
+  (:import-from #:koya-server/web/lib/http #:origin-allowed-p)
   (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:alexandria #:alist-hash-table))
-(in-package #:koya-spec/server/web/http)
+(in-package #:koya-spec/server/web/lib/http)
 
 (setup (setup-api))
 

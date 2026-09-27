@@ -1,9 +1,9 @@
-(defpackage #:koya-server/web/urls
+(defpackage #:koya-server/web/lib/urls
   (:use #:cl)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:cl-ppcre
                 #:regex-replace-all)
-  (:import-from #:koya-server/web/http #:blank-p)
+  (:import-from #:koya-server/web/lib/http #:blank-p)
   (:export #:space-url
            #:model-url
            #:content-url
@@ -11,7 +11,7 @@
            #:deploys-url
            #:webhook-log-url
            #:expand-url-template))
-(in-package #:koya-server/web/urls)
+(in-package #:koya-server/web/lib/urls)
 
 (defun space-url (space) (format nil "/s/~a" space))
 (defun model-url (space model) (format nil "/s/~a/m/~a" space model))

@@ -6,7 +6,7 @@
   (:import-from #:koya-server/infra/main
                 #:db-path #:server-port #:open-store #:close-store #:write-snapshot)
   (:import-from #:koya-server/web/app #:app #:*app* #:install-routes)
-  (:import-from #:koya-server/web/assets #:refresh-asset-version)
+  (:import-from #:koya-server/web/lib/assets #:refresh-asset-version)
   (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/usecases/ports/config #:dev-mode-p)
   (:import-from #:koya-server/usecases/ports/main #:+ports+)

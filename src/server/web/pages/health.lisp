@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/pages/health
   (:use #:cl #:hsx)
   (:import-from #:koya-server/usecases/system #:store-reachable-p)
-  (:import-from #:koya-server/web/auth #:public-path)
+  (:import-from #:koya-server/web/lib/auth #:public-path)
   (:export #:@get))
 (in-package #:koya-server/web/pages/health)
 

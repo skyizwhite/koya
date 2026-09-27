@@ -1,11 +1,11 @@
-(defpackage #:koya-server/web/display
+(defpackage #:koya-server/web/lib/display
   (:use #:cl)
   (:import-from #:koya-server/domain/timezone #:format-local)
   (:import-from #:koya-server/usecases/settings #:display-timezone)
   (:import-from #:koya-server/usecases/actor #:actor-key-label)
   (:export #:short-time
            #:caller-name))
-(in-package #:koya-server/web/display)
+(in-package #:koya-server/web/lib/display)
 
 (defun short-time (iso)
   (format-local iso :timezone (display-timezone)))

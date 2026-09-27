@@ -157,7 +157,6 @@
       (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" (format nil "t~a" i)) "publish" t)))
     (ok (<= (count-deliveries "website") +deliveries-kept+) "the cap holds")))
 
-
 (defvar *redirect* nil)
 
 (deftest where-a-webhook-is-sent

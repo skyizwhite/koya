@@ -1,11 +1,11 @@
-(defpackage #:koya-server/web/document
+(defpackage #:koya-server/web/lib/document
   (:use #:cl #:hsx)
   (:import-from #:jingle #:context)
-  (:import-from #:koya-server/web/assets #:asset-url)
+  (:import-from #:koya-server/web/lib/assets #:asset-url)
   (:export #:~document
            #:set-title
            #:page-title))
-(in-package #:koya-server/web/document)
+(in-package #:koya-server/web/lib/document)
 
 (defun set-title (title) (setf (context :title) title))
 (defun page-title () (context :title))

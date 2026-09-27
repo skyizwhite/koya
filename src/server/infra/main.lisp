@@ -12,4 +12,3 @@
            #:close-store
            #:write-snapshot))
 (in-package #:koya-server/infra)
-

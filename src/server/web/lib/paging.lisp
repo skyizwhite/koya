@@ -1,12 +1,12 @@
-(defpackage #:koya-server/web/paging
+(defpackage #:koya-server/web/lib/paging
   (:use #:cl)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/http
                 #:param)
   (:export #:+page-size+
            #:page-number
            #:last-page
            #:page-offset))
-(in-package #:koya-server/web/paging)
+(in-package #:koya-server/web/lib/paging)
 
 (defparameter +page-size+ 20)
 

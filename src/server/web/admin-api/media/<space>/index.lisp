@@ -1,10 +1,10 @@
 (defpackage #:koya-server/web/admin-api/media/<space>/index
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/http
                 #:path-param #:param #:fail-api #:ok-status #:uploaded-files #:form-field)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
-  (:import-from #:koya-server/web/presenters #:media->jobject)
+  (:import-from #:koya-server/web/lib/presenters #:media->jobject)
   (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
   (:import-from #:koya-server/usecases/spaces #:resolve-space)
   (:export #:@get #:@post))

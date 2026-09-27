@@ -4,9 +4,9 @@
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/domain/query
                 #:parse-query #:query-limit #:query-offset #:query-fields)
-  (:import-from #:koya-server/web/http #:path-param #:param)
+  (:import-from #:koya-server/web/lib/http #:path-param #:param)
   (:import-from #:koya-server/usecases/delivery #:delivered-list #:delivered-object)
-  (:import-from #:koya-server/web/presenters #:delivered->jobject)
+  (:import-from #:koya-server/web/lib/presenters #:delivered->jobject)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:export #:@get))
 (in-package #:koya-server/web/api/v1/<space>/<model>/index)

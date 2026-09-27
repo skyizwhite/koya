@@ -1,4 +1,3 @@
-
 (defsystem "koya-core"
   :version "0.14.1"
   :description "koya - a small headless CMS in Common Lisp (core: the schema, JSON, time and ids both the SDK and the server use)"

@@ -1,4 +1,4 @@
-(defpackage #:koya-server/web/presenters
+(defpackage #:koya-server/web/lib/presenters
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject #:json-null #:to-json)
   (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type)
@@ -23,7 +23,7 @@
            #:media-url
            #:admin-content->jobject
            #:changes->jarray))
-(in-package #:koya-server/web/presenters)
+(in-package #:koya-server/web/lib/presenters)
 
 (defun media-url (media &key (absolute t))
   (let ((path (format nil "/media/~a/~a" (media-space media) (media-file-name media))))

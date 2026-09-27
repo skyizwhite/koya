@@ -4,11 +4,9 @@
   (:export #:*webhook-sender* #:*address*))
 (in-package #:koya-spec/server/fake-webhooks)
 
-(defvar *webhook-sender* nil
-)
+(defvar *webhook-sender* nil)
 
-(defvar *address* nil
-)
+(defvar *address* nil)
 
 (defmethod send-webhook :around (url payload headers address)
   (if *webhook-sender*

@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject #:json-null)
   (:import-from #:jingle #:*request* #:request-env)
-  (:import-from #:koya-server/web/auth #:session-owner-p #:calling-space)
+  (:import-from #:koya-server/web/lib/auth #:session-owner-p #:calling-space)
   (:export #:@get))
 (in-package #:koya-server/web/admin-api/me)
 

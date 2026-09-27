@@ -12,18 +12,18 @@
                 #:with-args #:*mw-trim-trailing-slash* #:*mw-recovery*
                 #:*mw-mount* #:*mw-session* #:*mw-accesslog* #:make-cookie-state)
   (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
-  (:import-from #:koya-server/web/media #:media-app)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/media #:media-app)
+  (:import-from #:koya-server/web/lib/http
                 #:make-json-app)
-  (:import-from #:koya-server/web/middlewares
+  (:import-from #:koya-server/web/lib/middlewares
                 #:*mw-temporary-file* #:*mw-max-body*
                 #:*mw-default-cache-control* #:*mw-delivery-cors* #:+max-body-bytes+)
   (:import-from #:smart-buffer)
   (:import-from #:koya-server/usecases/auth #:make-session-store #:+session-seconds+)
-  (:import-from #:koya-server/web/auth
+  (:import-from #:koya-server/web/lib/auth
                 #:*mw-delivery-auth* #:*mw-admin-auth* #:*mw-actions-auth* #:*mw-pages-auth*)
-  (:import-from #:koya-server/web/presenters)
-  (:import-from #:koya-server/web/document
+  (:import-from #:koya-server/web/lib/presenters)
+  (:import-from #:koya-server/web/lib/document
                 #:~document #:page-title)
   (:export #:app
            #:*app*

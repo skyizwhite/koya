@@ -1,9 +1,9 @@
 (defpackage #:koya-server/web/admin-api/contents/<space>/<model>/<id>/index
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject)
-  (:import-from #:koya-server/web/http #:path-param #:read-json-body #:body-field #:fail-api)
+  (:import-from #:koya-server/web/lib/http #:path-param #:read-json-body #:body-field #:fail-api)
   (:import-from #:koya-server/usecases/contents #:update-draft #:destroy #:resolve-content)
-  (:import-from #:koya-server/web/presenters #:admin-content->jobject)
+  (:import-from #:koya-server/web/lib/presenters #:admin-content->jobject)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:export #:@get #:@patch #:@delete))
 (in-package #:koya-server/web/admin-api/contents/<space>/<model>/<id>/index)

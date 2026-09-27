@@ -4,7 +4,7 @@
                 #:media-id #:media-filename #:media-width #:media-height #:media-alt #:+max-upload-bytes+)
   (:import-from #:koya-server/usecases/media #:upload-limit-message)
   (:import-from #:koya-server/web/ui/toast #:~toast)
-  (:import-from #:koya-server/web/presenters #:media-url)
+  (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:export #:~media-grid
            #:~upload-limit

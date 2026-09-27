@@ -67,4 +67,3 @@
     (multiple-value-bind (status json) (request :put "/admin/api/schema/website" :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*))) :body "not json")
       (ok (= status 400))
       (ok (string= (jget json "error" "code") "bad_json")))))
-

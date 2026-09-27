@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/not-found
   (:use #:cl)
-  (:import-from #:koya-server/web/http #:error-object)
+  (:import-from #:koya-server/web/lib/http #:error-object)
   (:export #:@not-found))
 (in-package #:koya-server/web/admin-api/not-found)
 

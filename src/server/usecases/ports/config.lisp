@@ -10,4 +10,3 @@
 (defgeneric owner-secret ())
 
 (defgeneric dev-mode-p ())
-

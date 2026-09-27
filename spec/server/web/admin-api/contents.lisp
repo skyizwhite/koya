@@ -175,7 +175,6 @@
     (ok (= status 200))
     (ok (= (jget json "totalCount") 1))))
 
-
 (deftest a-referenced-content-stays
   (flet ((make (model data)
            (jget (nth-value 1 (admin :post (format nil "/admin/api/contents/website/~a" model)

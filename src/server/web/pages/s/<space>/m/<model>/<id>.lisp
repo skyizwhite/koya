@@ -8,22 +8,22 @@
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents
                 #:find-content #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
-  (:import-from #:koya-server/web/target #:target-model #:target-content)
+  (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
                 #:default-data #:content-label)
   (:import-from #:koya-server/usecases/spaces #:find-space)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/http
                 #:path-param #:param)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:not-found)
-  (:import-from #:koya-server/web/forms #:form->data)
+  (:import-from #:koya-server/web/lib/forms #:form->data)
   (:import-from #:koya-server/usecases/listing #:reference-options)
-  (:import-from #:koya-server/web/display #:short-time)
-  (:import-from #:koya-server/web/urls
+  (:import-from #:koya-server/web/lib/display #:short-time)
+  (:import-from #:koya-server/web/lib/urls
                 #:expand-url-template #:content-url #:model-url #:history-url #:webhook-log-url)
-  (:import-from #:koya-server/web/document #:set-title)
+  (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors)
   (:import-from #:koya-server/web/ui/icon #:~icon)

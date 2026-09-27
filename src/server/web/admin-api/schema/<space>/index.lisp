@@ -4,8 +4,8 @@
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/domain/errors
                 #:conflict #:koya-error-code #:koya-error-message #:koya-error-details)
-  (:import-from #:koya-server/web/http #:read-json-body #:path-param #:param #:fail-api)
-  (:import-from #:koya-server/web/presenters #:changes->jarray)
+  (:import-from #:koya-server/web/lib/http #:read-json-body #:path-param #:param #:fail-api)
+  (:import-from #:koya-server/web/lib/presenters #:changes->jarray)
   (:import-from #:koya-server/usecases/schema #:space-schema #:deploy)
   (:export #:@get #:@put))
 (in-package #:koya-server/web/admin-api/schema/<space>/index)

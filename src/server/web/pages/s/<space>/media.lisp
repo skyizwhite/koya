@@ -6,17 +6,17 @@
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
-  (:import-from #:koya-server/web/presenters #:media-url)
+  (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/usecases/media
                 #:remove-media #:store-uploads #:remove-each #:list-media #:count-media
                 #:find-media #:update-media #:media-reference-counts)
-  (:import-from #:koya-server/web/http
+  (:import-from #:koya-server/web/lib/http
                 #:path-param #:uploaded-files #:param #:form-values)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
-  (:import-from #:koya-server/web/paging #:page-number #:last-page #:page-offset)
-  (:import-from #:koya-server/web/display #:short-time)
-  (:import-from #:koya-server/web/urls #:space-url)
-  (:import-from #:koya-server/web/document #:set-title)
+  (:import-from #:koya-server/web/lib/paging #:page-number #:last-page #:page-offset)
+  (:import-from #:koya-server/web/lib/display #:short-time)
+  (:import-from #:koya-server/web/lib/urls #:space-url)
+  (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/icon #:~icon)

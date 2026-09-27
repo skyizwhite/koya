@@ -5,9 +5,9 @@
                 #:schema-models #:schema-webhooks #:model-name #:model-kind
                 #:webhook-label #:webhook-url #:webhook-only)
   (:import-from #:koya-server/usecases/listing #:count-contents)
-  (:import-from #:koya-server/web/http #:path-param)
-  (:import-from #:koya-server/web/urls #:model-url #:space-url #:deploys-url #:webhook-log-url)
-  (:import-from #:koya-server/web/document #:set-title)
+  (:import-from #:koya-server/web/lib/http #:path-param)
+  (:import-from #:koya-server/web/lib/urls #:model-url #:space-url #:deploys-url #:webhook-log-url)
+  (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/ui/icon #:~icon #:~model-icon)

@@ -1,4 +1,4 @@
-(defpackage #:koya-spec/server/web/auth
+(defpackage #:koya-spec/server/web/lib/auth
   (:use #:cl #:rove)
   (:import-from #:koya-spec/server/web/pages/support
                 #:*cookie* #:request #:request-url #:location #:setup-pages #:log-in #:post-login #:*secret*
@@ -8,14 +8,13 @@
   (:import-from #:koya-server/web/app #:*page-app* #:*app* #:build-app)
   (:import-from #:jingle #:route)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db))
-(in-package #:koya-spec/server/web/auth)
+(in-package #:koya-spec/server/web/lib/auth)
 
 (setup (setup-pages) (log-in))
 
 (teardown (disconnect-db))
 
-(defparameter +probe-path+ "/probe-page-the-guard-covers"
-)
+(defparameter +probe-path+ "/probe-page-the-guard-covers")
 
 (deftest a-page-that-does-nothing-is-the-owners
   (setf (route *page-app* +probe-path+)
@@ -59,7 +58,7 @@
 
 (deftest a-public-path-is-the-path-asked-for
   (flet ((public-p (request-uri)
-           (koya-server/web/auth::public-request-p (list :request-uri request-uri :path-info "/"))))
+           (koya-server/web/lib/auth::public-request-p (list :request-uri request-uri :path-info "/"))))
     (ok (public-p "/login"))
     (ok (public-p "/login?next=%2Fs%2Fwebsite") "whatever its query")
     (ok (public-p "/log%69n") "decoded, as path-info is")
@@ -101,7 +100,7 @@
 
 (deftest the-way-back-is-the-request-line-as-sent
   (flet ((next (request-uri path-info)
-           (koya-server/web/auth::page-login-location (list :request-uri request-uri :path-info path-info))))
+           (koya-server/web/lib/auth::page-login-location (list :request-uri request-uri :path-info path-info))))
     (ok (string= (next "/s/a%2Fb" "/s/a/b") "/login?next=%2Fs%2Fa%252Fb")
         "an encoded / stays encoded")
     (ok (string= (next "/s/a%3Fb" "/s/a?b") "/login?next=%2Fs%2Fa%253Fb")
