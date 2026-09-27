@@ -8,9 +8,6 @@
   (:import-from #:bordeaux-threads-2 #:make-thread #:join-thread))
 (in-package #:koya-spec/server/infra/webhook-sender)
 
-;;; The real sender, against a receiver on this machine that answers one call
-;;; and gives back the request's lines.
-
 (defun crlf (stream control &rest args)
   (apply #'format stream control args)
   (write-char #\Return stream) (write-char #\Newline stream))
@@ -46,10 +43,16 @@
                        lines)))
     (and line (string-trim " " (subseq line (1+ (length name)))))))
 
+(defun ipv6-here-p ()
+  (let ((listener (ignore-errors (socket-listen "::1" 0))))
+    (when listener (socket-close listener) t)))
+
 (deftest plain-http-connects-to-the-checked-address
   (let ((*webhook-sender* nil))
-    (dolist (case '(("127.0.0.1" #(127 0 0 1))
-                    ("::1" #(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1))))
+    (dolist (case (cons '("127.0.0.1" #(127 0 0 1))
+                        (if (ipv6-here-p)
+                            '(("::1" #(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)))
+                            (progn (skip "No IPv6 on this machine, so no call over it") '()))))
       (destructuring-bind (host address) case
         (multiple-value-bind (port receiver) (receive-once host)
           (let ((url (format nil "http://receiver.invalid:~a/hook?x=1" port)))
