@@ -83,6 +83,7 @@ export default defineConfig({
         name: "blog",
         kind: "list",
         label: "title",
+        publicUrl: "https://example.com/blog/{CONTENT_ID}",
         previewUrl: "https://example.com/blog/{CONTENT_ID}?draftKey={DRAFT_KEY}",
         fields: [
           { name: "title", type: "text", required: true },
