@@ -5,9 +5,6 @@
   (:import-from #:koya-server/usecases/ports/settings #:get-setting #:set-setting #:delete-setting))
 (in-package #:koya-server/infra/db/settings)
 
-;;; Instance-wide key/value settings the owner changes from the admin UI
-;;; (currently the two-factor secret). Values are strings.
-
 (defmethod get-setting (key)
   (let ((row (fetch-one "SELECT value FROM settings WHERE key = ?" key)))
     (and row (col row "value"))))

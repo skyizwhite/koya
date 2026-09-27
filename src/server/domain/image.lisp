@@ -5,10 +5,6 @@
            #:+image-types+))
 (in-package #:koya-server/domain/image)
 
-;;; Recognise the image formats the media library accepts by their leading
-;;; bytes and read the pixel size from the header. Nothing else is decoded.
-;;; The client-supplied Content-Type is never consulted.
-
 (defparameter +image-types+
   '(("image/png" . "png") ("image/jpeg" . "jpg") ("image/gif" . "gif") ("image/webp" . "webp")))
 
@@ -26,7 +22,6 @@
              :always (or (null e) (= (aref bytes k) e)))))
 
 (defun png-size (bytes)
-  ;; signature, then the IHDR chunk: length(4) "IHDR" width(4) height(4)
   (when (and (>= (length bytes) 24) (prefix-p bytes 12 #x49 #x48 #x44 #x52))
     (values (u32be bytes 16) (u32be bytes 20))))
 
@@ -35,7 +30,6 @@
     (values (u16le bytes 6) (u16le bytes 8))))
 
 (defun jpeg-size (bytes)
-  ;; walk the marker segments to the first SOF (start of frame)
   (let ((i 2) (n (length bytes)))
     (loop
       (when (> (+ i 9) n) (return nil))
@@ -48,19 +42,16 @@
               (t (incf i (+ 2 (u16be bytes (+ i 2))))))))))
 
 (defun webp-size (bytes)
-  ;; RIFF....WEBP then a VP8 / VP8L / VP8X chunk
   (when (and (>= (length bytes) 30) (prefix-p bytes 8 #x57 #x45 #x42 #x50))
-    (cond ((prefix-p bytes 12 #x56 #x50 #x38 #x20)          ; "VP8 " lossy
+    (cond ((prefix-p bytes 12 #x56 #x50 #x38 #x20)
            (values (logand (u16le bytes 26) #x3FFF) (logand (u16le bytes 28) #x3FFF)))
-          ((prefix-p bytes 12 #x56 #x50 #x38 #x4C)          ; "VP8L" lossless
+          ((prefix-p bytes 12 #x56 #x50 #x38 #x4C)
            (let ((b (u32be (reverse (subseq bytes 21 25)) 0)))
              (values (1+ (logand b #x3FFF)) (1+ (logand (ash b -14) #x3FFF)))))
-          ((prefix-p bytes 12 #x56 #x50 #x38 #x58)          ; "VP8X" extended
+          ((prefix-p bytes 12 #x56 #x50 #x38 #x58)
            (values (1+ (u24le bytes 24)) (1+ (u24le bytes 27)))))))
 
 (defun sniff-image (bytes)
-  "For an accepted image: (values mime width height). Otherwise NIL. WIDTH and
-HEIGHT are NIL when the header is truncated."
   (let ((bytes (coerce bytes '(simple-array (unsigned-byte 8) (*)))))
     (cond ((prefix-p bytes 0 #x89 #x50 #x4E #x47 #x0D #x0A #x1A #x0A)
            (multiple-value-bind (w h) (png-size bytes) (values "image/png" w h)))

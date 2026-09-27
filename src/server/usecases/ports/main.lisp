@@ -16,9 +16,6 @@
   (:export #:+ports+))
 (in-package #:koya-server/usecases/ports)
 
-;;; Every port, for whoever loads an implementation of them to check that it is
-;;; whole. Imported by its file name, koya-server/usecases/ports/main.
-
 (defparameter +ports+
   '(#:koya-server/usecases/ports/store
     #:koya-server/usecases/ports/spaces
@@ -31,5 +28,4 @@
     #:koya-server/usecases/ports/sessions
     #:koya-server/usecases/ports/config
     #:koya-server/usecases/ports/archives
-    #:koya-server/usecases/ports/presenters)
-  "The packages of the ports. A new port is imported above and named here.")
+    #:koya-server/usecases/ports/presenters))

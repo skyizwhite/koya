@@ -24,12 +24,6 @@
   (:export #:@get #:browse-deliveries))
 (in-package #:koya-server/web/pages/s/<space>/webhooks)
 
-;;; One log per space: the last +DELIVERIES-KEPT+ calls it made and what came
-;;; back. ?label= narrows it to one webhook, ?model= to the calls one model set
-;;; off -- which includes the space's own hooks, since they fire for every model.
-;;; Filtering and paging are an action that draws #deliveries again in place and
-;;; puts the filters and page back in the URL.
-
 (defun filtered-p (label model) (not (and (blank-p label) (blank-p model))))
 
 (defcomp ~outcome (&key delivery)
@@ -42,20 +36,7 @@
            (cond (status (format nil "~a" status))
                  (t "no response"))))))
 
-;;; The filters: the two selects both show what is filtered now and are how it is
-;;; set. Picking one draws the log again at its first page, in place: the selects
-;;; are outside what is drawn, so arrowing through a closed one keeps its focus
-;;; and only redraws the list at each step.
-;;;
-;;; The options are the schema's -- every model of the space, every webhook that
-;;; can fire for it -- plus anything the log holds that the schema no longer
-;;; does, so a model or hook renamed away is still reachable.
-
 (defun union-options (current logged selected)
-  "CURRENT in the schema's own order, then whatever else the log holds, sorted,
-then SELECTED if even that has not offered it. The last is what keeps the
-select showing the filter it is under: an option the browser cannot find is an
-option it silently replaces with the first one, which here reads \"All\"."
   (let ((options (append current
                          (sort (remove-if (lambda (value) (member value current :test #'string=)) logged)
                                #'string<))))
@@ -67,7 +48,6 @@ option it silently replaces with the first one, which here reads \"All\"."
   (and schema (mapcar #'model-name (schema-models schema))))
 
 (defun webhook-labels (schema)
-  "Every webhook that can fire for the space."
   (and schema
        (remove-duplicates (mapcar #'webhook-label (schema-webhooks schema))
                           :test #'string= :from-end t)))
@@ -82,8 +62,6 @@ option it silently replaces with the first one, which here reads \"All\"."
          (hsx (option :value value :selected (equal value selected) value)))))))
 
 (defcomp ~filters (&key space schema label model oob)
-  ;; SCHEMA comes from @GET: loading it reads and parses every model of the space,
-  ;; so it is loaded once a request, not once a lookup
   (let ((labels (union-options (webhook-labels schema) (delivery-labels space) label))
         (models (union-options (model-names schema) (delivery-models space) model)))
     (hsx
@@ -91,7 +69,6 @@ option it silently replaces with the first one, which here reads \"All\"."
            (hsx
             (form :id "filters" :method "get" :action (format nil "~a/webhooks" (space-url space))
                   :hx-get (browse-deliveries :space space) :hx-target "#deliveries" :hx-swap "outerHTML"
-                  ;; the change of either select, as it bubbles: from:'find select' would be the first alone
                   :hx-trigger "change, submit" :hx-swap-oob (and oob "true")
                   :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
               (~filter-select :name "label" :label "Webhook" :all "All webhooks"
@@ -116,14 +93,11 @@ option it silently replaces with the first one, which here reads \"All\"."
    (details :class "group"
      (summary :class "row-toggle flex cursor-pointer items-center justify-between gap-3 px-4 py-3 hover:bg-base"
        (span :class "flex min-w-0 items-center gap-3"
-         ;; the chevron turns down when the row is open
          (span :class "text-muted transition-transform group-open:rotate-90" (~icon :name :next))
          (~outcome :delivery delivery)
-         ;; on a narrow screen the model goes under the webhook
          (span :class "min-w-0"
            (span :class "font-medium" (delivery-label delivery))
            (code :class "block truncate text-xs text-muted sm:ml-2 sm:inline" (delivery-model delivery))))
-       ;; "2026-09-20 14:04 JST": on a narrow screen the date above the time and zone
        (let* ((time (short-time (delivery-created-at delivery)))
               (space-at (position #\Space time)))
          (hsx (span :class "shrink-0 whitespace-nowrap text-right text-sm text-muted"
@@ -155,7 +129,6 @@ option it silently replaces with the first one, which here reads \"All\"."
                    +deliveries-kept+)))))
 
 (defcomp ~deliveries (&key space label model page)
-  "What a filter or a page draws again: the calls and their pager."
   (let* ((total (count-deliveries space :label label :model model))
          (pages (last-page total))
          (page (min page pages))

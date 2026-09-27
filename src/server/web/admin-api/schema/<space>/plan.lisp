@@ -10,7 +10,6 @@
 (in-package #:koya-server/web/admin-api/schema/<space>/plan)
 
 (defun @post (params)
-  "What a deploy of the posted schema would change in this space. Changes nothing."
   (let ((changes (plan (path-param params :space) (jobject->schema (read-json-body)))))
     (jobject "changes" (changes->jarray changes)
              "destructive" (destructive-changes-p changes))))

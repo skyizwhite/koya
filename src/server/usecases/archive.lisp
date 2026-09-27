@@ -46,25 +46,9 @@
            #:archive-error))
 (in-package #:koya-server/usecases/archive)
 
-;;; A space as one zip: space.json -- the schema, every content with its draft,
-;;; its system timestamps and its history, the media rows, the keys and the
-;;; webhook secret -- plus the media files under media/. Importing makes the space
-;;; again under the same name, with the same ids, so references, media fields,
-;;; the /media/ paths in richtext and the site's keys and secret all still work.
-;;;
-;;; Keys are stored as SHA-256 and move as that, so the archive holds no key
-;;; that can be used; it does hold the webhook secret and every draft, so it is
-;;; to be kept as privately as the database itself.
-;;;
-;;; A space has no size limit, so neither has its archive: the files are copied
-;;; into it and out of it one at a time (ports/archives), and an import arrives
-;;; in pieces. What is held in memory is space.json and one file.
-
 (defparameter +archive-version+ 1)
 
-(defparameter +media-id-pattern+ "^[0-9A-Z]{26}\\z"
-  "What STORE-UPLOAD makes, and what /media/ serves. An archive's ids become file
-names, so nothing else is accepted.")
+(defparameter +media-id-pattern+ "^[0-9A-Z]{26}\\z")
 
 (define-condition archive-error (invalid-input) ())
 
@@ -76,8 +60,6 @@ names, so nothing else is accepted.")
 
 (defun archive-file-name (space)
   (format nil "~a-~a.zip" space (remove-if-not #'digit-char-p (subseq (now-iso) 0 19))))
-
-;;; --- Export -------------------------------------------------------------------
 
 (defun revision->jobject (revision)
   (jobject "event" (revision-event revision)
@@ -116,9 +98,6 @@ names, so nothing else is accepted.")
            "label" (key-label key) "createdAt" (key-created-at key)))
 
 (defun export-space (space)
-  "The archive of SPACE, written to a file whose pathname is returned; the caller
-deletes it once it is sent. Signals ARCHIVE-ERROR when the file of a media is
-missing: an archive without it would not restore."
   (let* ((schema (or (load-schema space) (fail "Space ~a not found" space)))
          (media (space-media space))
          (document (jobject "koyaExport" +archive-version+
@@ -137,11 +116,6 @@ missing: an archive without it would not restore."
     (write-archive (cons (cons "space.json" (string-to-octets (to-json document) :encoding :utf-8))
                          (mapcar (lambda (m) (cons (media-entry-name (media-id m) (media-mime m)) m))
                                  media)))))
-
-;;; --- Import -------------------------------------------------------------------
-;;;
-;;; An archive arrives in pieces (BEGIN-IMPORT, CONTINUE-IMPORT) and is read once
-;;; whole (FINISH-IMPORT), one file at a time.
 
 (defun read-document (archive)
   (let* ((json (or (archive-entry-bytes archive "space.json") (fail "The archive has no space.json")))
@@ -164,7 +138,6 @@ missing: an archive without it would not restore."
     value))
 
 (defun parse-content (object space schema)
-  "(content revisions) for one content of space.json."
   (unless (hash-table-p object) (fail "Each content must be an object"))
   (let* ((id (string-field object "id" :required t))
          (model (string-field object "model" :required t))
@@ -191,9 +164,6 @@ missing: an archive without it would not restore."
           revisions))))
 
 (defun parse-media (object archive)
-  "The media row as a plist with the :entry naming its file in ARCHIVE, which is
-checked the way an upload is. The bytes are not kept: they are read again when
-the file is written."
   (unless (hash-table-p object) (fail "Each media must be an object"))
   (let* ((id (string-field object "id" :required t))
          (mime (string-field object "mime" :required t)))
@@ -201,8 +171,6 @@ the file is written."
     (unless (image-extension mime) (fail "Media ~a is ~a, which is not an accepted image type" id mime))
     (let* ((entry (media-entry-name id mime))
            (size (or (archive-entry-size archive entry) (fail "The archive has no file for media ~a" id))))
-      ;; before reading it: an upload is never larger, and a file that says it is
-      ;; would be held whole
       (when (> size +max-upload-bytes+)
         (fail "The file of media ~a is larger than an upload may be" id))
       (let ((bytes (archive-entry-bytes archive entry)))
@@ -214,7 +182,6 @@ the file is written."
                 :created-at (string-field object "createdAt" :required t)))))))
 
 (defun parse-keys (document key)
-  "The keys under KEY of space.json as plists for IMPORT-*-KEY."
   (let ((keys (or (nullable (jget document key)) #())))
     (unless (json-array-p keys) (fail "~a must be an array" key))
     (map 'list (lambda (k)
@@ -227,9 +194,6 @@ the file is written."
          keys)))
 
 (defun check-target (space)
-  "A space is imported only where it meets nothing of its own: a name that is
-free, or a space that is empty -- no models (so no contents), no media and no
-keys. Its webhooks and webhook secret are the archive's to replace."
   (when (and (find-space space)
              (or (schema-models (load-schema space))
                  (plusp (count-media space))
@@ -238,32 +202,22 @@ keys. Its webhooks and webhook secret are the archive's to replace."
     (fail "Space ~a is not empty. Import into a new space, or one with no models, media or keys." space)))
 
 (defun write-media-files (space archive media written)
-  "Write every file, pushing each media onto the list in the cons WRITTEN once its
-file is made, so a caller that fails later takes away only what this import
-made. A file already there is an error, never replaced: it may be another
-import's."
   (dolist (m media)
     (unless (write-media-file space (getf m :id) (getf m :mime) (archive-entry-bytes archive (getf m :entry))
                               :new t)
       (fail "The file of media ~a is already in the media library" (getf m :id)))
     (push m (car written))))
 
-(defvar *uploads-lock* (bordeaux-threads-2:make-lock :name "koya-uploads")
-  "Held while a piece is checked and added, and while an upload is imported, so
-no two requests work on one upload at once.")
+(defvar *uploads-lock* (bordeaux-threads-2:make-lock :name "koya-uploads"))
 
 (defun no-such-import (id)
   (error 'not-found :message (format nil "There is no import ~a; start again" id)))
 
 (defun begin-import ()
-  "Start an import. Returns the id its pieces are sent under."
   (purge-stale-archives)
   (create-upload))
 
 (defun continue-import (id offset octets)
-  "Add OCTETS to import ID. OFFSET is where they go: pieces arrive in order, and one
-sent twice, or one that skipped ahead, is refused with a CONFLICT that says where
-the import stands."
   (bordeaux-threads-2:with-lock-held (*uploads-lock*)
     (let ((size (or (upload-size id) (no-such-import id))))
       (unless (eql offset size)
@@ -273,11 +227,6 @@ the import stands."
       (+ size (length octets)))))
 
 (defun finish-import (id &key (by *actor*))
-  "Make the space in the archive import ID collected again: its schema, contents
-with their history, and media. Returns the space's name. Nothing is sent to its
-webhooks. Signals ARCHIVE-ERROR (or a schema error) and changes nothing when the
-archive is malformed or the space is not empty. The upload is gone afterwards,
-whatever came of it."
   (bordeaux-threads-2:with-lock-held (*uploads-lock*)
     (unless (upload-size id) (no-such-import id))
     (unwind-protect (call-with-upload id (lambda (archive) (import-from-archive archive :by by)))
@@ -300,15 +249,12 @@ whatever came of it."
                  :by by)))
 
 (defun import-into (space archive schema contents media &key secret delivery-keys management-keys by)
-  ;; the files first, as an upload does: a failed write must not leave rows
-  ;; whose URLs 404; a failed transaction takes the files away again
   (let ((written (list '()))
         (done nil))
     (unwind-protect
          (progn
            (write-media-files space archive media written)
            (with-transaction
-             ;; checked again inside: another import may have made it since
              (check-target space)
              (unless (find-space space) (insert-space space (new-webhook-secret)))
              (replace-schema space schema :by by)

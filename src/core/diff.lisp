@@ -16,20 +16,9 @@
            #:change->jobject))
 (in-package #:koya-core/diff)
 
-;;; Structural diff between two schemas, used by plan/deploy. Both sides are one
-;;; space's schema, so a change is a plist (:op OP :model M :field F :from X :to Y);
-;;; the space is whichever one the deploy is addressed to.
-;;; Destructive ops are the ones that can hide or invalidate existing content.
-;;;
-;;; A :WAS on a model or a field makes a rename of what would be a removal and an
-;;; addition. It is matched here and nowhere else, and never counts as a change
-;;; of shape: two fields differing only in :WAS are the same field.
-
 (defparameter *destructive-ops* '(:remove-model :remove-field :change-kind :change-field-type))
 
 (defun options-tightened-p (from to)
-  "True when field options TO can reject content that FROM accepted: a constraint
-was added or narrowed, or the single/many shape changed."
   (flet ((f (k) (getf from k)) (n (k) (getf to k)))
     (or (and (not (f :required)) (n :required))
         (and (not (f :unique)) (n :unique))
@@ -66,16 +55,11 @@ was added or narrowed, or the single/many shape changed."
     changes))
 
 (defun plist-equal (a b)
-  "EQUAL, not EQUALP: a case-only change to a pattern or an option is a change."
   (and (= (length a) (length b))
        (loop :for (k v) :on a :by #'cddr
              :always (equal v (getf b k '%missing)))))
 
 (defun rename-pairs (old new key was)
-  "Pairs (OLD-ITEM . NEW-ITEM) where NEW-ITEM's :WAS names OLD-ITEM. Not a rename:
-one naming nothing in OLD (the annotation left after the rename was deployed),
-one whose new name OLD already uses, and one NEW still declares -- which the
-schema check refuses, but the guard here does not lean on that."
   (loop :for item :in new
         :for was-name = (funcall was item)
         :for match = (and was-name
@@ -88,7 +72,6 @@ schema check refuses, but the guard here does not lean on that."
   (remove-if (lambda (item) (find item pairs :key pick)) items))
 
 (defun field-changes (model old new)
-  "What changed between two versions of one field, whatever it is now called."
   (let ((from (forget-rename (field-options old)))
         (to (forget-rename (field-options new))))
     (cond ((not (eq (field-type old) (field-type new)))
@@ -112,7 +95,6 @@ schema check refuses, but the guard here does not lean on that."
       (lambda (o n) (field-changes model o n))))))
 
 (defun model-changes (old new)
-  "What changed between two versions of one model, whatever it is now called."
   (let ((from (forget-rename (model-options old)))
         (to (forget-rename (model-options new))))
     (append (unless (eq (model-kind old) (model-kind new))
@@ -136,14 +118,10 @@ schema check refuses, but the guard here does not lean on that."
       #'model-changes))))
 
 (defun diff-schemas (old new)
-  "List the changes needed to turn schema OLD into schema NEW. Both are the schema
-of one space; OLD may be NIL, which is the same as an empty space."
   (append (unless (equal (and old (schema-webhooks old)) (schema-webhooks new))
             (list (list :op :change-webhooks
                         :from (and old (schema-webhooks old)) :to (schema-webhooks new))))
           (diff-models (and old (schema-models old)) (schema-models new))))
-
-;;; Options are named as the schema document names them.
 
 (defparameter +absent+ '%missing)
 
@@ -151,13 +129,10 @@ of one space; OLD may be NIL, which is the same as an empty space."
   (cond ((eq value +absent+) "none")
         ((eq value t) "true")
         ((null value) "false")
-        ;; quoted, because an option's values may have spaces in them and a list
-        ;; run together reads as a different number of values than it is
         ((and (consp value) (every #'stringp value)) (format nil "~{~s~^, ~}" value))
         (t (princ-to-string value))))
 
 (defun option-differences (from to)
-  "Each option that differs, as \"name old -> new\", in a stable order."
   (let ((keys (sort (remove-duplicates
                      (append (loop :for (k nil) :on from :by #'cddr :collect k)
                              (loop :for (k nil) :on to :by #'cddr :collect k)))

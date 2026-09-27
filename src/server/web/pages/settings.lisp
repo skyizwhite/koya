@@ -18,20 +18,11 @@
            #:enable-two-factor-action #:disable-two-factor-action))
 (in-package #:koya-server/web/pages/settings)
 
-;;; Instance settings: what holds for the whole server rather than one space.
-;;; Keys are not here -- they belong to a space and are made on its keys page.
-;;; Two-factor login is set up here: a fresh secret is kept in
-;;; the session until the owner proves the authenticator has it by entering a
-;;; current code; only then is it stored and enforced. The time zone is the one
-;;; every page shows times in; storage and the delivery API stay UTC.
-
 (defun pending-secret () (gethash "totp_pending" (context :session)))
 (defun (setf pending-secret) (value)
   (if value
       (setf (gethash "totp_pending" (context :session)) value)
       (remhash "totp_pending" (context :session))))
-
-;;; Each card is worked on in place by the actions below.
 
 (defcomp ~code-input (&key (label "Current code from your authenticator"))
   (hsx (div
@@ -69,7 +60,6 @@
                  (~code-input :label "Code shown by the app")
                  (div :class "flex gap-2"
                    (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Enable two-factor login")
-                   ;; cancelling needs no code, so it skips the form's validation
                    (button :type "submit" :formnovalidate t :class "btn"
                            :hx-post (cancel-two-factor-action) :hx-target "#two-factor" :hx-swap "outerHTML"
                      (~icon :name :close) "Cancel"))))))
@@ -105,9 +95,6 @@
            (~time-zone)
            (~two-factor :pending pending)))))
 
-;;; --- The work ------------------------------------------------------------------
-;;; Each returns (values MESSAGE ERROR): a toast for success, or what went wrong.
-
 (defun save-timezone (params)
   (let ((name (string-trim " " (or (param params "timezone") ""))))
     (if (set-display-timezone name)
@@ -130,10 +117,7 @@
          (values "Two-factor login is off." nil))
         (t (values nil "That code did not match; two-factor login is still on."))))
 
-;;; --- Actions ------------------------------------------------------------------
-
 (defun answer (card message error)
-  "The card drawn again, with MESSAGE as the toast or ERROR inside it (422)."
   (when error (set-response-status 422))
   (if message
       (hsx (<> card (~toast-oob :message message)))
@@ -160,8 +144,6 @@
 (defaction disable-two-factor-action :post (params)
   (multiple-value-bind (message error) (disable-two-factor params)
     (answer (hsx (~two-factor :error error)) message error)))
-
-;;; --- Page ---------------------------------------------------------------------
 
 (defun @get (params)
   (declare (ignore params))

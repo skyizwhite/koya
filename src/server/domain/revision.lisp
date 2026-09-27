@@ -10,15 +10,10 @@
            #:changed-keys))
 (in-package #:koya-server/domain/revision)
 
-;;; What one write left a content with. EVENT is "draft", "publish", "unpublish"
-;;; or "discard"; BY names who wrote it, as usecases/actor's *ACTOR* does.
-
 (defstruct revision
   id content-id event data by created-at)
 
 (defun changed-keys (model before after)
-  "The keys whose value differs between BEFORE and AFTER (either may be NIL): the
-model's fields in its order, then keys it no longer has."
   (let* ((fields (mapcar #'field-name (model-fields model)))
          (gone (remove-if (lambda (key) (member key fields :test #'string=))
                           (remove-duplicates (append (and before (jkeys before)) (jkeys after))

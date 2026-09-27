@@ -25,16 +25,7 @@
            #:changes->jarray))
 (in-package #:koya-server/web/presenters)
 
-;;; What koya's answers are made of on the wire: a content and a media as the
-;;; delivery API and webhooks carry them, and a content as the admin API shows
-;;; it. Use cases hand over what they found; the names, the nulls and the URLs
-;;; are decided here.
-
-;;; --- Media ----------------------------------------------------------------------
-
 (defun media-url (media &key (absolute t))
-  "Where MEDIA is served: /media/{space}/{id}.{ext}, from the public URL unless
-ABSOLUTE is NIL, as a page of this server needs it."
   (let ((path (format nil "/media/~a/~a" (media-space media) (media-file-name media))))
     (if absolute
         (concatenate 'string (string-right-trim "/" (public-url)) path)
@@ -51,10 +42,7 @@ ABSOLUTE is NIL, as a page of this server needs it."
            "alt" (media-alt media)
            "createdAt" (media-created-at media)))
 
-;;; --- A delivered content ------------------------------------------------------
-
 (defun present-value (value)
-  "A value of delivered data as the wire carries it."
   (typecase value
     (media (media->jobject value))
     (delivered (delivered->jobject value))
@@ -62,8 +50,6 @@ ABSOLUTE is NIL, as a page of this server needs it."
     (t value)))
 
 (defun absolutize-richtext (object model)
-  "Destructively prefix /media/ paths inside richtext fields with the public URL:
-the HTML is rendered by other sites, where a relative path would point at them."
   (let ((base (string-right-trim "/" (public-url))))
     (dolist (field (model-fields model) object)
       (when (eq (field-type field) :richtext)
@@ -82,9 +68,6 @@ the HTML is rendered by other sites, where a relative path would point at them."
         out)))
 
 (defun delivered->jobject (delivered &key fields)
-  "DELIVERED as the delivery API and webhooks carry it: its data, with the system
-fields, media and embedded contents as objects, and richtext pointing at this
-server. FIELDS, when given, names the keys kept."
   (let ((content (delivered-content delivered))
         (object (make-hash-table :test 'equal)))
     (maphash (lambda (k v) (setf (gethash k object) (present-value v))) (delivered-data delivered))
@@ -104,15 +87,12 @@ server. FIELDS, when given, names the keys kept."
                     "contents" (jobject "old" (if old (delivered->jobject old) json-null)
                                         "new" (if new (delivered->jobject new) json-null)))))
 
-;;; --- The admin API ------------------------------------------------------------
-
 (defun copy-object (object)
   (let ((out (make-hash-table :test 'equal)))
     (maphash (lambda (k v) (setf (gethash k out) v)) object)
     out))
 
 (defun admin-content->jobject (content)
-  "A content with its status, both versions of its data and its metadata."
   (flet ((data (object) (and object (copy-object object))))
     (jobject "id" (content-id content)
              "status" (content-status content)
@@ -125,5 +105,4 @@ server. FIELDS, when given, names the keys kept."
              "revisedAt" (or (content-revised-at content) json-null))))
 
 (defun changes->jarray (changes)
-  "A deploy's CHANGES, as core/diff makes them, for an answer."
   (map 'vector #'change->jobject changes))

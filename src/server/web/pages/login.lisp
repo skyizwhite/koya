@@ -15,7 +15,6 @@
 (in-package #:koya-server/web/pages/login)
 
 (defcomp ~login-fields (&key error next)
-  "The form, which the log-in action draws again with what went wrong."
   (hsx
    (form :id "login" :class "space-y-4"
          :hx-post (log-in) :hx-target "#login" :hx-swap "outerHTML"
@@ -42,11 +41,9 @@
     (~footer))))
 
 (defun next-path (params)
-  "Where the login redirects to: the page that sent the owner here, if it is one of ours."
   (let ((next (param params "next")))
     (and (local-path-p next) next)))
 
-;; where a session comes from
 (public-path "/login")
 
 (defun @get (params)
@@ -55,9 +52,6 @@
       (redirect-to (or (next-path params) "/") 302)
       (hsx (~login-page :next (next-path params)))))
 
-;; The one action reachable without a session: it is where a session comes from.
-;; The actions guard still asks for htmx and this server's origin, which keeps
-;; another site from logging a browser in.
 (defaction log-in :post (params)
   (let ((address (request-remote-addr *request*))
         (next (next-path params)))
@@ -71,9 +65,7 @@
           (go-on)
           (case (session-login address (or (param params "secret") "") (param params "code"))
             ((t) (go-on))
-            ;; 403, not 429: Woo has no status line for 429 and fails to write the response
             (:locked (refuse 403 "Too many attempts. Wait a few minutes and try again."))
-            ;; one message for both factors: not saying which one was wrong
             (t (refuse 401 (if (totp-enabled-p) "Wrong secret or one-time code" "Wrong secret"))))))))
 
 (public-path (log-in))

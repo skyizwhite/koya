@@ -11,27 +11,15 @@
            #:lisp->jvalue))
 (in-package #:koya-core/case)
 
-;;; Conversions between the wire representation (JSON objects with camelCase
-;;; string keys, as jzon produces them: EQUAL hash tables and vectors) and the
-;;; Lisp-friendly representation (plists with kebab-case keywords and lists).
-
 (defun camel-key (key)
-  "\"published-at\" / :published-at -> \"publishedAt\". Strings that are already
-camelCase pass through unchanged."
   (cond ((symbolp key) (to-camel-case (string-downcase (symbol-name key))))
         ((find #\- key) (to-camel-case key))
         (t key)))
 
 (defun kebab-keyword (key)
-  "\"publishedAt\" -> :published-at."
   (intern (string-upcase (to-kebab-case (string key))) :keyword))
 
 (defun lisp->jvalue (value)
-  "Recursively convert a Lisp value into jzon's representation. NIL becomes JSON
-null (\"no value\"; the server drops null keys and treats them as blank), a plist
-whose first element is a keyword becomes an object, any other list or a vector
-becomes an array. Use #() for an empty array and T for true; JSON false has no
-Lisp spelling here, since the server treats null and false alike for booleans."
   (cond ((null value) 'null)
         ((and (consp value) (keywordp (first value)))
          (plist->object value))
@@ -46,8 +34,6 @@ Lisp spelling here, since the server treats null and false alike for booleans."
         (t value)))
 
 (defun jvalue->lisp (value)
-  "Inverse of LISP->JVALUE. Objects become kebab-keyword plists, arrays become
-lists and JSON null becomes NIL (so (getf item :published-at) is NIL for drafts)."
   (cond ((eq value 'null) nil)
         ((hash-table-p value) (object->plist value))
         ((and (vectorp value) (not (stringp value)))

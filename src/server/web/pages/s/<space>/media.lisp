@@ -26,38 +26,24 @@
            #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt))
 (in-package #:koya-server/web/pages/s/<space>/media)
 
-;;; The media library. Searching, paging and what is done to the files are all
-;;; actions answered in place: #library -- the upload row, the selection, the grid
-;;; and the pager -- is drawn again, with the count out of band, and the URL is
-;;; replaced with the search and page, so a reload or a link comes back to them.
-;;; The preview dialog is drawn by the server for the file it opens.
-
-(defparameter +library-size+ 24
-  "Files per page: four rows of the six columns a wide screen shows.")
+(defparameter +library-size+ 24)
 
 (defun media-page-url (space) (format nil "~a/media" (space-url space)))
 
 (defun library-url (space &key search (page 1))
-  "The library as it is being read: the search and the page, when they are not the first."
   (render-uri (make-uri :path (media-page-url space)
                         :query (append (and search (plusp (length search)) `(("q" . ,search)))
                                        (and (> page 1) `(("page" . ,page)))))))
 
-(defparameter +bulk-form+ "media-bulk"
-  "The selection form's id: the boxes are on the cards and join it by their form
-attribute, because the card already holds a form and forms do not nest.")
+(defparameter +bulk-form+ "media-bulk")
 
 (defun delete-confirmation (media references)
-  "What is asked before a file goes; with REFERENCES it cannot go, so the question
-becomes the reason."
   (if (plusp (or references 0))
       (format nil "~a is used by ~a content~:p and cannot be deleted until they stop using it. Remove it from them first."
               (media-filename media) references)
       (format nil "Delete ~a?" (media-filename media))))
 
 (defcomp ~media-card (&key space media references search page)
-  "The picture, which opens the preview, a Delete over its corner, and a box that
-joins the selection form."
   (let ((id (media-id media))
         (in-use (plusp (or references 0))))
     (hsx
@@ -71,7 +57,6 @@ joins the selection form."
                :title (media-filename media)
                :aria-label (format nil "Preview ~a" (media-filename media))
          (~thumb :media media))
-       ;; a file in use keeps its button, disabled, so the owner sees why it stays
        (form :class "absolute right-1 top-1"
              :hx-post (delete-media-action :space space :q (or search "") :page page)
              :hx-target "#library" :hx-swap "outerHTML"
@@ -92,12 +77,9 @@ joins the selection form."
          (q (or search "")))
     (hsx
      (div :id "library"
-       ;; the files go up as soon as they are chosen, as in the picker
-       ;; (ui/media/picker); alt text is written afterwards, in the preview
        (form :hx-post (upload-media :space space :q q :page page)
              :hx-target "#library" :hx-swap "outerHTML"
              :hx-encoding "multipart/form-data" :hx-trigger "change from:'find input[type=file]'"
-             ;; htmx aborts a request after 60s by default; a 20 MB upload may need longer
              :hx-config "timeout:0"
              :class "mb-8 flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
          (label :class "btn" (~icon :name :upload) "Upload"
@@ -109,7 +91,6 @@ joins the selection form."
            (hsx (~empty-state (if (plusp (length q)) "No file matches." "No media yet. Upload an image above.")))
            (hsx
             (<>
-              ;; Select all sits outside the bar, which is hidden until something is selected
               (div :class "mb-4 flex flex-wrap items-center gap-3"
                 (label :class "flex items-center gap-2 text-sm text-muted"
                   (input :type "checkbox" :data-bulk-all t :form +bulk-form+)
@@ -134,8 +115,6 @@ joins the selection form."
          (format nil "~a file~:p" (count-media space :search search)))))
 
 (defcomp ~library-header (&key space search)
-  "The title, the count and the search box, outside #library: typing draws the
-library again, and the box keeps its focus."
   (hsx
    (div :class "mb-6 flex flex-wrap items-center justify-between gap-4"
      (h1 :class "text-2xl font-bold" "Media" (~media-count :space space :search search))
@@ -146,8 +125,6 @@ library again, and the box keeps its focus."
               :aria-label "Search" :class "input")))))
 
 (defcomp ~media-preview-dialog (&key space media references search page oob)
-  "The picture large, its alt text and Delete. Empty and closed until a card asks
-for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
   (let ((in-use (and media (plusp (or references 0)))))
     (hsx
      (dialog :id "media-preview" :closedby "any" :data-show-modal (and media t)
@@ -181,11 +158,7 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
               (input :type "text" :name "alt" :value (media-alt media) :placeholder "alt text"
                      :class "input" :aria-label "alt text")
               (button :type "submit" :class "btn btn-icon" :aria-label "Save alt text" (~icon :name :check))
-              ;; the toast would be behind the dialog, so the answer is shown here
               (span :id "alt-saved" :class "shrink-0 text-sm text-ok")))))))))
-
-;;; --- The work ------------------------------------------------------------------
-;;; Each returns (values MESSAGE KIND) for the toast.
 
 (defun upload (space files)
   (handler-case
@@ -209,16 +182,11 @@ for a file; drawn for it, it opens itself (data-show-modal, koya-editor.js)."
             (values (format nil "Deleted ~a of ~a; ~a could not be~@[: ~a~]" done (+ done failed) failed message)
                     :error)))))
 
-;;; --- Actions ------------------------------------------------------------------
-
 (defun action-space (params)
   (let ((space (param params "space")))
     (and space (find-space space) space)))
 
 (defun answer (params space &key message kind close-preview)
-  "#library and the count at the search and page it was read at (the last page,
-when that one has emptied), the URL it is now read at, and MESSAGE as the toast.
-CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
   (let* ((search (param params "q"))
          (pages (last-page (count-media space :search search) +library-size+))
          (page (min (page-number params) pages)))
@@ -270,8 +238,6 @@ CLOSE-PREVIEW puts an empty, closed dialog in place of the open one."
     (cond ((null media) (action-refusal "Media not found." 404))
           (t (update-media space (media-id media) :alt (or (param params "alt") ""))
              (hsx (<> "Saved."))))))
-
-;;; --- Page ---------------------------------------------------------------------
 
 (defun @get (params)
   (let ((space (let ((name (path-param params :space))) (and (find-space name) name))))

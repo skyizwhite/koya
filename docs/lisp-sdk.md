@@ -45,8 +45,8 @@ then `qlot install` (and `qlot update koya` to pick up later changes). Add
 `koya-sdk` to the site's `.asd` `:depends-on`, and `(ql:quickload :koya-sdk)` in
 the REPL.
 
-All symbols below live in the `koya-sdk` package, which re-exports `koya-core`,
-`koya-sdk/config` and `koya-sdk/client`. The server (`koya-server`) is a
+All symbols below live in the `koya-sdk` package, and it exports nothing else.
+Each one has a docstring, so `describe` shows it at the REPL. The server (`koya-server`) is a
 separate system; a site never loads it.
 
 ## Configuration
@@ -409,7 +409,7 @@ alike for booleans, so `nil` means "off". On `update-content`, which merges,
 
 Timestamps are ISO 8601 in UTC with milliseconds, e.g.
 `"2026-09-20T05:04:03.123Z"`. `koya-sdk:now-iso`, `koya-sdk:format-iso` and
-`koya-sdk:parse-iso` are re-exported for building them, and `koya-sdk:make-ulid`
+`koya-sdk:parse-iso` are exported for building them, and `koya-sdk:make-ulid`
 for generating ids.
 
 ## The HTTP API underneath

@@ -22,11 +22,9 @@
     obj))
 
 (defun @get (params)
-  "The media object plus \"references\": how many contents mention it."
   (with-references (require-media params)))
 
 (defun @patch (params)
-  "Update the alt text: {\"alt\": \"...\"}."
   (let* ((media (require-media params))
          (alt (body-field (read-json-body) "alt")))
     (unless (stringp alt) (fail-api 400 "bad_request" "\"alt\" must be a string"))
@@ -34,7 +32,6 @@
                                   (media-id media) :alt alt))))
 
 (defun @delete (params)
-  "Delete the file and its row. Contents that referenced it keep a dangling id."
   (let ((media (require-media params)))
     (remove-media media)
     (jobject "deleted" t)))

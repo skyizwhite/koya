@@ -17,4 +17,4 @@
                "clack-handler-woo"
                "clack-handler-hunchentoot"
                "koya-server/main")
-  :in-order-to ((test-op (test-op "koya-tests"))))
+  :in-order-to ((test-op (test-op "koya-spec"))))

@@ -9,5 +9,3 @@
            #:dev-mode-p))
 (in-package #:koya-server/usecases/system)
 
-;;; The instance itself: whether its store answers, and what it was told when it
-;;; started.

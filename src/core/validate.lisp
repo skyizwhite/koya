@@ -21,9 +21,6 @@
            #:content-id-p))
 (in-package #:koya-core/validate)
 
-;;; Validation of content data (a JSON object with camelCase keys) against a
-;;; model. Returns a list of error plists: (:field NAME :code CODE :message MSG).
-
 (define-condition validation-error (error)
   ((errors :initarg :errors :reader validation-error-errors))
   (:report (lambda (c s)
@@ -38,15 +35,9 @@
       (and (json-array-p value) (zerop (length value)))))
 
 (defun empty-richtext-p (value)
-  "True for the HTML an editor leaves behind an emptied document: nothing but
-empty paragraphs, each holding at most a line break, as Quill writes <p><br></p>."
   (and (stringp value) (scan "^\\s*(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" value) t))
 
 (defun blank-for-field-p (field value)
-  "Blank means 'no value given': null, a whitespace-only string, an empty array
-on a :many field, and on a :richtext field the HTML of an emptied document. JSON
-false (NIL) is a value, so a text field set to false is a type error rather than
-an omission; the same goes for [] on a single-value field."
   (or (json-null-p value)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
       (and (field-many-p field) (json-array-p value) (zerop (length value)))
@@ -56,8 +47,6 @@ an omission; the same goes for [] on a single-value field."
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
 
 (defun parses-as-time-p (string)
-  "True when local-time accepts STRING. :fail-on-error only covers syntax; a date
-that does not exist on the calendar (2026-02-30) signals, so that is caught too."
   (handler-case (and (parse-timestring string :fail-on-error nil) t)
     (error () nil)))
 
@@ -67,13 +56,11 @@ that does not exist on the calendar (2026-02-30) signals, so that is caught too.
        (parses-as-time-p value)))
 
 (defun datetime-string-p (value)
-  "ISO 8601 date and time with an explicit zone: 2026-09-20T10:00:00.000Z or ...+09:00."
   (and (stringp value)
        (scan "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:\\d{2})\\z" value)
        (parses-as-time-p value)))
 
 (defun content-id-p (value)
-  "Content ids: 1-64 URL-safe characters (ULIDs, or ids carried over from another system)."
   (and (stringp value) (scan "^[A-Za-z0-9_-]{1,64}\\z" value) t))
 
 (defun slug-string-p (value)
@@ -93,7 +80,6 @@ that does not exist on the calendar (2026-02-30) signals, so that is caught too.
            errors))))
 
 (defun check-one (field value)
-  "Validate a single (non-many) VALUE for FIELD."
   (ecase (field-type field)
     ((:text :textarea :richtext)
      (check-string field value))
@@ -135,9 +121,6 @@ that does not exist on the calendar (2026-02-30) signals, so that is caught too.
       (check-one field value)))
 
 (defun validate-content (model data &key partial)
-  "Validate DATA (hash table, camelCase keys) against MODEL. With PARTIAL,
-missing fields are not treated as errors (for PATCH-style updates).
-Returns a list of error plists; empty means valid."
   (let ((errors '())
         (known (mapcar #'field-name (model-fields model))))
     (maphash (lambda (key value)

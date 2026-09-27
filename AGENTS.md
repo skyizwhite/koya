@@ -14,19 +14,24 @@ it like this?" about — not every edit.
 **An ADR is not edited.** When a decision is replaced, write a new one and add
 `Superseded by adr/<file>` under the old one's title. The history is the point.
 
-What is true *now* belongs in `docs/`, which is edited freely:
+What is true *now* belongs in `docs/`, which is written from the spec and
+edited freely:
 ARCHITECTURE.md for the shape of the system, ADMIN-UI.md, API.md, SCHEMA.md,
 lisp-sdk.md and openapi.yaml for what it does. README.md is written for the
 people who use koya from a TypeScript site and says nothing about Lisp; setting
 up to work on koya is in CONTRIBUTING.md.
 
-## Tests
+## The spec comes first
 
 ```sh
-just test
+just spec
 ```
 
-`tests/` mirrors `src/`: `core/`, `sdk/` and `server/`. Anything touching the
+The spec is the tests in `spec/` (`koya-spec`), and a change starts as a spec
+that fails. The implementation is written to pass it, and `docs/` follows what
+it says; nothing in the spec reads `docs/`.
+
+`spec/` mirrors `src/`: `core/`, `sdk/` and `server/`. Anything touching the
 database uses an in-memory one, and the admin UI and both APIs are driven through
 the app rather than by calling handlers.
 
@@ -41,7 +46,7 @@ the app rather than by calling handlers.
   stale.
 - **The server depends inward**: `domain/` ← `usecases/` ← `infra/`, `web/`.
   A store keeps what a use case decided and decides nothing; a use case returns
-  data and `web/` makes the JSON. `tests/server/layers.lisp` checks the
+  data and `web/` makes the JSON. `spec/server/layers.lisp` checks the
   direction.
 - **Guards are where things are mounted**, deny by default. A page or an action
   does nothing about who is asking; what is open says so with `public-path`.
@@ -51,6 +56,8 @@ the app rather than by calling handlers.
 - **`koya-core` and `koya-sdk` are MIT, `koya-server` is AGPL.** Moving a file
   across that line is a licensing change (see the ADR for which files). The
   server and the SDK share `koya-core` and do not use each other.
-- Comments carry what the code cannot: a constraint, a trap, a reason. Not a
-  restatement of the lines below them, and not how the code came to be — that is
-  what git and `adr/` are for.
+- **`src/` has no comments and no docstrings.** What the code must keep doing
+  is a spec; why it is this way is an ADR. The one exception is the site's API, the
+  symbols the `koya-sdk` package exports: they keep their docstrings for a
+  site's developer at the REPL. That package names each of them, and a symbol
+  exported only for the server or a spec stays in its own package.

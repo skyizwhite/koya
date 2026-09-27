@@ -8,8 +8,6 @@
            #:current-version))
 (in-package #:koya-server/infra/db/migrations)
 
-;;; Forward-only migrations applied at startup. Each entry is (VERSION . STATEMENTS).
-
 (defparameter *migrations*
   '((1
      "CREATE TABLE spaces (
@@ -88,8 +86,6 @@
         created_at TEXT NOT NULL)"
      "CREATE INDEX webhook_deliveries_by_space ON webhook_deliveries (space, id DESC)")
     (6
-     ;; management keys belong to one space; the old instance-wide ones cannot be
-     ;; assigned to one, so they are dropped and have to be made again
      "DROP TABLE management_keys"
      "CREATE TABLE management_keys (
         id TEXT PRIMARY KEY,
@@ -108,7 +104,6 @@
         created_at TEXT NOT NULL)"
      "CREATE INDEX schema_deploys_by_space ON schema_deploys (space, id DESC)")
     (8
-     ;; the table held delivery keys under the name the header used to have
      "ALTER TABLE api_keys RENAME TO delivery_keys")
     (9
      "CREATE TABLE content_revisions (
@@ -119,8 +114,6 @@
         written_by TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL)"
      "CREATE INDEX content_revisions_by_content ON content_revisions (content_id, id DESC)"
-     ;; what every content already holds is its first history: the published
-     ;; data, then the draft on top of it, so the ids come out in that order
      "INSERT INTO content_revisions (content_id, event, data, created_at)
         SELECT id, 'publish', published, COALESCE(revised_at, updated_at) FROM contents
          WHERE published IS NOT NULL ORDER BY created_at"
@@ -136,7 +129,6 @@
   (or (col (fetch-one "SELECT MAX(version) AS version FROM schema_version") "version") 0))
 
 (defun migrate ()
-  "Apply all pending migrations. Returns the list of versions applied."
   (let ((applied '()))
     (loop :for (version . statements) :in *migrations*
           :when (> version (current-version))

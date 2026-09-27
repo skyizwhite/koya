@@ -12,8 +12,6 @@
   (:export #:~field-input))
 (in-package #:koya-server/web/ui/content/field-input)
 
-;;; One form control per field type.
-
 (defun present-p (value) (and value (not (eq value json-null))))
 
 (defun selected-p (value option)
@@ -24,7 +22,6 @@
       nil))
 
 (defun reference-choices (value references)
-  "REFERENCES as (id . label), plus any selected id it lacks so nothing is dropped silently."
   (let ((selected (cond ((not (present-p value)) '())
                         ((and (vectorp value) (not (stringp value))) (coerce value 'list))
                         (t (list value)))))
@@ -39,7 +36,6 @@
          (many (field-many-p field)))
     (hsx
      (<>
-       ;; a many-reference is enhanced into chips + a dropdown by koya-editor.js
        (select :id name :name name :multiple many :data-picker many
          (unless many (hsx (option :value "" "—")))
          (loop :for (id . label) :in choices :collect
@@ -48,8 +44,6 @@
          (format nil "~a content~:p of ~a" (length choices) (field-option field :model)))))))
 
 (defcomp ~media-control (&key name value media)
-  "A hidden input holding the media id, a preview, and buttons wired up by
-koya-editor.js to the page's media picker dialog."
   (hsx
    (div :class "flex items-start gap-4" :data-media-field name
      (input :type "hidden" :id name :name name :value (or value ""))

@@ -29,8 +29,6 @@
 (defun db-path () (env "KOYA_DB_PATH" "./data/koya.db"))
 (defun media-dir () (env "KOYA_MEDIA_DIR" "./data/media"))
 (defun archive-dir ()
-  "Where space archives are written and uploads collected: archives/ beside the
-database, on the same volume, since one is as large as a space."
   (merge-pathnames "archives/" (uiop:pathname-directory-pathname (db-path))))
 (defun server-port () (parse-integer (env "KOYA_PORT" "3100")))
 (defmethod public-url ()

@@ -9,4 +9,4 @@
   :class :package-inferred-system
   :pathname "src/core"
   :depends-on ("koya-core/main")
-  :in-order-to ((test-op (test-op "koya-tests"))))
+  :in-order-to ((test-op (test-op "koya-spec"))))

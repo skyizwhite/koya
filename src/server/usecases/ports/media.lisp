@@ -15,42 +15,28 @@
            #:delete-space-media-files))
 (in-package #:koya-server/usecases/ports/media)
 
-;;; A space's library: the metadata of each file (domain/media), and the file
-;;; itself, kept apart from it.
-
-(defgeneric insert-media (space &key filename mime size width height alt id created-at)
-  (:documentation "Store a media of SPACE and return it. ID and CREATED-AT are made unless an
-import brings them."))
+(defgeneric insert-media (space &key filename mime size width height alt id created-at))
 
 (defgeneric find-media (space id))
 
-(defgeneric find-media-by-ids (space ids)
-  (:documentation "Hash of id -> media for those of IDS that are in SPACE's library."))
+(defgeneric find-media-by-ids (space ids))
 
-(defgeneric list-media (space &key search limit offset)
-  (:documentation "Newest first. SEARCH matches the file name; LIMIT defaults to 60."))
+(defgeneric list-media (space &key search limit offset))
 
-(defgeneric space-media (space)
-  (:documentation "Every media of SPACE, oldest first."))
+(defgeneric space-media (space))
 
 (defgeneric count-media (space &key search))
 
-(defgeneric update-media (space id &key alt)
-  (:documentation "Set what may change about a media, and return it."))
+(defgeneric update-media (space id &key alt))
 
 (defgeneric delete-media (space id))
 
-(defgeneric media-file-path (space id mime)
-  (:documentation "Where the file of media ID is kept, whether or not it is there."))
+(defgeneric media-file-path (space id mime))
 
 (defgeneric media-file-exists-p (space id mime))
 
-(defgeneric write-media-file (space id mime bytes &key new)
-  (:documentation "Write BYTES as the file of media ID and return true. With NEW, a file that is
-already there is left as it is, and NIL returned."))
+(defgeneric write-media-file (space id mime bytes &key new))
 
-(defgeneric delete-media-file (space id mime)
-  (:documentation "Delete the file of media ID. A file that is not there is not an error."))
+(defgeneric delete-media-file (space id mime))
 
-(defgeneric delete-space-media-files (space)
-  (:documentation "Delete every file of SPACE."))
+(defgeneric delete-space-media-files (space))

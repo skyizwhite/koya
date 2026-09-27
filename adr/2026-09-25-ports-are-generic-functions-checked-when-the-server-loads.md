@@ -2,6 +2,8 @@
 
 Superseded by adr/2026-09-25-use-cases-hand-over-data-and-the-web-makes-json.md (who implements a port)
 
+Superseded by adr/2026-09-27-the-spec-comes-first-and-src-has-no-comments.md (a port's documentation as its contract)
+
 *2026-09-25*
 
 ## Context

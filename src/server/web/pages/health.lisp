@@ -5,11 +5,9 @@
   (:export #:@get))
 (in-package #:koya-server/web/pages/health)
 
-;; asked by whatever watches the server, which has no session
 (public-path "/health")
 
 (defun @get (params)
-  "Unauthenticated health check: verifies the database answers."
   (declare (ignore params))
   (store-reachable-p)
   (hsx (p "ok")))

@@ -42,7 +42,6 @@
 (defun new-p (id) (string= id "new"))
 
 (defun media-for (space field value)
-  "The media struct behind a :media field's id, or NIL."
   (and (eq (field-type field) :media) (stringp value) (plusp (length value))
        (find-media space value)))
 
@@ -54,9 +53,7 @@
   (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" children (~icon :name :external))))
 
 (defcomp ~action-button (&key space model id op (class "btn") confirm icon children)
-  "A button in the bar or the danger zone: the action OP on the editor form's fields."
   (hsx (button :type "button" :class class
-               ;; Save draft is on only while the form holds a change (koya-editor.js)
                :data-save-draft (equal op "save")
                :hx-post (editor-action :space space :model model :id id :op op)
                :hx-include "#editor-form" :hx-target "#editor" :hx-swap "outerHTML"
@@ -72,8 +69,6 @@
      (span "updated at " (short-time (content-updated-at content))))))
 
 (defcomp ~restoring (&key space model content revision notes)
-  "Above the form while it holds an old version: which one, that nothing is
-stored yet, and what did not come back."
   (hsx
    (div :class "mb-6 rounded-md border border-accent/40 bg-accent/5 px-4 py-3 text-sm"
      (div :class "flex flex-wrap items-center justify-between gap-2"
@@ -87,8 +82,6 @@ stored yet, and what did not come back."
                 (hsx (li (strong (getf note :field)) " " (getf note :note))))))))))
 
 (defcomp ~editor (&key space model content data errors restoring)
-  "Everything an action on the content draws again: the bar, the form and the
-danger zone. The media picker stays outside it."
   (let* ((space-name space)
          (model-name (model-name model))
          (id (if content (content-id content) "new"))
@@ -101,16 +94,11 @@ danger zone. The media picker stays outside it."
          (public-url (and published (expand-url-template (model-public-url model) :id id))))
     (hsx
      (div :id "editor"
-       ;; Sticky action bar: title and metadata on the left, links and actions on the right.
-       ;; -mt-3 takes back the bar's own top padding so the title starts where every
-       ;; other page's title does, under the layout's padding alone.
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (h1 :class "text-2xl font-bold" model-name
            (unless object-p
              (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
          (when content (hsx (~meta :content content)))
-         ;; under the title, the full width: where the content can be seen on the
-         ;; left, what can be done to it on the right
          (div :class "mt-3 flex flex-wrap items-center justify-between gap-2"
            (div :class "flex flex-wrap items-center gap-2"
              (when preview-url (hsx (~external-link :href preview-url "Preview draft")))
@@ -118,8 +106,6 @@ danger zone. The media picker stays outside it."
              (when content
                (hsx (a :href (history-url space-name model-name id) :class "btn"
                        (~icon :name :history) "History")))
-             ;; an object model has no list page to carry this, and this editor
-             ;; is the whole of its screen -- but only where a hook can fire
              (when (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))
                (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
                        (~icon :name :webhook) "Webhooks"))))
@@ -135,9 +121,6 @@ danger zone. The media picker stays outside it."
        (~errors :errors errors)
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
-       ;; Enter in a field saves a draft, as the form's own submit
-       ;; unsaved: what the form shows is not what is stored -- a version being
-       ;; restored, or what was sent and refused -- so it can be saved as it stands
        (form :id "editor-form" :class "space-y-6" :data-editor-form t :data-unsaved (and (or restoring errors) t)
              :hx-post (editor-action :space space-name :model model-name :id id :op "save")
              :hx-target "#editor" :hx-swap "outerHTML"
@@ -147,7 +130,6 @@ danger zone. The media picker stays outside it."
                               :references (reference-options space field)
                               :media (media-for space field (and data (gethash (field-name field) data)))
                               :error (field-error errors (field-name field))))))
-       ;; the two ways to take content off the site, kept away from the daily ones
        (when content
          (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
                 (div
@@ -173,11 +155,9 @@ danger zone. The media picker stays outside it."
                           (list (cons model-name (model-url space model-name))
                                 (cons (if content (content-label content model) "new") nil)))
        (~editor :space space :model model :content content :data data :errors errors :restoring restoring)
-       ;; one picker per page, shared by :media fields and Quill's image button
        (~media-picker-dialog :space space)))))
 
 (defun load-editor (params)
-  "Return (values space model content) for the route, or signal 404 for unknown model."
   (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
     (let ((id (path-param params :id)))
       (values space model (and (not (new-p id))
@@ -195,8 +175,6 @@ danger zone. The media picker stays outside it."
        (hsx (~layout (h1 :class "text-xl font-bold" "Model not found"))))))
 
 (defun requested-revision (params content)
-  "The revision ?revision= names, or NIL. The second value is true when one was
-named that this content does not have."
   (let ((raw (param params "revision")))
     (when (and raw content)
       (let* ((n (ignore-errors (parse-integer raw)))
@@ -221,14 +199,7 @@ named that this content does not have."
           (t
            (hsx (~editor-page :space space :model model :content content :data current))))))))
 
-;;; --- The action ---------------------------------------------------------------
-;;; What stays on this content answers #editor drawn again, with the toast out of
-;;; band; what moves to another page -- a content just made, one deleted -- goes
-;;; there with HX-Redirect, and the toast waits in the session.
-
 (defun done (space model content message)
-  "#editor for CONTENT as it is now stored. The URL loses a ?revision= a restore
-was being read at: what it offered is now saved or left behind."
   (set-response-header :hx-replace-url (content-url space (model-name model) (content-id content)))
   (hsx (<> (~editor :space space :model model :content content :data (content-data content :draft t))
            (~toast-oob :message message))))
@@ -276,5 +247,4 @@ was being read at: what it offered is now saved or left behind."
              (set-response-status 422)
              (hsx (~editor :space space :model model :content content :data data
                            :errors (validation-error-errors e))))
-           ;; refused as things stand, such as a delete while other contents refer to this one
            (koya-error (e) (action-refused e))))))))

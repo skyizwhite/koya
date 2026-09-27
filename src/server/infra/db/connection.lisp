@@ -25,14 +25,10 @@
            #:col))
 (in-package #:koya-server/infra/db/connection)
 
-;;; A single SQLite connection guarded by a recursive lock. SQLite serializes
-;;; writers anyway, and one connection keeps transactions simple.
-
 (defvar *db* nil)
 (defvar *db-lock* (make-recursive-lock :name "koya-db"))
 
 (defun connect-db (path)
-  "Open (or reuse) the database at PATH. \":memory:\" gives a private in-memory database."
   (when *db* (disconnect-db))
   (unless (string= path ":memory:")
     (ensure-directories-exist path))
@@ -52,9 +48,7 @@
      (unless *db* (error "Database is not connected"))
      ,@body))
 
-(defvar *on-rollback* '()
-  "Functions called, with nothing, when a transaction is unwound: what was read
-inside it and kept -- the schema cache -- may be of rows that never were.")
+(defvar *on-rollback* '())
 
 (defmacro with-db-transaction (&body body)
   `(with-db
@@ -71,16 +65,13 @@ inside it and kept -- the schema cache -- may be of rows that never were.")
   (and (fetch-one "SELECT 1 AS ok") t))
 
 (defun exec (sql &rest params)
-  "Run a statement that returns no rows."
   (with-db (do-sql *db* sql params)))
 
 (defun fetch (sql &rest params)
-  "Run a query and return all rows as plists with :|column| keys."
   (with-db (fetch-all (execute (prepare *db* sql) params))))
 
 (defun fetch-one (sql &rest params)
   (first (apply #'fetch sql params)))
 
 (defun col (row name)
-  "Column NAME (a string) of ROW."
   (getf row (intern name :keyword)))

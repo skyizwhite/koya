@@ -24,17 +24,14 @@
            #:list-media #:get-media #:upload-media #:update-media #:delete-media))
 (in-package #:koya-sdk/client)
 
-;;; HTTP client for a koya server. Delivery calls need *DELIVERY-KEY*; admin calls
-;;; (schema deploys, content management, keys, media) need *MANAGEMENT-KEY*. Both
-;;; are made on the space's keys page and are good for that space alone, which is
-;;; *SPACE*. Responses are converted to kebab-case keyword plists, arrays to lists.
-
 (defvar *base-url* nil "Server URL, e.g. https://cms.example.com. Falls back to KOYA_URL.")
 (defvar *management-key* nil "Management key for admin calls. Falls back to KOYA_MANAGEMENT_KEY.")
 (defvar *delivery-key* nil "Delivery key. Falls back to KOYA_DELIVERY_KEY.")
 (defvar *space* nil "Default space for content calls. Falls back to KOYA_SPACE.")
 
 (defun configure (&key base-url management-key delivery-key space)
+  "Set *BASE-URL*, *MANAGEMENT-KEY*, *DELIVERY-KEY* and *SPACE* from the arguments
+given; the others keep their values."
   (when base-url (setf *base-url* base-url))
   (when management-key (setf *management-key* management-key))
   (when delivery-key (setf *delivery-key* delivery-key))
@@ -55,10 +52,13 @@
    (code :initarg :code :reader koya-error-code)
    (message :initarg :message :reader koya-error-message)
    (details :initarg :details :initform nil :reader koya-error-details))
+  (:documentation "Signalled for any answer but a 2xx. KOYA-ERROR-STATUS is the HTTP status,
+KOYA-ERROR-CODE and KOYA-ERROR-MESSAGE the error object's code and message, and
+KOYA-ERROR-DETAILS its details: the problems of a 422, or the changes a refused
+deploy would make.")
   (:report (lambda (c s) (format s "koya: ~a ~a: ~a" (koya-error-status c) (koya-error-code c) (koya-error-message c)))))
 
 (defun query-alist (query)
-  "Kebab plist -> camelCase alist of strings for the query string."
   (loop :for (k v) :on query :by #'cddr
         :when v :collect (cons (camel-key k)
                                (cond ((stringp v) v)
@@ -71,8 +71,6 @@
     (render-uri uri)))
 
 (defun request (method path &key query body form auth)
-  "Perform a request. AUTH is :management or :delivery. BODY is sent as JSON; FORM, an
-alist whose values may be pathnames, as multipart/form-data. Returns the parsed JSON value."
   (let ((headers (list (cons "Accept" "application/json"))))
     (ecase auth
       (:management (push (cons "Authorization" (format nil "Bearer ~a" (management-key))) headers))
@@ -96,8 +94,6 @@ alist whose values may be pathnames, as multipart/form-data. Returns the parsed 
                  :code (or (and err (jget err "code")) "http_error")
                  :message (or (and err (jget err "message")) (format nil "HTTP ~a" (dexador:response-status e)))
                  :details (and err (jvalue->lisp (jget err "details")))))))))
-
-;;; --- Schema -----------------------------------------------------------------
 
 (defun print-changes (changes stream)
   (if (null changes)
@@ -141,8 +137,6 @@ confirmation when CONFIRM is true. Returns the applied changes."
   "Fetch the schema SPACE currently has on the server as a schema object."
   (jobject->schema (request :get (schema-path space) :auth :management)))
 
-;;; --- Delivery API ------------------------------------------------------------
-
 (defun delivery-path (space model &optional id)
   (format nil "/api/v1/~a/~(~a~)~@[/~a~]" (space-name space) model id))
 
@@ -160,8 +154,6 @@ confirmation when CONFIRM is true. Returns the applied changes."
   "Fetch the content of an object-kind model."
   (jvalue->lisp (request :get (delivery-path space model) :query query :auth :delivery)))
 
-;;; --- Admin API: contents ----------------------------------------------------
-
 (defun admin-path (space model &optional id action)
   (format nil "/admin/api/contents/~a/~(~a~)~@[/~a~]~@[/~a~]" (space-name space) model id action))
 
@@ -170,6 +162,7 @@ confirmation when CONFIRM is true. Returns the applied changes."
   (jvalue->lisp (request :get (admin-path space model) :query query :auth :management)))
 
 (defun get-content (model id &key space)
+  "Content ID of MODEL as the admin API has it, draft included."
   (jvalue->lisp (request :get (admin-path space model id) :auth :management)))
 
 (defun create-content (model data &key space publish id created-at updated-at published-at revised-at)
@@ -196,6 +189,7 @@ can be given explicitly, e.g. when importing from another CMS."
     (jvalue->lisp (request :post (admin-path space model id "publish") :body body :auth :management))))
 
 (defun unpublish-content (model id &key space)
+  "Take content ID off the delivery API, keeping it as a draft."
   (jvalue->lisp (request :post (admin-path space model id "unpublish") :body (jobject) :auth :management)))
 
 (defun discard-draft (model id &key space)
@@ -203,13 +197,12 @@ can be given explicitly, e.g. when importing from another CMS."
   (jvalue->lisp (request :post (admin-path space model id "discard-draft") :body (jobject) :auth :management)))
 
 (defun delete-content (model id &key space)
+  "Delete content ID with its history. Refused while other contents refer to it."
   (jvalue->lisp (request :delete (admin-path space model id) :auth :management)))
 
 (defun draft-key (model id &key space)
   "The draft key of content ID for previews."
   (jget (request :post (admin-path space model id "draft-key") :body (jobject) :auth :management) "draftKey"))
-
-;;; --- Admin API: delivery keys ------------------------------------------------
 
 (defun create-delivery-key (&key space (label ""))
   "Create a delivery key for SPACE. Returns (values key id); it is shown only once."
@@ -218,6 +211,7 @@ can be given explicitly, e.g. when importing from another CMS."
     (values (jget response "key") (jget response "id"))))
 
 (defun list-delivery-keys (&key space)
+  "The delivery keys of SPACE, without their plaintext."
   (jvalue->lisp (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :management) "keys")))
 
 (defun webhook-secret (&key space)
@@ -225,9 +219,8 @@ can be given explicitly, e.g. when importing from another CMS."
   (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :management) "webhookSecret"))
 
 (defun delete-delivery-key (id &key space)
+  "Revoke the delivery key ID of SPACE."
   (jvalue->lisp (request :delete (format nil "/admin/api/keys/~a/~a" (space-name space) id) :auth :management)))
-
-;;; --- Admin API: media -------------------------------------------------------
 
 (defun media-path (space &optional id)
   (format nil "/admin/api/media/~a~@[/~a~]" (space-name space) id))

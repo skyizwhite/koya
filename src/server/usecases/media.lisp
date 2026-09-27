@@ -30,13 +30,7 @@
            #:stored-file))
 (in-package #:koya-server/usecases/media)
 
-;;; A space's library: a file is stored with its metadata, and taken away only
-;;; while nothing uses it.
-
 (defun media-reference-counts (space ids)
-  "Hash of id -> number of contents in SPACE whose published or draft data mentions
-it in a :media or :richtext field of the current schema, for all IDS in one pass
-over the space's contents: a page of the library asks for all its cards at once."
   (let ((counts (make-hash-table :test 'equal))
         (fields (media-fields (load-schema space))))
     (dolist (id ids) (setf (gethash id counts) 0))
@@ -47,8 +41,6 @@ over the space's contents: a page of the library asks for all its cards at once.
     counts))
 
 (defun media-references (space id)
-  "Number of contents in SPACE that mention ID (see MEDIA-REFERENCE-COUNTS). Only
-the contents whose data holds the id are read."
   (let ((fields (media-fields (load-schema space))))
     (count-if (lambda (content) (mentioned-ids content fields (list id)))
               (contents-mentioning space id))))
@@ -58,14 +50,11 @@ the contents whose data holds the id are read."
     (format nil "Images are limited to ~a MB each, and ~a MB per upload" mb mb)))
 
 (defun store-upload (space bytes &key filename (alt ""))
-  "Accept BYTES as a new media of SPACE: sniff the type, write the file, insert the
-row. Signals REJECTED or TOO-LARGE for data the library does not take."
   (when (zerop (length bytes)) (fail 'rejected "The uploaded file is empty" :code "empty_file"))
   (when (> (length bytes) +max-upload-bytes+)
     (fail 'too-large (upload-limit-message)))
   (multiple-value-bind (mime width height) (sniff-image bytes)
     (unless mime (fail 'rejected "Only PNG, JPEG, GIF and WebP images are accepted" :code "unsupported_type"))
-    ;; the file first: a failed write (disk full) must not leave a row whose URL 404s
     (let ((id (make-ulid)))
       (write-media-file space id mime bytes)
       (handler-case
@@ -76,16 +65,11 @@ row. Signals REJECTED or TOO-LARGE for data the library does not take."
           (error e))))))
 
 (defun store-uploads (space files &key (alt ""))
-  "Store each of FILES, each a list (octets filename), and return the new media.
-FILES together are held to the limit of one file, and refused whole past it.
-Otherwise signals for the first that is refused; the ones before it are kept."
   (when (> (reduce #'+ files :key (lambda (file) (length (first file)))) +max-upload-bytes+)
     (fail 'too-large (upload-limit-message)))
   (mapcar (lambda (file) (store-upload space (first file) :filename (second file) :alt alt)) files))
 
 (defun remove-media (media)
-  "Delete the row and the file. A missing file is not an error; a file some
-content still uses is: it stays, and a CONFLICT coded in_use names the count."
   (let ((references (media-references (media-space media) (media-id media))))
     (when (plusp references)
       (fail 'conflict (format nil "~a is used by ~a content~:p; remove it from them first"
@@ -95,8 +79,6 @@ content still uses is: it stays, and a CONFLICT coded in_use names the count."
   (delete-media-file (media-space media) (media-id media) (media-mime media)))
 
 (defun remove-each (space ids)
-  "Remove each of IDS: a file in use is refused, the rest still go.
-Returns (values DONE FAILED FIRST-MESSAGE)."
   (let ((done 0) (failed 0) (message nil))
     (dolist (id ids (values done failed message))
       (handler-case
@@ -105,8 +87,6 @@ Returns (values DONE FAILED FIRST-MESSAGE)."
                    (incf failed)
                    (unless message (setf message "one was gone already")))
                   (t (remove-media media) (incf done))))
-        ;; every condition, not only the library's own: a file that will not
-        ;; leave the disk must not take the selection down with it
         (koya-error (e)
           (incf failed)
           (unless message (setf message (koya-error-message e))))
@@ -115,15 +95,9 @@ Returns (values DONE FAILED FIRST-MESSAGE)."
           (unless message (setf message (princ-to-string e))))))))
 
 (defun remove-space-media (space)
-  "Delete every file of SPACE. Called when the space itself is deleted, after the
-rows have gone with it; nothing is left to reference them, so nothing is checked."
   (delete-space-media-files space))
 
-;;; A media is served by this server at /media/{space}/{id}.{ext} (web/presenters
-;;; makes the URL, web/media serves it).
-
 (defun stored-file (space id extension)
-  "(values PATH MIME) of the file a media URL names, or NIL when there is none."
   (let ((mime (car (rassoc extension +image-types+ :test #'string=))))
     (when (and mime (media-file-exists-p space id mime))
       (values (media-file-path space id mime) mime))))

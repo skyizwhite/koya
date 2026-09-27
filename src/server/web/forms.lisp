@@ -18,8 +18,6 @@
            #:number->string))
 (in-package #:koya-server/web/forms)
 
-;;; Conversion between HTML form submissions and content data objects.
-
 (defun field-param-name (field)
   (format nil "f-~a" (field-name field)))
 
@@ -41,8 +39,6 @@
   (remove "" (mapcar (lambda (s) (string-trim " " s)) (split "[,\\s]+" string)) :test #'string=))
 
 (defun form->data (model params)
-  "Build a content data object from PARAMS for MODEL. Blank inputs are omitted,
-except booleans which are always present (unchecked = false)."
   (let ((data (make-hash-table :test 'equal)))
     (dolist (field (model-fields model))
       (let* ((name (field-param-name field))
@@ -59,18 +55,12 @@ except booleans which are always present (unchecked = false)."
                (when raw (setf (gethash (field-name field) data) raw))))
           ((:reference :media)
            (if (field-many-p field)
-               ;; a multiple select repeats the name; a text input separates ids with commas
                (let ((ids (loop :for v :in (form-values params name) :append (split-ids v))))
                  (when ids (setf (gethash (field-name field) data) (coerce ids 'vector))))
                (when raw (setf (gethash (field-name field) data) raw))))
           (:datetime
-           ;; datetime-local gives 2026-09-20T10:00 in the display zone; stored as UTC
            (when raw (setf (gethash (field-name field) data) (local-input->iso raw :timezone (display-timezone)))))
           (:richtext
-           ;; stored as the editor sent it (see koya-editor.js), but for the CRLF
-           ;; a form submission turns its line breaks into -- not trimmed, as the
-           ;; other fields are, or an untouched field would lose the whitespace
-           ;; around it. An emptied document is blank, as core/validate has it.
            (let ((html (and raw (remove #\Return (first (form-values params name))))))
              (when (and html (not (blank-for-field-p field html)))
                (setf (gethash (field-name field) data) html))))
@@ -79,19 +69,16 @@ except booleans which are always present (unchecked = false)."
     data))
 
 (defun number->string (n)
-  "3 -> \"3\", 1.5d0 -> \"1.5\": no exponent marker, so <input type=number> accepts it."
   (if (floatp n)
       (let ((*read-default-float-format* (type-of n))) (princ-to-string n))
       (princ-to-string n)))
 
 (defun value->string (field value)
-  "Render a stored VALUE of FIELD as the string shown in its input."
   (cond ((or (null value) (eq value json-null)) "")
         ((realp value) (number->string value))
         ((and (vectorp value) (not (stringp value)))
          (format nil "~{~a~^, ~}" (coerce value 'list)))
         ((eq (field-type field) :datetime)
-         ;; 2026-09-20T01:00:00.000Z -> 2026-09-20T10:00 for datetime-local, in the display zone
          (if (stringp value) (iso->local-input value :timezone (display-timezone)) (princ-to-string value)))
         ((eq value t) "true")
         (t (princ-to-string value))))

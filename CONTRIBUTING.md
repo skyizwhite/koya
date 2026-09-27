@@ -31,13 +31,15 @@ from its **Keys** page. A site's schema reaches it with `koya deploy` from
 [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk), or from the
 [Common Lisp SDK](docs/lisp-sdk.md) in this repository.
 
-## Tests
+## The spec
 
 ```sh
-just test
+just spec
 ```
 
-`tests/` mirrors `src/`: `core/`, `sdk/` and `server/`. Anything touching the
+The spec in `spec/` comes first: a change starts as a spec that fails.
+
+`spec/` mirrors `src/`: `core/`, `sdk/` and `server/`. Anything touching the
 database uses an in-memory one, and the admin UI and both APIs are driven through
 the app rather than by calling handlers.
 
@@ -46,8 +48,8 @@ the app rather than by calling handlers.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the three systems, the tables,
   the stack, how the image is built.
 - [adr/](adr) — one file per design decision, and why.
-- [AGENTS.md](AGENTS.md) — the conventions: what goes in an ADR, how comments are
-  written, migrations.
+- [AGENTS.md](AGENTS.md) — the conventions: the spec first, what goes in an ADR,
+  no comments in `src/`, migrations.
 - [docs/openapi.yaml](docs/openapi.yaml) — the APIs. koya-ts-sdk is generated
   from it, so a change to an endpoint changes this document in the same commit.
 

@@ -45,7 +45,6 @@
                                                (format nil "~a content~:p" (count-contents name (model-name model)))))))))))))
               (let ((hooks (schema-webhooks schema)))
                 (when hooks
-                  ;; each row opens the log filtered to that webhook; "View log" opens it unfiltered
                   (hsx (section :class "mt-8"
                          (div :class "mb-2 flex items-baseline justify-between gap-3"
                            (h2 :class "text-sm font-semibold text-muted" "Webhooks")

@@ -19,11 +19,6 @@
   (:export #:@get #:browse-deploys))
 (in-package #:koya-server/web/pages/s/<space>/deploys)
 
-;;; What each deploy of this space's schema changed, newest first. Read-only:
-;;; deploys come from the project's repository through the client.
-;;;
-;;; Each change is drawn as the line PLAN prints for it.
-
 (defun deployed-by (deploy) (caller-name (deploy-by deploy)))
 
 (defun line-class (change)
@@ -47,14 +42,12 @@
          (span :class "font-medium" (format nil "~a change~:p" (deploy-change-count deploy)))
          (when (deploy-destructive deploy)
            (hsx (span :class "badge bg-danger/10 text-danger" "destructive")))
-         ;; a deploy from the REPL names nobody
          (unless (blank-p (deployed-by deploy))
            (hsx (span :class "text-muted" (format nil "· ~a" (deployed-by deploy))))))
        (span :class "shrink-0 whitespace-nowrap text-muted" (short-time (deploy-created-at deploy))))
      (~diff :changes (deploy-changes deploy)))))
 
 (defcomp ~deploys (&key space page)
-  "What paging draws again: the deploys and their pager."
   (let* ((pages (last-page (count-deploys space)))
          (page (min page pages))
          (items (list-deploys space :limit +page-size+ :offset (page-offset page))))
@@ -77,7 +70,6 @@
        (format nil "~a deploy~:p, the newest ~a kept." (count-deploys space) +deploys-kept+))
      (~deploys :space space :page page))))
 
-;; paging is answered in place, with the page put back in the URL
 (defaction browse-deploys :get (params)
   (let ((space (param params "space")))
     (cond ((not (and space (find-space space))) (action-refusal "Space not found." 404))

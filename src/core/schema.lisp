@@ -66,12 +66,8 @@
 
 (defparameter +schema-version+ 1)
 
-;;; Fields every content has; they are managed by the server and cannot be
-;;; declared in a model.
 (defparameter +system-fields+ '("id" "createdAt" "updatedAt" "publishedAt" "revisedAt"))
 
-;;; Field types and the options each accepts. Option names are kebab-case
-;;; keywords in Lisp and camelCase strings on the wire.
 (defparameter *field-types*
   '((:text      :required :max-length :pattern :unique)
     (:textarea  :required :max-length)
@@ -85,9 +81,6 @@
     (:reference :required :model :many)
     (:slug      :required :from :unique :pattern)))
 
-;;; Options every field type accepts on top of its own. :WAS names what the field
-;;; was called in the deployed schema: an instruction to the deploy, which
-;;; renames and then stores the field without it.
 (defparameter *universal-options* '(:was))
 
 (defun field-type-p (type)
@@ -104,28 +97,20 @@
   (error 'schema-error :message (apply #'format nil fmt args)))
 
 (defun slug-name-p (string)
-  "Space and model names: lowercase, digits and hyphens, used in URLs.
-Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline."
   (and (stringp string) (scan "^[a-z][a-z0-9-]*\\z" string) t))
 
 (defun field-name-p (string)
-  "Field names: camelCase identifiers, used as JSON keys."
   (and (stringp string) (scan "^[a-z][a-zA-Z0-9]*\\z" string) t))
 
-;;; ---------------------------------------------------------------------------
-;;; Structures
-
 (defstruct (field (:constructor %make-field))
-  name      ; camelCase string
-  type      ; keyword from *field-types*
-  options)  ; plist, kebab-case keywords
+  name
+  type
+  options)
 
 (defun normalize-option (key value)
-  "Options that name other things accept symbols and are stored as strings."
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
     (case key
       (:model (name-string value))
-      ;; a JSON null is left alone, to fail the option's own check
       ((:from :was) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
       (:options (if (or (listp value) (json-array-p value))
                     (map 'list #'name-string value)
@@ -133,8 +118,6 @@ Patterns end in \\z, not $: cl-ppcre's $ also matches before a trailing newline.
       (t value))))
 
 (defun check-option-value (field-name key value)
-  "Option values come from Lisp or from JSON, and are checked here so that
-validation never trips over a wrong type or a broken regex."
   (flet ((bad (what) (fail "field ~s: option ~s must be ~a, got ~s" field-name key what value)))
     (case key
       ((:required :unique :integer :many :default)
@@ -162,7 +145,6 @@ validation never trips over a wrong type or a broken regex."
 
 (defun make-field (name type &rest options)
   (let ((name (if (stringp name) name (camel-key name)))
-        ;; :was NIL is an option given as nothing, not a rename
         (options (loop :for (k v) :on options :by #'cddr
                        :unless (and (eq k :was) (null v))
                          :append (list k (normalize-option k v)))))
@@ -190,17 +172,13 @@ validation never trips over a wrong type or a broken regex."
   (getf (field-options field) key default))
 
 (defun field-was (field)
-  "The name FIELD had in the deployed schema, or NIL."
   (field-option field :was))
 
 (defun forget-rename (options)
-  "OPTIONS without :WAS: a rename takes no part in comparing shapes, and is not
-stored."
   (loop :for (key value) :on options :by #'cddr
         :unless (eq key :was) :append (list key value)))
 
 (defun field-forget-rename (field)
-  "FIELD as the server stores it: without its :WAS."
   (if (field-was field)
       (%make-field :name (field-name field) :type (field-type field)
                    :options (forget-rename (field-options field)))
@@ -209,25 +187,16 @@ stored."
 (defun field-required-p (field) (and (field-option field :required) t))
 (defun field-many-p (field) (and (field-option field :many) t))
 
-;;; ---------------------------------------------------------------------------
-;;; Webhooks: plists (:label L :url U :only (M...)), so EQUAL compares them. They
-;;; belong to the space and fire for every model unless :ONLY narrows them; every
-;;; one is sent every event (see koya-server's usecases/webhooks).
-
 (defun webhook-label (webhook) (getf webhook :label))
 (defun webhook-url (webhook) (getf webhook :url))
 (defun webhook-only (webhook)
-  "The model names this webhook is narrowed to, or NIL for every model."
   (getf webhook :only))
 
 (defun webhook-covers-p (webhook model-name)
-  "True when WEBHOOK fires for the model named MODEL-NAME."
   (let ((only (webhook-only webhook)))
     (or (null only) (and (member model-name only :test #'string=) t))))
 
 (defun normalize-only (label only)
-  "ONLY is a model name or a list of them, from the DSL (symbols allowed) or the
-wire. Returns a list of strings, or NIL for every model."
   (let ((names (cond ((null only) '())
                      ((or (symbolp only) (stringp only)) (list only))
                      ((or (listp only) (json-array-p only)) (coerce only 'list))
@@ -243,16 +212,12 @@ wire. Returns a list of strings, or NIL for every model."
       names)))
 
 (defun make-webhook (label url &key only)
-  "A webhook: LABEL names it in plans and logs, URL receives the POST. ONLY is a
-model name, or a list of them, to narrow it to; without it the webhook fires for
-every model of the space."
   (unless (and (stringp label) (plusp (length label))) (fail "webhook label must be a non-empty string, got ~s" label))
   (unless (and (stringp url) (plusp (length url))) (fail "webhook ~s: url must be a non-empty string, got ~s" label url))
   (let ((only (normalize-only label only)))
     (append (list :label label :url url) (and only (list :only only)))))
 
 (defun normalize-webhook (entry)
-  "ENTRY is a webhook plist from the DSL or a wire-format object."
   (cond ((and (consp entry) (keywordp (first entry)))
          (make-webhook (getf entry :label) (getf entry :url) :only (getf entry :only)))
         ((hash-table-p entry) (jobject->webhook entry))
@@ -268,14 +233,12 @@ every model of the space."
     hooks))
 
 (defstruct (model (:constructor %make-model))
-  name     ; slug string
-  kind     ; :list or :object
-  fields   ; list of FIELD
-  options) ; plist: :preview-url :public-url (templates with {CONTENT_ID} {DRAFT_KEY}),
-           ; :label (the field naming a content), :was
+  name
+  kind
+  fields
+  options)
 
 (defun check-field-renames (model-name fields)
-  "A field's :WAS must name one field, once, and one this model no longer declares."
   (let ((names (mapcar #'field-name fields))
         (renames (remove nil (mapcar #'field-was fields))))
     (when (/= (length renames) (length (remove-duplicates renames :test #'string=)))
@@ -285,9 +248,6 @@ every model of the space."
         (fail "model ~s: a field is renamed from ~s, which the model still declares" model-name was)))))
 
 (defun name-designator (value)
-  "VALUE as a lowercase name, or VALUE itself when it is not one -- a number, or a
-JSON null -- which then fails the check that reads it rather than passing as a
-thing called \"null\"."
   (cond ((json-null-p value) value)
         ((stringp value) (string-downcase value))
         ((and value (symbolp value)) (string-downcase (symbol-name value)))
@@ -296,7 +256,6 @@ thing called \"null\"."
 (defun make-model (name kind fields &key preview-url public-url label was)
   (let ((name (string-downcase (string name)))
         (was (name-designator was))
-        ;; a field name, as :from on a slug takes it
         (label (if (and label (symbolp label) (not (json-null-p label))) (camel-key label) label)))
     (dolist (url (list preview-url public-url))
       (unless (or (null url) (stringp url))
@@ -326,16 +285,12 @@ thing called \"null\"."
 (defun model-public-url (model) (getf (model-options model) :public-url))
 
 (defun model-label (model)
-  "The name of the field whose value names a content of MODEL, or NIL: which
-field that is only the schema can say."
   (getf (model-options model) :label))
 
 (defun model-was (model)
-  "The name MODEL had in the deployed schema, or NIL."
   (getf (model-options model) :was))
 
 (defun model-forget-renames (model)
-  "MODEL as the server stores it: no :WAS, on it or on its fields."
   (%make-model :name (model-name model) :kind (model-kind model)
                :fields (mapcar #'field-forget-rename (model-fields model))
                :options (forget-rename (model-options model))))
@@ -344,12 +299,9 @@ field that is only the schema can say."
   (find (if (stringp name) name (camel-key name)) (model-fields model)
         :key #'field-name :test #'string=))
 
-;;; A schema is one space's models and webhooks. The space itself is made in the
-;;; admin UI and is not part of the document; its name travels in the deploy URL.
-
 (defstruct (schema (:constructor %make-schema))
-  webhooks  ; list of webhook plists, fired by every model
-  models)   ; list of MODEL
+  webhooks
+  models)
 
 (defun make-schema (&key webhooks models)
   (let ((names (mapcar #'model-name models)))
@@ -360,11 +312,7 @@ field that is only the schema can say."
 (defun schema-model (schema name)
   (find (string-downcase (string name)) (schema-models schema) :key #'model-name :test #'string=))
 
-;;; ---------------------------------------------------------------------------
-;;; Semantic checks that need the whole schema (cross references).
-
 (defun schema-errors (schema)
-  "Return a list of human readable problems, empty when the schema is consistent."
   (let ((errors '()))
     (let ((renames (remove nil (mapcar #'model-was (schema-models schema)))))
       (dolist (was (remove-duplicates renames :test #'string= :from-end t))
@@ -416,14 +364,10 @@ field that is only the schema can say."
     (nreverse errors)))
 
 (defun check-schema (schema)
-  "Signal SCHEMA-ERROR when SCHEMA is inconsistent, otherwise return it."
   (let ((errors (schema-errors schema)))
     (when errors
       (fail "~{~a~^; ~}" errors)))
   schema)
-
-;;; ---------------------------------------------------------------------------
-;;; Wire format (JSON objects as EQUAL hash tables).
 
 (defun option->jvalue (key value)
   (case key
@@ -433,8 +377,6 @@ field that is only the schema can say."
 (defun field->jobject (field)
   (let ((obj (jobject "name" (field-name field)
                       "type" (string-downcase (symbol-name (field-type field))))))
-    ;; Options are emitted in sorted key order so that serialization is stable
-    ;; regardless of how the field was constructed.
     (let ((pairs (loop :for (k v) :on (field-options field) :by #'cddr :collect (cons k v))))
       (loop :for (k . v) :in (sort pairs #'string< :key (lambda (pair) (camel-key (car pair))))
             :do (setf (gethash (camel-key k) obj) (option->jvalue k v))))
@@ -448,8 +390,6 @@ field that is only the schema can say."
     obj))
 
 (defun jobject->webhook (obj)
-  "Any other key -- the \"events\" older schemas carried -- is ignored, so a
-stored schema loads and is rewritten in the current shape on the next deploy."
   (unless (hash-table-p obj) (fail "each webhook must be an object"))
   (let ((label (jget obj "label")) (url (jget obj "url")))
     (make-webhook (or label url) url :only (jget obj "only"))))
@@ -475,8 +415,6 @@ stored schema loads and is rewritten in the current shape on the next deploy."
     (t value)))
 
 (defun find-keyword (string candidates)
-  "The keyword in CANDIDATES whose lowercase name is STRING, or NIL. Wire input is
-never interned: an unknown name stays a string."
   (and (stringp string)
        (find string candidates :key (lambda (k) (string-downcase (symbol-name k))) :test #'string=)))
 
@@ -507,8 +445,6 @@ never interned: an unknown name stays a string."
     (unless (stringp name) (fail "model without a name"))
     (unless kind (fail "model ~s: kind must be \"list\" or \"object\"" name))
     (unless (or (null fields) (json-array-p fields)) (fail "model ~s: fields must be an array" name))
-    ;; a "webhooks" key from a schema stored before they all moved to the space is
-    ;; ignored, like the "events" of an older webhook
     (make-model name kind
                 (map 'list #'jobject->field (or fields #()))
                 :preview-url (jget obj "previewUrl")
@@ -517,7 +453,6 @@ never interned: an unknown name stays a string."
                 :was (jget obj "was"))))
 
 (defun jobject->schema (obj)
-  "Parse a wire-format schema object. Signals SCHEMA-ERROR on malformed input."
   (unless (hash-table-p obj) (fail "schema must be a JSON object"))
   (let ((version (jget obj "koyaSchema")))
     (unless (eql version +schema-version+)

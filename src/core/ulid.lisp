@@ -11,9 +11,6 @@
            #:ulid-timestamp))
 (in-package #:koya-core/ulid)
 
-;;; ULID: 48-bit millisecond timestamp + 80-bit randomness, encoded as 26
-;;; Crockford base32 characters. Lexicographically sortable by creation time.
-
 (defparameter +alphabet+ "0123456789ABCDEFGHJKMNPQRSTVWXYZ")
 (defparameter +length+ 26)
 
@@ -42,15 +39,12 @@
   (encode (logior (ash time-ms 80) (random-80-bits))))
 
 (defun ulid-p (string)
-  "True when STRING is a syntactically valid ULID."
   (and (stringp string)
        (= (length string) +length+)
-       ;; 128 bits in 130 bit slots: the first character can only use 3 bits.
        (char<= (char-upcase (char string 0)) #\7)
        (every (lambda (c) (position (char-upcase c) +alphabet+)) string)))
 
 (defun ulid-timestamp (ulid)
-  "Return the unix millisecond timestamp embedded in ULID."
   (let ((n 0))
     (loop :for c :across (subseq ulid 0 10)
           :do (setf n (logior (ash n 5) (position (char-upcase c) +alphabet+))))

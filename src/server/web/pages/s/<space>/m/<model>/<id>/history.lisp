@@ -33,12 +33,7 @@
   (:export #:@get #:browse-history))
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/<id>/history)
 
-;;; A content's revisions, newest first, each drawn as what it changed against
-;;; the one before it in the same view: every write, or the publishes alone,
-;;; where the one before is the version that was live until then.
-
 (defun restore-url (space model id revision-id)
-  "The editor, with REVISION-ID's data in the form."
   (render-uri (make-uri :path (content-url space model id) :query `(("revision" . ,revision-id)))))
 
 (defparameter +events+
@@ -54,12 +49,7 @@
         ((string= event "unpublish") "bg-warn/10 text-warn")
         (t "bg-line text-muted")))
 
-;;; Values, as text. A value is drawn whole: this page is where a change is
-;;; read, so nothing is cut. Rich text is the exception, drawn as rich text by
-;;; ~RICHTEXT.
-
 (defun id-text (space field id)
-  "An id with what it points at, when that still exists."
   (let ((label (if (eq (field-type field) :media)
                    (let ((media (find-media space id))) (and media (media-filename media)))
                    (let* ((target-model (find-model space (field-option field :model)))
@@ -76,7 +66,6 @@
     (t (if (eq value t) "Yes" (princ-to-string value)))))
 
 (defun value-text (space field value found)
-  "VALUE as text, or NIL for none. FIELD is NIL for a key the model has lost."
   (cond ((and field (eq (field-type field) :boolean))
          (and found (scalar-text space field value)))
         ((or (not found) (blank-value-p value)) nil)
@@ -85,15 +74,11 @@
         (t (scalar-text space field value))))
 
 (defun richtext-document (html)
-  "A page of its own for HTML, styled as the site might style it."
   (format nil "<!doctype html><html><head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"~a\"></head>~
                <body class=\"prose prose-sm max-w-none bg-transparent\">~a</body></html>"
           (asset-url "style/dist.css") html))
 
 (defcomp ~richtext (&key html)
-  "Stored rich text is whatever a management key sent, so it is not put in this
-page: a sandbox without allow-scripts runs nothing in it, not even an onerror.
-allow-same-origin is only there so that koya-editor.js can read its height."
   (hsx (iframe :sandbox "allow-same-origin" :srcdoc (richtext-document html) :title "rich text"
                :data-fit-content t :class "block h-16 w-full")))
 
@@ -120,7 +105,6 @@ allow-same-origin is only there so that koya-editor.js can read its height."
                                    (p :class "mb-1 text-sm font-medium" key
                                      (unless field
                                        (hsx (span :class "ml-2 font-normal text-muted" "no longer a field"))))
-                                   ;; the oldest has nothing to be compared with: its values alone
                                    (if before
                                        (hsx (div :class "grid gap-2 sm:grid-cols-2"
                                               (~value :space space :field field :value old :found found-old
@@ -137,7 +121,6 @@ allow-same-origin is only there so that koya-editor.js can read its height."
        (span :class "flex flex-wrap items-center gap-2"
          (span :class (clsx "badge" (event-class (revision-event revision))) (event-label (revision-event revision)))
          (span :class "whitespace-nowrap text-muted" (short-time (revision-created-at revision)))
-         ;; a write from the REPL names nobody
          (unless (blank-value-p (caller-name (revision-by revision)))
            (hsx (span :class "text-muted" (format nil "· ~a" (caller-name (revision-by revision)))))))
        (a :href (restore-url space (model-name model) id (revision-id revision)) :class "btn"
@@ -158,12 +141,10 @@ allow-same-origin is only there so that koya-editor.js can read its height."
   (last-page (count-revisions id :published-only published-only)))
 
 (defcomp ~revisions (&key space model content published-only page)
-  "What a tab or a page draws again: the tabs, the versions and their pager."
   (let* ((model-name (model-name model))
          (id (content-id content))
          (pages (page-count id published-only))
          (page (min page pages))
-         ;; one more than the page, so its last row has the one before it to compare with
          (rows (list-revisions id :published-only published-only
                                   :limit (1+ +page-size+) :offset (page-offset page)))
          (items (subseq rows 0 (min +page-size+ (length rows))))
@@ -206,7 +187,6 @@ allow-same-origin is only there so that koya-editor.js can read its height."
          "Every saved version of this content, newest first.")
        (~revisions :space space :model model :content content :published-only published-only :page page)))))
 
-;; a tab or a page is answered in place, with the view and page put back in the URL
 (defaction browse-history :get (params)
   (let* ((space (param params "space"))
          (model (target-model params))

@@ -13,13 +13,7 @@
   (:export #:+max-response-chars+))
 (in-package #:koya-server/infra/db/webhook-deliveries)
 
-;;; What came back from each webhook call, so the admin UI can show whether the
-;;; receiver accepted it. Only the newest +DELIVERIES-KEPT+ rows of a space are
-;;; kept: this is a log to glance at after a publish, not an audit trail.
-
-(defparameter +max-response-chars+ 4000
-  "How much of a response body is stored. A receiver that answers with a page
-instead of a line should not fill the database.")
+(defparameter +max-response-chars+ 4000)
 
 (defun row->delivery (row)
   (make-delivery :id (col row "id") :space (col row "space") :label (col row "label")
@@ -31,7 +25,6 @@ instead of a line should not fill the database.")
                  :created-at (col row "created_at")))
 
 (defun clip (text)
-  "TEXT as a string the log can hold: bodies that are not text are named, not stored."
   (cond ((null text) "")
         ((stringp text)
          (if (> (length text) +max-response-chars+)
@@ -48,7 +41,6 @@ instead of a line should not fill the database.")
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           id space (or label "") (or url "") (or model "") (or event "") (or content-id "")
           (if ok 1 0) status (clip response) (clip error) duration-ms (now-iso))
-    ;; ULIDs sort by time, so the newest rows are the largest ids
     (exec "DELETE FROM webhook_deliveries
             WHERE space = ?
               AND id NOT IN (SELECT id FROM webhook_deliveries WHERE space = ? ORDER BY id DESC LIMIT ?)"
@@ -58,7 +50,6 @@ instead of a line should not fill the database.")
 (defun blank-p (value) (or (null value) (zerop (length value))))
 
 (defun filter-clause (label model)
-  "The WHERE fragment and parameters for whichever of LABEL and MODEL is given."
   (let ((where "") (params '()))
     (unless (blank-p label)
       (setf where (concatenate 'string where " AND label = ?")

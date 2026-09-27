@@ -17,24 +17,7 @@
                 #:set-webhook-secret))
 (in-package #:koya-server/infra/db/schema-store)
 
-;;; The server keeps the deployed schema in the SPACES and MODELS tables. A model's
-;;; definition is stored as its wire-format JSON, so the tables never change
-;;; shape when the schema does.
-;;;
-;;; A space is made and deleted in the admin UI, never by a deploy: it owns the
-;;; contents, media, keys and webhook secret, so its life is longer than any one
-;;; schema. A deploy addresses one existing space and changes only its models and
-;;; webhooks.
-;;;
-;;; A schema is read from its rows once and kept until a deploy or a deletion
-;;; replaces it: every content delivered, every reference resolved and every
-;;; label drawn asks for a model, and parsing the models each time was most of
-;;; the work of a page. The cache is the connection's, so a test that opens a
-;;; fresh database starts empty; and it is dropped whole when a transaction
-;;; rolls back, since what was read inside it may be of rows that never were.
-
-(defvar *schemas* (cons nil (make-hash-table :test 'equal))
-  "(connection . hash of space name -> schema, or :none for a name that is no space).")
+(defvar *schemas* (cons nil (make-hash-table :test 'equal)))
 
 (defun schema-cache ()
   (unless (eq (car *schemas*) *db*)
@@ -101,12 +84,7 @@
   (exec "DELETE FROM spaces WHERE name = ?" name)
   (forget-schema name))
 
-;;; Renames. A :WAS matched by the diff is carried through to the stored content
-;;; in the same transaction as the schema write.
-
 (defun rename-model-rows (space from to)
-  "Move a model's row and its contents from FROM to TO. The contents move before
-the old row goes: they reference it ON DELETE CASCADE."
   (exec "INSERT INTO models (space, name, kind, definition, position)
          SELECT space, ?, kind, definition, position FROM models WHERE space = ? AND name = ?"
         to space from)
@@ -114,7 +92,6 @@ the old row goes: they reference it ON DELETE CASCADE."
   (exec "DELETE FROM models WHERE space = ? AND name = ?" space from))
 
 (defun rename-key (object from to)
-  "Move key FROM to TO in OBJECT, if it holds one. Returns true when it changed."
   (multiple-value-bind (value presentp) (gethash from object)
     (when presentp
       (remhash from object)
@@ -122,8 +99,6 @@ the old row goes: they reference it ON DELETE CASCADE."
       t)))
 
 (defun rename-content-field (space model from to)
-  "Rewrite the key FROM to TO in the published data, the draft and the revisions
-of every content of MODEL."
   (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?"
                       space model))
     (let* ((published (let ((v (col row "published"))) (and v (parse-json v))))
@@ -133,7 +108,6 @@ of every content of MODEL."
       (when (or in-published in-draft)
         (exec "UPDATE contents SET published = ?, draft = ? WHERE id = ?"
               (and published (to-json published)) (and draft (to-json draft)) (col row "id")))))
-  ;; the same field in the history, so an old version still restores into it
   (dolist (row (fetch "SELECT r.id, r.data FROM content_revisions r JOIN contents c ON c.id = r.content_id
                         WHERE c.space = ? AND c.model = ?"
                       space model))
@@ -142,8 +116,6 @@ of every content of MODEL."
         (exec "UPDATE content_revisions SET data = ? WHERE id = ?" (to-json data) (col row "id"))))))
 
 (defun apply-renames (space-name changes)
-  "Carry out a deploy's renames. Model renames come first in CHANGES, so a field
-rename names its model by the new name."
   (dolist (change changes)
     (case (getf change :op)
       (:rename-model (rename-model-rows space-name (getf change :from) (getf change :model)))
@@ -153,11 +125,8 @@ rename names its model by the new name."
 (defmethod save-schema (space-name schema changes &key (by ""))
   (with-db-transaction
     (progn
-      ;; first, and again once written: what a rename reads in between must be
-      ;; the rows, and the cache must not keep what this replaces
       (forget-schema space-name)
       (apply-renames space-name changes)
-      ;; in the transaction: a deploy that rolls back must not be in the log
       (record-deploy space-name changes :by by)
       (exec "UPDATE spaces SET webhooks = ? WHERE name = ?"
             (to-json (map 'vector #'webhook->jobject (schema-webhooks schema))) space-name)

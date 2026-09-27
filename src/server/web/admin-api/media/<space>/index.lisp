@@ -11,7 +11,6 @@
 (in-package #:koya-server/web/admin-api/media/<space>/index)
 
 (defun @get (params)
-  "List media, newest first: ?q= filters by file name, limit/offset page."
   (let* ((space (resolve-space (path-param params :space)))
          (query (parse-query params))
          (search (param params "q")))
@@ -21,7 +20,6 @@
              "offset" (query-offset query) "limit" (query-limit query))))
 
 (defun @post (params)
-  "Upload one or more images (multipart/form-data, field \"file\"; optional \"alt\"). Returns {\"media\": [...]}."
   (let* ((space (resolve-space (path-param params :space)))
          (files (uploaded-files params "file"))
          (alt (or (form-field params "alt") "")))

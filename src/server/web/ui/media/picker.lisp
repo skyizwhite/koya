@@ -15,17 +15,9 @@
            #:~media-picker-dialog))
 (in-package #:koya-server/web/ui/media/picker)
 
-;;; The media picker: a <dialog> on the editor page whose body is fetched from
-;;; these actions with HTMX, so the same grid serves :media fields and Quill's
-;;; image button. Selecting a card is handled in koya-editor.js. The owner
-;;; session and same-origin checks are *mw-actions-auth*'s.
-
-(defparameter +picker-size+ 12
-  "Files fetched at a time: three rows of the dialog's four columns. The next ones
-come as the last row scrolls into view.")
+(defparameter +picker-size+ 12)
 
 (defun picker-items (space search page)
-  "(values ITEMS MORE-URL) of PAGE, MORE-URL being where the page after it is."
   (let ((items (list-media space :search search :limit +picker-size+ :offset (page-offset page +picker-size+))))
     (values items
             (and (< page (last-page (count-media space :search search) +picker-size+))
@@ -40,7 +32,6 @@ come as the last row scrolls into view.")
          (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
        (form :hx-post (media-picker-upload :space space) :hx-target "#media-picker-body" :hx-swap "outerHTML"
              :hx-encoding "multipart/form-data" :hx-trigger "change from:'find input[type=file]'"
-             ;; htmx aborts a request after 60s by default; a 20 MB upload may need longer
              :hx-config "timeout:0"
              :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
          (label :class "btn" (~icon :name :upload) "Upload…"
@@ -80,12 +71,10 @@ come as the last row scrolls into view.")
                  (hsx (~picker-body :space space :error (koya-error-message e)))))))))
 
 (defcomp ~media-picker-dialog (&key space)
-  "The (initially empty) dialog. koya-editor.js loads the body from data-picker-url on open."
   (hsx
    (dialog :id "media-picker" :data-picker-url (media-picker :space space) :class "koya-dialog koya-dialog-wide max-w-3xl"
      (div :class "flex items-center justify-between border-b border-line px-4 py-3"
        (h2 :class "font-semibold" "Media")
        (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close" (~icon :name :close)))
-     ;; loaded into as a whole: an error fragment may replace #media-picker-body
      (div :id "media-picker-content" :class "max-h-[70vh] overflow-y-auto p-4"
        (div :id "media-picker-body" :class "text-sm text-muted" "Loading…")))))

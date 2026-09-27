@@ -20,11 +20,6 @@
                 #:uncompressed-size #:entry-to-vector))
 (in-package #:koya-server/infra/archives)
 
-;;; Archives are files in ARCHIVE-DIR: export-<ulid>.zip while one is being sent,
-;;; <ulid>.upload while one is arriving. zippy copies an entry from its source
-;;; and unpacks one on demand, a few kilobytes at a time, so neither side holds
-;;; a space's files in memory.
-
 (defparameter +stale-seconds+ (* 24 3600))
 
 (defun archive-file (name)
@@ -50,8 +45,6 @@
     path))
 
 (defun upload-file (id)
-  "The file of upload ID, or NIL for an id no upload could have: it comes from the
-request, and becomes a file name."
   (and (stringp id) (scan "^[0-9A-Z]{26}\\z" id)
        (merge-pathnames (format nil "~a.upload" id) (archive-dir))))
 
@@ -77,7 +70,7 @@ request, and becomes a file name."
     (when path (uiop:delete-file-if-exists path))))
 
 (defstruct (archive (:constructor make-archive (entries)))
-  entries)                              ; name -> zippy entry
+  entries)
 
 (defmethod call-with-upload (id function)
   (multiple-value-bind (zip streams)

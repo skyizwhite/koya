@@ -9,7 +9,7 @@ data/
 *.fasl
 assets/style/dist.css
 docs/
-tests/
+spec/
 README.md
 justfile
 .claude/

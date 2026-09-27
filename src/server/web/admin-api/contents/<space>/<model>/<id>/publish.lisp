@@ -8,7 +8,6 @@
 (in-package #:koya-server/web/admin-api/contents/<space>/<model>/<id>/publish)
 
 (defun @post (params)
-  "Publish the draft, or {\"data\": {...}} when given. {\"publishedAt\": iso} overrides the publish date."
   (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
     (let* ((body (read-json-body))
            (data (body-field body "data")))

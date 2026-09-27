@@ -20,13 +20,6 @@
            #:logout))
 (in-package #:koya-server/web/ui/layout)
 
-;;; The frame of every page behind the login: the header with its crumbs, #toast,
-;;; and the footer.
-
-;;; The AGPL asks a server that others use over the network to offer them its
-;;; source, so every page links to it. The link is the system's :homepage: a fork
-;;; that points it at its own repository offers its own source.
-
 (defparameter *version* (asdf:component-version (asdf:find-system "koya-server")))
 (defparameter *repository* (asdf:system-homepage (asdf:find-system "koya-server")))
 
@@ -48,7 +41,6 @@
              (hsx (a :href href :class "max-w-48 truncate text-fg hover:underline sm:max-w-xs" :title label label))
              (hsx (span :class "max-w-48 truncate text-muted sm:max-w-xs" :title label label))))))
 
-;; the header's Log out, on every page
 (defaction logout :post (params)
   (declare (ignore params))
   (session-logout)
@@ -60,8 +52,6 @@
    (<>
      (header :class "border-b border-line bg-panel"
        (div :class "mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3"
-         ;; on a narrow screen the crumbs wrap, each with its slash, and a long one
-         ;; (a content's label) is cut short; the buttons keep their size
          (nav :class "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
            (a :href "/" :class "inline-flex shrink-0 items-center gap-2 font-bold tracking-tight text-fg"
               (img :src (asset-url "icon.svg") :alt "" :width "20" :height "20" :class "h-5 w-5 rounded")
@@ -83,7 +73,5 @@
      (~footer))))
 
 (defcomp ~missing (&key what space)
-  "The page for a URL that names a WHAT -- a space, a model -- that is not there,
-answered 404, inside SPACE's frame when the space itself exists."
   (set-response-status 404)
   (hsx (~layout :space space (h1 :class "text-xl font-bold" (format nil "~a not found" what)))))

@@ -13,7 +13,6 @@
   (admin-content->jobject (resolve-content (path-param params :space) (path-param params :model) (path-param params :id))))
 
 (defun @patch (params)
-  "Save a draft: {\"data\": {...}} is merged onto the current data."
   (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
     (let ((data (body-field (read-json-body) "data")))
       (unless (hash-table-p data) (fail-api 400 "bad_request" "\"data\" must be an object"))

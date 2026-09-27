@@ -14,10 +14,6 @@
            #:human-size))
 (in-package #:koya-server/web/ui/media/grid)
 
-;;; What the library page and the picker share: a thumbnail, its size in words,
-;;; the limit on an upload, and the picker's grid. The library's own cards and
-;;; preview are on its page.
-
 (defun human-size (bytes)
   (cond ((< bytes 1024) (format nil "~a B" bytes))
         ((< bytes (* 1024 1024)) (format nil "~,1f KB" (/ bytes 1024.0)))
@@ -29,10 +25,6 @@
       "?"))
 
 (defcomp ~upload-limit ()
-  "Put in an upload form: what koya-editor.js checks the chosen files against before
-they are sent, and the toast it shows when they are too large. The server's 413
-would not do: it answers before the body is read and closes the connection, and
-a browser still sending takes that for a reset and shows nothing."
   (hsx (template :data-upload-limit (princ-to-string +max-upload-bytes+)
          (~toast :message (upload-limit-message) :kind :error))))
 
@@ -41,7 +33,6 @@ a browser still sending takes that for a reset and shows nothing."
             :class "aspect-square w-full rounded-md border border-line bg-panel object-contain")))
 
 (defcomp ~pick-card (&key media)
-  "Picker card: one button carrying everything the page needs to use the file."
   (hsx
    (li
      (button :type "button" :class "w-full space-y-1 rounded-md p-1 text-left text-xs hover:bg-accent/5"
@@ -54,8 +45,6 @@ a browser still sending takes that for a reset and shows nothing."
        (div :class "text-muted" (dimensions media))))))
 
 (defcomp ~pick-cards (&key items more)
-  "The picker's cards, and when MORE -- the URL of the next ones -- the row that
-fetches them as it scrolls into view and is replaced by them."
   (hsx
    (<> (loop :for media :in items :collect (hsx (~pick-card :media media)))
        (when more
@@ -64,7 +53,6 @@ fetches them as it scrolls into view and is replaced by them."
                 "Loading…"))))))
 
 (defcomp ~media-grid (&key items more)
-  "The picker's grid."
   (if (null items)
       (hsx (~empty-state "No media yet. Upload an image above."))
       (hsx (ul :class "grid grid-cols-3 gap-3 sm:grid-cols-4"

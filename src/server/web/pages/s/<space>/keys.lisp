@@ -18,16 +18,7 @@
   (:export #:@get #:create-key #:delete-key #:rotate-secret))
 (in-package #:koya-server/web/pages/s/<space>/keys)
 
-;;; Every key of one space: the delivery keys that read its published content and
-;;; the management keys that drive the admin API for it. Both belong to the space
-;;; and are kept apart because what they may do is not the same -- a delivery key
-;;; is handed to a front end, a management key deploys schemas.
-
-;;; Creating, deleting and rotating are actions answered in place: the section
-;;; they belong to is drawn again.
-
 (defun key-kind (kind)
-  "What differs between the two kinds of key, or NIL for anything else."
   (cond ((equal kind "delivery")
          (list :title "Delivery keys" :lead "Read-only access to this space's published content."
                :placeholder "e.g. production site"
@@ -47,7 +38,6 @@
 (defcomp ~key-table (&key space kind keys)
   (if (null keys)
       (hsx (~empty-state "No keys yet."))
-      ;; framed like the other lists
       (hsx (div :class "overflow-x-auto rounded-md border border-line bg-panel"
              (table :class "w-full text-sm"
                (thead (tr :class "border-b border-line text-left text-muted"
@@ -67,7 +57,6 @@
                                   :hx-target (format nil "#~a" (section-id kind)) :hx-swap "outerHTML"
                                   :hx-confirm "Delete this key? Whatever uses it stops working."
                               (input :type "hidden" :name "id" :value (key-id key))
-                              ;; the cell is narrow, so the icon stands for the label
                               (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete key"
                                 (~icon :name :delete)))))))))))))
 
@@ -110,10 +99,7 @@
        (~key-section :space space :kind "management"))
      (~webhook-secret :space space))))
 
-;;; --- Actions ------------------------------------------------------------------
-
 (defun action-target (params)
-  "The space and the kind of key an action names, when both exist."
   (let ((space (param params "space"))
         (kind (param params "kind")))
     (values (and space (find-space space) space)
@@ -141,8 +127,6 @@
                (hsx (<> (~webhook-secret :space space)
                         (~toast-oob :message "Webhook secret rotated."))))
         (action-refusal "Unknown space." 404))))
-
-;;; --- Page ---------------------------------------------------------------------
 
 (defun ensure-space (params)
   (find-space (path-param params :space)))

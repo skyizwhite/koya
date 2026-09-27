@@ -16,10 +16,6 @@
            #:json-equal))
 (in-package #:koya-core/json)
 
-;;; Thin layer over jzon. Objects are EQUAL hash tables with string keys,
-;;; arrays are vectors, null is the symbol JSON-NULL (jzon's 'NULL), false is NIL
-;;; and true is T.
-
 (defconstant json-null 'null)
 
 (defun json-null-p (value) (eq value 'null))
@@ -35,14 +31,12 @@
   (stringify value :pretty pretty))
 
 (defun jobject (&rest kv)
-  "Build a JSON object from alternating string keys and values."
   (let ((out (make-hash-table :test 'equal)))
     (loop :for (k v) :on kv :by #'cddr
           :do (setf (gethash k out) v))
     out))
 
 (defun jget (object &rest keys)
-  "Nested lookup. Returns two values like GETHASH; a missing intermediate returns NIL NIL."
   (let ((current object))
     (loop :for (key . rest) :on keys
           :do (multiple-value-bind (v found) (if (hash-table-p current) (gethash key current) (values nil nil))
@@ -60,8 +54,6 @@
     (sort keys #'string<)))
 
 (defun json-equal (a b)
-  "True when A and B are the same JSON value. Not EQUALP: that compares strings
-without case, and \"Title\" and \"title\" are two values."
   (cond ((and (hash-table-p a) (hash-table-p b))
          (and (= (hash-table-count a) (hash-table-count b))
               (loop :for key :being :the :hash-keys :of a :using (:hash-value value)

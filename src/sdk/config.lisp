@@ -16,49 +16,22 @@
            #:find-model))
 (in-package #:koya-sdk/config)
 
-;;; The configuration DSL used by projects that depend on koya. A project defines
-;;; one space's models; the space itself is made in the admin UI and named by
-;;; KOYA:*SPACE*, so no definition here repeats it. Definitions are collected into
-;;; an in-memory registry; CURRENT-SCHEMA turns it into a validated schema that
-;;; DEPLOY sends to the server.
-;;;
-;;;   (defwebhooks
-;;;     (webhook "revalidate" "https://example.com/api/revalidate")
-;;;     (webhook "preview-build" "https://preview.example/hook" :only 'blog))
-;;;
-;;;   (defmodel blog (:kind :list)
-;;;     (title        :text :required t)
-;;;     (content      :richtext)
-;;;     (published-at :datetime))
-;;;
-;;; :WAS names what a model or field used to be called, so that the deploy moves
-;;; the stored content instead of dropping it:
-;;;
-;;;   (defmodel article (:kind :list :was blog)
-;;;     (subtitle :text :was lede))
-;;;
-;;; Re-evaluating a form replaces the definition of the same name, so the schema
-;;; can be edited live from the REPL. A model with :WAS also drops the definition
-;;; it renames: editing DEFMODEL BLOG into the form above leaves one model.
+(defvar *webhooks* '())
 
-(defvar *webhooks* '()
-  "Webhooks every model of the space fires.")
-
-(defvar *models* '()
-  "Ordered alist of model-name -> model, in definition order.")
+(defvar *models* '())
 
 (defun clear-schema ()
+  "Forget every model and webhook defined so far."
   (setf *webhooks* '()
         *models* '()))
 
 (defun model-key (name) (string-downcase (string name)))
 
 (defun find-model (name)
+  "The model defined as NAME, or NIL."
   (cdr (assoc (model-key name) *models* :test #'string=)))
 
 (defun register-webhooks (webhooks)
-  ;; checked here, not at deploy time, so a malformed hook is signalled where it
-  ;; was typed; the schema built for the check is thrown away
   (make-schema :webhooks webhooks)
   (setf *webhooks* webhooks))
 
@@ -66,9 +39,6 @@
   (let* ((key (model-name model))
          (was (model-was model))
          (entry (assoc key *models* :test #'string=)))
-    ;; a renamed model is the same model: the registry lets the old name go, or
-    ;; re-evaluating the renamed form would leave the definition it replaced
-    ;; behind, and the schema would rename from a model it still declares
     (when was
       (setf *models* (remove was *models* :key #'car :test #'string=)))
     (if entry

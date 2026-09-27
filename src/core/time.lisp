@@ -12,21 +12,19 @@
            #:parse-iso))
 (in-package #:koya-core/time)
 
-;;; All timestamps on the wire and in the database are ISO 8601 in UTC with
-;;; millisecond precision, e.g. 2026-09-20T05:04:03.123Z.
-
 (defparameter +iso-format+
   '((:year 4) #\- (:month 2) #\- (:day 2) #\T (:hour 2) #\: (:min 2) #\: (:sec 2) #\. (:msec 3) #\Z))
 
 (defun format-iso (timestamp)
+  "TIMESTAMP, a local-time timestamp, as koya stores and serves it: ISO 8601 in UTC
+with milliseconds."
   (format-timestring nil timestamp :format +iso-format+ :timezone +utc-zone+))
 
 (defun now-iso ()
+  "The current time as FORMAT-ISO writes it."
   (format-iso (now)))
 
 (defun iso-from-now (seconds)
-  "The moment SECONDS from now. Comparable to NOW-ISO as a string: both are UTC
-and fixed width."
   (format-iso (timestamp+ (now) seconds :sec)))
 
 (defun parse-iso (string)

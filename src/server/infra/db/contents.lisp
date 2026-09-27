@@ -19,10 +19,6 @@
                 #:contents-mentioning))
 (in-package #:koya-server/infra/db/contents)
 
-;;; Content rows, the published and draft data stored as JSON. A row is written
-;;; as the content it is handed; what a write makes of a content is the
-;;; domain's, and its revision the use case's.
-
 (defun row->content (row)
   (flet ((json (name) (let ((v (col row name))) (and v (parse-json v)))))
     (make-content :id (col row "id") :space (col row "space") :model (col row "model")
@@ -70,7 +66,6 @@
         (content-id content)))
 
 (defmethod delete-content (id)
-  ;; its revisions go with it, ON DELETE CASCADE
   (exec "DELETE FROM contents WHERE id = ?" id))
 
 (defmethod contents-mentioning (space needle &key exclude-id)
@@ -105,7 +100,6 @@
              (rows (apply #'fetch
                           (format nil "SELECT * ~a ORDER BY ~a LIMIT ? OFFSET ?"
                                   base (build-order-by (query-orders query) schema-model column))
-                          ;; SQLite reads a negative LIMIT as none
                           (append params (list (or (query-limit query) -1) (query-offset query))))))
         (values (mapcar #'row->content rows) total)))))
 

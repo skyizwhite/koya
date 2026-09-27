@@ -7,12 +7,6 @@
            #:~pager))
 (in-package #:koya-server/web/ui/elements)
 
-;;; Small pieces any page draws.
-
-;;; A component whose whole body is a condition wraps it in a fragment: NIL is
-;;; nothing as a child, but a component's own value is rendered, and a NIL there
-;;; comes out as the word NIL.
-
 (defcomp ~errors (&key errors)
   (hsx
    (<> (when errors
@@ -31,9 +25,6 @@
     (hsx (span :class (clsx "badge" class) status))))
 
 (defcomp ~pager (&key page pages href browse target)
-  "Previous and Next under a list of PAGES pages, on PAGE, when there is more
-than one. HREF gives a page's URL and BROWSE the action that draws it in place,
-each a function of the page number; TARGET is what that action replaces."
   (flet ((link (n)
            (hsx (a :href (funcall href n) :hx-get (funcall browse n)
                    :hx-target target :hx-swap "outerHTML" :class "btn"

@@ -8,8 +8,6 @@
            #:build-order-by))
 (in-package #:koya-server/infra/db/content-query)
 
-;;; A query's filters and orders as SQL over a JSON data column.
-
 (defun system-column (name)
   (cond ((string= name "id") "id")
         ((string= name "createdAt") "created_at")
@@ -19,16 +17,12 @@
         (t nil)))
 
 (defun field-expr (name model column)
-  "SQL expression selecting field NAME. System fields are real columns, the rest
-live inside the JSON data column."
   (or (system-column name)
       (progn
         (unless (model-field model name) (bad-query "unknown field ~s" name))
         (format nil "json_extract(~a, '$.~a')" column name))))
 
 (defun parse-number-strictly (string)
-  "STRING as a real number, or NIL. The reader runs with *read-eval* off and standard
-syntax, and the whole string must be one number: filter values come from the network."
   (handler-case
       (with-standard-io-syntax
         (let ((*read-eval* nil) (*read-default-float-format* 'double-float))
@@ -79,7 +73,6 @@ syntax, and the whole string must be one number: filter values come from the net
               (write-char c out))))
 
 (defun build-where (filters model column)
-  "Return (values SQL PARAMS) for FILTERS (as parsed by PARSE-FILTERS), or (values NIL NIL)."
   (when filters
     (let ((group-sqls '()) (params '()))
       (dolist (group filters)
@@ -92,7 +85,6 @@ syntax, and the whole string must be one number: filter values come from the net
       (values (format nil "(~{~a~^ OR ~})" (nreverse group-sqls)) params))))
 
 (defun build-order-by (orders model column)
-  "ORDER BY clause body for ORDERS, defaulting to newest published first."
   (if (null orders)
       "published_at DESC, created_at DESC, rowid DESC"
       (format nil "~{~a~^, ~}, rowid DESC"

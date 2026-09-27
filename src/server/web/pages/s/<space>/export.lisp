@@ -12,14 +12,6 @@
   (:export #:@get))
 (in-package #:koya-server/web/pages/s/<space>/export)
 
-;;; The space as a zip download (usecases/archive). The archive is written
-;;; to a file and sent from there, then deleted (*MW-TEMPORARY-FILE*):
-;;; it holds the webhook secret and every draft.
-;;;
-;;; The link to it carries no download attribute: Content-Disposition makes the
-;;; zip a download on its own, and a failure -- a redirect to the space page with
-;;; the toast, or to the login page -- has to be shown, not saved as a file.
-
 (defun @get (params)
   (let ((name (path-param params :space)))
     (if (null (find-space name))

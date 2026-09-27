@@ -9,9 +9,6 @@
                 #:delete-space-media-files))
 (in-package #:koya-server/infra/media-files)
 
-;;; The files of the media library, on disk at {KOYA_MEDIA_DIR}/{space}/{id}.{ext}.
-;;; KOYA_MEDIA_DIR is read on every call.
-
 (defun media-root ()
   (uiop:ensure-directory-pathname (media-dir)))
 
@@ -24,7 +21,6 @@
 (defmethod write-media-file (space id mime bytes &key new)
   (let ((path (media-file-path space id mime)))
     (ensure-directories-exist path)
-    ;; with NEW, opening fails rather than truncating what another writer made
     (with-open-file (out path :direction :output :element-type '(unsigned-byte 8)
                               :if-exists (if new nil :supersede))
       (when out

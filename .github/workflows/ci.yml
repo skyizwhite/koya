@@ -37,8 +37,8 @@ jobs:
       - name: Run the test suite
         run: |
           qlot exec sbcl --non-interactive \
-            --eval '(handler-bind ((warning (function muffle-warning))) (ql:quickload :koya-tests :silent t))' \
-            --eval '(uiop:quit (if (rove:run :koya-tests :style :dot) 0 1))'
+            --eval '(handler-bind ((warning (function muffle-warning))) (ql:quickload :koya-spec :silent t))' \
+            --eval '(uiop:quit (if (rove:run :koya-spec :style :dot) 0 1))'
 
   image:
     # on master and tags the Image workflow builds, checks and publishes it

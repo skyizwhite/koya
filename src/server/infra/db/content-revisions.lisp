@@ -12,9 +12,6 @@
                 #:content-history))
 (in-package #:koya-server/infra/db/content-revisions)
 
-;;; One row per write to a content (domain/revision). Rows go with their content
-;;; (ON DELETE CASCADE) and are otherwise kept.
-
 (defun row->revision (row)
   (make-revision :id (col row "id")
                  :content-id (col row "content_id")

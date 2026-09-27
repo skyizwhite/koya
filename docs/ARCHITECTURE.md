@@ -11,7 +11,7 @@ is in [../adr](../adr). Setting up to work on it is in
 | System | Holds | Licence |
 |---|---|---|
 | `koya-core` | the schema, its validation, the diff between two of them, JSON and name conversion, time, ULIDs | MIT |
-| `koya-sdk` | the schema DSL and the HTTP client, with `koya-core` re-exported | MIT |
+| `koya-sdk` | the schema DSL and the HTTP client, behind one package that exports a site's API alone | MIT |
 | `koya-server` | the admin UI, the delivery API, the admin API and the media store | AGPL |
 
 `koya-sdk` and `koya-server` both depend on `koya-core` and not on each other,
@@ -19,7 +19,7 @@ which is why one repository holds all three. A site depends on `koya-sdk` alone;
 `qlot` pulls it by git.
 
 ```
-koya-core.asd  koya-sdk.asd  koya-server.asd  koya-tests.asd
+koya-core.asd  koya-sdk.asd  koya-server.asd  koya-spec.asd
 qlfile  justfile  Dockerfile
 adr/                  ; one file per design decision
 docs/                 ; this, and the documents above
@@ -27,7 +27,7 @@ src/
   core/               ; the koya-core system (MIT): schema, validate, diff, json,
                       ; case, time, ulid, and main, which re-exports them
   sdk/                ; the koya-sdk system (MIT)
-    main.lisp         ; the koya-sdk package: core + config + client re-exported
+    main.lisp         ; the koya-sdk package: the site's API from config, client and core
     config.lisp       ; defmodel / defwebhooks / current-schema
     client.lisp       ; plan / deploy / pull, get-list …, the admin API wrappers
   server/             ; the koya-server system (AGPL)
@@ -55,7 +55,7 @@ src/
                       ;   elements at the top; content/ and media/ below
       api/            ;   the delivery API
       admin-api/      ;   the admin API
-tests/                ; mirrors src/: core/, sdk/, server/
+spec/                 ; mirrors src/: core/, sdk/, server/
 assets/               ; style/ (Tailwind in and out), js/
 ```
 
@@ -85,8 +85,8 @@ web  ──▶  usecases  ──▶  domain
 - `usecases/` uses `domain/` and its ports. It raises the errors in
   `domain/errors`, which say what went wrong without an HTTP status, and names
   who is making a change from `*actor*` (`usecases/actor`).
-- A port is a package of generic functions, each with the lambda list and the
-  documentation that are its contract. `infra/` adds the one method each has,
+- A port is a package of generic functions; what each must do is what the spec
+  of its callers requires. `infra/` adds the one method each has,
   so a use case calls `find-content` without knowing that SQLite answers it.
   A port keeps what it is given and decides nothing: a deploy's changes are
   found by the use case and handed to `save-schema` with the schema, and a key
@@ -117,7 +117,7 @@ both APIs -- are the outermost part of the web: they use the rest of `web/` (and
 the pages `ui/`), and nothing uses them, another route included. A URL two pages link to is in
 `web/urls`. See `adr/2026-09-27-routes-do-not-import-one-another.md`.
 
-`tests/server/layers.lisp` declares the layers with
+`spec/server/layers.lisp` declares the layers with
 [okite](https://github.com/skyizwhite/okite) -- in `web/`, each router a layer
 of its own, isolated, outside `ui/` outside the rest -- and fails when a file
 imports from a layer further out or a route from another route, from a library
@@ -181,7 +181,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Archives | zippy (a space's export and import) |
 | Other | ironclad, local-time, cl-dotenv, Tailwind CSS v4 (standalone) |
 | Checks | okite: the ports as the server loads, the layers in the tests |
-| Tests | rove (`koya-tests`) |
+| Spec | rove (`koya-spec`) |
 
 The four apps — pages, delivery API, admin API and actions — are separate ningle
 apps mounted together, so each decides its own response type. A request first

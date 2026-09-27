@@ -12,9 +12,6 @@
                 #:count-media #:update-media #:delete-media))
 (in-package #:koya-server/infra/db/media)
 
-;;; Rows of the media table. The file itself lives on disk (see infra/media-files);
-;;; this module only knows the metadata.
-
 (defun row->media (row)
   (make-media :id (col row "id") :space (col row "space") :filename (col row "filename")
               :mime (col row "mime") :size (col row "size")

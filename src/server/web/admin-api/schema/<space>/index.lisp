@@ -10,18 +10,14 @@
   (:export #:@get #:@put))
 (in-package #:koya-server/web/admin-api/schema/<space>/index)
 
-;;; One space's schema (usecases/schema).
-
 (defun @get (params)
   (schema->jobject (space-schema (path-param params :space))))
 
 (defun @put (params)
-  "Replace the space's schema (deploy). Destructive changes need ?force=true."
   (let* ((space (path-param params :space))
          (changes (handler-case (deploy space (jobject->schema (read-json-body))
                                         :force (equal (param params "force") "true"))
                     (conflict (e)
-                      ;; the changes a refused deploy would make, for the caller to look over
                       (if (equal (koya-error-code e) "destructive_changes")
                           (fail-api 409 (koya-error-code e) (koya-error-message e)
                                     (changes->jarray (koya-error-details e)))

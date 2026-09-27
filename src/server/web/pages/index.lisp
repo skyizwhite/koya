@@ -19,21 +19,9 @@
            #:begin-import-action #:continue-import-action #:finish-import-action))
 (in-package #:koya-server/web/pages/index)
 
-;;; The spaces. A space owns the contents, media, keys and webhook secret, so it
-;;; is made and deleted here, never by a deploy, which only changes its models.
-;;; Its name is its id -- it is in every URL -- so there is nothing to edit.
-;;;
-;;; Making and deleting one are actions answered in place. The dialogs open and
-;;; close by HTML alone (commandfor, closedby), so one swapped in works like the
-;;; one it replaced. Each space's delete dialog is in its row, so the list
-;;; answered after a delete takes the open one away with it.
-
 (defun delete-phrase (name)
-  "What the owner types to delete space NAME."
   (format nil "delete ~a" name))
 
-;; each prefix differs from the others where the name starts, so no space's ids
-;; are another's: a name is a slug and can end in -phrase or -error
 (defun delete-dialog-id (name) (format nil "delete-space-~a" name))
 (defun delete-phrase-id (name) (format nil "delete-phrase-~a" name))
 (defun delete-error-id (name) (format nil "delete-error-~a" name))
@@ -42,9 +30,6 @@
   (hsx (button :type "button" :commandfor dialog :command "close" :class "btn" children)))
 
 (defcomp ~delete-space-dialog (&key name)
-  "Deleting a space takes everything in it, so the owner types what they are
-deleting. The button waits for the phrase (data-confirm-phrase, koya-editor.js)
-and the action checks it again."
   (let ((id (delete-dialog-id name))
         (phrase (delete-phrase name))
         (input (delete-phrase-id name)))
@@ -93,8 +78,6 @@ and the action checks it again."
                 (loop :for space :in spaces :collect (hsx (~space-row :space space)))))))))
 
 (defcomp ~new-space-dialog ()
-  "The whole of making a space is one name, so it lives in a dialog rather than
-taking up the page."
   (hsx
    (dialog :id "new-space" :closedby "any" :class "koya-dialog max-w-sm"
      (form :hx-post (create-space-action) :hx-target "#new-space" :hx-swap "outerHTML"
@@ -104,7 +87,6 @@ taking up the page."
            (~icon :name :close)))
        (div :class "px-4 py-4"
          (label :for "name" :class "label" "Name")
-         ;; the hyphen is escaped: browsers read a pattern with the v flag, where a bare one is an error
          (input :type "text" :id "name" :name "name" :required t :autofocus t :autocomplete "off"
                 :pattern "[a-z][a-z0-9\\-]*" :placeholder "website" :class "input mt-1.5")
          (p :class "mt-2 text-xs text-muted"
@@ -115,13 +97,9 @@ taking up the page."
          (~dialog-close :dialog "new-space" "Cancel")
          (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create space"))))))
 
-(defparameter +import-piece-bytes+ (* 16 1024 1024)
-  "How much of an archive one request carries: under the body limit
-(web/middlewares), which it has to pass, and small enough to send again.")
+(defparameter +import-piece-bytes+ (* 16 1024 1024))
 
 (defcomp ~import-space-dialog ()
-  "A space archive from a space's Export. koya-editor.js sends the chosen file to
-the import actions in pieces (see BEGIN-IMPORT-ACTION)."
   (hsx
    (dialog :id "import-space" :closedby "any" :class "koya-dialog max-w-sm"
      (form :data-import-begin (begin-import-action)
@@ -162,17 +140,11 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
      (~new-space-dialog)
      (~import-space-dialog))))
 
-;;; --- The work ------------------------------------------------------------------
-
 (defun make-space (params)
-  "(values MESSAGE ERROR). A bad or taken name signals; its message is what the owner needs."
   (handler-case (values (format nil "Space ~a created." (create-space (or (param params "name") ""))) nil)
     (koya-error (e) (values nil (koya-error-message e)))))
 
 (defun import-archive (id)
-  "The location to go to after importing the archive upload ID collected."
-  ;; every condition: a bad archive can fail in the zip reader, the schema
-  ;; check or the database, and each one's message is what the owner needs
   (handler-case
       (let ((space (finish-import id)))
         (set-toast (format nil "Space ~a imported." space))
@@ -181,24 +153,19 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
       (set-toast (format nil "Import failed: ~a" e) :error)
       "/")))
 
-;;; --- Actions ------------------------------------------------------------------
-
 (defaction create-space-action :post (params)
   (multiple-value-bind (message error) (make-space params)
     (cond (error
-           ;; the dialog stays open with the reason under the name
            (set-response-status 422)
            (set-response-header :hx-retarget "#new-space-error")
            (set-response-header :hx-reswap "innerHTML")
            (hsx (<> error)))
           (t
-           ;; a fresh dialog in place of the open one closes it and clears the name
            (hsx (<> (~new-space-dialog)
                     (~space-list :spaces (list-spaces) :oob t)
                     (~toast-oob :message message)))))))
 
 (defun delete-refusal (name message status)
-  "A refused delete, answered under the phrase: a toast would be behind the open dialog."
   (cond ((null name) (action-refusal message status))
         (t (set-response-status status)
            (set-response-header :hx-retarget (format nil "#~a" (delete-error-id name)))
@@ -214,14 +181,6 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
              (hsx (<> (~space-list :spaces (list-spaces))
                       (~toast-oob :message (format nil "Space ~a deleted." name))))))))
 
-;;; A space archive from Export, made into a space again (usecases/archive).
-;;;
-;;; koya-editor.js sends the file in pieces of +IMPORT-PIECE-BYTES+, each where it
-;;; goes, so no request is larger than any other and a space has no size an
-;;; import cannot take. The first answer is the id the pieces go under, each
-;;; next one how much has arrived, and the last where to go next, in
-;;; HX-Redirect; the toast waits there.
-
 (defaction begin-import-action :post (params)
   (declare (ignore params))
   (hsx (<> (begin-import))))
@@ -236,8 +195,6 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
 (defaction finish-import-action :post (params)
   (set-response-header :hx-redirect (import-archive (param params "id")))
   (hsx (<>)))
-
-;;; --- Page ---------------------------------------------------------------------
 
 (defun @get (params)
   (declare (ignore params))

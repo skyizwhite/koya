@@ -16,9 +16,6 @@
   (:export #:record-deploy))
 (in-package #:koya-server/infra/db/schema-deploys)
 
-;;; One row per deploy that changed something (domain/deploy). The changes are
-;;; kept as core/diff's wire objects, the shape PLAN and the admin API answer with.
-
 (defun jobject->change (object)
   (make-change :op (gethash "op" object)
                :destructive (and (gethash "destructive" object) t)
@@ -34,8 +31,6 @@
                :created-at (col row "created_at")))
 
 (defun record-deploy (space changes &key (by ""))
-  "Store what a deploy changed. CHANGES is the diff's change plists; NIL records
-nothing. Returns the new row's id, or NIL."
   (when changes
     (let ((id (make-ulid)))
       (exec "INSERT INTO schema_deploys (id, space, changes, change_count, destructive, deployed_by, created_at)
@@ -46,7 +41,6 @@ nothing. Returns the new row's id, or NIL."
             (if (some #'destructive-change-p changes) 1 0)
             (or by "")
             (now-iso))
-      ;; ULIDs sort by time, so the newest rows are the largest ids
       (exec "DELETE FROM schema_deploys
               WHERE space = ?
                 AND id NOT IN (SELECT id FROM schema_deploys WHERE space = ? ORDER BY id DESC LIMIT ?)"

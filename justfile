@@ -23,9 +23,9 @@ watch:
 build:
     @{{ tw_bin }} -i {{ style_src }} -o {{ style_dist }} --minify
 
-# Run the test suite
-test:
-    @qlot exec ros --non-interactive -e '(handler-bind ((warning (function muffle-warning))) (ql:quickload :koya-tests :silent t))' -e '(uiop:quit (if (rove:run :koya-tests :style :dot) 0 1))' -q
+# Run the spec
+spec:
+    @qlot exec ros --non-interactive -e '(handler-bind ((warning (function muffle-warning))) (ql:quickload :koya-spec :silent t))' -e '(uiop:quit (if (rove:run :koya-spec :style :dot) 0 1))' -q
 
 # Build the CSS and start the server in development mode (Hunchentoot, localhost:3100)
 dev: build

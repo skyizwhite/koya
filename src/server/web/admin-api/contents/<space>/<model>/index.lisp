@@ -12,7 +12,6 @@
 (in-package #:koya-server/web/admin-api/contents/<space>/<model>/index)
 
 (defun @get (params)
-  "List every content of the model, drafts included."
   (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
     (let ((query (parse-query params)))
       (multiple-value-bind (contents total) (all-contents space model query)
@@ -20,8 +19,6 @@
                  "totalCount" total "offset" (query-offset query) "limit" (query-limit query))))))
 
 (defun @post (params)
-  "Create a content from {\"data\": {...}, \"publish\": bool, \"id\"?: string,
-\"createdAt\"?, \"updatedAt\"?, \"publishedAt\"?, \"revisedAt\"?: iso}."
   (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
     (let* ((body (read-json-body))
            (data (body-field body "data")))

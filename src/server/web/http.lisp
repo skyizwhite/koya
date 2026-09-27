@@ -41,8 +41,6 @@
            #:ok-status))
 (in-package #:koya-server/web/http)
 
-;;; Shared plumbing for the two JSON apps (delivery and admin API).
-
 (define-condition api-error (error)
   ((status :initarg :status :reader api-error-status)
    (code :initarg :code :reader api-error-code)
@@ -64,7 +62,6 @@
         (list (to-json object))))
 
 (defun error-status (condition)
-  "The HTTP status a KOYA-ERROR is answered with."
   (etypecase condition
     (not-found 404)
     (conflict 409)
@@ -76,9 +73,7 @@
   (map 'vector (lambda (e) (jobject "field" (getf e :field) "code" (getf e :code) "message" (getf e :message)))
        errors))
 
-(defclass json-app (jingle:app) ()
-  (:documentation "A jingle app whose handlers return JSON values (hash tables,
-vectors, strings...) and whose errors become JSON error responses."))
+(defclass json-app (jingle:app) ())
 
 (defun make-json-app ()
   (make-instance 'json-app))
@@ -109,7 +104,6 @@ vectors, strings...) and whose errors become JSON error responses."))
   (set-response-status status))
 
 (defun read-json-body ()
-  "Parse the request body as JSON. Signals a 400 API error when it is not a JSON object."
   (let* ((octets (request-content *request*))
          (text (octets-to-string octets :encoding :utf-8))
          (value (if (zerop (length (string-trim '(#\Space #\Newline #\Return #\Tab) text)))
@@ -126,7 +120,6 @@ vectors, strings...) and whose errors become JSON error responses."))
 (defun blank-p (value) (or (null value) (zerop (length value))))
 
 (defun param (params name)
-  "A query or form parameter, or NIL when absent or blank."
   (let ((v (cdr (assoc name params :test #'equal))))
     (if (and (stringp v) (blank-p v)) nil v)))
 
@@ -138,18 +131,14 @@ vectors, strings...) and whose errors become JSON error responses."))
     (if found v default)))
 
 (defun form-field (params name)
-  "A plain (non-file) form field, or NIL when absent or blank."
   (let ((v (cdr (assoc name params :test #'equal))))
     (and (stringp v) (plusp (length (string-trim " " v))) (string-trim " " v))))
 
 (defun form-values (params name)
-  "All values submitted under NAME (checkbox groups and a selection repeat the name)."
   (loop :for (k . v) :in params
         :when (and (stringp k) (string= k name)) :collect v))
 
 (defun uploaded-files (params name)
-  "Files posted under NAME as a list of (octets filename content-type). A multipart
-file part arrives from lack as (stream filename content-type); one name may repeat."
   (loop :for (k . v) :in params
         :when (and (equal k name) (consp v) (streamp (first v)))
           :collect (destructuring-bind (stream &optional filename content-type) v
@@ -159,12 +148,7 @@ file part arrives from lack as (stream filename content-type); one name may repe
   (let ((values (get-request-header name)))
     (and values (string-trim " " (first values)))))
 
-;;; --- Same-origin check (CSRF) --------------------------------------------------
-
 (defun origin-key (url)
-  "host or host:port of URL, lowercased, with the scheme's default port dropped.
-NIL when URL has no host, which includes the literal \"null\" browsers send from
-sandboxed or opaque origins."
   (let ((u (ignore-errors (uri (string-trim " " url)))))
     (and u (uri-host u)
          (let* ((scheme (string-downcase (or (uri-scheme u) "")))
@@ -176,7 +160,6 @@ sandboxed or opaque origins."
                 (format nil "~a:~a" (uri-host u) port)))))))
 
 (defun host-key (host)
-  "The Host header in the same shape as ORIGIN-KEY: default ports are dropped."
   (let ((host (string-downcase (string-trim " " (or host "")))))
     (dolist (suffix '(":80" ":443") host)
       (let ((n (- (length host) (length suffix))))
@@ -184,10 +167,6 @@ sandboxed or opaque origins."
           (return (subseq host 0 n)))))))
 
 (defun origin-allowed-p (origin referer host &optional (base (public-url)))
-  "CSRF check for state-changing requests. The Origin header (or Referer when
-Origin is absent) must name the Host or KOYA_BASE_URL. A request with neither
-header is accepted: non-browser clients. A present but unusable Origin such as
-\"null\" is rejected."
   (let ((source (or origin referer)))
     (or (null source)
         (let ((key (origin-key source)))

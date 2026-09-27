@@ -34,16 +34,13 @@
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/index)
 
 (defun list-url (space model &key search-text status sort-key (page 1))
-  "This model's list with the search, filter, sort and page it is being read at."
   (render-uri (make-uri :path (model-url space model)
                         :query (append (unless (blank-p search-text) `(("q" . ,search-text)))
                                        (unless (blank-p status) `(("status" . ,status)))
                                        (unless (blank-p sort-key) `(("sort" . ,sort-key)))
                                        (when (> page 1) `(("page" . ,page)))))))
 
-(defparameter +preview-length+ 120
-  "Longest field preview carried into the list, in characters: a guard against
-putting a whole richtext body in the HTML. The visible cut is the browser's.")
+(defparameter +preview-length+ 120)
 
 (defparameter +column-widths+
   '((:text      . "min-w-32 max-w-56")
@@ -56,18 +53,12 @@ putting a whole richtext body in the HTML. The visible cut is the browser's.")
     (:select    . "min-w-24 max-w-36")
     (:media     . "min-w-24 max-w-36")
     (:reference . "min-w-32 max-w-48")
-    (:slug      . "min-w-32 max-w-48"))
-  "Bounds for a list column, per field type. The minimum keeps a column readable
-and lets a wide model outgrow the page; the maximum stops one long text field
-taking the whole width.")
+    (:slug      . "min-w-32 max-w-48")))
 
 (defun column-width (field)
-  "Width bounds for FIELD's column, as classes on the cell's inner box."
   (or (cdr (assoc (field-type field) +column-widths+)) "min-w-24 max-w-48"))
 
-(defparameter +row-height+ "h-14"
-  "Two text-sm lines plus padding. On the row, not the cell, so that a shorter
-preview is centred with the badge and the chevron.")
+(defparameter +row-height+ "h-14")
 
 (defun reference-label (field id ref-labels)
   (let ((table (and ref-labels (gethash (field-name field) ref-labels))))
@@ -77,7 +68,6 @@ preview is centred with the badge and the chevron.")
   (string-trim " " (regex-replace-all "\\s+" string " ")))
 
 (defun strip-html (html)
-  "Plain text of HTML: tags dropped, block boundaries become spaces, common entities decoded."
   (let ((text (regex-replace-all "<[^>]*>" html " ")))
     (dolist (pair '(("&nbsp;" . " ") ("&lt;" . "<") ("&gt;" . ">") ("&quot;" . "\"") ("&#39;" . "'") ("&amp;" . "&")))
       (setf text (regex-replace-all (car pair) text (cdr pair))))
@@ -89,7 +79,6 @@ preview is centred with the badge and the chevron.")
       string))
 
 (defun scalar-preview (field value ref-labels)
-  "Preview of one non-empty VALUE of FIELD as plain text. LABELS resolves references."
   (case (field-type field)
     (:richtext (strip-html value))
     (:datetime (short-time value))
@@ -99,11 +88,9 @@ preview is centred with the badge and the chevron.")
     (t (collapse-whitespace (princ-to-string value)))))
 
 (defun field-preview (field data ref-labels)
-  "Plain-text preview of FIELD in DATA, or NIL when the field is empty."
   (let ((value (and data (gethash (field-name field) data))))
     (cond ((eq value json-null) nil)
           ((eq (field-type field) :boolean)
-           ;; a stored false is NIL, so only a missing key is "empty"
            (and data (nth-value 1 (gethash (field-name field) data))
                 (scalar-preview field value ref-labels)))
           ((null value) nil)
@@ -115,9 +102,6 @@ preview is centred with the badge and the chevron.")
           (t (truncate-text (scalar-preview field value ref-labels))))))
 
 (defcomp ~media-cell (&key field id media)
-  "The image itself, at the row's height. It is the original file -- koya keeps
-no smaller copy -- so it is loaded lazily, and a list of a model with large
-images costs what the images cost, once, then comes from the cache."
   (let ((found (gethash id media)))
     (hsx
      (td :class (clsx "py-2 pr-4" (if found "" "text-muted"))
@@ -139,24 +123,17 @@ images costs what the images cost, once, then comes from the cache."
 
 (defun browse-url (space model state &key (search-text (getf state :search-text)) (status (getf state :status))
                                              (sort-key (getf state :sort-key)) (page (getf state :page)) clear)
-  "The action that draws #contents for STATE, with any part of it replaced."
   (browse-contents :space space :model model :q (or search-text "") :status (or status "")
                    :sort (or sort-key "") :page page :clear (if clear "1" "")))
 
 (defcomp ~sort-input (&key sort-key oob)
-  "The sort the filters send along. A header's link changes it, so the answer to one
-puts it back out of band -- this input alone, not the box being typed in."
   (hsx (input :type "hidden" :id "filter-sort" :name "sort" :value (or sort-key "")
               :hx-swap-oob (and oob "true"))))
 
 (defcomp ~filters (&key space model search-text status sort-key oob)
-  "The search box and the status filter. Typing, or picking a status, draws the
-list again at its first page; the box is outside what is drawn, so it keeps its
-focus. Without JavaScript it is a GET form."
   (hsx
    (form :id "filters" :method "get" :action (model-url space model)
          :hx-get (browse-contents :space space :model model) :hx-target "#contents" :hx-swap "outerHTML"
-         ;; find is the first match only: one search box and one select, so each is named
          :hx-trigger "input changed delay:300ms from:'find input[type=search]', change from:'find select', submit"
          :hx-swap-oob (and oob "true")
          :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
@@ -171,7 +148,6 @@ focus. Without JavaScript it is a GET form."
            (hsx (option :value value :selected (equal value status) value))))))))
 
 (defcomp ~column-header (&key space model field state)
-  "The header sorts by its field; clicking the sorted one turns it around."
   (let* ((name (field-name field))
          (active (equal name (getf state :sort-name)))
          (next (if (and active (eq (getf state :sort-direction) :asc)) (format nil "-~a" name) name)))
@@ -185,8 +161,6 @@ focus. Without JavaScript it is a GET form."
            (hsx (span :class "shrink-0 text-accent" (if (eq (getf state :sort-direction) :asc) "↑" "↓")))))))))
 
 (defcomp ~bulk-bar (&key space model state)
-  "What can be done to a selection. Hidden until there is one (koya-editor.js).
-Each button is an action on the selection form's boxes."
   (flet ((url (op)
            (bulk-contents :space space :model model :op op
                           :q (or (getf state :search-text) "") :status (or (getf state :status) "")
@@ -204,7 +178,6 @@ Each button is an action on the selection form's boxes."
          (~icon :name :delete) "Delete")))))
 
 (defun read-state (params model)
-  "What the list is being read at, from the query string: page, search, status, sort."
   (let ((status (let ((s (param params "status"))) (and (member s +statuses+ :test #'equal) s))))
     (multiple-value-bind (sort-name sort-direction) (parse-sort (param params "sort") model)
       (list :page (page-number params) :search-text (param params "q") :status status
@@ -212,7 +185,6 @@ Each button is an action on the selection form's boxes."
             :sort-key (and sort-name (if (eq sort-direction :desc) (format nil "-~a" sort-name) sort-name))))))
 
 (defun fetch-page (space model state)
-  "(values CONTENTS TOTAL PAGES) of STATE's page."
   (content-page space model :page (getf state :page) :page-size +page-size+
                             :search-text (getf state :search-text)
                             :status (getf state :status)
@@ -228,7 +200,6 @@ Each button is an action on the selection form's boxes."
              (format nil "~a content~:p" total)))))
 
 (defcomp ~content-list (&key space model state contents pages)
-  "What a search, a sort, a page or a bulk action draws again: the table and its pager."
   (let* ((model-name (model-name model))
          (fields (model-fields model))
          (ref-labels (reference-labels space model contents))
@@ -263,8 +234,6 @@ Each button is an action on the selection form's boxes."
                                (th)))
                       (tbody :class "divide-y divide-line"
                         (loop :for content :in contents :collect
-                          ;; the whole row opens the editor: the link in its last cell
-                          ;; covers the row, and the box sits above it
                           (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
                                  (td :class "relative z-10 py-2 pl-4 pr-2"
                                    (input :type "checkbox" :name "id" :data-bulk-item t
@@ -292,7 +261,6 @@ Each button is an action on the selection form's boxes."
          (h1 :class "text-2xl font-bold" model-name
            (~content-count :space space :model model :state state :total total))
          (div :class "flex items-center gap-2"
-           ;; only where a hook can fire, or the log can hold nothing
            (when (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space))
              (hsx (a :href (webhook-log-url space :model model-name) :class "btn"
                      (~icon :name :webhook) "Webhooks")))
@@ -303,8 +271,6 @@ Each button is an action on the selection form's boxes."
        (~content-list :space space :model model :state state :contents contents :pages pages)))))
 
 (defun answer-list (space model state &key message kind clear)
-  "#contents for STATE (at its last page when it asks for one past the end), the
-count, the sort the filters send, and the URL the list is now read at."
   (multiple-value-bind (contents total pages) (fetch-page space model state)
     (when (> (getf state :page) pages)
       (setf (getf state :page) pages)
@@ -333,7 +299,6 @@ count, the sort the filters send, and the URL the list is now read at."
            (let ((state (read-state params model)))
              (multiple-value-bind (contents total pages) (fetch-page space model state)
                (if (> (getf state :page) pages)
-                   ;; past the end: a link to a page that has since emptied
                    (redirect-to (list-url space model-name :search-text (getf state :search-text)
                                                            :status (getf state :status)
                                                            :sort-key (getf state :sort-key) :page pages)
@@ -366,7 +331,6 @@ count, the sort the filters send, and the URL the list is now read at."
                    (values "Nothing was selected." :error)
                    (multiple-value-bind (done skipped failed first) (apply-to-each space model ids op)
                      (values (bulk-message op done skipped failed first) (if (plusp failed) :error :ok))))
-             ;; a page emptied by a delete shows the last one there still is
              (answer-list space model (read-state params model) :message message :kind kind))))))
 
 (defaction browse-contents :get (params)

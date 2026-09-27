@@ -7,9 +7,6 @@
                 #:send-webhook))
 (in-package #:koya-server/infra/webhook-sender)
 
-;;; Webhooks go out over HTTP with dexador, with short timeouts: a receiver that
-;;; hangs holds up only the thread its calls run in.
-
 (defmethod send-webhook (url payload headers)
   (handler-case
       (multiple-value-bind (body status)
