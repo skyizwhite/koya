@@ -1,17 +1,17 @@
-(defpackage #:koya-tests/server/usecases/contents/revisions
+(defpackage #:koya-tests/server/usecases/revisions
   (:use #:cl #:rove)
   (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space #:find-model)
-  (:import-from #:koya-server/usecases/contents/write #:create)
-  (:import-from #:koya-server/usecases/contents/revisions #:restore-data)
+  (:import-from #:koya-server/usecases/schema #:replace-schema #:find-model)
+  (:import-from #:koya-server/usecases/spaces #:create-space)
+  (:import-from #:koya-server/usecases/contents #:create)
+  (:import-from #:koya-server/usecases/revisions #:restore-data)
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-core/json #:jget))
-(in-package #:koya-tests/server/usecases/contents/revisions)
+(in-package #:koya-tests/server/usecases/revisions)
 
 ;;; What an old version becomes when it is brought back into the editor. The
 ;;; schema and the space may have moved on: a field gone, a rule tightened, a

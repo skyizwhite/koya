@@ -1,19 +1,22 @@
 (defpackage #:koya-tests/server/web/pages/content-list
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/web/pages/support #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request #:location #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/web/pages/support
+                #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
+                #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
-  (:import-from #:koya-server/usecases/ports/contents #:list-contents #:get-content #:update-content)
+  (:import-from #:koya-server/usecases/ports/contents
+                #:list-contents #:get-content #:update-content)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-id #:content-draft-key #:content-published #:drafted)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
-  (:import-from #:koya-server/usecases/contents/write #:create)
-  (:import-from #:koya-server/usecases/contents/lookup #:resolve-model)
+  (:import-from #:koya-server/usecases/contents #:create)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-tests/server/web/pages/support #:call-action)
-  (:import-from #:koya-server/web/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents))
+  (:import-from #:koya-server/web/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents)
+  (:import-from #:koya-server/usecases/schema #:resolve-model))
 (in-package #:koya-tests/server/web/pages/content-list)
 
 (defun bulk (op ids &key (q "") (status "") (page 1))

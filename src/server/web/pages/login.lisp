@@ -1,11 +1,11 @@
 (defpackage #:koya-server/web/pages/login
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:jingle
+                #:set-response-status #:set-response-header #:*request* #:request-remote-addr)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/auth
                 #:session-login #:public-path #:session-owner-p #:local-path-p)
-  (:import-from #:lack/request #:request-remote-addr)
-  (:import-from #:koya-server/usecases/settings/two-factor #:totp-enabled-p)
+  (:import-from #:koya-server/usecases/settings #:totp-enabled-p)
   (:import-from #:koya-server/web/assets #:asset-url)
   (:import-from #:koya-server/web/http #:redirect-to #:param)
   (:import-from #:koya-server/web/document #:set-title)
@@ -59,7 +59,7 @@
 ;; The actions guard still asks for htmx and this server's origin, which keeps
 ;; another site from logging a browser in.
 (defaction log-in :post (params)
-  (let ((address (request-remote-addr ningle:*request*))
+  (let ((address (request-remote-addr *request*))
         (next (next-path params)))
     (flet ((refuse (status error)
              (set-response-status status)

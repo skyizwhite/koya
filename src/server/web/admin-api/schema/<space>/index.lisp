@@ -2,14 +2,15 @@
   (:use #:cl)
   (:import-from #:koya-core/schema #:schema->jobject #:jobject->schema)
   (:import-from #:koya-core/json #:jobject)
-  (:import-from #:koya-server/domain/errors #:conflict #:koya-error-code #:koya-error-message #:koya-error-details)
+  (:import-from #:koya-server/domain/errors
+                #:conflict #:koya-error-code #:koya-error-message #:koya-error-details)
   (:import-from #:koya-server/web/http #:read-json-body #:path-param #:param #:fail-api)
   (:import-from #:koya-server/web/presenters #:changes->jarray)
-  (:import-from #:koya-server/usecases/schema/deploy #:space-schema #:deploy)
+  (:import-from #:koya-server/usecases/schema #:space-schema #:deploy)
   (:export #:@get #:@put))
 (in-package #:koya-server/web/admin-api/schema/<space>/index)
 
-;;; One space's schema (usecases/schema/deploy).
+;;; One space's schema (usecases/schema).
 
 (defun @get (params)
   (schema->jobject (space-schema (path-param params :space))))

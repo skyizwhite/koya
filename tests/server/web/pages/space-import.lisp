@@ -2,13 +2,14 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
-  (:import-from #:koya-tests/server/web/pages/support #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
+  (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-tests/server/web/pages/support
+                #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/spaces #:find-space #:delete-space #:load-schema
                 #:space-webhooks #:space-webhook-secret)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
-  (:import-from #:koya-server/usecases/ports/keys
+  (:import-from #:koya-server/usecases/spaces #:create-space)
+  (:import-from #:koya-server/usecases/keys
                 #:create-delivery-key #:list-delivery-keys #:create-management-key
                 #:space-for-delivery-key #:space-for-management-key)
   (:import-from #:koya-server/domain/content
@@ -19,7 +20,7 @@
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-space #:media-mime #:media-alt
                 #:+max-upload-bytes+)
-  (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
+  (:import-from #:koya-tests/server/usecases/media #:png-bytes)
   (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-core/schema #:make-webhook)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
@@ -27,13 +28,13 @@
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-revisions #:count-revisions #:get-content)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
-  (:import-from #:koya-server/usecases/contents/write #:create #:update-draft)
-  (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-async*)
+  (:import-from #:koya-server/usecases/contents #:create #:update-draft)
+  (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
   (:import-from #:koya-server/domain/revision #:revision-event)
   (:import-from #:koya-core/json #:jget)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
-  (:import-from #:koya-server/usecases/media/library
+  (:import-from #:koya-server/usecases/media
                 #:store-upload #:remove-space-media)
   (:import-from #:koya-core/schema #:schema-models #:model-name #:webhook-url)
   (:import-from #:koya-server/web/pages/index

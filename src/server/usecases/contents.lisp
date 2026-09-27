@@ -1,36 +1,31 @@
-(defpackage #:koya-server/usecases/contents/write
+(defpackage #:koya-server/usecases/contents
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-option #:model-name)
   (:import-from #:koya-core/validate
-                #:validate-content #:validation-error #:blank-value-p #:content-id-p)
-  (:import-from #:koya-core/time
-                #:parse-iso)
-  (:import-from #:koya-core/json
-                #:json-null #:json-equal)
-  (:import-from #:koya-core/ulid
-                #:make-ulid)
+                #:validate-content #:validation-error #:blank-value-p #:content-id-p
+                #:validation-error-errors)
+  (:import-from #:koya-core/time #:parse-iso)
+  (:import-from #:koya-core/json #:json-null #:json-equal)
+  (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-server/domain/errors
-                #:fail #:conflict #:invalid-input)
-  (:import-from #:koya-server/usecases/ports/store
-                #:with-transaction)
+                #:fail #:conflict #:invalid-input #:not-found #:koya-error #:koya-error-message)
+  (:import-from #:koya-server/usecases/ports/store #:with-transaction)
   (:import-from #:koya-server/usecases/ports/spaces
-                #:space-webhook-secret)
-  (:import-from #:koya-server/usecases/contents/lookup
-                #:resolve-model #:resolve-content)
+                #:space-webhook-secret #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:record-revision
-                #:find-object-content #:unique-value-taken-p #:get-content)
-  (:import-from #:koya-server/usecases/contents/references
-                #:content-references)
+                #:find-object-content #:unique-value-taken-p #:get-content #:find-content
+                #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-published #:content-draft #:content-draft-key #:content-data
-                #:merge-data #:fill-defaults #:fill-slugs
-                #:new-content #:drafted #:published #:unpublished #:discarded #:keyed)
-  (:import-from #:koya-server/usecases/contents/delivery #:deliver)
-  (:import-from #:koya-server/usecases/webhooks/notify #:notify-webhooks)
-  (:import-from #:koya-server/usecases/actor
-                #:*actor*)
+                #:merge-data #:fill-defaults #:fill-slugs #:new-content #:drafted #:published
+                #:unpublished #:discarded #:keyed)
+  (:import-from #:koya-server/usecases/delivery #:deliver)
+  (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
+  (:import-from #:koya-server/usecases/actor #:*actor*)
+  (:import-from #:koya-server/usecases/schema #:resolve-model)
+  (:import-from #:koya-server/domain/references #:reference-fields #:refers-p)
   (:export #:check-content
            #:create
            #:update-draft
@@ -38,8 +33,13 @@
            #:unpublish
            #:discard
            #:destroy
-           #:draft-key))
-(in-package #:koya-server/usecases/contents/write)
+           #:draft-key
+           #:resolve-content
+           #:find-content
+           #:bulk-action-p
+           #:apply-to-each
+           #:content-references))
+(in-package #:koya-server/usecases/contents)
 
 ;;; Content operations shared by the admin API and the admin UI: lookup,
 ;;; validation, persistence and webhook notification. What a write makes of a
@@ -249,3 +249,66 @@ it away would leave that content pointing at nothing."
            (keyed (keyed content)))
       (unless (eq keyed content) (update-content keyed))
       (content-draft-key keyed))))
+
+;; the content a request names, or NOT-FOUND
+(defun resolve-content (space-name model-name id)
+  (or (find-content space-name model-name id)
+      (fail 'not-found (format nil "Content ~a does not exist" id))))
+
+;;; What is done to a selection of contents: one at a time through the writes above,
+;;; so validation, timestamps and webhooks behave as they do for a single one. One
+;;; that fails leaves the rest to go through.
+
+(defun bulk-action-function (action)
+  (cond ((equal action "publish") #'publish)
+        ((equal action "unpublish") #'unpublish)
+        ((equal action "delete") #'destroy)))
+
+(defun bulk-action-p (action)
+  "True for \"publish\", \"unpublish\" and \"delete\"."
+  (and (bulk-action-function action) t))
+
+(defun nothing-to-do-p (action content)
+  "True when ACTION would change nothing. A selection is a tick of the header box,
+so it holds published and draft alike: publishing what is published again would
+move revisedAt and fire a webhook, and unpublishing a draft would reissue its
+draft key and break a preview link."
+  (and content
+       (cond ((equal action "publish") (and (content-published content) (null (content-draft content))))
+             ((equal action "unpublish") (null (content-published content)))
+             (t nil))))
+
+(defun failure-message (condition)
+  "A validation failure as the field that stopped it, not the condition's report."
+  (typecase condition
+    (validation-error
+     (format nil "~{~a~^, ~}"
+             (mapcar (lambda (e) (format nil "~a ~a" (getf e :field) (getf e :message)))
+                     (validation-error-errors condition))))
+    (koya-error (koya-error-message condition))
+    (t (princ-to-string condition))))
+
+(defun apply-to-each (space model ids action)
+  "Do ACTION to each of IDS. Returns (values DONE SKIPPED FAILED FIRST-MESSAGE)."
+  (let ((function (bulk-action-function action))
+        (model-name (model-name model))
+        (done 0)
+        (skipped 0)
+        (failed 0)
+        (message nil))
+    (dolist (id ids (values done skipped failed message))
+      (handler-case
+          (if (nothing-to-do-p action (find-content space model-name id))
+              (incf skipped)
+              (progn (funcall function space model id)
+                     (incf done)))
+        (error (e) (incf failed) (unless message (setf message (failure-message e))))))))
+
+(defun content-references (space model id)
+  "Number of other contents in SPACE whose published or draft data refers to
+content ID of MODEL through a :reference field of the current schema."
+  (let ((fields (reference-fields (load-schema space) model)))
+    (if (zerop (hash-table-count fields))
+        0
+        (count-if (lambda (content) (refers-p content fields id))
+                  (contents-mentioning space id :exclude-id id)))))

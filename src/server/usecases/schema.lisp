@@ -1,25 +1,25 @@
-(defpackage #:koya-server/usecases/schema/deploy
+(defpackage #:koya-server/usecases/schema
   (:use #:cl)
-  (:import-from #:koya-core/schema
-                #:check-schema)
-  (:import-from #:koya-core/diff
-                #:diff-schemas #:destructive-changes-p)
-  (:import-from #:koya-server/domain/errors
-                #:fail #:conflict #:not-found)
+  (:import-from #:koya-core/schema #:check-schema)
+  (:import-from #:koya-core/diff #:diff-schemas #:destructive-changes-p)
+  (:import-from #:koya-server/domain/errors #:fail #:conflict #:not-found)
   (:import-from #:koya-server/usecases/ports/spaces
-                #:find-space #:load-schema #:save-schema)
+                #:find-space #:load-schema #:find-model #:save-schema)
   (:import-from #:koya-server/usecases/ports/deploys
                 #:list-deploys #:count-deploys #:+deploys-kept+)
-  (:import-from #:koya-server/usecases/actor
-                #:*actor*)
-  (:export #:space-schema
+  (:import-from #:koya-server/usecases/actor #:*actor*)
+  (:import-from #:koya-server/usecases/spaces #:resolve-space)
+  (:export #:load-schema
+           #:find-model
+           #:resolve-model
+           #:space-schema
            #:plan
            #:deploy
            #:replace-schema
            #:list-deploys
            #:count-deploys
            #:+deploys-kept+))
-(in-package #:koya-server/usecases/schema/deploy)
+(in-package #:koya-server/usecases/schema)
 
 ;;; A site deploys its schema to one space. The space itself is made in the admin
 ;;; UI, so a deploy to a name that does not exist is an error and never creates
@@ -28,6 +28,13 @@
 (defun existing-space (name)
   (or (find-space name)
       (fail 'not-found (format nil "Space ~a does not exist; create it in the admin UI" name))))
+
+(defun resolve-model (space-name model-name)
+  "Return (values space-name model), or signal NOT-FOUND."
+  (let* ((space (resolve-space space-name))
+         (model (or (find-model space model-name)
+                    (fail 'not-found (format nil "Model ~a does not exist" model-name)))))
+    (values space model)))
 
 (defun space-schema (name)
   "The schema deployed to space NAME."

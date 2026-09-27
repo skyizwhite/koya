@@ -1,7 +1,9 @@
 (defpackage #:koya-tests/server/web/http
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
-  (:import-from #:koya-tests/server/web/api-support #:*secret* #:*management-key* #:*api-key* #:request #:admin #:delivery #:setup-api #:reset-api)
+  (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-tests/server/web/api-support
+                #:*secret* #:*management-key* #:*api-key* #:request #:admin #:delivery #:setup-api
+                #:reset-api)
   (:import-from #:koya-server/web/app #:app)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook)
@@ -99,6 +101,9 @@
     (ok (= status 404))
     (ok (string= (jget json "error" "code") "not_found")))
   (multiple-value-bind (status json) (request :get "/api/nothing/here")
+    (ok (= status 401) "a path that is no route is refused before it is looked for")
+    (ok (string= (jget json "error" "code") "unauthorized")))
+  (multiple-value-bind (status json) (delivery "/api/v1/website/blog/1/nothing/here")
     (ok (= status 404))
     (ok (string= (jget json "error" "code") "not_found"))))
 
@@ -166,11 +171,12 @@
                                                              :query-string "limit=1" :request-uri "/api/v1/website/blog/?limit=1"
                                                              :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                                                              :url-scheme "http" :remote-addr "127.0.0.1"
-                                                             :headers (alist-hash-table nil :test 'equal)
+                                                             :headers (alist-hash-table `(("x-koya-delivery-key" . ,*api-key*)) :test 'equal)
                                                              :content-type nil :content-length nil :raw-body nil))
     (declare (ignore body))
-    (ok (= status 301))
+    (ok (= status 301) "the delivery API is sent to its URL")
     (ok (string= (getf headers :location) "/api/v1/website/blog?limit=1") "the query is kept"))
+  (ok (= 401 (delivery "/api/v1/website/blog/" :key nil)) "but not without a key")
   (destructuring-bind (status headers body)
       (funcall (app) (list :request-method :options :script-name "" :path-info "/api/v1/website/blog/"
                            :query-string "" :request-uri "/api/v1/website/blog/"

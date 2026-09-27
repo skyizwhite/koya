@@ -1,12 +1,10 @@
 (defpackage #:koya-server/web/pages/s/<space>/webhooks
   (:use #:cl #:hsx)
-  (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:load-schema)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
-  (:import-from #:koya-server/usecases/webhooks/log
+  (:import-from #:koya-server/usecases/webhooks
                 #:list-deliveries #:count-deliveries #:delivery-labels #:delivery-models
                 #:+deliveries-kept+)
   (:import-from #:koya-server/domain/webhook-delivery
@@ -16,13 +14,14 @@
   (:import-from #:koya-server/web/http #:path-param #:param #:blank-p)
   (:import-from #:koya-server/web/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/display #:short-time)
-  (:import-from #:koya-server/web/urls #:space-url #:content-url)
+  (:import-from #:koya-server/web/urls #:space-url #:content-url #:webhook-log-url)
   (:import-from #:koya-server/web/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
-  (:export #:@get #:webhook-log-url #:browse-deliveries))
+  (:import-from #:koya-server/usecases/schema #:load-schema)
+  (:export #:@get #:browse-deliveries))
 (in-package #:koya-server/web/pages/s/<space>/webhooks)
 
 ;;; One log per space: the last +DELIVERIES-KEPT+ calls it made and what came
@@ -32,13 +31,6 @@
 ;;; puts the filters and page back in the URL.
 
 (defun filtered-p (label model) (not (and (blank-p label) (blank-p model))))
-
-(defun webhook-log-url (space &key label model page)
-  "This space's log, narrowed to LABEL and/or MODEL, at PAGE."
-  (render-uri (make-uri :path (format nil "~a/webhooks" (space-url space))
-                        :query (append (unless (blank-p label) `(("label" . ,label)))
-                                       (unless (blank-p model) `(("model" . ,model)))
-                                       (when (and page (> page 1)) `(("page" . ,page)))))))
 
 (defcomp ~outcome (&key delivery)
   (let* ((status (delivery-status delivery))

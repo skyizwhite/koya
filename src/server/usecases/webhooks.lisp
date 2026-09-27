@@ -1,23 +1,29 @@
-(defpackage #:koya-server/usecases/webhooks/notify
+(defpackage #:koya-server/usecases/webhooks
   (:use #:cl)
-  (:import-from #:koya-core/schema
-                #:model-name #:webhook-covers-p
-                #:webhook-label #:webhook-url)
+  (:import-from #:koya-core/schema #:model-name #:webhook-covers-p #:webhook-label #:webhook-url)
   (:import-from #:koya-server/usecases/ports/spaces #:space-webhooks)
-  (:import-from #:koya-server/usecases/ports/webhooks #:record-delivery #:send-webhook)
+  (:import-from #:koya-server/usecases/ports/webhooks
+                #:record-delivery #:send-webhook #:list-deliveries #:count-deliveries
+                #:find-delivery #:delivery-labels #:delivery-models #:+deliveries-kept+)
   (:import-from #:koya-server/usecases/ports/presenters #:webhook-payload)
-  (:import-from #:bordeaux-threads-2
-                #:make-thread)
-  (:export #:notify-webhooks
-           #:*webhook-async*))
-(in-package #:koya-server/usecases/webhooks/notify)
+  (:import-from #:bordeaux-threads-2 #:make-thread)
+  (:export #:space-webhooks
+           #:notify-webhooks
+           #:*webhook-async*
+           #:list-deliveries
+           #:count-deliveries
+           #:find-delivery
+           #:delivery-labels
+           #:delivery-models
+           #:+deliveries-kept+))
+(in-package #:koya-server/usecases/webhooks)
 
 ;;; Content change notifications, whose body web/presenters makes:
 ;;; {"space": SPACE, "model": MODEL, "id": ID, "event": "publish"|"unpublish"|"delete"|"draft",
 ;;;  "contents": {"old": {...}|null, "new": {...}|null}}
 ;;; Every webhook gets every event for every model it covers ("only" narrows it),
 ;;; and the receiver decides what to act on. What came back is recorded for the
-;;; admin UI's log (usecases/webhooks/log).
+;;; admin UI's log (below).
 
 (defparameter +events+ '(:publish :unpublish :delete :draft))
 
@@ -61,7 +67,7 @@ failed write may stop the hooks queued behind it."
 (defun notify-webhooks (space-name model id event &key old new (async *webhook-async*) secret)
   "Send EVENT (one of +EVENTS+) for content ID to the webhooks of the space named
 SPACE-NAME and of MODEL (a model struct). OLD and NEW are the content before and
-after, delivered (usecases/contents/delivery). SECRET, when given, is sent as the
+after, delivered (usecases/delivery). SECRET, when given, is sent as the
 X-KOYA-WEBHOOK-KEY header so receivers can authenticate the call. Delivery is
 asynchronous unless ASYNC is NIL."
   (assert (member event +events+))
@@ -77,3 +83,7 @@ asynchronous unless ASYNC is NIL."
           (if async
               (make-thread #'send :name "koya-webhook")
               (send)))))))
+
+;;; What came back from each webhook call, so the admin UI can show whether the
+;;; receiver took it. A log to glance at after a publish, not an audit trail:
+;;; only the newest +DELIVERIES-KEPT+ of a space are kept.

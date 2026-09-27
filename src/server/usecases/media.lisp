@@ -1,24 +1,19 @@
-(defpackage #:koya-server/usecases/media/library
+(defpackage #:koya-server/usecases/media
   (:use #:cl)
   (:import-from #:koya-server/domain/errors
                 #:fail #:koya-error #:koya-error-message #:conflict #:rejected #:too-large)
-  (:import-from #:koya-server/domain/image
-                #:sniff-image)
+  (:import-from #:koya-server/domain/image #:sniff-image #:+image-types+)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-space #:media-filename #:media-mime #:safe-filename
                 #:+max-upload-bytes+)
   (:import-from #:koya-server/usecases/ports/media
-                #:insert-media #:delete-media #:find-media #:list-media
-                #:count-media #:update-media #:space-media
-                #:write-media-file #:delete-media-file #:delete-space-media-files)
-  (:import-from #:koya-server/domain/references
-                #:media-fields #:mentioned-ids)
-  (:import-from #:koya-server/usecases/ports/spaces
-                #:load-schema)
-  (:import-from #:koya-server/usecases/ports/contents
-                #:contents-mentioning #:space-contents)
-  (:import-from #:koya-core/ulid
-                #:make-ulid)
+                #:insert-media #:delete-media #:find-media #:list-media #:count-media #:update-media
+                #:space-media #:write-media-file #:delete-media-file #:delete-space-media-files
+                #:media-file-path #:media-file-exists-p)
+  (:import-from #:koya-server/domain/references #:media-fields #:mentioned-ids)
+  (:import-from #:koya-server/usecases/ports/spaces #:load-schema)
+  (:import-from #:koya-server/usecases/ports/contents #:contents-mentioning #:space-contents)
+  (:import-from #:koya-core/ulid #:make-ulid)
   (:export #:store-upload
            #:store-uploads
            #:upload-limit-message
@@ -31,8 +26,9 @@
            #:update-media
            #:space-media
            #:media-references
-           #:media-reference-counts))
-(in-package #:koya-server/usecases/media/library)
+           #:media-reference-counts
+           #:stored-file))
+(in-package #:koya-server/usecases/media)
 
 ;;; A space's library: a file is stored with its metadata, and taken away only
 ;;; while nothing uses it.
@@ -122,3 +118,12 @@ Returns (values DONE FAILED FIRST-MESSAGE)."
   "Delete every file of SPACE. Called when the space itself is deleted, after the
 rows have gone with it; nothing is left to reference them, so nothing is checked."
   (delete-space-media-files space))
+
+;;; A media is served by this server at /media/{space}/{id}.{ext} (web/presenters
+;;; makes the URL, web/media serves it).
+
+(defun stored-file (space id extension)
+  "(values PATH MIME) of the file a media URL names, or NIL when there is none."
+  (let ((mime (car (rassoc extension +image-types+ :test #'string=))))
+    (when (and mime (media-file-exists-p space id mime))
+      (values (media-file-path space id mime) mime))))

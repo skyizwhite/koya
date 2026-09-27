@@ -3,9 +3,10 @@
   (:import-from #:koya-tests/server/web/pages/support
                 #:*cookie* #:request #:request-url #:location #:setup-pages #:log-in #:post-login #:*secret*
                 #:call-action)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
+  (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-server/usecases/keys #:create-management-key)
   (:import-from #:koya-server/web/app #:*page-app* #:*app* #:build-app)
+  (:import-from #:jingle #:route)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db))
 (in-package #:koya-tests/server/web/auth)
 
@@ -19,7 +20,7 @@
   "A page added by the test and left in place: no page of koya's is at it.")
 
 (deftest a-page-that-does-nothing-is-the-owners
-  (setf (ningle:route *page-app* +probe-path+)
+  (setf (route *page-app* +probe-path+)
         (lambda (params) (declare (ignore params)) "what only the owner sees"))
   (let ((*cookie* nil))
     (multiple-value-bind (status body headers) (request :get +probe-path+ :query "a=1")

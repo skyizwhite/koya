@@ -35,15 +35,11 @@ src/
     domain/           ; what koya is made of: content, media, revision, deploy,
                       ; key, webhook-delivery, references, query, errors, image,
                       ; totp, timezone
-    usecases/         ; what koya does, knowing neither HTTP nor SQL:
-      contents/       ;   write, delivery, listing, labels, revisions, bulk, lookup,
-                      ;   references
-      media/          ;   library, delivery
-      spaces/         ;   lifecycle, archive
-      schema/         ;   deploy
-      webhooks/       ;   notify, log
-      settings/       ;   timezone, two-factor
-                      ;   and actor, auth, keys, system at the top
+    usecases/         ; what koya does, knowing neither HTTP nor SQL, one file
+                      ; per part: contents (writes), listing (the admin's reads),
+                      ; delivery (the delivery API's reads), revisions, spaces,
+                      ; schema (models and deploys), archive, media, webhooks,
+                      ; keys, settings, auth, actor, system
       ports/          ; what the use cases need from outside: store, spaces,
                       ; deploys, contents, media, keys, webhooks, archives, settings,
                       ; sessions, config, presenters (the web's to implement), and main,
@@ -93,7 +89,9 @@ web  ──▶  usecases  ──▶  domain
   documentation that are its contract. `infra/` adds the one method each has,
   so a use case calls `find-content` without knowing that SQLite answers it.
   A port keeps what it is given and decides nothing: a deploy's changes are
-  found by the use case and handed to `save-schema` with the schema. See
+  found by the use case and handed to `save-schema` with the schema, and a key
+  is made and hashed in `domain/key`, so the store sees only its hash
+  (`adr/2026-09-27-a-key-is-made-in-the-domain-and-stored-by-its-hash.md`). See
   `adr/2026-09-25-the-store-saves-what-a-use-case-decided.md`.
   `koya-server/main` is the only module that loads `infra/`, and it refuses to
   load while a port has no method. The web app is built on first use (`app`),
@@ -103,10 +101,10 @@ web  ──▶  usecases  ──▶  domain
   `web/http`). The auth guards bind `*actor*`. The web never reaches a port or
   `infra/` directly: where a use case has nothing to add, it re-exports the
   port's function. Exactly one use case does, the one the function belongs
-  with (a space's schema is `spaces/lifecycle`'s, its keys and webhook secret
+  with (a space's schema is `schema`'s, its keys and webhook secret
   `keys`'s), so a page has one place to import it from; a test holds it to one.
 - Use cases hand over what they found, never JSON. A content as the delivery
-  API serves it is a `delivered` (`usecases/contents/delivery`): its data with
+  API serves it is a `delivered` (`usecases/delivery`): its data with
   media and the references asked for resolved. `web/presenters` makes it, a
   media, a content of the admin API and a deploy's changes into what the wire
   carries: the names, the nulls, the URLs. A webhook carries the delivery shape
@@ -114,13 +112,18 @@ web  ──▶  usecases  ──▶  domain
   `ports/presenters`, whose `webhook-payload` the use case sends.
 
 What only one page needs to draw -- its URLs, a badge's class, how a value
-reads there -- stays in that page's file.
+reads there -- stays in that page's file. The three routers -- the pages and
+both APIs -- are the outermost part of the web: they use the rest of `web/` (and
+the pages `ui/`), and nothing uses them, another route included. A URL two pages link to is in
+`web/urls`. See `adr/2026-09-27-routes-do-not-import-one-another.md`.
 
 `tests/server/layers.lisp` declares the layers with
-[okite](https://github.com/skyizwhite/okite) and fails when a file imports from a
-layer further out, from a library that belongs to another layer (`cl-dbi` outside
-`infra/`, `ningle` outside `web/`), from a library it does not list at all, or
-from `koya-sdk`. What no layer owns — koya-core, alexandria and the like — is
+[okite](https://github.com/skyizwhite/okite) -- in `web/`, each router a layer
+of its own, isolated, outside `ui/` outside the rest -- and fails when a file
+imports from a layer further out or a route from another route, from a library
+that belongs to another layer (`cl-dbi` outside `infra/`, `jingle` outside
+`web/`), from a library it does not list at all, or from `koya-sdk` or `ningle`
+-- ningle is reached through jingle, which re-exports it. What no layer owns — koya-core, alexandria and the like — is
 listed as usable anywhere. `main` checks with okite,
 as it loads, that every generic function of `usecases/ports/` has a method.
 See `adr/2026-09-25-the-server-is-layered-and-depends-inward.md`.
@@ -184,11 +187,11 @@ The four apps — pages, delivery API, admin API and actions — are separate ni
 apps mounted together, so each decides its own response type. A request first
 goes through what every answer needs (the deletion of a temporary file once sent,
 the access log, Cache-Control, the error page, the body limit), then to the app
-mounted at its path, which carries the middlewares it needs: CORS for the
-delivery API, the session and a guard for the admin API, the actions and the
-pages; the assets and the media need none. The admin API, the actions and the
-pages are each guarded where they are mounted
-(`*mw-admin-auth*`, `*mw-actions-auth*`, `*mw-pages-auth*`),
+mounted at its path, which carries the middlewares it needs: CORS and a guard
+for the delivery API, the session and a guard for the admin API, the actions and
+the pages; the assets and the media need none.
+The two APIs, the actions and the pages are each guarded where they are mounted
+(`*mw-delivery-auth*`, `*mw-admin-auth*`, `*mw-actions-auth*`, `*mw-pages-auth*`),
 so a route added later is covered without checking for itself. A page asked for
 without the owner's session is a redirect to the login page, which comes back to
 it; so is a path that is no page. The delivery API is mounted behind

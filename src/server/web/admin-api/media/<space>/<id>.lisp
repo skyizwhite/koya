@@ -2,11 +2,11 @@
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/http #:path-param #:read-json-body #:body-field #:fail-api)
-  (:import-from #:koya-server/usecases/contents/lookup #:resolve-space)
   (:import-from #:koya-server/web/presenters #:media->jobject)
-  (:import-from #:koya-server/usecases/media/library
+  (:import-from #:koya-server/usecases/media
                 #:remove-media #:find-media #:update-media #:media-references)
   (:import-from #:koya-server/domain/media #:media-space #:media-id)
+  (:import-from #:koya-server/usecases/spaces #:resolve-space)
   (:export #:@get #:@patch #:@delete))
 (in-package #:koya-server/web/admin-api/media/<space>/<id>)
 

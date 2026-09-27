@@ -1,9 +1,9 @@
 (defpackage #:koya-server/web/pages/s/<space>/export
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
+  (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/web/http #:path-param #:redirect-to)
-  (:import-from #:koya-server/usecases/spaces/archive
+  (:import-from #:koya-server/usecases/archive
                 #:export-space #:archive-file-name #:archive-error)
   (:import-from #:koya-server/web/urls #:space-url)
   (:import-from #:koya-server/web/ui/layout #:~missing)
@@ -12,7 +12,7 @@
   (:export #:@get))
 (in-package #:koya-server/web/pages/s/<space>/export)
 
-;;; The space as a zip download (usecases/spaces/archive). The archive is written
+;;; The space as a zip download (usecases/archive). The archive is written
 ;;; to a file and sent from there, then deleted (*MW-TEMPORARY-FILE*):
 ;;; it holds the webhook secret and every draft.
 ;;;

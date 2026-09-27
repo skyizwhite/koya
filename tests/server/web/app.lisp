@@ -2,6 +2,8 @@
   (:use #:cl #:rove)
   (:import-from #:koya-tests/server/web/pages/support #:edit #:moved-to #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/web/app #:app #:*page-app*)
+  (:import-from #:koya-server/usecases/keys #:create-delivery-key)
+  (:import-from #:jingle #:route)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
@@ -91,7 +93,7 @@
       (remove-method #'lack/middleware/session/store:fetch-session spy))))
 
 (deftest an-error-is-logged-and-not-cached
-  (setf (ningle:route *page-app* "/probe-page-that-fails")
+  (setf (route *page-app* "/probe-page-that-fails")
         (lambda (params) (declare (ignore params)) (error "The probe fails")))
   (let* ((status nil)
          (body nil)
@@ -112,7 +114,8 @@
     (declare (ignore body))
     (ok (= status 301) "a page is sent to its URL")
     (ok (string= (location headers) "/s/website")))
-  (multiple-value-bind (status body headers) (request :get "/api/v1/website/blog/")
+  (multiple-value-bind (status body headers)
+      (request :get "/api/v1/website/blog/" :headers `(("x-koya-delivery-key" . ,(create-delivery-key "website"))))
     (declare (ignore body))
     (ok (= status 301) "so is the delivery API")
     (ok (string= (location headers) "/api/v1/website/blog"))

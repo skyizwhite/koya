@@ -3,11 +3,11 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
+  (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
   (:import-from #:koya-server/web/presenters #:media-url)
-  (:import-from #:koya-server/usecases/media/library
+  (:import-from #:koya-server/usecases/media
                 #:remove-media #:store-uploads #:remove-each #:list-media #:count-media
                 #:find-media #:update-media #:media-reference-counts)
   (:import-from #:koya-server/web/http

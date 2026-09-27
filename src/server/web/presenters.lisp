@@ -10,7 +10,7 @@
   (:import-from #:koya-server/domain/media
                 #:media #:media-id #:media-space #:media-filename #:media-mime #:media-size
                 #:media-width #:media-height #:media-alt #:media-created-at #:media-file-name)
-  (:import-from #:koya-server/usecases/contents/delivery
+  (:import-from #:koya-server/usecases/delivery
                 #:delivered #:delivered-content #:delivered-model #:delivered-data)
   (:import-from #:koya-server/usecases/ports/presenters
                 #:webhook-payload)

@@ -1,14 +1,11 @@
-(defpackage #:koya-server/usecases/contents/delivery
+(defpackage #:koya-server/usecases/delivery
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p)
   (:import-from #:koya-core/json #:json-null)
-  (:import-from #:koya-server/domain/errors
-                #:fail #:not-found)
-  (:import-from #:koya-server/domain/query
-                #:bad-query #:query-include)
-  (:import-from #:koya-server/domain/content
-                #:content-published #:content-draft-key #:content-data)
+  (:import-from #:koya-server/domain/errors #:fail #:not-found)
+  (:import-from #:koya-server/domain/query #:bad-query #:query-include)
+  (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/ports/media #:find-media)
   (:import-from #:koya-server/usecases/ports/contents
@@ -21,7 +18,7 @@
            #:delivered-list
            #:delivered-one
            #:delivered-object))
-(in-package #:koya-server/usecases/contents/delivery)
+(in-package #:koya-server/usecases/delivery)
 
 ;;; A content as koya delivers it, to the delivery API and to webhooks alike:
 ;;; its data with every media field holding its media, and the references a

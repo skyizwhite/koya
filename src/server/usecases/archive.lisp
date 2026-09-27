@@ -1,25 +1,21 @@
-(defpackage #:koya-server/usecases/spaces/archive
+(defpackage #:koya-server/usecases/archive
   (:use #:cl)
-  (:import-from #:koya-server/domain/errors
-                #:invalid-input #:conflict #:not-found)
-  (:import-from #:koya-server/usecases/ports/store
-                #:with-transaction)
-  (:import-from #:koya-server/usecases/actor
-                #:*actor*)
+  (:import-from #:koya-server/domain/errors #:invalid-input #:conflict #:not-found)
+  (:import-from #:koya-server/usecases/ports/store #:with-transaction)
+  (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/usecases/ports/spaces
                 #:load-schema #:find-space #:insert-space #:space-webhook-secret
                 #:set-webhook-secret)
-  (:import-from #:koya-server/usecases/schema/deploy
-                #:replace-schema)
+  (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/usecases/ports/keys
-                #:stored-delivery-keys #:import-delivery-key #:stored-management-keys
-                #:import-management-key)
+                #:stored-delivery-keys #:insert-delivery-key #:stored-management-keys
+                #:insert-management-key)
   (:import-from #:koya-server/usecases/ports/contents
                 #:space-contents #:insert-content #:content-history #:record-revision)
   (:import-from #:koya-server/domain/content
                 #:make-content #:content-id #:content-model #:content-published #:content-draft
-                #:content-draft-key #:content-created-at #:content-updated-at
-                #:content-published-at #:content-revised-at)
+                #:content-draft-key #:content-created-at #:content-updated-at #:content-published-at
+                #:content-revised-at)
   (:import-from #:koya-server/domain/revision
                 #:revision-event #:revision-data #:revision-by #:revision-created-at)
   (:import-from #:koya-server/usecases/ports/media
@@ -32,25 +28,23 @@
                 #:media-id #:media-space #:media-filename #:media-mime #:media-size #:media-width
                 #:media-height #:media-alt #:media-created-at #:+max-upload-bytes+)
   (:import-from #:koya-server/domain/image #:sniff-image #:image-extension)
-  (:import-from #:koya-server/domain/key #:key-id #:key-hash #:key-label #:key-created-at)
+  (:import-from #:koya-server/domain/key
+                #:key-id #:key-hash #:key-label #:key-created-at #:new-webhook-secret)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p)
   (:import-from #:koya-core/json
                 #:jobject #:jget #:json-null #:json-null-p #:json-array-p #:parse-json #:to-json)
-  (:import-from #:koya-core/time
-                #:now-iso)
-  (:import-from #:cl-ppcre
-                #:scan)
-  (:import-from #:babel
-                #:string-to-octets #:octets-to-string)
-  (:import-from #:bordeaux-threads-2)
+  (:import-from #:koya-core/time #:now-iso)
+  (:import-from #:cl-ppcre #:scan)
+  (:import-from #:babel #:string-to-octets #:octets-to-string)
+  (:import-from #:bordeaux-threads-2 )
   (:export #:export-space
            #:begin-import
            #:continue-import
            #:finish-import
            #:archive-file-name
            #:archive-error))
-(in-package #:koya-server/usecases/spaces/archive)
+(in-package #:koya-server/usecases/archive)
 
 ;;; A space as one zip: space.json -- the schema, every content with its draft,
 ;;; its system timestamps and its history, the media rows, the keys and the
@@ -316,11 +310,11 @@ whatever came of it."
            (with-transaction
              ;; checked again inside: another import may have made it since
              (check-target space)
-             (unless (find-space space) (insert-space space))
+             (unless (find-space space) (insert-space space (new-webhook-secret)))
              (replace-schema space schema :by by)
              (when secret (set-webhook-secret space secret))
-             (dolist (k delivery-keys) (apply #'import-delivery-key space k))
-             (dolist (k management-keys) (apply #'import-management-key space k))
+             (dolist (k delivery-keys) (apply #'insert-delivery-key space k))
+             (dolist (k management-keys) (apply #'insert-management-key space k))
              (dolist (m media)
                (insert-media space :id (getf m :id) :filename (getf m :filename) :mime (getf m :mime)
                                    :size (getf m :size) :width (getf m :width) :height (getf m :height)

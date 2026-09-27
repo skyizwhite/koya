@@ -1,7 +1,7 @@
 (defpackage #:koya-tests/server/infra/db
   (:use #:cl #:rove)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
+  (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/infra/db/migrations #:migrate #:current-version)
@@ -9,7 +9,7 @@
   (:import-from #:koya-server/usecases/ports/spaces
                 #:load-schema #:find-model #:list-spaces #:delete-space
                 #:find-space)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
+  (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-server/domain/deploy
                 #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by
                 #:change-description #:change-op)
@@ -19,7 +19,7 @@
                 #:schema->jobject)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions)
-  (:import-from #:koya-server/usecases/contents/write #:create)
+  (:import-from #:koya-server/usecases/contents #:create)
   (:import-from #:koya-core/diff
                 #:destructive-changes-p)
   (:import-from #:koya-server/usecases/ports/sessions #:make-session-store)

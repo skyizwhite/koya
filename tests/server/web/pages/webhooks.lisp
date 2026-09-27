@@ -1,7 +1,8 @@
 (defpackage #:koya-tests/server/web/pages/webhooks
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
-  (:import-from #:koya-tests/server/web/pages/support #:blog-model #:request #:call-action #:setup-pages #:log-in)
+  (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-tests/server/web/pages/support
+                #:blog-model #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/webhooks #:browse-deliveries)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/webhooks #:record-delivery)

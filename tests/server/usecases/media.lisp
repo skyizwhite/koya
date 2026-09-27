@@ -1,16 +1,16 @@
-(defpackage #:koya-tests/server/usecases/media/library
+(defpackage #:koya-tests/server/usecases/media
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
+  (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
   (:import-from #:koya-server/usecases/ports/spaces #:delete-space #:find-model)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
-  (:import-from #:koya-server/usecases/contents/write #:create)
+  (:import-from #:koya-server/usecases/spaces #:create-space)
+  (:import-from #:koya-server/usecases/contents #:create)
   (:import-from #:koya-server/usecases/ports/media
                 #:find-media #:list-media #:count-media #:update-media #:media-file-path)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-server/web/presenters #:media-url #:media->jobject)
-  (:import-from #:koya-server/usecases/media/library
+  (:import-from #:koya-server/usecases/media
                 #:store-upload #:store-uploads #:remove-media #:remove-space-media #:media-references
                 #:media-reference-counts)
   (:import-from #:koya-server/domain/media
@@ -22,7 +22,7 @@
   (:import-from #:koya-core/json #:jget #:parse-json)
   (:import-from #:babel #:string-to-octets)
   (:export #:png-bytes #:*media-root* #:multipart-body))
-(in-package #:koya-tests/server/usecases/media/library)
+(in-package #:koya-tests/server/usecases/media)
 
 (defvar *media-root*
   (uiop:ensure-directory-pathname

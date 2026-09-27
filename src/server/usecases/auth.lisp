@@ -7,7 +7,7 @@
   (:import-from #:bordeaux-threads-2)
   (:import-from #:koya-server/usecases/ports/config
                 #:owner-secret)
-  (:import-from #:koya-server/usecases/settings/two-factor
+  (:import-from #:koya-server/usecases/settings
                 #:totp-enabled-p #:totp-code-valid-p)
   (:import-from #:koya-server/usecases/ports/sessions
                 #:make-session-store #:+session-seconds+)

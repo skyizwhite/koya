@@ -9,7 +9,6 @@
            #:find-model
            #:space-webhooks
            #:space-webhook-secret
-           #:rotate-webhook-secret
            #:set-webhook-secret))
 (in-package #:koya-server/usecases/ports/spaces)
 
@@ -22,9 +21,9 @@
   (:documentation "NAME when there is a space of that name, NIL otherwise: a missing space, told
 apart from an empty one."))
 
-(defgeneric insert-space (name)
-  (:documentation "Store a new space named NAME, last in display order, with a fresh webhook
-secret. Returns NAME."))
+(defgeneric insert-space (name webhook-secret)
+  (:documentation "Store a new space named NAME, last in display order, with WEBHOOK-SECRET.
+Returns NAME."))
 
 (defgeneric delete-space (name)
   (:documentation "Delete a space with everything in it: models, contents, media rows, keys, the
@@ -50,8 +49,5 @@ models, because every content change needs them."))
 (defgeneric space-webhook-secret (space-name)
   (:documentation "The secret sent as X-KOYA-WEBHOOK-KEY with every webhook of SPACE-NAME."))
 
-(defgeneric rotate-webhook-secret (space-name))
-
 (defgeneric set-webhook-secret (space-name secret)
-  (:documentation "Give SPACE-NAME the secret it had elsewhere: an imported space keeps the one
-its site already checks."))
+  (:documentation "Make SECRET the one SPACE-NAME's webhooks carry from now on."))

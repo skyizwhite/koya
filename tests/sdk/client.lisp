@@ -1,10 +1,10 @@
 (defpackage #:koya-tests/sdk/client
   (:use #:cl #:rove)
   (:import-from #:koya-server #:start #:stop)
-  (:import-from #:koya-server/usecases/ports/keys #:create-delivery-key #:create-management-key)
-  (:import-from #:koya-server/usecases/webhooks/notify #:*webhook-async*)
+  (:import-from #:koya-server/usecases/keys #:create-delivery-key #:create-management-key)
+  (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
   (:import-from #:koya-tests/server/fake-webhooks #:*webhook-sender*)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
+  (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-sdk/config #:defmodel #:clear-schema #:current-schema)
   (:import-from #:koya-core/schema #:schema-models #:model-name)
   (:import-from #:koya-sdk/client
@@ -14,7 +14,7 @@
                 #:delete-content #:draft-key #:list-delivery-keys #:delete-delivery-key
                 #:webhook-secret #:list-media #:get-media #:upload-media #:update-media
                 #:delete-media #:deploy)
-  (:import-from #:koya-tests/server/usecases/media/library #:png-bytes #:*media-root*))
+  (:import-from #:koya-tests/server/usecases/media #:png-bytes #:*media-root*))
 (in-package #:koya-tests/sdk/client)
 
 (defparameter *port* 3987)

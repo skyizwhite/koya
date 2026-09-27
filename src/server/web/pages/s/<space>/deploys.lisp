@@ -1,33 +1,28 @@
 (defpackage #:koya-server/web/pages/s/<space>/deploys
   (:use #:cl #:hsx)
-  (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status #:set-response-header)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/usecases/schema/deploy #:list-deploys #:count-deploys #:+deploys-kept+)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
+  (:import-from #:koya-server/usecases/schema #:list-deploys #:count-deploys #:+deploys-kept+)
+  (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/domain/deploy
                 #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by
                 #:deploy-created-at #:change-op #:change-destructive #:change-description)
   (:import-from #:koya-server/web/http #:path-param #:param #:blank-p)
   (:import-from #:koya-server/web/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/display #:short-time #:caller-name)
-  (:import-from #:koya-server/web/urls #:space-url)
+  (:import-from #:koya-server/web/urls #:deploys-url)
   (:import-from #:koya-server/web/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
-  (:export #:@get #:deploys-url #:browse-deploys))
+  (:export #:@get #:browse-deploys))
 (in-package #:koya-server/web/pages/s/<space>/deploys)
 
 ;;; What each deploy of this space's schema changed, newest first. Read-only:
 ;;; deploys come from the project's repository through the client.
 ;;;
 ;;; Each change is drawn as the line PLAN prints for it.
-
-(defun deploys-url (space &key page)
-  (render-uri (make-uri :path (format nil "~a/deploys" (space-url space))
-                        :query (when (and page (> page 1)) `(("page" . ,page))))))
 
 (defun deployed-by (deploy) (caller-name (deploy-by deploy)))
 

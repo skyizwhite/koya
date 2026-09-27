@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/admin-api/me
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject #:json-null)
-  (:import-from #:lack/request #:request-env)
+  (:import-from #:jingle #:*request* #:request-env)
   (:import-from #:koya-server/web/auth #:session-owner-p #:calling-space)
   (:export #:@get))
 (in-package #:koya-server/web/admin-api/me)
@@ -11,7 +11,7 @@
 other way past the admin auth middleware) and the space it is limited to, plus
 the server version."
   (declare (ignore params))
-  (let ((owner (session-owner-p (getf (request-env ningle:*request*) :lack.session))))
+  (let ((owner (session-owner-p (getf (request-env *request*) :lack.session))))
     (jobject "owner" (and owner t)
              "management" (not owner)
              "space" (if owner json-null (calling-space))

@@ -7,15 +7,15 @@
                 #:model-kind #:model-name #:model-field #:field-type #:field-option)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/validate #:blank-value-p)
-  (:import-from #:koya-server/usecases/contents/revisions #:list-revisions #:count-revisions)
-  (:import-from #:koya-server/usecases/contents/lookup #:find-content #:resolve-model)
+  (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions)
+  (:import-from #:koya-server/usecases/contents #:find-content)
   (:import-from #:koya-server/web/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content #:content-id #:content-label)
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by
                 #:revision-created-at #:changed-keys)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space #:find-model)
-  (:import-from #:koya-server/usecases/media/library #:find-media)
+  (:import-from #:koya-server/usecases/spaces #:find-space)
+  (:import-from #:koya-server/usecases/media #:find-media)
   (:import-from #:koya-server/domain/media #:media-filename)
   (:import-from #:koya-server/web/http #:path-param #:param)
   (:import-from #:koya-server/domain/errors #:not-found)
@@ -23,23 +23,19 @@
   (:import-from #:koya-server/web/assets #:asset-url)
   (:import-from #:koya-server/web/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/display #:short-time #:caller-name)
-  (:import-from #:koya-server/web/urls #:content-url #:model-url)
+  (:import-from #:koya-server/web/urls #:content-url #:model-url #:history-url)
   (:import-from #:koya-server/web/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
-  (:export #:@get #:history-url #:restore-url #:browse-history))
+  (:import-from #:koya-server/usecases/schema #:resolve-model #:find-model)
+  (:export #:@get #:browse-history))
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/<id>/history)
 
 ;;; A content's revisions, newest first, each drawn as what it changed against
 ;;; the one before it in the same view: every write, or the publishes alone,
 ;;; where the one before is the version that was live until then.
-
-(defun history-url (space model id &key published-only page)
-  (render-uri (make-uri :path (format nil "~a/history" (content-url space model id))
-                        :query (append (when published-only '(("view" . "published")))
-                                       (when (and page (> page 1)) `(("page" . ,page)))))))
 
 (defun restore-url (space model id revision-id)
   "The editor, with REVISION-ID's data in the form."

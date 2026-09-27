@@ -5,7 +5,7 @@
                 #:space-webhook-secret #:rotate-webhook-secret #:create-delivery-key
                 #:list-delivery-keys #:delete-delivery-key #:create-management-key
                 #:list-management-keys #:delete-management-key)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:find-space)
+  (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/domain/key #:key-id #:key-label #:key-created-at)
   (:import-from #:koya-server/web/http #:path-param #:param)
   (:import-from #:koya-server/web/display #:short-time)

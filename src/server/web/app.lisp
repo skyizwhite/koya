@@ -1,9 +1,7 @@
 (defpackage #:koya-server/web/app
   (:use #:cl)
   (:import-from #:jingle
-                #:make-app #:set-response-header)
-  (:import-from #:ningle
-                #:process-response)
+                #:make-app #:set-response-header #:process-response)
   (:import-from #:ningle-fbr
                 #:set-routes)
   (:import-from #:ningle-actions
@@ -23,7 +21,7 @@
   (:import-from #:smart-buffer)
   (:import-from #:koya-server/usecases/auth #:make-session-store #:+session-seconds+)
   (:import-from #:koya-server/web/auth
-                #:*mw-admin-auth* #:*mw-actions-auth* #:*mw-pages-auth*)
+                #:*mw-delivery-auth* #:*mw-admin-auth* #:*mw-actions-auth* #:*mw-pages-auth*)
   ;; loaded for the method it adds to ports/presenters, which webhooks need
   ;; whether or not a route has loaded it
   (:import-from #:koya-server/web/presenters)
@@ -100,7 +98,7 @@ with the middlewares it needs. The pages app answers what no mount takes."
      *mw-max-body*
      ;; CORS outside the trimming, so its redirect carries CORS headers as well
      (with-args *mw-mount* "/api"
-       (lack:builder *mw-delivery-cors* *mw-trim-trailing-slash* *api-app*))
+       (lack:builder *mw-delivery-cors* *mw-trim-trailing-slash* *mw-delivery-auth* *api-app*))
      ;; files need no session: none is read for them
      (with-args *mw-mount* "/assets" (make-instance 'lack-app-file :root #p"assets/"))
      (with-args *mw-mount* "/media" #'media-app)

@@ -8,7 +8,7 @@
   (:import-from #:cl-ppcre
                 #:split)
   (:import-from #:koya-server/domain/timezone #:iso->local-input #:local-input->iso)
-  (:import-from #:koya-server/usecases/settings/timezone #:display-timezone)
+  (:import-from #:koya-server/usecases/settings #:display-timezone)
   (:import-from #:koya-server/web/http
                 #:form-values)
   (:export #:form->data

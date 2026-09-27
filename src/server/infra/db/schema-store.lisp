@@ -11,12 +11,10 @@
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
   (:import-from #:koya-core/time
                 #:now-iso)
-  (:import-from #:ironclad
-                #:random-data #:byte-array-to-hex-string)
   (:import-from #:koya-server/usecases/ports/spaces
                 #:load-schema #:save-schema #:list-spaces #:find-space #:insert-space
                 #:delete-space #:find-model #:space-webhooks #:space-webhook-secret
-                #:rotate-webhook-secret #:set-webhook-secret))
+                #:set-webhook-secret))
 (in-package #:koya-server/infra/db/schema-store)
 
 ;;; The server keeps the deployed schema in the SPACES and MODELS tables. A model's
@@ -85,24 +83,17 @@
   (let ((schema (load-schema space-name)))
     (and schema (schema-model schema model-name))))
 
-(defun new-secret () (byte-array-to-hex-string (random-data 24)))
-
 (defmethod space-webhook-secret (space-name)
   (let ((row (fetch "SELECT webhook_secret FROM spaces WHERE name = ?" space-name)))
     (and row (col (first row) "webhook_secret"))))
 
-(defmethod rotate-webhook-secret (space-name)
-  (let ((secret (new-secret)))
-    (exec "UPDATE spaces SET webhook_secret = ? WHERE name = ?" secret space-name)
-    secret))
-
 (defmethod set-webhook-secret (space-name secret)
   (exec "UPDATE spaces SET webhook_secret = ? WHERE name = ?" secret space-name))
 
-(defmethod insert-space (name)
+(defmethod insert-space (name webhook-secret)
   (exec "INSERT INTO spaces (name, webhooks, webhook_secret, position, created_at)
          VALUES (?, '[]', ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM spaces), ?)"
-        name (new-secret) (now-iso))
+        name webhook-secret (now-iso))
   (forget-schema name)
   name)
 

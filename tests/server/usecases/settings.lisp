@@ -1,8 +1,8 @@
-(defpackage #:koya-tests/server/usecases/settings/two-factor
+(defpackage #:koya-tests/server/usecases/settings
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/settings/two-factor #:totp-code-valid-p #:*totp-last-counter*)
+  (:import-from #:koya-server/usecases/settings #:totp-code-valid-p #:*totp-last-counter*)
   (:import-from #:koya-server/domain/totp #:totp))
-(in-package #:koya-tests/server/usecases/settings/two-factor)
+(in-package #:koya-tests/server/usecases/settings)
 
 ;; RFC 4226 / RFC 6238 test secret: the ASCII string 12345678901234567890
 (defparameter *rfc-secret* "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")

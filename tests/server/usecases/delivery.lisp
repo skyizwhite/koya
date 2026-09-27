@@ -1,11 +1,11 @@
-(defpackage #:koya-tests/server/usecases/contents/delivery
+(defpackage #:koya-tests/server/usecases/delivery
   (:use #:cl #:rove)
   (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space #:find-model)
-  (:import-from #:koya-server/usecases/contents/write #:create #:update-draft #:draft-key)
-  (:import-from #:koya-server/usecases/contents/delivery
+  (:import-from #:koya-server/usecases/schema #:replace-schema #:find-model)
+  (:import-from #:koya-server/usecases/spaces #:create-space)
+  (:import-from #:koya-server/usecases/contents #:create #:update-draft #:draft-key)
+  (:import-from #:koya-server/usecases/delivery
                 #:deliver #:delivered-data #:delivered-p #:delivered-content
                 #:delivered-one #:delivered-list #:delivered-object)
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
@@ -15,7 +15,7 @@
   (:import-from #:koya-server/domain/query #:parse-query #:make-query #:query-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-core/json #:jobject #:jget #:json-null #:json-null-p))
-(in-package #:koya-tests/server/usecases/contents/delivery)
+(in-package #:koya-tests/server/usecases/delivery)
 
 ;;; What the delivery API hands the presenter: a content's data with its media
 ;;; and the references it was asked for, resolved. No HTTP, no JSON.

@@ -5,7 +5,7 @@
   (:import-from #:koya-server/web/presenters #:changes->jarray)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/http #:read-json-body #:path-param)
-  (:import-from #:koya-server/usecases/schema/deploy #:plan)
+  (:import-from #:koya-server/usecases/schema #:plan)
   (:export #:@post))
 (in-package #:koya-server/web/admin-api/schema/<space>/plan)
 

@@ -8,12 +8,13 @@
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/usecases/ports/media #:list-media #:count-media)
   (:import-from #:koya-server/domain/media #:media-id #:media-filename)
-  (:import-from #:koya-server/web/ui/media/picker #:media-picker #:media-picker-more #:media-picker-upload)
+  (:import-from #:koya-server/web/ui/media/picker
+                #:media-picker #:media-picker-more #:media-picker-upload)
   (:import-from #:koya-server/web/pages/s/<space>/media
                 #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt)
-  (:import-from #:koya-tests/server/usecases/media/library #:png-bytes)
+  (:import-from #:koya-tests/server/usecases/media #:png-bytes)
   (:import-from #:koya-server/domain/query #:parse-query)
-  (:import-from #:koya-server/usecases/media/library #:store-upload)
+  (:import-from #:koya-server/usecases/media #:store-upload)
   (:import-from #:babel #:string-to-octets))
 (in-package #:koya-tests/server/web/pages/media)
 

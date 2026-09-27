@@ -4,7 +4,7 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:babel #:string-to-octets)
-  (:import-from #:koya-tests/server/usecases/media/library #:png-bytes))
+  (:import-from #:koya-tests/server/usecases/media #:png-bytes))
 (in-package #:koya-tests/server/web/admin-api/media)
 
 (setup (setup-api))

@@ -1,9 +1,9 @@
 (defpackage #:koya-server/web/admin-api/contents/<space>/<model>/<id>/publish
   (:use #:cl)
   (:import-from #:koya-server/web/http #:path-param #:read-json-body #:body-field)
-  (:import-from #:koya-server/usecases/contents/write #:publish)
-  (:import-from #:koya-server/usecases/contents/lookup #:resolve-model)
+  (:import-from #:koya-server/usecases/contents #:publish)
   (:import-from #:koya-server/web/presenters #:admin-content->jobject)
+  (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:export #:@post))
 (in-package #:koya-server/web/admin-api/contents/<space>/<model>/<id>/publish)
 

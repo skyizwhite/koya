@@ -7,7 +7,7 @@
   (:import-from #:koya-server/web/forms #:field-param-name #:value->string)
   (:import-from #:koya-server/domain/media #:media-filename #:media-alt)
   (:import-from #:koya-server/web/presenters #:media-url)
-  (:import-from #:koya-server/usecases/settings/timezone #:display-timezone-name)
+  (:import-from #:koya-server/usecases/settings #:display-timezone-name)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:export #:~field-input))
 (in-package #:koya-server/web/ui/content/field-input)

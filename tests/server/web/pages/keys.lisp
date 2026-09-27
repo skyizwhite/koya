@@ -1,9 +1,10 @@
 (defpackage #:koya-tests/server/web/pages/keys
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
-  (:import-from #:koya-tests/server/web/pages/support #:request #:request-url #:call-action #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/web/pages/support
+                #:request #:request-url #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/keys #:create-key #:delete-key #:rotate-secret)
-  (:import-from #:koya-server/usecases/ports/keys #:list-delivery-keys #:list-management-keys)
+  (:import-from #:koya-server/usecases/keys #:list-delivery-keys #:list-management-keys)
   (:import-from #:koya-server/usecases/ports/spaces #:space-webhook-secret)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db))
 (in-package #:koya-tests/server/web/pages/keys)

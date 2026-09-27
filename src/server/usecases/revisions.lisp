@@ -1,22 +1,20 @@
-(defpackage #:koya-server/usecases/contents/revisions
+(defpackage #:koya-server/usecases/revisions
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-name #:model-fields #:model-field
-                #:field-name #:field-type #:field-option #:field-required-p)
-  (:import-from #:koya-core/validate
-                #:validate-content #:blank-value-p)
-  (:import-from #:koya-core/json
-                #:json-array-p #:jkeys)
+                #:model-name #:model-fields #:model-field #:field-name #:field-type #:field-option
+                #:field-required-p)
+  (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
+  (:import-from #:koya-core/json #:json-array-p #:jkeys)
   (:import-from #:koya-server/usecases/ports/contents
-                #:find-content #:unique-value-taken-p
-                #:list-revisions #:count-revisions #:find-revision)
+                #:find-content #:unique-value-taken-p #:list-revisions #:count-revisions
+                #:find-revision)
   (:import-from #:koya-server/domain/content #:content-published)
   (:import-from #:koya-server/usecases/ports/media #:find-media)
   (:export #:restore-data
            #:list-revisions
            #:count-revisions
            #:find-revision))
-(in-package #:koya-server/usecases/contents/revisions)
+(in-package #:koya-server/usecases/revisions)
 
 ;;; What a revision's data becomes when it is brought back into the editor. The
 ;;; schema and the space may have moved on since it was written, so each field

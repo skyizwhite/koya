@@ -1,15 +1,15 @@
 (defpackage #:koya-server/web/auth
   (:use #:cl)
   (:import-from #:koya-server/web/http
-                #:fail-api #:header #:json-response #:error-object #:origin-allowed-p)
+                #:json-response #:error-object #:origin-allowed-p)
   (:import-from #:koya-server/usecases/keys
                 #:space-for-delivery-key #:space-for-management-key #:management-key-label)
   (:import-from #:koya-server/usecases/auth
                 #:attempt-login)
   (:import-from #:koya-server/usecases/actor
                 #:*actor* #:+owner+ #:key-actor)
-  (:import-from #:lack/request
-                #:request-env)
+  (:import-from #:jingle
+                #:*request* #:context #:request-env)
   (:import-from #:lack-mw
                 #:mw-every #:mw-some #:mw-except)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri #:url-decode)
@@ -17,7 +17,7 @@
            #:*mw-admin-auth*
            #:*mw-actions-auth*
            #:*mw-pages-auth*
-           #:require-delivery-key
+           #:*mw-delivery-auth*
            #:public-path
            #:local-path-p
            #:session-login
@@ -41,7 +41,7 @@
     (and auth (> (length auth) 7) (string-equal (subseq auth 0 7) "Bearer ")
          (string-trim " " (subseq auth 7)))))
 
-(defun session-owner-p (&optional (session (ningle:context :session)))
+(defun session-owner-p (&optional (session (context :session)))
   (and session (gethash "owner" session) t))
 
 (defun session-login (address secret &optional code)
@@ -49,11 +49,11 @@
 with SECRET and CODE. Returns what ATTEMPT-LOGIN does."
   (let ((result (attempt-login address secret code)))
     (when (eq result t)
-      (setf (gethash "owner" (ningle:context :session)) t))
+      (setf (gethash "owner" (context :session)) t))
     result))
 
 (defun session-logout ()
-  (remhash "owner" (ningle:context :session)))
+  (remhash "owner" (context :session)))
 
 (defun session-env-owner-p (env)
   "True for the owner's session. The owner secret itself is not accepted on the
@@ -76,7 +76,7 @@ one is refused rather than guessed at."
 (defun calling-space ()
   "The space of the management key making this request, or NIL for the owner's
 session, which reaches every space."
-  (space-for-management-key (bearer-token (request-env ningle:*request*))))
+  (space-for-management-key (bearer-token (request-env *request*))))
 
 (defun cross-origin-write-p (env)
   "A state-changing request whose Origin/Referer does not match this server. The
@@ -203,14 +203,24 @@ the page htmx says it was sent from. The login page checks NEXT is a local path.
 session only (but for a PUBLIC-PATH), no cross-origin writes. Stacked on the
 actions app, so an action defined later is covered without checking for itself.")
 
-(defun require-delivery-key (space)
-  "Signal 401/403 unless the request carries a delivery key valid for SPACE."
-  (let* ((key (header "x-koya-delivery-key"))
-         (key-space (space-for-delivery-key key)))
-    (cond ((null key) (fail-api 401 "unauthorized" "X-KOYA-DELIVERY-KEY header is required"))
-          ((null key-space) (fail-api 401 "unauthorized" "Invalid delivery key"))
-          ((string/= key-space space) (fail-api 403 "forbidden" "Delivery key does not belong to this space"))
-          (t t))))
+(defparameter *mw-delivery-auth*
+  (lambda (app)
+    (lambda (env)
+      (let* ((key (let ((header (gethash "x-koya-delivery-key" (getf env :headers))))
+                    (and header (string-trim " " header))))
+             (key-space (space-for-delivery-key key)))
+        (cond ((null key)
+               (json-response 401 (error-object "unauthorized" "X-KOYA-DELIVERY-KEY header is required")))
+              ((null key-space)
+               (json-response 401 (error-object "unauthorized" "Invalid delivery key")))
+              ;; deny by default, as for a management key: every route is
+              ;; v1/<space>/..., and a path naming no space is no space of the key's
+              ((not (equal key-space (second (path-segments (getf env :path-info)))))
+               (json-response 403 (error-object "forbidden" "Delivery key does not belong to this space")))
+              (t (funcall app env))))))
+  "Lack middleware guarding the delivery API: a delivery key, for the space the path
+names. Stacked on the API app, so a route added later is covered without checking
+for itself.")
 
 (defun local-path-p (path)
   "True for a path on this server. What the login page redirects to comes from the

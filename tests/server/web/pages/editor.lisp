@@ -1,8 +1,10 @@
 (defpackage #:koya-tests/server/web/pages/editor
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
+  (:import-from #:koya-server/usecases/schema #:replace-schema #:resolve-model)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id>/history #:browse-history)
-  (:import-from #:koya-tests/server/web/pages/support #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/web/pages/support
+                #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages
+                #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:list-revisions #:count-revisions #:get-content
@@ -16,8 +18,7 @@
                 #:make-field #:make-model #:make-schema #:field-name #:model-fields)
   (:import-from #:koya-core/json #:jget #:jobject)
   (:import-from #:koya-server/usecases/ports/media #:insert-media #:delete-media)
-  (:import-from #:koya-server/usecases/contents/write #:create)
-  (:import-from #:koya-server/usecases/contents/lookup #:resolve-model))
+  (:import-from #:koya-server/usecases/contents #:create))
 (in-package #:koya-tests/server/web/pages/editor)
 
 (setup (setup-pages) (log-in))

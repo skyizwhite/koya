@@ -10,4 +10,4 @@
 (defgeneric webhook-payload (space model id event old new)
   (:documentation "The body of the webhook sent for EVENT (:publish, :unpublish, :delete or
 :draft) on content ID of the model named MODEL in SPACE, as a string. OLD and NEW
-are the content before and after, delivered (usecases/contents/delivery), or NIL."))
+are the content before and after, delivered (usecases/delivery), or NIL."))

@@ -4,8 +4,8 @@
   (:import-from #:koya-server/web/http #:path-param #:read-json-body #:body-field #:ok-status)
   (:import-from #:koya-server/usecases/keys
                 #:space-webhook-secret #:create-delivery-key #:list-delivery-keys)
-  (:import-from #:koya-server/usecases/contents/lookup #:resolve-space)
   (:import-from #:koya-server/domain/key #:key-id #:key-label #:key-created-at)
+  (:import-from #:koya-server/usecases/spaces #:resolve-space)
   (:export #:@get #:@post))
 (in-package #:koya-server/web/admin-api/keys/<space>/index)
 

@@ -1,6 +1,8 @@
 (defpackage #:koya-tests/server/web/pages/settings
   (:use #:cl #:rove)
-  (:import-from #:koya-tests/server/web/pages/support #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request #:location #:call-action #:setup-pages #:log-in)
+  (:import-from #:koya-tests/server/web/pages/support
+                #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
+                #:location #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/settings
                 #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
                 #:enable-two-factor-action #:disable-two-factor-action)
@@ -9,9 +11,9 @@
   (:import-from #:koya-server/domain/content #:content-draft #:content-id)
   (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/domain/timezone #:find-timezone)
-  (:import-from #:koya-server/usecases/settings/two-factor #:*totp-last-counter* #:totp-enabled-p)
+  (:import-from #:koya-server/usecases/settings
+                #:*totp-last-counter* #:totp-enabled-p #:display-timezone-name)
   (:import-from #:koya-server/domain/query #:parse-query)
-  (:import-from #:koya-server/usecases/settings/timezone #:display-timezone-name)
   (:import-from #:cl-ppcre #:scan-to-strings)
   (:import-from #:koya-core/json #:jget))
 (in-package #:koya-tests/server/web/pages/settings)

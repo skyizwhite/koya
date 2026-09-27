@@ -1,17 +1,17 @@
-(defpackage #:koya-tests/server/usecases/contents/write
+(defpackage #:koya-tests/server/usecases/contents
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
-  (:import-from #:koya-server/usecases/schema/deploy #:replace-schema)
+  (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:fetch-one #:col #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
-  (:import-from #:koya-server/usecases/spaces/lifecycle #:create-space)
+  (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:find-content #:list-contents
                 #:find-object-content #:unique-value-taken-p #:list-revisions
                 #:count-revisions #:find-revision)
-  (:import-from #:koya-server/usecases/contents/write
+  (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
@@ -19,7 +19,7 @@
                 #:content-published-at #:content-revised-at #:content-draft-key)
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by)
-  (:import-from #:koya-server/usecases/ports/keys
+  (:import-from #:koya-server/usecases/keys
                 #:create-delivery-key #:list-delivery-keys #:delete-delivery-key
                 #:space-for-delivery-key)
   (:import-from #:koya-server/domain/query
@@ -27,7 +27,7 @@
                 #:query-filters #:query-fields #:query-include #:query-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-core/json #:parse-json #:jget))
-(in-package #:koya-tests/server/usecases/contents/write)
+(in-package #:koya-tests/server/usecases/contents)
 
 (defun blog-model ()
   (make-model "blog" :list (list (make-field :title :text :required t :unique t)
@@ -193,7 +193,7 @@
       (ok (signals (list-contents "website" "blog" model (q "filters" "count[equals]1 2")) 'query-error) "trailing garbage")
       (let ((*read-eval-probe* nil))
         (ok (signals (list-contents "website" "blog" model
-                                    (q "filters" "count[equals]#.(setf koya-tests/server/usecases/contents/write::*read-eval-probe* t)"))
+                                    (q "filters" "count[equals]#.(setf koya-tests/server/usecases/contents::*read-eval-probe* t)"))
                      'query-error)
             "reader macros in a number filter are rejected")
         (ok (null *read-eval-probe*) "and never evaluated"))

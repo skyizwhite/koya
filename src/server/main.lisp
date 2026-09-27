@@ -11,7 +11,7 @@
   (:import-from #:koya-server/usecases/ports/config #:dev-mode-p)
   (:import-from #:koya-server/usecases/ports/main #:+ports+)
   (:import-from #:okite #:ensure-implemented)
-  (:import-from #:koya-server/usecases/settings/two-factor #:totp-secret)
+  (:import-from #:koya-server/usecases/settings #:totp-secret)
   (:export #:start
            #:stop
            #:reload

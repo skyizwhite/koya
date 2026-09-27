@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/media
   (:use #:cl)
-  (:import-from #:koya-server/usecases/media/delivery
+  (:import-from #:koya-server/usecases/media
                 #:stored-file)
   (:import-from #:cl-ppcre
                 #:scan-to-strings)

@@ -4,9 +4,9 @@
   (:import-from #:koya-server/web/http
                 #:path-param #:param #:fail-api #:ok-status #:uploaded-files #:form-field)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
-  (:import-from #:koya-server/usecases/contents/lookup #:resolve-space)
   (:import-from #:koya-server/web/presenters #:media->jobject)
-  (:import-from #:koya-server/usecases/media/library #:store-uploads #:list-media #:count-media)
+  (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
+  (:import-from #:koya-server/usecases/spaces #:resolve-space)
   (:export #:@get #:@post))
 (in-package #:koya-server/web/admin-api/media/<space>/index)
 

@@ -1,6 +1,7 @@
 (defpackage #:koya-server/web/pages/index
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:jingle
+                #:set-response-status #:set-response-header #:*request* #:request-content)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/http #:param)
   (:import-from #:koya-server/web/urls #:space-url)
@@ -8,11 +9,11 @@
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/ui/toast #:set-toast #:~toast-oob #:action-refusal #:action-refused)
-  (:import-from #:lack/request #:request-content)
+  (:import-from #:koya-server/web/ui/toast
+                #:set-toast #:~toast-oob #:action-refusal #:action-refused)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
-  (:import-from #:koya-server/usecases/spaces/archive #:begin-import #:continue-import #:finish-import)
-  (:import-from #:koya-server/usecases/spaces/lifecycle
+  (:import-from #:koya-server/usecases/archive #:begin-import #:continue-import #:finish-import)
+  (:import-from #:koya-server/usecases/spaces
                 #:create-space #:remove-space #:list-spaces #:find-space)
   (:export #:@get #:create-space-action #:delete-space-action
            #:begin-import-action #:continue-import-action #:finish-import-action))
@@ -213,7 +214,7 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
              (hsx (<> (~space-list :spaces (list-spaces))
                       (~toast-oob :message (format nil "Space ~a deleted." name))))))))
 
-;;; A space archive from Export, made into a space again (usecases/spaces/archive).
+;;; A space archive from Export, made into a space again (usecases/archive).
 ;;;
 ;;; koya-editor.js sends the file in pieces of +IMPORT-PIECE-BYTES+, each where it
 ;;; goes, so no request is larger than any other and a space has no size an
@@ -229,7 +230,7 @@ the import actions in pieces (see BEGIN-IMPORT-ACTION)."
   (let ((offset (ignore-errors (parse-integer (or (param params "offset") "")))))
     (handler-case
         (hsx (<> (princ-to-string (continue-import (param params "id") offset
-                                                   (request-content ningle:*request*)))))
+                                                   (request-content *request*)))))
       (koya-error (e) (action-refused e)))))
 
 (defaction finish-import-action :post (params)
