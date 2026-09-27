@@ -4,7 +4,7 @@
 
 ## Context
 
-`adr/2026-09-23-every-write-to-a-content-is-kept.md` records every write, but a
+`adr/2026-09-27-every-write-to-a-content-is-kept.md` records every write, but a
 draft save that changes nothing against the newest revision records nothing.
 The save still wrote a draft: the content became `published+draft` with a fresh
 draft key, and **Discard draft** appeared. Discarding it then recorded a

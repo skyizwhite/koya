@@ -10,7 +10,7 @@ its gigabyte, anyone, signed in or not, could have Woo write up to a gigabyte
 to the disk for each request to any path, however little koya takes:
 `+max-body-bytes+`, 21 MB.
 
-`adr/2026-09-25-a-space-has-no-size-limit-and-moves-in-pieces.md` kept the
+`adr/archives/2026-09-25-a-space-has-no-size-limit-and-moves-in-pieces.md` kept the
 gigabyte because past the limit Woo signaled an error it did not catch and
 stopped serving. Woo now answers 413 there instead, refuses a body whose
 Content-Length is past the limit before reading it, and deletes a body's file

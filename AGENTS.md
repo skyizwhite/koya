@@ -7,12 +7,21 @@ and read its content. Start with [README.md](README.md) and
 
 ## Design decisions go in `adr/`
 
-One file per decision, `adr/<date>-<title>.md`, in English, with Context,
+One decision per file, `adr/<date>-<title>.md`, in English, with Context,
 Decision and Consequences. Record the ones a reader would otherwise ask "why is
 it like this?" about — not every edit.
 
-**An ADR is not edited.** When a decision is replaced, write a new one and add
-`Superseded by adr/<file>` under the old one's title. The history is the point.
+**An ADR records a design decision, not a work log.** A decision is a choice
+among alternatives whose reason someone could later ask for. A rename, a file or
+package moved, a table of what went where, or a trick that works around a
+library is a change, not a decision: git holds it, and a constraint worth
+keeping is a spec. Write what is decided, not how the code got there.
+
+**An ADR is not edited, and it is replaced whole.** When a decision changes,
+write the new one, and write again, one ADR each, whatever of the old ADR still
+holds. Then add `Superseded by adr/<file>` lines under the old one's title and
+move it to `adr/archives/`. `.ignore` keeps `adr/archives/` out of searches: do
+not read it unless asked.
 
 What is true *now* belongs in `docs/`, which is written from the spec and
 edited freely:

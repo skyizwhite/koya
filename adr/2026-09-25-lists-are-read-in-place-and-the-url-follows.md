@@ -4,7 +4,7 @@
 
 ## Context
 
-`adr/2026-09-25-pages-answer-get-and-every-change-is-an-action.md` kept
+`adr/archives/2026-09-25-pages-answer-get-and-every-change-is-an-action.md` kept
 whatever lives in the query string -- a list's search, filters, sort and page,
 the history's tabs -- as page loads, so that a list as it is being read stays a
 link. That cost a whole page for every page turned and every filter picked, and

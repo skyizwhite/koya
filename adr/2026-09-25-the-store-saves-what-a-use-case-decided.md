@@ -4,7 +4,7 @@
 
 ## Context
 
-`adr/2026-09-25-the-server-is-layered-and-depends-inward.md` put what koya
+`adr/archives/2026-09-25-the-server-is-layered-and-depends-inward.md` put what koya
 does in `usecases/` and left `infra/` to keep its promises. The schema deploy
 did not follow: `save-schema` in `infra/db/schema-store` checked the schema,
 diffed it against the stored one, applied the renames the diff found, wrote

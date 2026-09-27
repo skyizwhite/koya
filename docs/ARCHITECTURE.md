@@ -64,7 +64,7 @@ file under them is the URL, and `<space>` in a directory name is a path paramete
 
 A component that more than one page draws is under `web/ui/`. A component that
 only one page draws is in that page's file, next to the actions that answer with
-it. See `adr/2026-09-25-shared-components-live-in-ui.md`.
+it. See `adr/2026-09-27-shared-components-live-in-ui.md`.
 
 ### Layers
 
@@ -91,7 +91,7 @@ web  ──▶  usecases  ──▶  domain
   A port keeps what it is given and decides nothing: a deploy's changes are
   found by the use case and handed to `save-schema` with the schema, and a key
   is made and hashed in `domain/key`, so the store sees only its hash
-  (`adr/2026-09-27-a-key-is-made-in-the-domain-and-stored-by-its-hash.md`). See
+  (`adr/2026-09-27-a-key-is-stored-by-its-hash.md`). See
   `adr/2026-09-25-the-store-saves-what-a-use-case-decided.md`.
   `koya-server/main` is the only module that loads `infra/`, and it refuses to
   load while a port has no method. The web app is built on first use (`app`),
@@ -126,7 +126,7 @@ that belongs to another layer (`cl-dbi` outside `infra/`, `jingle` outside
 -- ningle is reached through jingle, which re-exports it. What no layer owns — koya-core, alexandria and the like — is
 listed as usable anywhere. `main` checks with okite,
 as it loads, that every generic function of `usecases/ports/` has a method.
-See `adr/2026-09-25-the-server-is-layered-and-depends-inward.md`.
+See `adr/2026-09-27-the-server-is-layered-and-depends-inward.md`.
 
 ## Storage
 
@@ -219,7 +219,7 @@ three actions, which add each to the end of a file there and then import it in
 one transaction. Searching, filtering, sorting and
 paging a list are actions as well, answered with `HX-Replace-Url` so the page's
 URL still carries that state for its GET to draw. See
-`adr/2026-09-25-pages-answer-get-and-every-change-is-an-action.md` and
+`adr/2026-09-27-pages-answer-get-and-every-change-is-an-action.md` and
 `adr/2026-09-25-lists-are-read-in-place-and-the-url-follows.md`.
 
 ## Running it

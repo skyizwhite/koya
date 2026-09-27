@@ -6,7 +6,7 @@
 
 The second factor was turned on from the settings page, and `KOYA_TOTP_SECRET`
 could set it from outside instead, with `(koya-server:totp-setup)` in the
-server's REPL to make the value (`adr/2026-09-20-two-factor-is-totp-from-the-settings-page.md`).
+server's REPL to make the value (`adr/archives/2026-09-20-two-factor-is-totp-from-the-settings-page.md`).
 Nobody sets it that way, and the published image has no REPL to run
 `totp-setup` in. Two ways to hold one secret meant the settings page had to
 explain which was in force and refuse to change the other.

@@ -7,7 +7,7 @@
 The design planned a `POST /admin/api/backup` that would `VACUUM INTO` a copy
 of the database, as a later phase (#7). It was meant both for keeping a copy of
 the instance and for getting data out. A space can now be exported as a zip and
-imported again (adr/2026-09-23-a-space-moves-as-one-zip-through-the-admin-ui.md),
+imported again (adr/archives/2026-09-23-a-space-moves-as-one-zip-through-the-admin-ui.md),
 which covers the second.
 
 ## Decision

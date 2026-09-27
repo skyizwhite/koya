@@ -29,7 +29,7 @@ answer is the same for every caller, so there is no `Vary: Origin`.
 
 The admin API and the admin UI send no CORS headers. The management key must
 never be in a browser, and the check that writes come from this server's origin
-(`adr/2026-09-20-writes-check-their-origin.md`) is unchanged.
+(`adr/2026-09-27-a-write-must-come-from-this-origin.md`) is unchanged.
 
 ## Consequences
 
