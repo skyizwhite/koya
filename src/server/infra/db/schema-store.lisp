@@ -115,18 +115,29 @@
       (when (rename-key data from to)
         (exec "UPDATE content_revisions SET data = ? WHERE id = ?" (to-json data) (col row "id"))))))
 
-(defun apply-renames (space-name changes)
+(defun drop-content-field (space model field)
+  (let ((path (format nil "$.~a" field)))
+    (exec "UPDATE contents SET published = json_remove(published, ?), draft = json_remove(draft, ?)
+           WHERE space = ? AND model = ?"
+          path path space model)
+    (exec "UPDATE content_revisions SET data = json_remove(data, ?)
+           WHERE content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
+          path space model)))
+
+(defun apply-changes (space-name changes)
   (dolist (change changes)
     (case (getf change :op)
       (:rename-model (rename-model-rows space-name (getf change :from) (getf change :model)))
       (:rename-field (rename-content-field space-name (getf change :model)
-                                           (getf change :from) (getf change :field))))))
+                                           (getf change :from) (getf change :field)))
+      ((:remove-field :change-field-type)
+       (drop-content-field space-name (getf change :model) (getf change :field))))))
 
 (defmethod save-schema (space-name schema changes &key (by ""))
   (with-db-transaction
     (progn
       (forget-schema space-name)
-      (apply-renames space-name changes)
+      (apply-changes space-name changes)
       (record-deploy space-name changes :by by)
       (exec "UPDATE spaces SET webhooks = ? WHERE name = ?"
             (to-json (map 'vector #'webhook->jobject (schema-webhooks schema))) space-name)

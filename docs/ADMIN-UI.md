@@ -253,11 +253,11 @@ saying which version it is. Nothing is stored until **Save draft** or
 goes back to the current data.
 
 The schema and the space may have changed since the version was written, so not
-everything always comes back. The banner lists each field that did not: a field
-since removed from the model is left out, a value that no longer fits the field
-leaves the current value in place, and a reference or media that has since been
-deleted is dropped. A deleted content cannot be restored at all: its history
-went with it.
+everything always comes back. The banner lists each field that did not: a value
+that no longer fits the field leaves the current value in place, and a reference
+or media that has since been deleted is dropped. A field removed from the model,
+or given another type, took its old values out of the history with it. A deleted
+content cannot be restored at all: its history went with it.
 
 ## The webhook delivery log
 
