@@ -71,12 +71,17 @@
 (defun without-renamed (items pairs pick)
   (remove-if (lambda (item) (find item pairs :key pick)) items))
 
+(defun field-target (field)
+  (and (eq (field-type field) :reference) (getf (field-options field) :model)))
+
 (defun field-changes (model old new)
   (let ((from (forget-rename (field-options old)))
         (to (forget-rename (field-options new))))
-    (cond ((not (eq (field-type old) (field-type new)))
+    (cond ((or (not (eq (field-type old) (field-type new)))
+               (not (equal (field-target old) (field-target new))))
            (list (list :op :change-field-type :model model :field (field-name new)
-                       :from (field-type old) :to (field-type new))))
+                       :from (field-type old) :to (field-type new)
+                       :from-target (field-target old) :to-target (field-target new))))
           ((not (plist-equal from to))
            (list (list :op :change-field-options :model model :field (field-name new)
                        :from from :to to)))
@@ -168,8 +173,12 @@
             (case op
               ((:rename-model :rename-field)
                (format nil "renamed from ~a" (getf change :from)))
-              ((:change-kind :change-field-type)
+              (:change-kind
                (format nil "~(~a~) -> ~(~a~)" (getf change :from) (getf change :to)))
+              (:change-field-type
+               (format nil "~(~a~)~@[ to ~a~] -> ~(~a~)~@[ to ~a~]"
+                       (getf change :from) (getf change :from-target)
+                       (getf change :to) (getf change :to-target)))
               (:change-field-options
                (options-detail change (if (destructive-change-p change) "options tightened" "options changed")))
               (:change-model-options (options-detail change "options changed"))

@@ -50,6 +50,21 @@
     (ng (destructive-changes-p changes) "it changes what the admin UI shows, not what is stored")
     (ok (search "label" (format-change (first changes))))))
 
+(deftest a-reference-pointed-at-another-model-is-retyped
+  (flet ((blog (target &rest options)
+           (make-schema :models (list (make-model "tag" :list (list (make-field :name :text)))
+                                      (make-model "cat" :list (list (make-field :name :text)))
+                                      (make-model "blog" :list
+                                                  (list (apply #'make-field :tag :reference :model target options)))))))
+    (let ((changes (diff-schemas (blog "tag") (blog "cat"))))
+      (ok (equal (ops changes) '(:change-field-type))
+          "the stored ids name contents of the old model, so they are values of another type")
+      (ok (destructive-changes-p changes))
+      (ok (search "reference to tag -> reference to cat" (format-change (first changes)))))
+    (let ((changes (diff-schemas (blog "tag") (blog "cat" :many t :required t))))
+      (ok (equal (ops changes) '(:change-field-type)) "options changed with it go with the values"))
+    (ng (diff-schemas (blog "tag") (blog "tag")) "the same model is no change")))
+
 (deftest field-options
   (flet ((blog (&rest title-options)
            (make-schema :models (list (make-model "blog" :list

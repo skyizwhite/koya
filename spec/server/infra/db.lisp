@@ -20,7 +20,7 @@
                 #:schema->jobject)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions)
-  (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish)
+  (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish #:destroy)
   (:import-from #:koya-core/diff
                 #:destructive-changes-p)
   (:import-from #:koya-server/usecases/ports/sessions #:make-session-store)
@@ -225,6 +225,29 @@
                                                                 (make-field :summary :text))))))
       (ng (nth-value 1 (gethash "summary" (content-published (get-content id)))))))
   (delete-space "trimmed"))
+
+(deftest a-reference-pointed-at-another-model-takes-its-values-with-it
+  (create-space "pointed")
+  (flet ((deploy (target)
+           (replace-schema "pointed"
+                           (make-schema :models (list (make-model "tag" :list (list (make-field :name :text)))
+                                                      (make-model "cat" :list (list (make-field :name :text)))
+                                                      (make-model "post" :list
+                                                                  (list (make-field :title :text)
+                                                                        (make-field :tag :reference :model target))))))))
+    (deploy "tag")
+    (let* ((tag (content-id (create "pointed" (find-model "pointed" "tag") (jobject "name" "Lisp") :publish t)))
+           (post (content-id (create "pointed" (find-model "pointed" "post")
+                                     (jobject "title" "One" "tag" tag) :publish t))))
+      (ok (equal (mapcar (lambda (c) (getf c :op)) (deploy "cat")) '(:change-field-type)))
+      (testing "the post no longer names the tag"
+        (let ((published (content-published (get-content post))))
+          (ng (nth-value 1 (gethash "tag" published)))
+          (ok (string= (jget published "title") "One") "the rest is untouched")))
+      (testing "so the tag is deleted with nothing left pointing at it"
+        (ok (destroy "pointed" (find-model "pointed" "tag") tag))
+        (ng (get-content tag)))))
+  (delete-space "pointed"))
 
 (deftest stored-values-of-fields-that-are-gone-are-dropped
   (create-space "leftover")
