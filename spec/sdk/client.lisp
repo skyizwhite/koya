@@ -14,11 +14,19 @@
                 #:delete-content #:draft-key #:list-delivery-keys #:delete-delivery-key
                 #:webhook-secret #:list-media #:get-media #:upload-media #:update-media
                 #:delete-media #:deploy)
-  (:import-from #:koya-spec/server/usecases/media #:png-bytes #:*media-root*))
+  (:import-from #:koya-spec/server/usecases/media #:png-bytes #:*media-root*)
+  (:import-from #:usocket #:socket-connect #:socket-close #:socket-error))
 (in-package #:koya-spec/sdk/client)
 
 (defparameter *port* 3987)
 (defparameter *secret* "client-test-secret-long-enough-to-log-in")
+
+(defun wait-for-server (port)
+  (loop :repeat 200
+        :do (handler-case (progn (socket-close (socket-connect "127.0.0.1" port))
+                                 (return))
+              (socket-error () (sleep 0.05)))
+        :finally (error "Nothing listens on port ~a" port)))
 
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
@@ -26,6 +34,7 @@
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (start :server :woo :port *port* :db ":memory:")
+  (wait-for-server *port*)
   (create-space "website")
   (configure :base-url (format nil "http://127.0.0.1:~a" *port*)
              :management-key (create-management-key "website" :label "client")
