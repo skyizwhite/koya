@@ -71,30 +71,39 @@
 (defun without-renamed (items pairs pick)
   (remove-if (lambda (item) (find item pairs :key pick)) items))
 
-(defun field-changes (model old new)
+(defun field-target (field)
+  (and (eq (field-type field) :reference) (getf (field-options field) :model)))
+
+(defun renamed-target (field renames)
+  (let ((target (field-target field)))
+    (or (cdr (assoc target renames :test #'equal)) target)))
+
+(defun field-changes (model old new renames)
   (let ((from (forget-rename (field-options old)))
         (to (forget-rename (field-options new))))
-    (cond ((not (eq (field-type old) (field-type new)))
+    (cond ((or (not (eq (field-type old) (field-type new)))
+               (not (equal (renamed-target old renames) (field-target new))))
            (list (list :op :change-field-type :model model :field (field-name new)
-                       :from (field-type old) :to (field-type new))))
+                       :from (field-type old) :to (field-type new)
+                       :from-target (field-target old) :to-target (field-target new))))
           ((not (plist-equal from to))
            (list (list :op :change-field-options :model model :field (field-name new)
                        :from from :to to)))
           (t nil))))
 
-(defun diff-fields (model old new)
+(defun diff-fields (model old new renames)
   (let ((pairs (rename-pairs old new #'field-name #'field-was)))
     (append
      (loop :for (o . n) :in pairs
            :append (cons (list :op :rename-field :model model :field (field-name n) :from (field-name o))
-                         (field-changes model o n)))
+                         (field-changes model o n renames)))
      (diff-named
       (without-renamed old pairs #'car) (without-renamed new pairs #'cdr) #'field-name
       (lambda (f) (list (list :op :add-field :model model :field (field-name f) :to (field-type f))))
       (lambda (f) (list (list :op :remove-field :model model :field (field-name f) :from (field-type f))))
-      (lambda (o n) (field-changes model o n))))))
+      (lambda (o n) (field-changes model o n renames))))))
 
-(defun model-changes (old new)
+(defun model-changes (old new renames)
   (let ((from (forget-rename (model-options old)))
         (to (forget-rename (model-options new))))
     (append (unless (eq (model-kind old) (model-kind new))
@@ -102,20 +111,21 @@
                           :from (model-kind old) :to (model-kind new))))
             (unless (plist-equal from to)
               (list (list :op :change-model-options :model (model-name new) :from from :to to)))
-            (diff-fields (model-name new) (model-fields old) (model-fields new)))))
+            (diff-fields (model-name new) (model-fields old) (model-fields new) renames))))
 
 (defun diff-models (old new)
-  (let ((pairs (rename-pairs old new #'model-name #'model-was)))
+  (let* ((pairs (rename-pairs old new #'model-name #'model-was))
+         (renames (mapcar (lambda (pair) (cons (model-name (car pair)) (model-name (cdr pair)))) pairs)))
     (append
      (loop :for (o . n) :in pairs
            :append (cons (list :op :rename-model :model (model-name n) :from (model-name o))
-                         (model-changes o n)))
+                         (model-changes o n renames)))
      (diff-named
       (without-renamed old pairs #'car) (without-renamed new pairs #'cdr) #'model-name
       (lambda (m) (cons (list :op :add-model :model (model-name m) :to (model-kind m))
-                        (diff-fields (model-name m) nil (model-fields m))))
+                        (diff-fields (model-name m) nil (model-fields m) renames)))
       (lambda (m) (list (list :op :remove-model :model (model-name m))))
-      #'model-changes))))
+      (lambda (o n) (model-changes o n renames))))))
 
 (defun diff-schemas (old new)
   (append (unless (equal (and old (schema-webhooks old)) (schema-webhooks new))
@@ -168,8 +178,12 @@
             (case op
               ((:rename-model :rename-field)
                (format nil "renamed from ~a" (getf change :from)))
-              ((:change-kind :change-field-type)
+              (:change-kind
                (format nil "~(~a~) -> ~(~a~)" (getf change :from) (getf change :to)))
+              (:change-field-type
+               (format nil "~(~a~)~@[ to ~a~] -> ~(~a~)~@[ to ~a~]"
+                       (getf change :from) (getf change :from-target)
+                       (getf change :to) (getf change :to-target)))
               (:change-field-options
                (options-detail change (if (destructive-change-p change) "options tightened" "options changed")))
               (:change-model-options (options-detail change "options changed"))

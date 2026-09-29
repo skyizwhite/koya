@@ -250,7 +250,7 @@ the difference between the space's stored schema and the one sent as a list of
 | `remove_model` `remove_field` | something gone | **yes** |
 | `rename_model` `rename_field` | a `was` was matched, see [Renames](#renames) | no |
 | `change_kind` | a model's `kind` changed | **yes** |
-| `change_field_type` | a field's `type` changed | **yes** |
+| `change_field_type` | a field's `type` changed, or the `model` a `reference` points at | **yes** |
 | `change_field_options` | a field's options changed | yes when tightened, see below |
 | `change_model_options` | `previewUrl` / `publicUrl` / `label` changed | no |
 | `change_webhooks` | the space's webhooks changed | no |
@@ -264,9 +264,9 @@ from `options`.
 include a destructive one is refused with `409 destructive_changes` (the changes
 in `details`) unless `?force=true` is given. Applying a schema carries a rename
 through the stored content, and takes the values of a removed field, or of one
-whose type changed, out of every published object, draft and revision, in the
-same transaction. A field added later under that name starts empty. Rows that no
-longer fit tightened options stay as they are.
+whose type or target model changed, out of every published object, draft and
+revision, in the same transaction. A field added later under that name starts
+empty. Rows that no longer fit tightened options stay as they are.
 
 ## Example
 

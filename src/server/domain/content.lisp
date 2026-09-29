@@ -130,7 +130,8 @@
     (setf (content-draft next) (content-data content :draft t)
           (content-draft-key next) (new-draft-key)
           (content-published next) nil
-          (content-published-at next) nil)
+          (content-published-at next) nil
+          (content-revised-at next) nil)
     (touched next now)))
 
 (defun discarded (content &key (now (now-iso)))

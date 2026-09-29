@@ -7,7 +7,7 @@
                 #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-contents #:list-revisions #:count-revisions #:get-content
+                #:list-contents #:list-revisions #:count-revisions #:get-content #:count-contents
                 #:update-content #:delete-content)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-published #:content-draft #:content-id #:slugify #:unpublished)
@@ -401,3 +401,16 @@
     (testing "a restore is marked unsaved"
       (let ((revision (revision-id (car (last (list-revisions id))))))
         (ok (search "data-unsaved" (nth-value 1 (request :get path :query (format nil "revision=~a" revision)))))))))
+
+(deftest an-unknown-editor-action-is-refused
+  (exec "DELETE FROM contents")
+  (multiple-value-bind (space model) (resolve-model "website" "blog")
+    (let* ((id (content-id (create space model (jobject "title" "Kept"))))
+           (path (format nil "/s/website/m/blog/~a" id)))
+      (ok (= 404 (edit path :form '(("action" . "foo") ("title" . "Changed"))))
+          "an op the editor does not know answers 404")
+      (ok (string= (jget (content-draft (get-content id)) "title") "Kept") "and saves nothing")
+      (ok (= 1 (count-revisions id)) "nor records anything")
+      (ok (= 404 (edit "/s/website/m/blog/new" :form '(("action" . "foo") ("title" . "Made"))))
+          "on the new-content form too")
+      (ok (= 1 (count-contents "website" "blog")) "which creates nothing"))))

@@ -1110,7 +1110,7 @@ components:
         id:
           type: string
           pattern: "^[A-Za-z0-9_-]{1,64}$"
-          description: Defaults to a fresh ULID.
+          description: Defaults to a fresh ULID. `new` is refused, as the admin UI's new-content form.
         createdAt: { $ref: "#/components/schemas/Timestamp" }
         updatedAt: { $ref: "#/components/schemas/Timestamp" }
         publishedAt: { $ref: "#/components/schemas/Timestamp" }
