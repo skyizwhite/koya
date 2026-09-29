@@ -282,7 +282,7 @@
           (ok (search "Restoring the version of" body))
           (ok (search "value=\"First\"" body) "the old title is in the form")
           (ok (search "value=\"first\"" body) "and its slug, which nobody else has taken")
-          (ok (search "<strong>count</strong> is no longer a field" body))
+          (ng (search "<strong>count</strong>" body) "a removed field took its old values with it")
           (ok (search "<strong>category</strong> keeps the current value" body))
           (ok (search "value=\"tech\" selected" body) "the option that is gone leaves the current one")
           (ok (search "<strong>related</strong> lost 2 references" body))

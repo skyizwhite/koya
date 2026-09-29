@@ -262,9 +262,11 @@ from `options`.
 
 `path` is `webhooks` (the space's own), `model` or `model.field`. A `PUT` whose changes
 include a destructive one is refused with `409 destructive_changes` (the changes
-in `details`) unless `?force=true` is given. Applying a schema touches stored
-content only to carry a rename through; otherwise rows that no longer fit stay as
-they are.
+in `details`) unless `?force=true` is given. Applying a schema carries a rename
+through the stored content, and takes the values of a removed field, or of one
+whose type changed, out of every published object, draft and revision, in the
+same transaction. A field added later under that name starts empty. Rows that no
+longer fit tightened options stay as they are.
 
 ## Example
 

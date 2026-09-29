@@ -58,7 +58,7 @@
     (if (and label (string/= label id)) (format nil "~a (~a)" label id) id)))
 
 (defun scalar-text (space field value)
-  (case (and field (field-type field))
+  (case (field-type field)
     ((:reference :media) (id-text space field value))
     (:datetime (short-time value))
     (:boolean (if value "Yes" "No"))
@@ -66,7 +66,7 @@
     (t (if (eq value t) "Yes" (princ-to-string value)))))
 
 (defun value-text (space field value found)
-  (cond ((and field (eq (field-type field) :boolean))
+  (cond ((eq (field-type field) :boolean)
          (and found (scalar-text space field value)))
         ((or (not found) (blank-value-p value)) nil)
         ((json-array-p value)
@@ -88,7 +88,7 @@
      (div :class (clsx "max-h-64 overflow-auto break-words rounded border px-3 py-2"
                        (if text class "border-line text-muted"))
        (cond ((null text) "—")
-             ((and field (eq (field-type field) :richtext)) (~richtext :html value))
+             ((eq (field-type field) :richtext) (~richtext :html value))
              (t (hsx (div :class "whitespace-pre-wrap font-mono text-xs leading-5" text))))))))
 
 (defcomp ~changes (&key space model before after)
@@ -102,9 +102,7 @@
                         (multiple-value-bind (old found-old) (if before (gethash key before) (values nil nil))
                           (multiple-value-bind (new found-new) (gethash key after)
                             (hsx (div
-                                   (p :class "mb-1 text-sm font-medium" key
-                                     (unless field
-                                       (hsx (span :class "ml-2 font-normal text-muted" "no longer a field"))))
+                                   (p :class "mb-1 text-sm font-medium" key)
                                    (if before
                                        (hsx (div :class "grid gap-2 sm:grid-cols-2"
                                               (~value :space space :field field :value old :found found-old

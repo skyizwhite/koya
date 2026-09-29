@@ -50,12 +50,6 @@
     (ok (= (jget data "count") 3))))
 
 (deftest what-the-schema-no-longer-has
-  (testing "a field that is gone is left out, and said"
-    (replace-schema "site" (schema (make-field :title :text :required t)))
-    (multiple-value-bind (data notes) (restore-data "site" (post) "x" (object "title" "Old" "lede" "Then") (object))
-      (ok (string= (jget data "title") "Old"))
-      (ng (nth-value 1 (gethash "lede" data)))
-      (ok (equal (notes-of notes) '("lede")))))
   (testing "a value the field no longer accepts keeps the current one"
     (replace-schema "site" (schema (make-field :title :text :required t) (make-field :count :number :max 10)))
     (multiple-value-bind (data notes) (restore-data "site" (post) "x" (object "title" "Old" "count" 99) (object "count" 5))

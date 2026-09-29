@@ -241,9 +241,10 @@ Destructive means a change that can hide or invalidate content already stored:
 removing a model or field, changing a kind or a field type, or tightening a
 field's options. Deleting the space itself is not among them — that is done in
 the admin UI, with its own confirmation. The exact list, and the shape of each
-change, is in [SCHEMA.md, "Changes"](SCHEMA.md#changes). Apart from a rename
-declared with `:was`, nothing migrates existing content: a deploy replaces the
-stored schema, and rows that no longer fit it stay as they are.
+change, is in [SCHEMA.md, "Changes"](SCHEMA.md#changes). A rename declared with
+`:was` carries existing content through, and removing a field or changing its
+type takes its values out of every published object, draft and revision; rows
+that no longer fit tightened options stay as they are.
 
 Every deploy that changed something is recorded — what it changed, and the label
 of the management key that sent it — and is read afterwards in the admin UI at

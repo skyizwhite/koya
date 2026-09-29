@@ -167,7 +167,9 @@ paths:
       description: |
         Validates the document, diffs it against the space's stored schema and,
         unless a destructive change is present without `force=true`, stores it.
-        Existing content is never modified. The space must already exist — it is
+        Existing content changes only as the schema does: a rename carries it
+        through, and a removed or retyped field's values are taken out of every
+        published object, draft and revision. The space must already exist — it is
         made in the admin UI — and a deploy to an unknown name is a 404.
       security: [{ managementKey: [] }]
       parameters:

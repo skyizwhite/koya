@@ -20,7 +20,7 @@
                 #:schema->jobject)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions)
-  (:import-from #:koya-server/usecases/contents #:create)
+  (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish)
   (:import-from #:koya-core/diff
                 #:destructive-changes-p)
   (:import-from #:koya-server/usecases/ports/sessions #:make-session-store)
@@ -53,7 +53,7 @@
                                                             (make-field :event-at :datetime))))))
 
 (deftest migrations
-  (ok (= (current-version) 11))
+  (ok (= (current-version) 12))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -64,7 +64,7 @@
         "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
         0)
   (exec "DELETE FROM schema_version WHERE version >= 10")
-  (ok (equal (migrate) '(10 11)))
+  (ok (equal (migrate) '(10 11 12)))
   (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
     (ng (search "previewUrl" definition))
     (ok (search "https://x/about" definition) "a web address is kept"))
@@ -74,8 +74,8 @@
   (create-space "legacy")
   (exec "UPDATE spaces SET webhooks = ? WHERE name = 'legacy'"
         "[{\"label\":\"bare\",\"url\":\"example.com/hook\"},{\"label\":\"site\",\"url\":\"https://x/hook\"},{\"label\":\"ftp\",\"url\":\"ftp://x/hook\"}]")
-  (exec "DELETE FROM schema_version WHERE version = 11")
-  (ok (equal (migrate) '(11)))
+  (exec "DELETE FROM schema_version WHERE version >= 11")
+  (ok (equal (migrate) '(11 12)))
   (ok (equal (mapcar (lambda (hook) (getf hook :label)) (space-webhooks "legacy")) '("site"))
       "the space still reads, with the one hook that can be sent")
   (delete-space "legacy"))
@@ -185,6 +185,73 @@
                                                                     :was 'post)))))
           "deploying the same source again changes nothing"))))
 
+(deftest a-removed-field-takes-its-values-with-it
+  (create-space "trimmed")
+  (replace-schema "trimmed"
+               (make-schema :models (list (make-model "post" :list (list (make-field :title :text)
+                                                                        (make-field :summary :text)
+                                                                        (make-field :rank :text))))))
+  (let* ((content (create "trimmed" (find-model "trimmed" "post")
+                          (jobject "title" "One" "summary" "Short" "rank" "high") :publish t))
+         (id (content-id content)))
+    (update-draft "trimmed" (find-model "trimmed" "post") id (jobject "title" "One, again"))
+    (let ((changes (replace-schema "trimmed"
+                                (make-schema :models (list (make-model "post" :list
+                                                                       (list (make-field :title :text)
+                                                                             (make-field :rank :number))))))))
+      (ok (equal (mapcar (lambda (c) (getf c :op)) changes) '(:remove-field :change-field-type))))
+    (testing "the published data loses the removed field and the retyped one"
+      (let ((published (content-published (get-content id))))
+        (ng (nth-value 1 (gethash "summary" published)))
+        (ng (nth-value 1 (gethash "rank" published)))
+        (ok (string= (jget published "title") "One") "the rest is untouched")))
+    (testing "so does the draft"
+      (let ((draft (content-draft (get-content id))))
+        (ng (nth-value 1 (gethash "summary" draft)))
+        (ng (nth-value 1 (gethash "rank" draft)))
+        (ok (string= (jget draft "title") "One, again"))))
+    (testing "and the history"
+      (dolist (revision (list-revisions id))
+        (ng (nth-value 1 (gethash "summary" (revision-data revision))))
+        (ng (nth-value 1 (gethash "rank" (revision-data revision))))))
+    (testing "so a write of one field and a publish of the draft are checked against the model alone"
+      (ok (update-draft "trimmed" (find-model "trimmed" "post") id (jobject "rank" 1)))
+      (ok (publish "trimmed" (find-model "trimmed" "post") id)))
+    (testing "a field added again under the old name starts empty"
+      (replace-schema "trimmed"
+                   (make-schema :models (list (make-model "post" :list
+                                                          (list (make-field :title :text)
+                                                                (make-field :rank :number)
+                                                                (make-field :summary :text))))))
+      (ng (nth-value 1 (gethash "summary" (content-published (get-content id)))))))
+  (delete-space "trimmed"))
+
+(deftest stored-values-of-fields-that-are-gone-are-dropped
+  (create-space "leftover")
+  (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
+        "leftover" "post" "list"
+        "{\"name\":\"post\",\"kind\":\"list\",\"fields\":[{\"name\":\"title\",\"type\":\"text\"},{\"name\":\"flag\",\"type\":\"boolean\"}]}"
+        0)
+  (exec "INSERT INTO contents (id, space, model, status, published, draft, created_at, updated_at)
+         VALUES ('kept', 'leftover', 'post', 'published+draft',
+                 '{\"title\":\"Live\",\"flag\":false,\"gone\":\"x\"}', '{\"title\":\"Next\",\"gone\":[1]}',
+                 '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
+  (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
+         VALUES ('kept', 'publish', '{\"title\":\"Old\",\"gone\":{\"a\":1}}', '2026-01-01T00:00:00.000Z')")
+  (exec "DELETE FROM schema_version WHERE version >= 12")
+  (ok (equal (migrate) '(12)))
+  (let ((content (get-content "kept")))
+    (ng (nth-value 1 (gethash "gone" (content-published content))))
+    (ng (nth-value 1 (gethash "gone" (content-draft content))))
+    (ok (string= (jget (content-published content) "title") "Live") "a declared field is kept")
+    (ok (eq (jget (content-published content) "flag") nil) "as the value it was")
+    (ok (nth-value 1 (gethash "flag" (content-published content))))
+    (ok (string= (jget (content-draft content) "title") "Next")))
+  (let ((data (revision-data (first (list-revisions "kept")))))
+    (ng (nth-value 1 (gethash "gone" data)) "the history loses it too")
+    (ok (string= (jget data "title") "Old")))
+  (delete-space "leftover"))
+
 (deftest a-deploy-leaves-a-record
   (create-space "logged")
   (replace-schema "logged"
@@ -222,7 +289,7 @@
           (remove 9 koya-server/infra/db/migrations::*migrations* :key #'car :test #'<=)))
     (migrate))
   (exec "INSERT INTO spaces (name, webhook_secret, created_at) VALUES ('old', 's', '2026-01-01T00:00:00.000Z')")
-  (exec "INSERT INTO models (space, name, kind, definition) VALUES ('old', 'post', 'list', '{}')")
+  (exec "INSERT INTO models (space, name, kind, definition) VALUES ('old', 'post', 'list', '{\"fields\":[{\"name\":\"title\",\"type\":\"text\"}]}')")
   (exec "INSERT INTO contents (id, space, model, status, published, draft, created_at, updated_at, published_at, revised_at)
          VALUES ('both', 'old', 'post', 'published+draft', '{\"title\":\"Live\"}', '{\"title\":\"Next\"}',
                  '2026-01-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z', '2026-02-01T00:00:00.000Z'),

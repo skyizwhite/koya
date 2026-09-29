@@ -1,10 +1,10 @@
 (defpackage #:koya-server/usecases/revisions
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-name #:model-fields #:model-field #:field-name #:field-type #:field-option
+                #:model-name #:model-fields #:field-name #:field-type #:field-option
                 #:field-required-p)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
-  (:import-from #:koya-core/json #:json-array-p #:jkeys)
+  (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-server/usecases/ports/contents
                 #:find-content #:unique-value-taken-p #:list-revisions #:count-revisions
                 #:find-revision)
@@ -44,9 +44,6 @@
            (keep-current (name)
              (multiple-value-bind (value found) (gethash name current)
                (when found (setf (gethash name data) value)))))
-      (dolist (key (jkeys revision))
-        (unless (model-field model key)
-          (note key "is no longer a field of this model, so it was left out")))
       (dolist (field (model-fields model))
         (let ((name (field-name field)))
           (multiple-value-bind (value found) (gethash name revision)

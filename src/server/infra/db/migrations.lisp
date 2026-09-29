@@ -140,7 +140,29 @@
        WHERE EXISTS (SELECT 1 FROM json_each(spaces.webhooks) AS hook
                       WHERE NOT (json_type(hook.value, '$.url') = 'text'
                                  AND (json_extract(hook.value, '$.url') LIKE 'http://_%'
-                                      OR json_extract(hook.value, '$.url') LIKE 'https://_%')))")))
+                                      OR json_extract(hook.value, '$.url') LIKE 'https://_%')))")
+    (12
+     "UPDATE contents SET
+        published = (SELECT json_group_object(e.key, json(contents.published -> e.fullkey))
+                       FROM json_each(contents.published) e
+                      WHERE e.key IN (SELECT json_extract(f.value, '$.name')
+                                        FROM models m, json_each(m.definition, '$.fields') f
+                                       WHERE m.space = contents.space AND m.name = contents.model))
+       WHERE published IS NOT NULL"
+     "UPDATE contents SET
+        draft = (SELECT json_group_object(e.key, json(contents.draft -> e.fullkey))
+                   FROM json_each(contents.draft) e
+                  WHERE e.key IN (SELECT json_extract(f.value, '$.name')
+                                    FROM models m, json_each(m.definition, '$.fields') f
+                                   WHERE m.space = contents.space AND m.name = contents.model))
+       WHERE draft IS NOT NULL"
+     "UPDATE content_revisions SET
+        data = (SELECT json_group_object(e.key, json(content_revisions.data -> e.fullkey))
+                  FROM json_each(content_revisions.data) e
+                 WHERE e.key IN (SELECT json_extract(f.value, '$.name')
+                                   FROM contents c, models m, json_each(m.definition, '$.fields') f
+                                  WHERE c.id = content_revisions.content_id
+                                    AND m.space = c.space AND m.name = c.model))")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))
