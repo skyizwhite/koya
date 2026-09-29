@@ -67,6 +67,7 @@
 (defun check-new-id (id)
   (cond ((null id) nil)
         ((not (content-id-p id)) (fail 'invalid-input "\"id\" must be 1-64 letters, digits, '-' or '_'"))
+        ((string= id "new") (fail 'invalid-input "\"id\" cannot be \"new\""))
         ((get-content id) (fail 'conflict (format nil "Content ~a already exists" id)))
         (t id)))
 

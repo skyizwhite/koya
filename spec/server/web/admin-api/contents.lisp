@@ -141,6 +141,9 @@
       (ok (string= (jget json "error" "code") "conflict")))
     (multiple-value-bind (status) (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "x") "id" "bad id!"))
       (ok (= status 400)))
+    (multiple-value-bind (status json) (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "x") "id" "new"))
+      (ok (= status 400) "new is the admin UI's new-content form, so no content takes it as its id")
+      (ok (string= (jget json "error" "code") "bad_request")))
     (multiple-value-bind (status) (admin :post "/admin/api/contents/website/tag" :body (jobject "data" (jobject "name" "x") "publish" t "publishedAt" "yesterday"))
       (ok (= status 400))))
   (testing "publish with publishedAt override"
