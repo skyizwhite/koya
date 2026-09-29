@@ -82,6 +82,8 @@
           (let ((u (unpublish "website" (blog) (content-id c))))
             (ok (string= (content-status u) "draft"))
             (ok (null (content-published u)))
+            (ok (null (content-published-at u)) "an unpublished content has no publish date")
+            (ok (null (content-revised-at u)) "nor a revision date")
             (ok (string= (jget (content-draft u) "title") "Edited") "unpublish keeps the data as draft")
             (ok (string= (content-status (get-content (content-id c))) "draft") "and that is what is stored"))))
       (destroy "website" (blog) (content-id c))
