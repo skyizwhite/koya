@@ -317,10 +317,14 @@ onEach("iframe[data-fit-content]", (frame) => {
   const fit = () => {
     const doc = frame.contentDocument;
     // the body, not the root: the root is never shorter than the frame itself
-    if (doc && doc.body) frame.style.height = `${doc.body.scrollHeight}px`;
+    if (doc && doc.body) frame.style.height = `${Math.ceil(doc.body.getBoundingClientRect().height)}px`;
   };
-  frame.addEventListener("load", fit);
-  if (frame.contentDocument && frame.contentDocument.readyState === "complete") fit();
+  const track = () => {
+    const doc = frame.contentDocument;
+    if (doc && doc.body) new ResizeObserver(fit).observe(doc.body);
+  };
+  frame.addEventListener("load", track);
+  if (frame.contentDocument && frame.contentDocument.readyState === "complete") track();
 });
 
 // Import: the archive goes to the import actions in pieces, each a request of

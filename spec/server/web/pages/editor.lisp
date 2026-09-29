@@ -246,6 +246,8 @@
         (ok (search "Kept (" body) "a reference is shown with its label")
         (ok (search "<iframe sandbox=\"allow-same-origin\"" body) "rich text is drawn in a sandbox without scripts")
         (ok (search "<b>old</b>" body) "as the frame's own document")
+        (ok (search "<html class=&quot;overflow-hidden&quot;>" body)
+            "which never scrolls: the frame is as tall as what it holds")
         (let ((outside (cl-ppcre:regex-replace-all "srcdoc=\"[^\"]*\"" body "")))
           (ng (search "<b>old</b>" outside) "and never as markup of this page")
           (ng (search "onerror" outside)))

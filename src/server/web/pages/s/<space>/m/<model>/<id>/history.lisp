@@ -74,7 +74,7 @@
         (t (scalar-text space field value))))
 
 (defun richtext-document (html)
-  (format nil "<!doctype html><html><head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"~a\"></head>~
+  (format nil "<!doctype html><html class=\"overflow-hidden\"><head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"~a\"></head>~
                <body class=\"prose prose-sm max-w-none bg-transparent\">~a</body></html>"
           (asset-url "style/dist.css") html))
 
