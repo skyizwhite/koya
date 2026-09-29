@@ -217,6 +217,8 @@
          (content (and model id (not (new-p id)) (target-content params model))))
     (cond
       ((null model) (action-refusal "Model not found." 404))
+      ((not (member op '("save" "publish" "unpublish" "discard" "delete") :test #'string=))
+       (action-refusal "Unknown action." 404))
       ((and (null content) (not (and (equal id "new") (member op '("save" "publish") :test #'string=))))
        (action-refusal "Content not found." 404))
       (t
