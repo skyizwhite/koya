@@ -114,7 +114,7 @@
          (end (and start (search "</dialog>" body :start2 start)))
          (at (search post body)))
     (and (search (format nil "commandfor=\"~a\" command=\"show-modal\"" dialog) body)
-         start at (< start at end)
+         start end at (< start at end)
          (null (search post body :start2 (1+ at))))))
 
 (defun call-action (method url &rest args &key headers &allow-other-keys)

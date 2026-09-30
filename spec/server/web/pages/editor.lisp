@@ -371,7 +371,9 @@
           (testing (format nil "~a opens a dialog, and the dialog does it" op)
             (ok (asked-first body (format nil "confirm-~a" op) (post id op)))))
         (testing "saving a draft is not asked"
-          (ok (search (format nil "hx-post=\"~a\"" (uiop:frob-substrings (post id "save") '("&") "&amp;")) body))
+          (ok (search (format nil "data-save-draft hx-post=\"~a\"" (uiop:frob-substrings (post id "save") '("&") "&amp;"))
+                      body)
+              "its button posts the draft itself")
           (ng (search "confirm-save" body)))
         (ng (search "hx-confirm" body))))))
 
