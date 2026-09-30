@@ -25,7 +25,7 @@
                 #:expand-url-template #:content-url #:model-url #:history-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors #:~confirm-dialog)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast-oob #:action-refusal #:action-refused)
@@ -52,14 +52,22 @@
 (defcomp ~external-link (&key href children)
   (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" children (~icon :name :external))))
 
-(defcomp ~action-button (&key space model id op (class "btn") confirm icon children)
-  (hsx (button :type "button" :class class
-               :data-save-draft (equal op "save")
-               :hx-post (editor-action :space space :model model :id id :op op)
-               :hx-include "#editor-form" :hx-target "#editor" :hx-swap "outerHTML"
-               :hx-confirm confirm
-         (when icon (hsx (~icon :name icon)))
-         children)))
+(defcomp ~action-button (&key space model id op (class "btn") title confirm icon children)
+  (let ((dialog (and confirm (format nil "confirm-~a" op))))
+    (flet ((post ()
+             (hsx (button :type "button" :class class
+                          :data-save-draft (equal op "save")
+                          :commandfor dialog :command (and dialog "close")
+                          :hx-post (editor-action :space space :model model :id id :op op)
+                          :hx-include "#editor-form" :hx-target "#editor" :hx-swap "outerHTML"
+                    (when icon (hsx (~icon :name icon)))
+                    children))))
+      (if dialog
+          (hsx (<> (button :type "button" :class class :commandfor dialog :command "show-modal"
+                     (when icon (hsx (~icon :name icon)))
+                     children)
+                   (~confirm-dialog :id dialog :title title :message confirm (post))))
+          (post)))))
 
 (defcomp ~meta (&key content)
   (hsx
@@ -112,12 +120,14 @@
            (div :class "flex flex-wrap items-center gap-2"
              (when (and published draft)
                (hsx (~action-button :space space-name :model model-name :id id :op "discard"
-                                    :icon :discard :class "btn btn-danger"
+                                    :icon :discard :class "btn btn-danger" :title "Discard draft"
                                     :confirm "Discard the draft and go back to the published version?"
                                     "Discard draft")))
              (~action-button :space space-name :model model-name :id id :op "save" :icon :save "Save draft")
              (~action-button :space space-name :model model-name :id id :op "publish" :icon :publish
-                             :class "btn btn-primary" "Publish"))))
+                             :class "btn btn-primary" :title "Publish content"
+                             :confirm "Publish this content? The site shows it as the form has it now."
+                             "Publish"))))
        (~errors :errors errors)
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
@@ -141,9 +151,12 @@
                 (div :class "flex flex-wrap items-center gap-2"
                   (when published
                     (hsx (~action-button :space space-name :model model-name :id id :op "unpublish"
-                                         :icon :unpublish "Unpublish")))
+                                         :icon :unpublish :title "Unpublish content"
+                                         :confirm "Unpublish this content? It comes off the site and stays here as a draft."
+                                         "Unpublish")))
                   (~action-button :space space-name :model model-name :id id :op "delete"
-                                  :icon :delete :class "btn btn-danger" :confirm "Delete this content?"
+                                  :icon :delete :class "btn btn-danger" :title "Delete content"
+                                  :confirm "Delete this content? This cannot be undone."
                                   "Delete")))))))))
 
 (defcomp ~editor-page (&key space model content data errors restoring)

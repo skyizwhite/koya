@@ -17,7 +17,7 @@
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager #:~confirm-dialog)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast-oob #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
@@ -161,21 +161,28 @@
            (hsx (span :class "shrink-0 text-accent" (if (eq (getf state :sort-direction) :asc) "↑" "↓")))))))))
 
 (defcomp ~bulk-bar (&key space model state)
-  (flet ((url (op)
-           (bulk-contents :space space :model model :op op
-                          :q (or (getf state :search-text) "") :status (or (getf state :status) "")
-                          :sort (or (getf state :sort-key) "") :page (getf state :page))))
+  (labels ((url (op)
+             (bulk-contents :space space :model model :op op
+                            :q (or (getf state :search-text) "") :status (or (getf state :status) "")
+                            :sort (or (getf state :sort-key) "") :page (getf state :page)))
+           (action (op class icon label title message)
+             (let ((dialog (format nil "confirm-bulk-~a" op)))
+               (hsx (<> (button :type "button" :class class :commandfor dialog :command "show-modal"
+                          (~icon :name icon) label)
+                        (~confirm-dialog :id dialog :title title :message message
+                          (button :type "button" :class class :commandfor dialog :command "close"
+                                  :hx-post (url op) :hx-target "#contents" :hx-swap "outerHTML"
+                            (~icon :name icon) label)))))))
     (hsx
      (div :data-bulk-bar t :hidden t
           :class "mb-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel px-4 py-2 text-sm"
        (span :data-bulk-count t :class "mr-2 text-muted" "0 selected")
-       (button :type "submit" :class "btn" :hx-post (url "publish") :hx-target "#contents" :hx-swap "outerHTML"
-         (~icon :name :publish) "Publish")
-       (button :type "submit" :class "btn" :hx-post (url "unpublish") :hx-target "#contents" :hx-swap "outerHTML"
-         (~icon :name :unpublish) "Unpublish")
-       (button :type "submit" :class "btn btn-danger" :hx-post (url "delete") :hx-target "#contents" :hx-swap "outerHTML"
-               :hx-confirm "Delete the selected contents? This cannot be undone."
-         (~icon :name :delete) "Delete")))))
+       (action "publish" "btn" :publish "Publish" "Publish contents"
+               "Publish the selected contents? The site shows each of them as it is now.")
+       (action "unpublish" "btn" :unpublish "Unpublish" "Unpublish contents"
+               "Unpublish the selected contents? They come off the site and stay here as drafts.")
+       (action "delete" "btn btn-danger" :delete "Delete" "Delete contents"
+               "Delete the selected contents? This cannot be undone.")))))
 
 (defun read-state (params model)
   (let ((status (let ((s (param params "status"))) (and (member s +statuses+ :test #'equal) s))))

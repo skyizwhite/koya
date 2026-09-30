@@ -4,7 +4,8 @@
   (:export #:~errors
            #:~empty-state
            #:~status-badge
-           #:~pager))
+           #:~pager
+           #:~confirm-dialog))
 (in-package #:koya-server/web/ui/elements)
 
 (defcomp ~errors (&key errors)
@@ -37,3 +38,15 @@
                   (when (> page 1) (link (1- page)))
                   (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
                   (when (< page pages) (link (1+ page))))))))))
+
+(defcomp ~confirm-dialog (&key id title message children)
+  (hsx
+   (dialog :id id :closedby "any" :class "koya-dialog max-w-sm"
+     (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
+       (h2 :class "font-semibold" title)
+       (button :type "button" :commandfor id :command "close" :class "btn btn-icon" :aria-label "Close"
+         (~icon :name :close)))
+     (p :class "px-4 py-4 text-sm" message)
+     (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
+       (button :type "button" :commandfor id :command "close" :class "btn" "Cancel")
+       children))))

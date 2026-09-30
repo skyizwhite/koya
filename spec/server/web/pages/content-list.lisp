@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-spec/server/web/pages/support
                 #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
-                #:location #:setup-pages #:log-in)
+                #:location #:setup-pages #:log-in #:asked-first)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:get-content #:update-content)
@@ -239,9 +239,12 @@
             (ok (search (format nil "name=\"id\" data-bulk-item value=\"~a\"" one) body)
                 "each row carries its id")
             (ok (search "data-bulk-bar hidden" body) "the bar waits for a selection")
-            (ok (search "op=publish" body))
-            (ok (search "op=unpublish" body))
-            (ok (search "hx-confirm=\"Delete the selected contents?" body))))
+            (dolist (op '("publish" "unpublish" "delete"))
+              (ok (asked-first body (format nil "confirm-bulk-~a" op)
+                               (bulk-contents :space "website" :model "blog" :op op
+                                              :q "" :status "" :sort "" :page 1))
+                  (format nil "~a opens a dialog, and the dialog does it" op)))
+            (ng (search "hx-confirm" body) "not the browser's own confirm")))
         (testing "publishing a selection publishes each of them"
           (multiple-value-bind (status body) (bulk "publish" (list one two))
             (ok (= status 200))
