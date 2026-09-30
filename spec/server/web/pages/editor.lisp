@@ -4,7 +4,8 @@
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id>/history #:browse-history)
   (:import-from #:koya-spec/server/web/pages/support
                 #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages
-                #:log-in)
+                #:log-in #:asked-first)
+  (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id> #:editor-action)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:list-revisions #:count-revisions #:get-content #:count-contents
@@ -355,6 +356,24 @@
         (ok (null (moved-to headers)) "and on this content, not the list")
         (ok (search "referenced by 1 other content" body) "the toast says why")
         (ok (get-content target) "it is still there")))))
+
+(deftest the-editor-asks-before-it-acts
+  (exec "DELETE FROM contents")
+  (flet ((post (id op) (editor-action :space "website" :model "blog" :id id :op op)))
+    (testing "a new content is published from a dialog"
+      (let ((body (nth-value 1 (request :get "/s/website/m/blog/new"))))
+        (ok (asked-first body "confirm-publish" (post "new" "publish")))
+        (ng (search "hx-confirm" body) "not the browser's own confirm")))
+    (let ((id (new-blog '(("action" . "publish") ("f-title" . "Asked")))))
+      (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "save") ("f-title" . "Asked again")))
+      (let ((body (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" id)))))
+        (dolist (op '("publish" "unpublish" "delete" "discard"))
+          (testing (format nil "~a opens a dialog, and the dialog does it" op)
+            (ok (asked-first body (format nil "confirm-~a" op) (post id op)))))
+        (testing "saving a draft is not asked"
+          (ok (search (format nil "hx-post=\"~a\"" (uiop:frob-substrings (post id "save") '("&") "&amp;")) body))
+          (ng (search "confirm-save" body)))
+        (ng (search "hx-confirm" body))))))
 
 (deftest history-is-read-in-place
   (exec "DELETE FROM contents")

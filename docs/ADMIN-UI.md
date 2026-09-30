@@ -144,7 +144,7 @@ All three are in the URL, so the list as you are reading it is a link.
 ### Doing it to several at once
 
 A checkbox per row, and one in the header for the whole page. Tick any and a
-bar appears with **Publish**, **Unpublish** and **Delete**; Delete asks first.
+bar appears with **Publish**, **Unpublish** and **Delete**; each asks first.
 Filter first and select the page: *status = draft*, select all, Publish.
 
 Each content goes through the same path a single one takes, so validation and
@@ -191,9 +191,9 @@ content can be seen on the left, what can be done to it on the right:
 | **Published page** | opens the content on the site — shown when the schema gives the model a `publicUrl` and the content is published |
 | **History** | the content's revisions, and where an old version is restored from — see [History](#history) |
 | **Webhooks** | an object model's delivery log — shown while a webhook covers the model |
-| **Discard draft** | throws the draft away and goes back to the published version |
+| **Discard draft** | throws the draft away and goes back to the published version — asks first |
 | **Save draft** | saves the form as a draft, leaving what is published untouched — on only while the form holds a change |
-| **Publish** | validates and publishes the form as it stands |
+| **Publish** | validates and publishes the form as it stands — asks first |
 
 At the bottom, the **Danger zone** holds **Unpublish** (takes the content off the
 delivery API, keeping its data as a draft) and **Delete** (removes it for good;

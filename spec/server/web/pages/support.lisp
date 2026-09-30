@@ -14,7 +14,8 @@
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
   (:import-from #:quri #:url-encode-params)
-  (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in))
+  (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in
+           #:asked-first))
 (in-package #:koya-spec/server/web/pages/support)
 
 (defparameter *secret* "ui-secret-long-enough-to-log-in-with-it")
@@ -106,6 +107,15 @@
 
 (defun moved-to (headers)
   (or (getf headers :hx-redirect) (getf headers :hx-replace-url)))
+
+(defun asked-first (body dialog post)
+  (let* ((post (format nil "hx-post=\"~a\"" (uiop:frob-substrings post '("&") "&amp;")))
+         (start (search (format nil "<dialog id=\"~a\"" dialog) body))
+         (end (and start (search "</dialog>" body :start2 start)))
+         (at (search post body)))
+    (and (search (format nil "commandfor=\"~a\" command=\"show-modal\"" dialog) body)
+         start at (< start at end)
+         (null (search post body :start2 (1+ at))))))
 
 (defun call-action (method url &rest args &key headers &allow-other-keys)
   (apply #'request-url method url
