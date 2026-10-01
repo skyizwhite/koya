@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/ui/media/picker
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:js #:searches #:uploads #:+draws-refusals+)
+  (:import-from #:koya-server/web/lib/binds #:js #:searches #:uploads)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
@@ -74,8 +74,7 @@
   (hsx
    (dialog :id "media-picker" :class "koya-dialog koya-dialog-wide max-w-3xl"
            :nm-data (format nil "...koya.mediaPicker(this, ~a)" (js (media-picker :space space)))
-           :nm-bind (format nil "{ onclick: (e) => e.target === this && _close(), onopenpicker: (e) => _open(e.detail), ~a }"
-                            +draws-refusals+)
+           :nm-bind "{ onclick: (e) => e.target === this && _close(), onopenpicker: (e) => _open(e.detail) }"
      (div :class "flex items-center justify-between border-b border-line px-4 py-3"
        (h2 :class "font-semibold" "Media")
        (button :type "button" :class "btn btn-icon" :nm-bind "{ onclick: () => _close() }" :aria-label "Close"

@@ -1,5 +1,8 @@
 # An element asks the server with Nomini's own $get and $post
 
+Superseded by adr/2026-10-02-an-element-asks-with-nominis-get-and-post.md
+Superseded by adr/2026-10-02-nomini-is-handed-each-answer-whole-and-drawable.md
+
 *2026-10-02*
 
 ## Context
