@@ -106,13 +106,17 @@
     const PLACEHOLDER = "";
 
     const protect = (html) => {
-      const template = document.createElement("template");
-      template.innerHTML = html;
-      const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         node.data = node.data.replaceAll(IDEOGRAPHIC_SPACE, PLACEHOLDER);
       }
-      return template.innerHTML;
+      for (const el of doc.body.querySelectorAll("pre, textarea, listing")) {
+        if (el.firstChild?.nodeType === Node.TEXT_NODE && el.firstChild.data.startsWith("\n")) {
+          el.firstChild.data = `\n${el.firstChild.data}`;
+        }
+      }
+      return doc.documentElement.outerHTML;
     };
     const restore = (html) =>
       html
