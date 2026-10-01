@@ -15,7 +15,7 @@
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
   (:import-from #:quri #:url-encode-params)
   (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in
-           #:asked-first))
+           #:asked-first #:count-ids))
 (in-package #:koya-spec/server/web/pages/support)
 
 (defparameter *secret* "ui-secret-long-enough-to-log-in-with-it")
@@ -106,10 +106,14 @@
                  :headers headers)))
 
 (defun moved-to (headers)
-  (or (getf headers :hx-redirect) (getf headers :hx-replace-url)))
+  (or (getf headers :koya-redirect) (getf headers :koya-replace-url)))
+
+(defun count-ids (html)
+  (loop :for start := (search " id=\"" html) :then (search " id=\"" html :start2 (1+ start))
+        :while start :count t))
 
 (defun asked-first (body dialog post)
-  (let* ((post (format nil "hx-post=\"~a\"" (uiop:frob-substrings post '("&") "&amp;")))
+  (let* ((post (format nil "data-post=\"~a\"" (uiop:frob-substrings post '("&") "&amp;")))
          (start (search (format nil "<dialog id=\"~a\"" dialog) body))
          (end (and start (search "</dialog>" body :start2 start)))
          (at (search post body)))
@@ -119,7 +123,7 @@
 
 (defun call-action (method url &rest args &key headers &allow-other-keys)
   (apply #'request-url method url
-         :headers (append headers '(("hx-request" . "true") ("origin" . "http://localhost:3000")))
+         :headers (append headers '(("koya-request" . "true") ("origin" . "http://localhost:3000")))
          (loop :for (k v) :on args :by #'cddr :unless (eq k :headers) :append (list k v))))
 
 (defun setup-pages ()

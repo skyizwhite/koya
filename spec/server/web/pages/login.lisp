@@ -81,7 +81,7 @@
     (multiple-value-bind (status body headers) (call-action :post (logout))
       (declare (ignore body))
       (ok (= status 200))
-      (ok (equal (getf headers :hx-redirect) "/login")))
+      (ok (equal (getf headers :koya-redirect) "/login")))
     (ok (= 302 (request :get "/")) "and the session is gone")
     (log-in)))
 
@@ -117,10 +117,10 @@
     (let ((*cookie* nil))
       (multiple-value-bind (status body headers)
           (call-action :post (create-key :space "website" :kind "delivery")
-                       :headers '(("hx-current-url" . "http://localhost:3000/s/website/keys")))
+                       :headers '(("referer" . "http://localhost:3000/s/website/keys")))
         (declare (ignore body))
         (ok (= status 401))
-        (ok (string= (getf headers :hx-redirect) "/login?next=%2Fs%2Fwebsite%2Fkeys")))))
+        (ok (string= (getf headers :koya-redirect) "/login?next=%2Fs%2Fwebsite%2Fkeys")))))
   (testing "next never leaves the server"
     (dolist (next '("//evil.test/" "/\\evil.test/" "https://evil.test/" "evil"))
       (let ((*cookie* nil))
@@ -132,7 +132,7 @@
 
 (deftest login-is-the-one-open-action
   (let ((*cookie* nil))
-    (testing "it needs no session, but still htmx and this origin"
+    (testing "it needs no session, but still the admin UI and this origin"
       (ok (= 403 (post-login :form `(("secret" . ,*secret*)) :headers '(("origin" . "https://evil.example"))))
           "another site cannot log a browser in")
       (ok (null *cookie*) "and no session was made")

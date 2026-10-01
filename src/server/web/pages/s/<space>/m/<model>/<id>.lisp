@@ -28,7 +28,7 @@
   (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors #:~confirm-dialog)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
-                #:set-toast #:~toast-oob #:action-refusal #:action-refused)
+                #:set-toast #:~toast #:action-refusal #:action-refused)
   (:import-from #:koya-server/usecases/media #:find-media)
   (:import-from #:koya-server/web/ui/content/field-input #:~field-input)
   (:import-from #:koya-server/usecases/revisions #:restore-data #:find-revision)
@@ -56,10 +56,11 @@
   (let ((dialog (and confirm (format nil "confirm-~a" op))))
     (flet ((post ()
              (hsx (button :type "button" :class class
-                          :data-save-draft (equal op "save")
                           :commandfor dialog :command (and dialog "close")
-                          :hx-post (editor-action :space space :model model :id id :op op)
-                          :hx-include "#editor-form" :hx-target "#editor" :hx-swap "outerHTML"
+                          :form "editor-form" :data-post (editor-action :space space :model model :id id :op op)
+                          :nm-bind (if (equal op "save")
+                                       "{ onclick: koya.submit, disabled: () => unchanged() }"
+                                       "{ onclick: koya.submit }")
                     (when icon (hsx (~icon :name icon)))
                     children))))
       (if dialog
@@ -101,7 +102,7 @@
                                                 :id id :draft-key (content-draft-key content))))
          (public-url (and published (expand-url-template (model-public-url model) :id id))))
     (hsx
-     (div :id "editor"
+     (div :id "editor" :nm-data "...koya.editor(this)"
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (h1 :class "text-2xl font-bold" model-name
            (unless object-p
@@ -131,9 +132,10 @@
        (~errors :errors errors)
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
-       (form :id "editor-form" :class "space-y-6" :data-editor-form t :data-unsaved (and (or restoring errors) t)
-             :hx-post (editor-action :space space-name :model model-name :id id :op "save")
-             :hx-target "#editor" :hx-swap "outerHTML"
+       (form :id "editor-form" :class "space-y-6"
+             :data-post (editor-action :space space-name :model model-name :id id :op "save")
+             :data-unsaved (and (or restoring errors) t)
+             :nm-bind "{ onsubmit: koya.submit, oninput: () => track(), onchange: () => track() }"
          (loop :for field :in (model-fields model) :collect
            (hsx (~field-input :field field
                               :value (and data (gethash (field-name field) data))
@@ -213,13 +215,13 @@
            (hsx (~editor-page :space space :model model :content content :data current))))))))
 
 (defun done (space model content message)
-  (set-response-header :hx-replace-url (content-url space (model-name model) (content-id content)))
+  (set-response-header :koya-replace-url (content-url space (model-name model) (content-id content)))
   (hsx (<> (~editor :space space :model model :content content :data (content-data content :draft t))
-           (~toast-oob :message message))))
+           (~toast :message message))))
 
 (defun move-on (url message)
   (set-toast message)
-  (set-response-header :hx-redirect url)
+  (set-response-header :koya-redirect url)
   (hsx (<>)))
 
 (defaction editor-action :post (params)

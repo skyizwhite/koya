@@ -58,7 +58,7 @@
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                   (loop :for deploy :in items :collect
                     (hsx (~deploy :deploy deploy))))))
-       (~pager :page page :pages pages :target "#deploys"
+       (~pager :page page :pages pages
                :href (lambda (n) (deploys-url space :page n))
                :browse (lambda (n) (browse-deploys :space space :page n)))))))
 
@@ -74,7 +74,7 @@
   (let ((space (param params "space")))
     (cond ((not (and space (find-space space))) (action-refusal "Space not found." 404))
           (t (let ((page (min (page-number params) (last-page (count-deploys space)))))
-               (set-response-header :hx-replace-url (deploys-url space :page page))
+               (set-response-header :koya-replace-url (deploys-url space :page page))
                (hsx (~deploys :space space :page page)))))))
 
 (defun @get (params)

@@ -115,11 +115,11 @@
 (defun public-path-p (path)
   (and (gethash path *public-paths*) t))
 
-(defun htmx-request-p (env)
-  (equal (gethash "hx-request" (getf env :headers)) "true"))
+(defun page-request-p (env)
+  (equal (gethash "koya-request" (getf env :headers)) "true"))
 
 (defun login-location (env)
-  (let* ((current (ignore-errors (uri (gethash "hx-current-url" (getf env :headers)))))
+  (let* ((current (ignore-errors (uri (gethash "referer" (getf env :headers)))))
          (next (and current (render-uri (make-uri :path (or (uri-path current) "/") :query (uri-query current))))))
     (if (and next (string/= next "/"))
         (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
@@ -129,10 +129,10 @@
   (let ((path (ignore-errors (url-decode (or (uri-path (uri (getf env :request-uri))) "")))))
     (and path (public-path-p path))))
 
-(defparameter *htmx-only*
+(defparameter *page-requests-only*
   (lambda (app)
     (lambda (env)
-      (if (htmx-request-p env)
+      (if (page-request-p env)
           (funcall app env)
           (list 400 (list :content-type "text/plain; charset=utf-8") (list "Bad Request"))))))
 
@@ -141,7 +141,7 @@
     (lambda (env)
       (if (session-env-owner-p env)
           (funcall app env)
-          (list 401 (list :content-type "text/html; charset=utf-8" :hx-redirect (login-location env))
+          (list 401 (list :content-type "text/html; charset=utf-8" :koya-redirect (login-location env))
                 (list "<p class=\"text-sm text-danger\">Log in again to continue.</p>"))))))
 
 (defparameter *action-actor*
@@ -153,7 +153,7 @@
           (funcall app env)))))
 
 (defparameter *mw-actions-auth*
-  (mw-every *htmx-only*
+  (mw-every *page-requests-only*
             (mw-except #'public-request-p *action-session*)
             (same-origin-writes (lambda () (html-forbidden "Cross-origin request rejected.")))
             *action-actor*))

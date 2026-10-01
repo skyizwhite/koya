@@ -28,7 +28,7 @@
 (defun too-large-response (env)
   (let ((message (format nil "Request body is limited to ~a MB"
                          (floor +max-body-bytes+ (* 1024 1024)))))
-    (if (gethash "hx-request" (getf env :headers))
+    (if (equal (gethash "koya-request" (getf env :headers)) "true")
         (list 413 (list :content-type "text/html; charset=utf-8" :cache-control "no-store")
               (list (format nil "<p class=\"text-sm text-danger\">~a</p>" message)))
         (list 413 (list :content-type "application/json; charset=utf-8" :cache-control "no-store")

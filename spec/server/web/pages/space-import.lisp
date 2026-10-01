@@ -56,9 +56,9 @@
                                                             (make-field :tags :reference :model "tag" :many t))
                                          :label :title))))
 
-(defparameter +as-htmx+ '(("origin" . "http://localhost:3000") ("hx-request" . "true")))
+(defparameter +from-the-page+ '(("origin" . "http://localhost:3000") ("koya-request" . "true")))
 
-(defun post-piece (url &optional (octets (make-array 0 :element-type '(unsigned-byte 8))) (headers +as-htmx+))
+(defun post-piece (url &optional (octets (make-array 0 :element-type '(unsigned-byte 8))) (headers +from-the-page+))
   (let ((q (position #\? url)))
     (request :post (subseq url 0 q) :query (and q (subseq url (1+ q))) :headers headers
                                     :body octets :content-type "application/octet-stream")))
@@ -76,7 +76,7 @@
           :do (post-piece (piece-url id offset) (subseq octets offset (min (length octets) (+ offset size)))))
     (multiple-value-bind (status body headers) (post-piece (format nil "~a?id=~a" (finish-import-action) id))
       (declare (ignore body))
-      (values status (getf headers :hx-redirect)))))
+      (values status (getf headers :koya-redirect)))))
 
 (defun declare-sizes (octets size)
   (let ((copy (copy-seq octets)))
@@ -286,11 +286,12 @@
       (delete-space "archive")
       (remove-space-media "archive"))
     (testing "an import from another site is refused"
-      (ok (= 403 (post-piece (begin-import-action) nil '(("origin" . "https://evil.test") ("hx-request" . "true")))))
+      (ok (= 403 (post-piece (begin-import-action) nil '(("origin" . "https://evil.test") ("koya-request" . "true")))))
       (ok (= 400 (post-piece (begin-import-action) nil '(("origin" . "http://localhost:3000"))))
-          "nor is a plain post: an action answers htmx only")
+          "nor is a plain post: an action answers the admin UI only")
       (ng (find-space "archive")))
     (testing "the import dialog is on the spaces page"
       (let ((page (nth-value 1 (request :get "/"))))
+        (ok (search "nm-data=\"...koya.importer(this)\"" page) "the form holds how far the import is")
         (ok (search (format nil "data-import-begin=\"~a\"" (begin-import-action)) page))
         (ok (search "data-import-piece-bytes=" page)))))))

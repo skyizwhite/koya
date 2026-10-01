@@ -20,9 +20,10 @@
        (link :rel "icon" :type "image/svg+xml" :href (asset-url "icon.svg"))
        (link :rel "stylesheet" :href (asset-url "style/quill.snow.css"))
        (link :rel "stylesheet" :href (asset-url "style/dist.css"))
-       (script :src (asset-url "js/htmx.min.js") :defer t)
+       (script :src (asset-url "js/nomini.js") :defer t)
        (script :src (asset-url "js/quill/quill.js") :defer t)
        (script :src (asset-url "js/qrcode.min.js") :defer t)
-       (script :src (asset-url "js/koya-editor.js") :defer t))
-     (body :class "flex min-h-screen flex-col bg-base text-fg antialiased"
+       (script :src (asset-url "js/koya-fetch.js") :defer t)
+       (script :src (asset-url "js/koya.js") :defer t))
+     (body :nm-data t :class "flex min-h-screen flex-col bg-base text-fg antialiased"
        children))))

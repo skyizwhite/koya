@@ -27,7 +27,7 @@
 (defcomp ~login-fields (&key error next)
   (hsx
    (form :id "login" :class "space-y-4"
-         :hx-post (log-in) :hx-target "#login" :hx-swap "outerHTML"
+         :data-post (log-in) :nm-bind "{ onsubmit: koya.submit }"
      (when next (hsx (input :type "hidden" :name "next" :value next)))
      (div
        (label :for "secret" :class "label" "Owner secret")
@@ -70,7 +70,7 @@
              (set-response-status status)
              (hsx (~login-fields :error error :next next)))
            (go-on ()
-             (set-response-header :hx-redirect (or next "/"))
+             (set-response-header :koya-redirect (or next "/"))
              (hsx (<>))))
       (if (session-owner-p)
           (go-on)

@@ -25,10 +25,10 @@
                      (t "bg-line text-muted"))))
     (hsx (span :class (clsx "badge" class) status))))
 
-(defcomp ~pager (&key page pages href browse target)
+(defcomp ~pager (&key page pages href browse)
   (flet ((link (n)
-           (hsx (a :href (funcall href n) :hx-get (funcall browse n)
-                   :hx-target target :hx-swap "outerHTML" :class "btn"
+           (hsx (a :href (funcall href n) :data-get (funcall browse n)
+                   :nm-bind "{ onclick: koya.follow }" :class "btn"
                    (if (< n page)
                        (hsx (<> (~icon :name :prev) "Previous"))
                        (hsx (<> "Next" (~icon :name :next))))))))

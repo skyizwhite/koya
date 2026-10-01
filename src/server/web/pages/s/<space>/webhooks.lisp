@@ -61,15 +61,15 @@
        (loop :for value :in options :collect
          (hsx (option :value value :selected (equal value selected) value)))))))
 
-(defcomp ~filters (&key space schema label model oob)
+(defcomp ~filters (&key space schema label model)
   (let ((labels (union-options (webhook-labels schema) (delivery-labels space) label))
         (models (union-options (model-names schema) (delivery-models space) model)))
     (hsx
      (<> (unless (and (null labels) (null models))
            (hsx
             (form :id "filters" :method "get" :action (format nil "~a/webhooks" (space-url space))
-                  :hx-get (browse-deliveries :space space) :hx-target "#deliveries" :hx-swap "outerHTML"
-                  :hx-trigger "change, submit" :hx-swap-oob (and oob "true")
+                  :data-get (browse-deliveries :space space)
+                  :nm-bind "{ onsubmit: koya.submit, onchange: koya.search }"
                   :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
               (~filter-select :name "label" :label "Webhook" :all "All webhooks"
                               :options labels :selected label)
@@ -119,9 +119,9 @@
                 (span :class "text-danger" (delivery-error delivery)))))
        (~field :label "response" (~body-block :text (delivery-response delivery)))))))
 
-(defcomp ~delivery-count (&key space label model oob)
+(defcomp ~delivery-count (&key space label model)
   (let ((total (count-deliveries space :label label :model model)))
-    (hsx (p :id "delivery-count" :class "mb-4 text-sm text-muted" :hx-swap-oob (and oob "true")
+    (hsx (p :id "delivery-count" :class "mb-4 text-sm text-muted"
            (format nil "~a call~:p~a. The newest ~a of the space are kept." total
                    (cond ((not (filtered-p label model)) "")
                          ((= total 1) " matches")
@@ -139,7 +139,7 @@
        (when (filtered-p label model)
          (hsx (p :class "-mt-3 mb-3 text-sm"
                 (a :href (webhook-log-url space)
-                   :hx-get (browse-deliveries :space space :clear "1") :hx-target "#deliveries" :hx-swap "outerHTML"
+                   :data-get (browse-deliveries :space space :clear "1") :nm-bind "{ onclick: koya.follow }"
                    :class "text-muted hover:text-fg hover:underline"
                   "Clear the filters"))))
        (if (null items)
@@ -149,7 +149,7 @@
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                   (loop :for delivery :in items :collect
                     (hsx (li (~delivery :space space :delivery delivery)))))))
-       (~pager :page page :pages pages :target "#deliveries"
+       (~pager :page page :pages pages
                :href (lambda (n) (webhook-log-url space :label label :model model :page n))
                :browse (lambda (n) (browse-deliveries :space space :label (or label "") :model (or model "") :page n)))))))
 
@@ -171,11 +171,11 @@
          (page (and schema (min (page-number params) pages))))
     (cond ((null schema) (action-refusal "Space not found." 404))
           (t
-           (set-response-header :hx-replace-url (webhook-log-url space :label label :model model :page page))
+           (set-response-header :koya-replace-url (webhook-log-url space :label label :model model :page page))
            (hsx (<> (~deliveries :space space :label label :model model :page page)
-                    (~delivery-count :space space :label label :model model :oob t)
+                    (~delivery-count :space space :label label :model model)
                     (if clear
-                        (hsx (~filters :space space :schema schema :oob t))
+                        (hsx (~filters :space space :schema schema))
                         (hsx (<>)))))))))
 
 (defun @get (params)

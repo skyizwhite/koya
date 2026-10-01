@@ -13,7 +13,7 @@
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/ui/toast #:~toast-oob #:action-refusal)
+  (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
   (:export #:@get #:create-key #:delete-key #:rotate-secret))
 (in-package #:koya-server/web/pages/s/<space>/keys)
@@ -53,9 +53,9 @@
                                 (key-label key)))
                           (td :class "py-2 pr-4 whitespace-nowrap text-muted" (short-time (key-created-at key)))
                           (td :class "py-2 pl-4 pr-4 text-right"
-                            (form :hx-post (delete-key :space space :kind kind)
-                                  :hx-target (format nil "#~a" (section-id kind)) :hx-swap "outerHTML"
-                                  :hx-confirm "Delete this key? Whatever uses it stops working."
+                            (form :data-post (delete-key :space space :kind kind)
+                                  :data-confirm "Delete this key? Whatever uses it stops working."
+                                  :nm-bind "{ onsubmit: koya.submit }"
                               (input :type "hidden" :name "id" :value (key-id key))
                               (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete key"
                                 (~icon :name :delete)))))))))))))
@@ -68,8 +68,7 @@
        (p :class "mb-4 text-sm text-muted" (getf k :lead))
        (when new-key (hsx (~new-key :key new-key)))
        (~key-table :space space :kind kind :keys (funcall (getf k :list) space))
-       (form :hx-post (create-key :space space :kind kind)
-             :hx-target (format nil "#~a" (section-id kind)) :hx-swap "outerHTML"
+       (form :data-post (create-key :space space :kind kind) :nm-bind "{ onsubmit: koya.submit }"
              :class "mt-4 flex items-end gap-3"
          (div :class "flex-1"
            (label :class "label" "Label")
@@ -85,9 +84,9 @@
      (div :class "flex items-center gap-3"
        (code :class "select-all break-all rounded border border-line bg-panel px-2 py-1 font-mono text-sm"
          (space-webhook-secret space))
-       (form :hx-post (rotate-secret :space space)
-             :hx-target "#webhook-secret" :hx-swap "outerHTML"
-             :hx-confirm "Rotate the webhook secret? Receivers checking the old one start refusing."
+       (form :data-post (rotate-secret :space space)
+             :data-confirm "Rotate the webhook secret? Receivers checking the old one start refusing."
+             :nm-bind "{ onsubmit: koya.submit }"
          (button :type "submit" :class "btn" (~icon :name :rotate) "Rotate"))))))
 
 (defcomp ~keys-page (&key space)
@@ -117,7 +116,7 @@
     (if (and space kind)
         (progn (funcall (getf (key-kind kind) :delete) space (or (param params "id") ""))
                (hsx (<> (~key-section :space space :kind kind)
-                        (~toast-oob :message "Key deleted."))))
+                        (~toast :message "Key deleted."))))
         (action-refusal "Unknown space or kind of key." 404))))
 
 (defaction rotate-secret :post (params)
@@ -125,7 +124,7 @@
     (if space
         (progn (rotate-webhook-secret space)
                (hsx (<> (~webhook-secret :space space)
-                        (~toast-oob :message "Webhook secret rotated."))))
+                        (~toast :message "Webhook secret rotated."))))
         (action-refusal "Unknown space." 404))))
 
 (defun ensure-space (params)

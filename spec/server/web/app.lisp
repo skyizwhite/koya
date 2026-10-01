@@ -33,8 +33,9 @@
     (ok (search "name=\"f-body\"" body))
     (ok (search "type=\"checkbox\"" body))
     (ok (search "datetime-local" body))
-    (ok (search "data-quill-for=\"f-body\"" body) "rich text gets a Quill holder")
-    (ok (search "id=\"editor-form\" class=\"space-y-6\" data-editor-form hx-post=" body) "the form is an action"))
+    (ok (search "data-quill-for=\"f-body\" nm-bind=\"{ oninit: () => koya.quill(this) }\"" body)
+        "rich text gets a Quill holder")
+    (ok (search "id=\"editor-form\" class=\"space-y-6\" data-post=" body) "the form is an action"))
   (multiple-value-bind (status) (request :get "/s/nope")
     (ok (= status 404)))
   (multiple-value-bind (status) (edit "/s/website/m/blog/new" :form '(("action" . "delete")))
@@ -45,6 +46,19 @@
     (ok (= status 404)))
   (multiple-value-bind (status) (request :get "/s/website/m/blog/01ARZ3NDEKTSV4RRFFQ69G5FAV")
     (ok (= status 404))))
+
+(deftest every-page-runs-on-nomini
+  (dolist (path '("/s/website" "/login"))
+    (let ((*cookie* (if (string= path "/login") nil *cookie*)))
+      (let ((body (nth-value 1 (request :get path))))
+        (testing path
+          (ok (search "/assets/js/nomini.js?" body))
+          (ok (< (search "/assets/js/nomini.js?" body)
+                 (search "/assets/js/koya-fetch.js?" body)
+                 (search "/assets/js/koya.js?" body))
+              "then the wrapper, then what the pages do with it")
+          (ng (search "htmx" body))
+          (ok (search "<body nm-data" body) "every element is in a scope"))))))
 
 (deftest every-page-offers-the-source
   (let ((version (asdf:component-version (asdf:find-system "koya-server"))))
@@ -133,9 +147,9 @@
       (declare (ignore headers))
       (ok (= status 413) "a huge Content-Length is refused before the body is read")
       (ok (search "too_large" (first body))))
-    (destructuring-bind (status headers body) (huge-post '(("hx-request" . "true")))
+    (destructuring-bind (status headers body) (huge-post '(("koya-request" . "true")))
       (ok (= status 413))
-      (ok (search "text/html" (getf headers :content-type)) "htmx swaps it in, so it is HTML")
+      (ok (search "text/html" (getf headers :content-type)) "the page shows it, so it is HTML")
       (ok (search "limited to" (first body)))
       (ok (not (search "too_large" (first body)))))
     (ok (= smart-buffer:*default-disk-limit* +max-body-bytes+)

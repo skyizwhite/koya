@@ -1,5 +1,7 @@
 # Lists are read in place, and the URL follows
 
+Superseded by adr/2026-10-01-lists-are-read-in-place-and-the-url-follows.md
+
 *2026-09-25*
 
 ## Context

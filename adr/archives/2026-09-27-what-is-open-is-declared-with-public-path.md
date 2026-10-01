@@ -1,5 +1,7 @@
 # What is open is declared with public-path where it is defined
 
+Superseded by adr/2026-10-01-what-is-open-is-declared-with-public-path.md
+
 *2026-09-27, restating a decision of 2026-09-25*
 
 ## Context

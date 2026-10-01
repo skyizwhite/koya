@@ -27,12 +27,11 @@
   (multiple-value-bind (items more) (picker-items space search 1)
     (hsx
      (div :id "media-picker-body" :class "space-y-4"
-       (form :hx-get (media-picker :space space) :hx-target "#media-picker-body" :hx-swap "outerHTML"
-             :hx-trigger "input changed delay:300ms from:'find input', submit" :class "flex gap-2"
+       (form :data-get (media-picker :space space)
+             :nm-bind "{ onsubmit: koya.submit, 'oninput.debounce300': koya.search, onchange: koya.search }" :class "flex gap-2"
          (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
-       (form :hx-post (media-picker-upload :space space) :hx-target "#media-picker-body" :hx-swap "outerHTML"
-             :hx-encoding "multipart/form-data" :hx-trigger "change from:'find input[type=file]'"
-             :hx-config "timeout:0"
+       (form :data-post (media-picker-upload :space space)
+             :enctype "multipart/form-data" :nm-bind "{ onchange: koya.upload }"
              :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
          (label :class "btn" (~icon :name :upload) "Upload…"
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
@@ -57,7 +56,7 @@
   (let ((space (picker-space params)))
     (if space
         (multiple-value-bind (items more) (picker-items space (param params "q") (page-number params))
-          (hsx (~pick-cards :items items :more more)))
+          (hsx (ul :id "media-picker-grid" :nm-swap "append" (~pick-cards :items items :more more))))
         (forbidden "Unknown space."))))
 
 (defaction media-picker-upload :post (params)
@@ -72,9 +71,11 @@
 
 (defcomp ~media-picker-dialog (&key space)
   (hsx
-   (dialog :id "media-picker" :data-picker-url (media-picker :space space) :class "koya-dialog koya-dialog-wide max-w-3xl"
+   (dialog :id "media-picker" :data-get (media-picker :space space) :class "koya-dialog koya-dialog-wide max-w-3xl"
+           :nm-data "...koya.mediaPicker(this)" :nm-bind "{ onclick: (e) => e.target === this && close() }"
      (div :class "flex items-center justify-between border-b border-line px-4 py-3"
        (h2 :class "font-semibold" "Media")
-       (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close" (~icon :name :close)))
+       (button :type "button" :class "btn btn-icon" :nm-bind "{ onclick: () => close() }" :aria-label "Close"
+         (~icon :name :close)))
      (div :id "media-picker-content" :class "max-h-[70vh] overflow-y-auto p-4"
        (div :id "media-picker-body" :class "text-sm text-muted" "Loading…")))))

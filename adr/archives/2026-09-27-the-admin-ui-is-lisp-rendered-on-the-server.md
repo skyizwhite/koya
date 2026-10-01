@@ -1,5 +1,8 @@
 # The admin UI is Lisp, rendered on the server
 
+Superseded by adr/2026-10-01-the-admin-ui-is-lisp-rendered-on-the-server.md
+Superseded by adr/2026-10-01-nomini-swaps-and-holds-the-pages-state.md
+
 *2026-09-27, restating a decision of 2026-09-20*
 
 ## Context

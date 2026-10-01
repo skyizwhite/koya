@@ -336,7 +336,7 @@
                  "without a :label the reference is its id")
              (multiple-value-bind (status editor) (request :get (format nil "/s/website/m/blog/~a" pointer))
                (ok (= status 200))
-               (ok (search (format nil "value=\"~a\" selected>~a<" target target) editor)
+               (ok (search (format nil "value=\"~a\" selected nm-bind=\"{ selected: () => has(this.value) }\">~a<" target target) editor)
                    "and so is the option that picks it")
                (ok (search (format nil "title=\"~a\">~a</span>" pointer pointer) editor)
                    "and the crumb")))
@@ -352,7 +352,7 @@
       (create space model (jobject "title" "Refers" "related" (vector target)) :publish t)
       (multiple-value-bind (status body headers) (edit path :form '(("action" . "delete")))
         (ok (= status 409))
-        (ok (equal (getf headers :hx-reswap) "none") "the editor stays as it is")
+        (ng (search "id=\"editor\"" body) "the editor stays as it is")
         (ok (null (moved-to headers)) "and on this content, not the list")
         (ok (search "referenced by 1 other content" body) "the toast says why")
         (ok (get-content target) "it is still there")))))
@@ -363,7 +363,7 @@
     (testing "a new content is published from a dialog"
       (let ((body (nth-value 1 (request :get "/s/website/m/blog/new"))))
         (ok (asked-first body "confirm-publish" (post "new" "publish")))
-        (ng (search "hx-confirm" body) "not the browser's own confirm")))
+        (ng (search "data-confirm" body) "not the browser's own confirm")))
     (let ((id (new-blog '(("action" . "publish") ("f-title" . "Asked")))))
       (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "save") ("f-title" . "Asked again")))
       (let ((body (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" id)))))
@@ -371,11 +371,12 @@
           (testing (format nil "~a opens a dialog, and the dialog does it" op)
             (ok (asked-first body (format nil "confirm-~a" op) (post id op)))))
         (testing "saving a draft is not asked"
-          (ok (search (format nil "data-save-draft hx-post=\"~a\"" (uiop:frob-substrings (post id "save") '("&") "&amp;"))
+          (ok (search (format nil "form=\"editor-form\" data-post=\"~a\" nm-bind=\"{ onclick: koya.submit, disabled: () => unchanged() }\""
+                              (uiop:frob-substrings (post id "save") '("&") "&amp;"))
                       body)
               "its button posts the draft itself")
           (ng (search "confirm-save" body)))
-        (ng (search "hx-confirm" body))))))
+        (ng (search "data-confirm" body))))))
 
 (deftest history-is-read-in-place
   (exec "DELETE FROM contents")
@@ -390,7 +391,7 @@
         (ok (= status 200))
         (ok (search "id=\"revisions\"" body))
         (ng (search "Draft saved" body) "the published versions alone")
-        (ok (string= (getf headers :hx-replace-url) (format nil "~a?view=published" path)))))
+        (ok (string= (getf headers :koya-replace-url) (format nil "~a?view=published" path)))))
     (ok (= 404 (call-action :get (browse-history :space "website" :model "blog" :id "nope"))))))
 
 (deftest a-draft-that-changes-nothing-is-none
@@ -398,10 +399,12 @@
   (let* ((id (new-blog '(("action" . "publish") ("f-title" . "Live") ("f-slug" . "live"))))
          (path (format nil "/s/website/m/blog/~a" id))
          (form '(("f-title" . "Live") ("f-slug" . "live"))))
-    (testing "the form and its Save draft are marked for the script that turns it on"
+    (testing "the editor holds what the form was drawn with, and Save draft waits for a change"
       (let ((body (nth-value 1 (request :get path))))
-        (ok (search "data-save-draft" body))
-        (ok (search "data-editor-form" body))
+        (ok (search "<div id=\"editor\" nm-data=\"...koya.editor(this)\">" body))
+        (ok (search "nm-bind=\"{ onsubmit: koya.submit, oninput: () => track(), onchange: () => track() }\"" body)
+            "the form tells it of every change")
+        (ok (search "disabled: () => unchanged()" body))
         (ng (search "data-unsaved" body) "what is shown is what is stored")))
     (testing "saving what is published already writes nothing"
       (let ((before (count-revisions id)))
@@ -435,3 +438,24 @@
       (ok (= 404 (edit "/s/website/m/blog/new" :form '(("action" . "foo") ("title" . "Made"))))
           "on the new-content form too")
       (ok (= 1 (count-contents "website" "blog")) "which creates nothing"))))
+
+(deftest a-many-reference-is-chips-the-server-draws
+  (exec "DELETE FROM contents")
+  (multiple-value-bind (space model) (resolve-model "website" "blog")
+    (let* ((chosen (content-id (create space model (jobject "title" "Chosen") :publish t)))
+           (other (content-id (create space model (jobject "title" "Other") :publish t)))
+           (id (content-id (create space model (jobject "title" "Refers" "related" (vector chosen)) :publish t)))
+           (body (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" id)))))
+      (ok (search "nm-data=\"...koya.references(this)\"" body) "the field holds what is chosen")
+      (ok (search "<select id=\"f-related\" name=\"f-related\" multiple hidden" body)
+          "the select that is sent stays out of sight")
+      (ok (search (format nil "<option value=\"~a\" selected nm-bind=\"{ selected: () => has(this.value) }\"" chosen) body)
+          "and follows the chips")
+      (ok (search (format nil "data-id=\"~a\" nm-bind=\"{ hidden: () => !has(this.dataset.id) }\"" chosen) body)
+          "a chip for what is chosen")
+      (ok (search (format nil "data-id=\"~a\" hidden nm-bind=\"{ hidden: () => !has(this.dataset.id) }\"" other) body)
+          "and one waiting for each of the rest")
+      (ok (search (format nil "<option value=\"~a\" hidden disabled nm-bind=" chosen) body)
+          "what is chosen is not offered again")
+      (ok (search (format nil "<option value=\"~a\" nm-bind=\"{ hidden: () => has(this.value), disabled: () => has(this.value) }\"" other) body)
+          "the rest are"))))

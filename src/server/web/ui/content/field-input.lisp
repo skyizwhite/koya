@@ -30,35 +30,66 @@
                   :unless (assoc id references :test #'equal)
                     :collect (cons id (format nil "~a (missing)" id))))))
 
+(defcomp ~reference-chips (&key name value choices)
+  (hsx
+   (div :class "flex flex-wrap items-center gap-2" :nm-data "...koya.references(this)"
+     (select :id name :name name :multiple t :hidden t :nm-ref "select"
+       (loop :for (id . label) :in choices :collect
+         (hsx (option :value id :selected (selected-p value id)
+                      :nm-bind "{ selected: () => has(this.value) }"
+                label))))
+     (loop :for (id . label) :in choices :collect
+       (hsx (span :class "badge inline-flex items-center gap-1 bg-line text-fg"
+                  :data-id id :hidden (not (selected-p value id))
+                  :nm-bind "{ hidden: () => !has(this.dataset.id) }"
+              label
+              (button :type "button" :class "text-muted hover:text-danger" :data-id id
+                      :aria-label (format nil "Remove ~a" label)
+                      :nm-bind "{ onclick: () => remove(this.dataset.id) }"
+                "×"))))
+     (select :aria-label "Add" :nm-bind "{ onchange: () => add(this) }"
+       (option :value "" "Add…")
+       (loop :for (id . label) :in choices :collect
+         (let ((chosen (selected-p value id)))
+           (hsx (option :value id :hidden chosen :disabled chosen
+                        :nm-bind "{ hidden: () => has(this.value), disabled: () => has(this.value) }"
+                  label))))))))
+
 (defcomp ~reference-select (&key field value references)
   (let* ((name (field-param-name field))
-         (choices (reference-choices value references))
-         (many (field-many-p field)))
+         (choices (reference-choices value references)))
     (hsx
      (<>
-       (select :id name :name name :multiple many :data-picker many
-         (unless many (hsx (option :value "" "—")))
-         (loop :for (id . label) :in choices :collect
-           (hsx (option :value id :selected (selected-p value id) label))))
+       (if (field-many-p field)
+           (hsx (~reference-chips :name name :value value :choices choices))
+           (hsx (select :id name :name name
+                  (option :value "" "—")
+                  (loop :for (id . label) :in choices :collect
+                    (hsx (option :value id :selected (selected-p value id) label))))))
        (p :class "text-xs text-muted"
          (format nil "~a content~:p of ~a" (length choices) (field-option field :model)))))))
 
 (defcomp ~media-control (&key name value media)
-  (hsx
-   (div :class "flex items-start gap-4" :data-media-field name
-     (input :type "hidden" :id name :name name :value (or value ""))
-     (img :src (if media (media-url media :absolute nil) "")
-          :alt (if media (media-alt media) "")
-          :class (clsx "h-24 w-24 rounded-md border border-line bg-panel object-contain" (unless media "hidden"))
-          :data-media-preview t)
-     (div :class "space-y-2 text-sm"
-       (div :class "text-muted" :data-media-name t
-         (cond (media (media-filename media))
-               ((and value (plusp (length value))) (format nil "~a (missing)" value))
-               (t "No image")))
-       (div :class "flex gap-2"
-         (button :type "button" :class "btn" :data-media-pick-for name (~icon :name :media) "Choose…")
-         (button :type "button" :class "btn" :data-media-clear-for name (~icon :name :close) "Clear"))))))
+  (let ((url (if media (media-url media :absolute nil) ""))
+        (alt (if media (media-alt media) ""))
+        (label (cond (media (media-filename media))
+                     ((and value (plusp (length value))) (format nil "~a (missing)" value))
+                     (t "No image"))))
+    (hsx
+     (div :class "flex items-start gap-4" :nm-data "...koya.mediaField(this.dataset)"
+          :data-id (or value "") :data-url url :data-alt alt :data-name label
+       (input :type "hidden" :id name :name name :value (or value "") :nm-ref "input"
+              :nm-bind "{ value: () => id }")
+       (img :src url :alt alt
+            :class (clsx "h-24 w-24 rounded-md border border-line bg-panel object-contain" (unless media "hidden"))
+            :nm-bind "{ src: () => url, alt: () => alt, 'class.hidden': () => !url }")
+       (div :class "space-y-2 text-sm"
+         (div :class "text-muted" :nm-bind "{ textContent: () => name }" label)
+         (div :class "flex gap-2"
+           (button :type "button" :class "btn" :nm-bind "{ onclick: () => choose() }"
+             (~icon :name :media) "Choose…")
+           (button :type "button" :class "btn" :nm-bind "{ onclick: () => clear() }"
+             (~icon :name :close) "Clear")))))))
 
 (defcomp ~field-input (&key field value error references media)
   (let* ((name (field-param-name field))
@@ -80,7 +111,8 @@
           (hsx
            (<>
              (input :type "hidden" :id id :name name :value string)
-             (div :class "quill-editor" :data-quill-for id))))
+             (div :class "quill-editor" :data-quill-for id
+                  :nm-bind "{ oninit: () => koya.quill(this) }"))))
          (:number
           (hsx (input :type "number" :id id :name name :value string :step "any" :class "input")))
          (:boolean

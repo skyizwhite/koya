@@ -125,7 +125,10 @@
                                :ok t :status 200 :response "" :error "" :duration-ms 1))
   (testing "the selects call the action as they are picked"
     (let ((body (nth-value 1 (request :get "/s/website/webhooks"))))
-      (ok (search "hx-trigger=\"change, submit\"" body) "either select, as its change bubbles")
+      (ok (search (format nil "data-get=\"~a\" nm-bind=\"{ onsubmit: koya.submit, onchange: koya.search }\""
+                          (browse-deliveries :space "website"))
+                  body)
+          "either select, as its change bubbles")
       (ng (search ">Filter<" body) "so there is no button to press")))
   (testing "a filter draws #deliveries and the count, and puts itself in the URL"
     (multiple-value-bind (status body headers)
@@ -135,11 +138,11 @@
       (ok (search "1 call matches." body) "the count, out of band")
       (ok (search "Clear the filters" body))
       (ng (search "id=\"filters\"" body) "the selects stay as they are")
-      (ok (string= (getf headers :hx-replace-url) "/s/website/webhooks?model=about"))))
+      (ok (string= (getf headers :koya-replace-url) "/s/website/webhooks?model=about"))))
   (testing "clearing puts the selects back"
     (multiple-value-bind (status body headers) (call-action :get (browse-deliveries :space "website" :clear "1"))
       (ok (= status 200))
       (ok (search "id=\"filters\"" body))
       (ok (search "3 calls." body))
-      (ok (string= (getf headers :hx-replace-url) "/s/website/webhooks"))))
+      (ok (string= (getf headers :koya-replace-url) "/s/website/webhooks"))))
   (ok (= 404 (call-action :get (browse-deliveries :space "nope")))))
