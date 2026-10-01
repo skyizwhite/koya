@@ -27,5 +27,6 @@ own for lists alone.
 - A list is read the same way wherever it is sent from, a form posted by hand
   included.
 - A schema whose options carried a comma has to change them before its next
-  deploy. Until then, a many select with such an option is split at the comma
-  when the admin UI saves it.
+  deploy. Until then, a content with such an option chosen in a many select
+  cannot be saved from the admin UI: the option is split at the comma, and the
+  parts are refused as options the field does not have.
