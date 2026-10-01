@@ -1,6 +1,17 @@
 {
   const koya = (window.koya ||= {});
 
+  const fetchWhole = window.fetch;
+  window.fetch = async (input, init) => {
+    const response = await fetchWhole(input, init);
+    if (!init?.headers?.["nm-request"]) return response;
+    return new Response(await response.arrayBuffer(), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  };
+
   const changed = (el) => setTimeout(() => el.dispatchEvent(new Event("change", { bubbles: true })));
 
   const pickMedia = (onpick) =>
@@ -94,7 +105,15 @@
     const IDEOGRAPHIC_SPACE = "　";
     const PLACEHOLDER = "";
 
-    const protect = (html) => html.replaceAll(IDEOGRAPHIC_SPACE, PLACEHOLDER);
+    const protect = (html) => {
+      const template = document.createElement("template");
+      template.innerHTML = html;
+      const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        node.data = node.data.replaceAll(IDEOGRAPHIC_SPACE, PLACEHOLDER);
+      }
+      return template.innerHTML;
+    };
     const restore = (html) =>
       html
         .replace(/(^|[^;&])&nbsp;(?!&nbsp;)/g, "$1 ")

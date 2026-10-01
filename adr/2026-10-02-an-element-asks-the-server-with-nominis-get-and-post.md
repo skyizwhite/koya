@@ -28,14 +28,19 @@ carrying the body in the error's message. It cannot send a file.
   is an element swapped into the document's `#location`, which does it as it is
   drawn.
 - A file is sent by an upload's own fetch, and its answer drawn as a refusal is.
+- Nomini swaps what it has read of an answer whenever 20 ms pass without more,
+  so an answer that arrives in pieces would be swapped in part. `koya.js` wraps
+  `window.fetch` so that a request Nomini makes (`nm-request`) is read whole
+  before Nomini sees it.
 - The actions take only what Nomini sends, `nm-request: true` among it.
 
 ## Consequences
 
 - What an element asks and what comes of it are in the element's markup.
-- koya depends on two things Nomini does without promising them: the message
-  of the error for an answer that is not ok, and how `$fetch` reads a `data:`
-  URL. A new Nomini is checked against both before it is taken.
+- koya depends on three things Nomini does without promising them: the message
+  of the error for an answer that is not ok, how `$fetch` reads a `data:` URL,
+  and that it reads an answer through `window.fetch`. A new Nomini is checked
+  against all three before it is taken.
 - A request cancels the one in flight from the same scope, as Nomini does: a
   search that is overtaken is not drawn.
 - A Content-Security-Policy, if one is added, has to let the page fetch `data:`.
