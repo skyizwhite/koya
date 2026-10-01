@@ -141,9 +141,11 @@
   // tidied here.
   //
   // Two Quill quirks are worked around here:
-  // - pasted text has every whitespace character (including U+3000, the
-  //   ideographic space) collapsed to an ASCII space, so U+3000 is swapped for a
-  //   private-use placeholder before loading and restored on save;
+  // - HTML Quill reads -- what the field was stored with, and what is pasted --
+  //   has every whitespace character (including U+3000, the ideographic space)
+  //   made an ASCII space, so U+3000 is swapped for a private-use placeholder
+  //   before Quill reads it, and the placeholder for U+3000 in the document
+  //   after, which Quill keeps as it is typed;
   // - getSemanticHTML() turns every ASCII space into &nbsp;, which is undone for
   //   single spaces (runs of two or more are kept, they are deliberate).
   {
@@ -153,7 +155,6 @@
     const protect = (html) => html.replaceAll(IDEOGRAPHIC_SPACE, PLACEHOLDER);
     const restore = (html) =>
       html
-        .replaceAll(PLACEHOLDER, IDEOGRAPHIC_SPACE)
         .replace(/(^|[^;&])&nbsp;(?!&nbsp;)/g, "$1 ")
         .replace(/&nbsp;(?=\S)(?!&nbsp;)/g, " ");
     // an empty paragraph is a blank line the site should show; a line break after
@@ -171,7 +172,6 @@
 
     koya.quill = (holder) => {
       const input = document.getElementById(holder.dataset.quillFor);
-      if (!input || typeof Quill === "undefined") return;
       const quill = new Quill(holder, {
         theme: "snow",
         placeholder: "Write here...",
@@ -189,22 +189,50 @@
               image: () =>
                 picker()?._open((item) => {
                   const range = quill.getSelection(true);
-                  quill.insertEmbed(range.index, "image", new URL(item.url, location.href).pathname, "user");
+                  quill.insertEmbed(range.index, "image", item.url, "user");
                   quill.setSelection(range.index + 1);
                 }),
             },
           },
         },
       });
-      if (input.value) quill.clipboard.dangerouslyPasteHTML(protect(input.value));
+      // one character for one: no index moves
+      const settle = () => {
+        let index = 0;
+        for (const op of quill.getContents().ops) {
+          if (typeof op.insert !== "string") {
+            index += 1;
+            continue;
+          }
+          for (let at = op.insert.indexOf(PLACEHOLDER); at !== -1; at = op.insert.indexOf(PLACEHOLDER, at + 1)) {
+            quill.updateContents(
+              [{ retain: index + at }, { delete: 1 }, { insert: IDEOGRAPHIC_SPACE, attributes: op.attributes }],
+              "silent",
+            );
+          }
+          index += op.insert.length;
+        }
+      };
+      if (input.value) {
+        quill.clipboard.dangerouslyPasteHTML(protect(input.value));
+        settle();
+      }
       const opened = tidy(restore(quill.getSemanticHTML()));
       const original = input.value;
-      quill.on("text-change", () => {
+      const write = () => {
         const html = tidy(restore(quill.getSemanticHTML()));
         input.value = html === opened ? original : html;
         // a value set from script fires nothing; the editor form listens for this
         input.dispatchEvent(new Event("input", { bubbles: true }));
-      });
+      };
+      quill.on("text-change", write);
+      // a paste changes the text before it is settled, so it is written again
+      const paste = quill.clipboard.onPaste.bind(quill.clipboard);
+      quill.clipboard.onPaste = (range, { text, html }) => {
+        paste(range, { text, html: html && protect(html) });
+        settle();
+        write();
+      };
     };
   }
 
