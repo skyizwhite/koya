@@ -55,6 +55,7 @@
            #:schema-error-message
            #:schema-errors
            #:check-schema
+           #:check-deployable
            #:schema->jobject
            #:jobject->schema
            #:field->jobject
@@ -372,6 +373,18 @@
 
 (defun check-schema (schema)
   (let ((errors (schema-errors schema)))
+    (when errors
+      (fail "~{~a~^; ~}" errors)))
+  schema)
+
+(defun check-deployable (schema)
+  (let ((errors (loop :for model :in (schema-models schema)
+                      :append (loop :for field :in (model-fields model)
+                                    :for comma := (find-if (lambda (option) (find #\, option))
+                                                           (field-option field :options))
+                                    :when comma
+                                      :collect (format nil "model ~a: field ~s: option ~s holds a comma"
+                                                       (model-name model) (field-name field) comma)))))
     (when errors
       (fail "~{~a~^; ~}" errors)))
   schema)

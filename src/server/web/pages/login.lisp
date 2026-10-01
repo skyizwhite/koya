@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/pages/login
   (:use #:cl #:hsx)
   (:import-from #:jingle
-                #:set-response-status #:set-response-header)
+                #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/auth
                 #:session-login #:public-path #:session-owner-p #:local-path-p)
@@ -12,6 +12,8 @@
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~footer)
   (:import-from #:koya-server/web/ui/icon #:~icon)
+  (:import-from #:koya-server/web/ui/elements #:~go-to)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:export #:@get #:log-in))
 (in-package #:koya-server/web/pages/login)
 
@@ -27,7 +29,7 @@
 (defcomp ~login-fields (&key error next)
   (hsx
    (form :id "login" :class "space-y-4"
-         :hx-post (log-in) :hx-target "#login" :hx-swap "outerHTML"
+         :nm-bind (posts (log-in))
      (when next (hsx (input :type "hidden" :name "next" :value next)))
      (div
        (label :for "secret" :class "label" "Owner secret")
@@ -70,8 +72,7 @@
              (set-response-status status)
              (hsx (~login-fields :error error :next next)))
            (go-on ()
-             (set-response-header :hx-redirect (or next "/"))
-             (hsx (<>))))
+             (hsx (~go-to :url (or next "/")))))
       (if (session-owner-p)
           (go-on)
           (case (session-login (or (param params "secret") "") (param params "code"))

@@ -1,5 +1,7 @@
 # Pages answer GET, and every change is an action
 
+Superseded by adr/2026-10-01-pages-answer-get-and-every-change-is-an-action.md
+
 *2026-09-27, restating a decision of 2026-09-25*
 
 ## Context

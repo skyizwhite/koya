@@ -3,7 +3,8 @@
   (:import-from #:koya-spec/server/web/api-support #:*management-key* #:test-schema #:request #:admin #:setup-api #:reset-api)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema->jobject)
-  (:import-from #:koya-core/json #:jobject #:jget))
+  (:import-from #:koya-core/json #:jobject #:jget)
+  (:import-from #:koya-server/usecases/schema #:replace-schema))
 (in-package #:koya-spec/server/web/admin-api/schema)
 
 (setup (setup-api))
@@ -67,3 +68,21 @@
     (multiple-value-bind (status json) (request :put "/admin/api/schema/website" :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*))) :body "not json")
       (ok (= status 400))
       (ok (string= (jget json "error" "code") "bad_json")))))
+
+(deftest an-option-with-a-comma-is-refused-on-deploy-alone
+  (let ((comma (make-schema :models (list (make-model "blog" :list
+                                                      (list (make-field :title :text :required t :unique t)
+                                                            (make-field :tone :select :options '("Red, dark" "Blue"))))))))
+    (multiple-value-bind (status json) (admin :post "/admin/api/schema/website/plan" :body (schema->jobject comma))
+      (ok (= status 400))
+      (ok (string= (jget json "error" "code") "invalid_schema"))
+      (ok (search "comma" (jget json "error" "message")) "the plan says why"))
+    (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (schema->jobject comma) :query "force=true")
+      (ok (= status 400) "nor is it deployed, forced or not")
+      (ok (string= (jget json "error" "code") "invalid_schema")))
+    (testing "a space already stored with one, or imported with one, is read as it is"
+      (replace-schema "website" comma)
+      (multiple-value-bind (status json) (admin :get "/admin/api/schema/website")
+        (ok (= status 200))
+        (ok (= (length (jget json "models")) 1)))
+      (ok (= 200 (nth-value 0 (admin :get "/admin/api/contents/website/blog")))))))

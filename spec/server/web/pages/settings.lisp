@@ -1,7 +1,8 @@
 (defpackage #:koya-spec/server/web/pages/settings
   (:use #:cl #:rove)
+  (:import-from #:koya-server/web/lib/binds #:clicks)
   (:import-from #:koya-spec/server/web/pages/support
-                #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
+                #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/settings
                 #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
@@ -94,12 +95,11 @@
           (ok (string= (display-timezone-name) "Asia/Tokyo"))
           (testing "the editor takes and shows datetimes in that zone"
             (let ((id nil))
-              (multiple-value-bind (status body headers)
+              (multiple-value-bind (status body)
                   (edit "/s/website/m/blog/new"
                             :form '(("action" . "save") ("f-title" . "Tokyo time") ("f-when" . "2026-09-21T08:30")) :headers origin)
-                (declare (ignore body))
                 (ok (= status 200))
-                (let* ((loc (moved-to headers)) (path (subseq loc 0 (position #\? loc))))
+                (let* ((loc (moved-to body)) (path (subseq loc 0 (position #\? loc))))
                   (setf id (subseq path (1+ (position #\/ path :from-end t))))))
               (let ((content (find-if (lambda (c) (string= (content-id c) id))
                                       (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))
@@ -124,12 +124,12 @@
       (ok (= status 200))
       (ok (search "id=\"time-zone\"" body))
       (ok (search "Times are now shown in Asia&#x2F;Tokyo." body))
-      (ok (search "hx-swap-oob" body) "the toast goes out of band")
+      (ok (search "<div id=\"toast\"" body) "the toast beside it")
       (ng (search "<html" body)))
     (multiple-value-bind (status body) (call-action :post (save-timezone-action) :form '(("timezone" . "Mars/Olympus")))
       (ok (= status 422))
       (ok (search "is not a time zone" body) "the error is inside the card")
-      (ng (search "hx-swap-oob" body)))
+      (ng (search "<div id=\"toast\"" body)))
     (call-action :post (save-timezone-action) :form '(("timezone" . "UTC"))))
   (testing "two-factor login is set up step by step in its card"
     (let ((secret nil))
@@ -137,7 +137,9 @@
         (ok (= status 200))
         (ok (search "id=\"two-factor\"" body))
         (ok (search "data-qr=\"otpauth://" body))
-        (ok (search "formnovalidate" body) "cancelling needs no code")
+        (ok (search "nm-bind=\"{ oninit: () => koya.qr(this) }\"" body) "drawn as it comes in")
+        (ok (search (format nil "<button type=\"button\" class=\"btn\" ~a" (bound (clicks (cancel-two-factor-action)))) body)
+            "cancelling sends no form, so it needs no code")
         (multiple-value-bind (match groups) (scan-to-strings "secret=([A-Z2-7]+)&amp;" body)
           (ok match)
           (setf secret (and match (aref groups 0)))))

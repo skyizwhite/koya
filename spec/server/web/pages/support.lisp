@@ -14,8 +14,9 @@
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
   (:import-from #:quri #:url-encode-params)
+  (:import-from #:cl-ppcre #:scan-to-strings)
   (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in
-           #:asked-first))
+           #:asked-first #:count-ids #:replaced-url #:bound))
 (in-package #:koya-spec/server/web/pages/support)
 
 (defparameter *secret* "ui-secret-long-enough-to-log-in-with-it")
@@ -105,11 +106,29 @@
                  :form (remove "action" form :key #'car :test #'equal)
                  :headers headers)))
 
-(defun moved-to (headers)
-  (or (getf headers :hx-redirect) (getf headers :hx-replace-url)))
+(defun attribute (string)
+  (uiop:frob-substrings (uiop:frob-substrings string '("&") "&amp;") '("\"") "&quot;"))
+
+(defun bound (bind)
+  (format nil "nm-bind=\"~a\"" (attribute bind)))
+
+(defun location-url (body attribute)
+  (multiple-value-bind (match groups)
+      (scan-to-strings (format nil "<div id=\"location\" hidden ~a=\"([^\"]*)\"" attribute) body)
+    (and match (uiop:frob-substrings (aref groups 0) '("&amp;") "&"))))
+
+(defun moved-to (body)
+  (or (location-url body "data-go") (location-url body "data-replace")))
+
+(defun replaced-url (body)
+  (location-url body "data-replace"))
+
+(defun count-ids (html)
+  (loop :for start := (search " id=\"" html) :then (search " id=\"" html :start2 (1+ start))
+        :while start :count t))
 
 (defun asked-first (body dialog post)
-  (let* ((post (format nil "hx-post=\"~a\"" (uiop:frob-substrings post '("&") "&amp;")))
+  (let* ((post (attribute (koya-server/web/lib/binds:js post)))
          (start (search (format nil "<dialog id=\"~a\"" dialog) body))
          (end (and start (search "</dialog>" body :start2 start)))
          (at (search post body)))
@@ -119,7 +138,7 @@
 
 (defun call-action (method url &rest args &key headers &allow-other-keys)
   (apply #'request-url method url
-         :headers (append headers '(("hx-request" . "true") ("origin" . "http://localhost:3000")))
+         :headers (append headers '(("nm-request" . "true") ("origin" . "http://localhost:3000")))
          (loop :for (k v) :on args :by #'cddr :unless (eq k :headers) :append (list k v))))
 
 (defun setup-pages ()

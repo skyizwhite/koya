@@ -156,7 +156,7 @@ take their names.
 | `maxLength` | integer | positive |
 | `min` `max` | number | |
 | `pattern` | string | a Perl-style regular expression, checked when the schema is deployed |
-| `options` | array of string | non-empty, no duplicates; **required** on `select` |
+| `options` | array of string | non-empty, no duplicates, no commas in an option (checked when the schema is deployed); **required** on `select` |
 | `model` | string | a model name; **required** on `reference`, and the model must exist in the same space |
 | `from` | string | a field name; **required** on `slug`, and must name a `text` or `textarea` field of the same model other than the slug itself |
 | `was` | string | a field name other than this one and not a system field, see [Renames](#renames) |

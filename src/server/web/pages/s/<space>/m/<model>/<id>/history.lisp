@@ -1,8 +1,9 @@
 (defpackage #:koya-server/web/pages/s/<space>/m/<model>/<id>/history
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/web/lib/binds #:follows)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-field #:field-type #:field-option)
   (:import-from #:koya-core/json #:json-array-p)
@@ -26,7 +27,7 @@
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:history-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:import-from #:koya-server/usecases/schema #:resolve-model #:find-model)
@@ -80,7 +81,7 @@
 
 (defcomp ~richtext (&key html)
   (hsx (iframe :sandbox "allow-same-origin" :srcdoc (richtext-document html) :title "rich text"
-               :data-fit-content t :class "block h-16 w-full")))
+               :nm-bind "{ oninit: () => koya.fitContent(this) }" :class "block h-16 w-full")))
 
 (defcomp ~value (&key space field value found class)
   (let ((text (value-text space field value found)))
@@ -130,7 +131,7 @@
                :after (revision-data revision)))))
 
 (defcomp ~tab (&key href browse active children)
-  (hsx (a :href href :hx-get browse :hx-target "#revisions" :hx-swap "outerHTML"
+  (hsx (a :href href :nm-bind (follows browse)
           :class (clsx "border-b-2 px-3 py-2 text-sm"
                        (if active "border-accent font-medium text-fg" "border-transparent text-muted hover:text-fg"))
           children)))
@@ -166,7 +167,7 @@
                         :for n :below (length items)
                         :collect (hsx (~revision :space space :model model :id id
                                                  :revision revision :previous previous))))))
-       (~pager :page page :pages pages :target "#revisions"
+       (~pager :page page :pages pages
                :href (lambda (n) (history-url space model-name id :published-only published-only :page n))
                :browse (lambda (n) (browse-history :space space :model model-name :id id :view view :page n)))))))
 
@@ -193,11 +194,10 @@
           (t
            (let* ((published-only (equal (param params "view") "published"))
                   (page (min (page-number params) (page-count (content-id content) published-only))))
-             (set-response-header :hx-replace-url
-                                  (history-url space (model-name model) (content-id content)
-                                               :published-only published-only :page page))
-             (hsx (~revisions :space space :model model :content content
-                              :published-only published-only :page page)))))))
+             (hsx (<> (~revisions :space space :model model :content content
+                                  :published-only published-only :page page)
+                      (~replace-url :url (history-url space (model-name model) (content-id content)
+                                                      :published-only published-only :page page)))))))))
 
 (defun @get (params)
   (handler-case

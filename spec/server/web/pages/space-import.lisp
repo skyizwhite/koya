@@ -5,7 +5,7 @@
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-spec/server/web/pages/support
-                #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
+                #:moved-to #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/spaces #:find-space #:delete-space #:load-schema
                 #:space-webhooks #:space-webhook-secret)
@@ -56,9 +56,9 @@
                                                             (make-field :tags :reference :model "tag" :many t))
                                          :label :title))))
 
-(defparameter +as-htmx+ '(("origin" . "http://localhost:3000") ("hx-request" . "true")))
+(defparameter +from-the-page+ '(("origin" . "http://localhost:3000") ("nm-request" . "true")))
 
-(defun post-piece (url &optional (octets (make-array 0 :element-type '(unsigned-byte 8))) (headers +as-htmx+))
+(defun post-piece (url &optional (octets (make-array 0 :element-type '(unsigned-byte 8))) (headers +from-the-page+))
   (let ((q (position #\? url)))
     (request :post (subseq url 0 q) :query (and q (subseq url (1+ q))) :headers headers
                                     :body octets :content-type "application/octet-stream")))
@@ -74,9 +74,8 @@
         (size (max 1 (ceiling (length octets) pieces))))
     (loop :for offset :from 0 :below (length octets) :by size
           :do (post-piece (piece-url id offset) (subseq octets offset (min (length octets) (+ offset size)))))
-    (multiple-value-bind (status body headers) (post-piece (format nil "~a?id=~a" (finish-import-action) id))
-      (declare (ignore body))
-      (values status (getf headers :hx-redirect)))))
+    (multiple-value-bind (status body) (post-piece (format nil "~a?id=~a" (finish-import-action) id))
+      (values status (moved-to body)))))
 
 (defun declare-sizes (octets size)
   (let ((copy (copy-seq octets)))
@@ -286,11 +285,12 @@
       (delete-space "archive")
       (remove-space-media "archive"))
     (testing "an import from another site is refused"
-      (ok (= 403 (post-piece (begin-import-action) nil '(("origin" . "https://evil.test") ("hx-request" . "true")))))
+      (ok (= 403 (post-piece (begin-import-action) nil '(("origin" . "https://evil.test") ("nm-request" . "true")))))
       (ok (= 400 (post-piece (begin-import-action) nil '(("origin" . "http://localhost:3000"))))
-          "nor is a plain post: an action answers htmx only")
+          "nor is a plain post: an action answers the admin UI only")
       (ng (find-space "archive")))
     (testing "the import dialog is on the spaces page"
       (let ((page (nth-value 1 (request :get "/"))))
+        (ok (search "nm-data=\"...koya.importer(this)\"" page) "the form holds how far the import is")
         (ok (search (format nil "data-import-begin=\"~a\"" (begin-import-action)) page))
         (ok (search "data-import-piece-bytes=" page)))))))

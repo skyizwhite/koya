@@ -6,6 +6,7 @@
   (:import-from #:koya-server/web/ui/toast #:~toast)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
+  (:import-from #:koya-server/web/lib/binds #:reveals)
   (:export #:~media-grid
            #:~upload-limit
            #:~pick-cards
@@ -40,6 +41,7 @@
              :data-pick-url (media-url media :absolute nil)
              :data-pick-alt (media-alt media)
              :data-pick-name (media-filename media)
+             :nm-bind "{ onclick: () => _pick(this.dataset) }"
        (~thumb :media media)
        (div :class "truncate" :title (media-filename media) (media-filename media))
        (div :class "text-muted" (dimensions media))))))
@@ -48,8 +50,8 @@
   (hsx
    (<> (loop :for media :in items :collect (hsx (~pick-card :media media)))
        (when more
-         (hsx (li :class "col-span-full py-2 text-center text-xs text-muted"
-                  :hx-get more :hx-trigger "revealed" :hx-swap "outerHTML"
+         (hsx (li :id more :class "col-span-full py-2 text-center text-xs text-muted"
+                  :nm-bind (reveals more)
                 "Loading…"))))))
 
 (defcomp ~media-grid (&key items more)

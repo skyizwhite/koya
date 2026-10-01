@@ -7,6 +7,6 @@
 (deftest a-component-with-nothing-to-draw-draws-nothing
   (ok (string= (render-to-string (hsx (~errors :errors nil))) ""))
   (ok (string= (render-to-string (hsx (~pager :page 1 :pages 1 :href #'princ-to-string
-                                              :browse #'princ-to-string :target "#list")))
+                                              :browse #'princ-to-string)))
                "")
       "not the word NIL"))

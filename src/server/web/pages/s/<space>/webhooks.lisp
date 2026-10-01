@@ -1,7 +1,8 @@
 (defpackage #:koya-server/web/pages/s/<space>/webhooks
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/web/lib/binds #:searches #:follows)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
   (:import-from #:koya-server/usecases/webhooks
@@ -17,7 +18,7 @@
   (:import-from #:koya-server/web/lib/urls #:space-url #:content-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:import-from #:koya-server/usecases/schema #:load-schema)
@@ -61,15 +62,14 @@
        (loop :for value :in options :collect
          (hsx (option :value value :selected (equal value selected) value)))))))
 
-(defcomp ~filters (&key space schema label model oob)
+(defcomp ~filters (&key space schema label model)
   (let ((labels (union-options (webhook-labels schema) (delivery-labels space) label))
         (models (union-options (model-names schema) (delivery-models space) model)))
     (hsx
      (<> (unless (and (null labels) (null models))
            (hsx
             (form :id "filters" :method "get" :action (format nil "~a/webhooks" (space-url space))
-                  :hx-get (browse-deliveries :space space) :hx-target "#deliveries" :hx-swap "outerHTML"
-                  :hx-trigger "change, submit" :hx-swap-oob (and oob "true")
+                  :nm-data "...koya.search()" :nm-bind (searches (browse-deliveries :space space) :typing nil)
                   :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
               (~filter-select :name "label" :label "Webhook" :all "All webhooks"
                               :options labels :selected label)
@@ -119,9 +119,9 @@
                 (span :class "text-danger" (delivery-error delivery)))))
        (~field :label "response" (~body-block :text (delivery-response delivery)))))))
 
-(defcomp ~delivery-count (&key space label model oob)
+(defcomp ~delivery-count (&key space label model)
   (let ((total (count-deliveries space :label label :model model)))
-    (hsx (p :id "delivery-count" :class "mb-4 text-sm text-muted" :hx-swap-oob (and oob "true")
+    (hsx (p :id "delivery-count" :class "mb-4 text-sm text-muted"
            (format nil "~a call~:p~a. The newest ~a of the space are kept." total
                    (cond ((not (filtered-p label model)) "")
                          ((= total 1) " matches")
@@ -139,7 +139,7 @@
        (when (filtered-p label model)
          (hsx (p :class "-mt-3 mb-3 text-sm"
                 (a :href (webhook-log-url space)
-                   :hx-get (browse-deliveries :space space :clear "1") :hx-target "#deliveries" :hx-swap "outerHTML"
+                   :nm-bind (follows (browse-deliveries :space space :clear "1"))
                    :class "text-muted hover:text-fg hover:underline"
                   "Clear the filters"))))
        (if (null items)
@@ -149,7 +149,7 @@
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                   (loop :for delivery :in items :collect
                     (hsx (li (~delivery :space space :delivery delivery)))))))
-       (~pager :page page :pages pages :target "#deliveries"
+       (~pager :page page :pages pages
                :href (lambda (n) (webhook-log-url space :label label :model model :page n))
                :browse (lambda (n) (browse-deliveries :space space :label (or label "") :model (or model "") :page n)))))))
 
@@ -171,11 +171,11 @@
          (page (and schema (min (page-number params) pages))))
     (cond ((null schema) (action-refusal "Space not found." 404))
           (t
-           (set-response-header :hx-replace-url (webhook-log-url space :label label :model model :page page))
            (hsx (<> (~deliveries :space space :label label :model model :page page)
-                    (~delivery-count :space space :label label :model model :oob t)
+                    (~replace-url :url (webhook-log-url space :label label :model model :page page))
+                    (~delivery-count :space space :label label :model model)
                     (if clear
-                        (hsx (~filters :space space :schema schema :oob t))
+                        (hsx (~filters :space space :schema schema))
                         (hsx (<>)))))))))
 
 (defun @get (params)

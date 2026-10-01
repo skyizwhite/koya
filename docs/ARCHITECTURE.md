@@ -177,7 +177,8 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | HTTP | Clack / Lack; Hunchentoot in development, Woo in production |
 | Middlewares | lack-mw: Lack's own, and the guards combined with `mw-every` / `mw-some` / `mw-except` |
 | Router | jingle (a ningle extension) + ningle-fbr |
-| Templates | hsx; ningle-actions + HTMX for everything done on a page |
+| Templates | hsx; ningle-actions for everything done on a page |
+| Browser | Nomini (requests, swaps and a page's state), `koya.js` (what a page holds) |
 | DB | cl-dbi + dbd-sqlite3 |
 | JSON | jzon, with kebab/camel conversion in `core/case` |
 | Client | dexador |
@@ -205,14 +206,24 @@ that it answers 413 in plain text itself.
 A page route answers GET and draws a page; everything done on it is an action
 (`defaction`), defined beside the page that calls it, or with the `ui/`
 component that cannot work without it (the media picker, Log out). The actions middleware lets
-through htmx requests only, from the owner's session and this origin, and sends a
-request that has lost its session to the login page with `HX-Redirect`. An action
-answers the part of the page it changed, under that part's id, and the toast out
-of band into the layout's `#toast`; a result on another page is an `HX-Redirect`
+through requests from the admin UI only (`nm-request`, which Nomini sends), from the
+owner's session and this origin, and sends a request that has lost its session to the
+login page. An action answers each part of the page it changed, under that part's id,
+the toast (`#toast`) among them, with its status; a refusal answers the toast alone, and
+a result on another page is an element for `#location` that sends the browser there,
 with the toast in the session. A path declared with `public-path` (`web/lib/auth`)
 needs no session: the login page and its action, and `/health`. `/assets/` and
 `/media/` are served outside the session and the guards, so the login page is
 drawn with the assets and no file fetched reads the session.
+
+In the browser, an element asks for an action with Nomini's `$get` or `$post` in its
+`nm-bind`, written by `web/lib/binds`, and Nomini swaps each element of the answer in
+where the element of its id is. A refused answer is drawn the same way, handed back to
+Nomini from `fetcherr`. A list is sent comma-separated. A part of a page that holds
+state in the browser is a Nomini scope made by a factory in `assets/js/koya.js`
+(`nm-data="...koya.bulk(this)"`). See
+`adr/2026-10-01-nomini-swaps-and-holds-the-pages-state.md` and
+`adr/2026-10-02-an-element-asks-the-server-with-nominis-get-and-post.md`.
 
 A space's archive moves whatever its size. The export writes it to a file under
 `archives/` beside the database and sends it from there; the page marks the
@@ -220,10 +231,10 @@ answer with `+temporary-file-header+`, and `*mw-temporary-file*` deletes
 the file once the server has it. The import dialog uploads the zip in pieces to
 three actions, which add each to the end of a file there and then import it in
 one transaction. Searching, filtering, sorting and
-paging a list are actions as well, answered with `HX-Replace-Url` so the page's
-URL still carries that state for its GET to draw. See
-`adr/2026-09-27-pages-answer-get-and-every-change-is-an-action.md` and
-`adr/2026-09-25-lists-are-read-in-place-and-the-url-follows.md`.
+paging a list are actions as well, whose answers replace the page's URL so it still
+carries that state for its GET to draw. See
+`adr/2026-10-01-pages-answer-get-and-every-change-is-an-action.md` and
+`adr/2026-10-01-lists-are-read-in-place-and-the-url-follows.md`.
 
 ## Running it
 

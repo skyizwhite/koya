@@ -32,6 +32,7 @@
            #:body-field
            #:form-field
            #:form-values
+           #:form-list
            #:uploaded-files
            #:header
            #:origin-allowed-p
@@ -137,6 +138,11 @@
 (defun form-values (params name)
   (loop :for (k . v) :in params
         :when (and (stringp k) (string= k name)) :collect v))
+
+(defun form-list (params name)
+  (loop :for value :in (form-values params name)
+        :when (stringp value)
+          :append (remove "" (uiop:split-string value :separator ",") :test #'string=)))
 
 (defun uploaded-files (params name)
   (loop :for (k . v) :in params

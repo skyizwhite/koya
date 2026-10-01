@@ -1,16 +1,17 @@
 (defpackage #:koya-server/web/pages/index
   (:use #:cl #:hsx)
   (:import-from #:jingle
-                #:set-response-status #:set-response-header #:*request* #:request-content)
+                #:set-response-status #:*request* #:request-content)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/http #:param)
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~go-to)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
-                #:set-toast #:~toast-oob #:action-refusal #:action-refused)
+                #:set-toast #:~toast #:action-refusal #:action-refused)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/usecases/archive #:begin-import #:continue-import #:finish-import)
   (:import-from #:koya-server/usecases/spaces
@@ -29,13 +30,17 @@
 (defcomp ~dialog-close (&key dialog children)
   (hsx (button :type "button" :commandfor dialog :command "close" :class "btn" children)))
 
+(defcomp ~delete-error (&key name message)
+  (hsx (p :id (delete-error-id name) :nm-ref "error" :class "mt-2 text-sm text-danger" message)))
+
 (defcomp ~delete-space-dialog (&key name)
   (let ((id (delete-dialog-id name))
         (phrase (delete-phrase name))
         (input (delete-phrase-id name)))
     (hsx
-     (dialog :id id :closedby "any" :class "koya-dialog max-w-sm"
-       (form :hx-post (delete-space-action) :hx-target "#spaces" :hx-swap "outerHTML"
+     (dialog :id id :closedby "any" :class "koya-dialog max-w-sm" :nm-data "...koya.phrase(this)"
+             :nm-bind "{ onclose: () => _reset() }"
+       (form :nm-bind (posts (delete-space-action))
          (input :type "hidden" :name "name" :value name)
          (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
            (h2 :class "font-semibold" "Delete space")
@@ -47,11 +52,13 @@
               "It cannot be undone.")
            (label :for input :class "label mt-4" "Type " (code (format nil "\"~a\"" phrase)) " to confirm")
            (input :type "text" :id input :name "confirm" :required t :autocomplete "off"
-                  :spellcheck "false" :data-confirm-phrase phrase :class "input mt-1.5")
-           (p :id (delete-error-id name) :data-confirm-error t :class "mt-2 text-sm text-danger"))
+                  :spellcheck "false" :data-confirm-phrase phrase :class "input mt-1.5"
+                  :nm-bind "{ value: () => _typed, oninput: () => _typed = this.value }")
+           (~delete-error :name name))
          (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
            (~dialog-close :dialog id "Cancel")
            (button :type "submit" :class "btn btn-danger" :disabled t
+                   :nm-bind "{ disabled: () => _typed !== _phrase }"
              (~icon :name :delete) "Delete space")))))))
 
 (defcomp ~space-row (&key space)
@@ -66,9 +73,9 @@
          (~icon :name :delete))
        (~delete-space-dialog :name name)))))
 
-(defcomp ~space-list (&key spaces oob)
+(defcomp ~space-list (&key spaces)
   (hsx
-   (div :id "spaces" :hx-swap-oob (and oob "true")
+   (div :id "spaces"
      (if (null spaces)
          (hsx (~empty-state
                 (p "No spaces yet.")
@@ -77,10 +84,13 @@
          (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                 (loop :for space :in spaces :collect (hsx (~space-row :space space)))))))))
 
+(defcomp ~new-space-error (&key message)
+  (hsx (p :id "new-space-error" :class "mt-2 text-sm text-danger" message)))
+
 (defcomp ~new-space-dialog ()
   (hsx
    (dialog :id "new-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :hx-post (create-space-action) :hx-target "#new-space" :hx-swap "outerHTML"
+     (form :nm-bind (posts (create-space-action))
        (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
          (h2 :class "font-semibold" "New space")
          (button :type "button" :commandfor "new-space" :command "close" :class "btn btn-icon" :aria-label "Close"
@@ -92,7 +102,7 @@
          (p :class "mt-2 text-xs text-muted"
             "Lowercase letters, digits and hyphens. It is in every URL and in the delivery API, "
             "so it cannot be changed later.")
-         (p :id "new-space-error" :class "mt-2 text-sm text-danger"))
+         (~new-space-error))
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
          (~dialog-close :dialog "new-space" "Cancel")
          (button :type "submit" :class "btn btn-primary" (~icon :name :plus) "Create space"))))))
@@ -102,7 +112,8 @@
 (defcomp ~import-space-dialog ()
   (hsx
    (dialog :id "import-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :data-import-begin (begin-import-action)
+     (form :nm-data "...koya.importer(this)" :nm-bind "{ 'onsubmit.prevent': () => _start() }"
+           :data-import-begin (begin-import-action)
            :data-import-continue (continue-import-action)
            :data-import-finish (finish-import-action)
            :data-import-piece-bytes (princ-to-string +import-piece-bytes+)
@@ -113,18 +124,22 @@
        (div :class "px-4 py-4"
          (label :for "archive" :class "label" "Archive")
          (input :type "file" :id "archive" :name "file" :required t :accept ".zip,application/zip"
-                :class "input mt-1.5")
+                :nm-ref "file" :class "input mt-1.5")
          (p :class "mt-2 text-xs text-muted"
             "A zip from a space's " (strong "Export") ". The space is made again under its own name, "
             "with its models, webhooks, contents, history, media and keys. A space of that name must not "
             "exist yet, or must be empty: no models, media or keys. Nothing is sent to the webhooks.")
-         (div :class "mt-4 hidden" :data-import-progress t
-           (progress :class "w-full" :max "100")
-           (p :class "mt-1 text-xs text-muted" :data-import-status t)))
-       (p :class "hidden px-4 pb-3 text-sm text-danger" :data-import-error t)
+         (div :class "mt-4" :hidden t :nm-bind "{ hidden: () => !_busy }"
+           (progress :class "w-full" :max "100" :nm-ref "bar"
+                     :nm-bind "{ max: () => _total || 1, value: () => _sent }")
+           (p :class "mt-1 text-xs text-muted" :nm-bind "{ textContent: () => _status }")))
+       (p :class "px-4 pb-3 text-sm text-danger" :hidden t
+          :nm-bind "{ hidden: () => !_error, textContent: () => _error }")
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
          (~dialog-close :dialog "import-space" "Cancel")
-         (button :type "submit" :class "btn btn-primary" (~icon :name :import) "Import"))))))
+         (button :type "submit" :class "btn btn-primary" :nm-bind "{ disabled: () => _busy }"
+           (~icon :name :import)
+           (span :nm-bind "{ textContent: () => _busy ? 'Importing…' : 'Import' }" "Import")))))))
 
 (defcomp ~spaces-page (&key spaces)
   (hsx
@@ -157,20 +172,16 @@
   (multiple-value-bind (message error) (make-space params)
     (cond (error
            (set-response-status 422)
-           (set-response-header :hx-retarget "#new-space-error")
-           (set-response-header :hx-reswap "innerHTML")
-           (hsx (<> error)))
+           (hsx (~new-space-error :message error)))
           (t
            (hsx (<> (~new-space-dialog)
-                    (~space-list :spaces (list-spaces) :oob t)
-                    (~toast-oob :message message)))))))
+                    (~space-list :spaces (list-spaces))
+                    (~toast :message message)))))))
 
 (defun delete-refusal (name message status)
   (cond ((null name) (action-refusal message status))
         (t (set-response-status status)
-           (set-response-header :hx-retarget (format nil "#~a" (delete-error-id name)))
-           (set-response-header :hx-reswap "innerHTML")
-           (hsx (<> message)))))
+           (hsx (~delete-error :name name :message message)))))
 
 (defaction delete-space-action :post (params)
   (let ((name (param params "name")))
@@ -179,7 +190,7 @@
            (delete-refusal name (format nil "Type \"~a\" to delete this space." (delete-phrase name)) 422))
           (t (remove-space name)
              (hsx (<> (~space-list :spaces (list-spaces))
-                      (~toast-oob :message (format nil "Space ~a deleted." name))))))))
+                      (~toast :message (format nil "Space ~a deleted." name))))))))
 
 (defaction begin-import-action :post (params)
   (declare (ignore params))
@@ -193,8 +204,7 @@
       (koya-error (e) (action-refused e)))))
 
 (defaction finish-import-action :post (params)
-  (set-response-header :hx-redirect (import-archive (param params "id")))
-  (hsx (<>)))
+  (hsx (~go-to :url (import-archive (param params "id")))))
 
 (defun @get (params)
   (declare (ignore params))

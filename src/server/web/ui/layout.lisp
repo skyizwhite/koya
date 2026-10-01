@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/ui/layout
   (:use #:cl #:hsx)
   (:import-from #:jingle
-                #:set-response-header #:set-response-status)
+                #:set-response-status)
   (:import-from #:ningle-actions
                 #:defaction)
   (:import-from #:koya-server/web/lib/auth
@@ -10,10 +10,13 @@
                 #:asset-url)
   (:import-from #:koya-server/web/lib/urls
                 #:space-url)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:import-from #:koya-server/web/ui/icon
                 #:~icon)
+  (:import-from #:koya-server/web/ui/elements
+                #:~go-to)
   (:import-from #:koya-server/web/ui/toast
-                #:~toast #:take-toast)
+                #:~toast #:~toast-message #:take-toast)
   (:export #:~layout
            #:~missing
            #:~footer
@@ -44,8 +47,7 @@
 (defaction logout :post (params)
   (declare (ignore params))
   (session-logout)
-  (set-response-header :hx-redirect "/login")
-  (hsx (<>)))
+  (hsx (~go-to :url "/login")))
 
 (defcomp ~layout (&key space crumbs children)
   (hsx
@@ -63,12 +65,14 @@
          (div :class "flex shrink-0 items-center gap-2"
            (a :href "/settings" :class "btn" :aria-label "Settings"
               (~icon :name :settings) (span :class "hidden sm:inline" "Settings"))
-           (form :hx-post (logout)
+           (form :nm-bind (posts (logout))
              (button :type "submit" :class "btn" :aria-label "Log out"
                      (~icon :name :logout) (span :class "hidden sm:inline" "Log out"))))))
      (main :class "mx-auto w-full max-w-5xl flex-1 px-4 py-8"
        (multiple-value-bind (message kind) (take-toast)
          (hsx (~toast :message message :kind kind)))
+       (template :id "toast-failed"
+         (~toast-message :message "The server could not be reached." :kind :error))
        children)
      (~footer))))
 

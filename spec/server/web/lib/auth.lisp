@@ -81,7 +81,7 @@
 
 (deftest what-an-action-refuses
   (ok (= 400 (request-url :get (koya-server/web/pages/login:log-in))) "a plain GET")
-  (ok (= 400 (request :get "/actions")) "the prefix itself, not from htmx"))
+  (ok (= 400 (request :get "/actions")) "the prefix itself, not from the admin UI"))
 
 (deftest logging-out-closes-every-app
   (unwind-protect

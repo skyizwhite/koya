@@ -11,8 +11,9 @@
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/ui/toast #:~toast-oob)
+  (:import-from #:koya-server/web/ui/toast #:~toast)
   (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/web/lib/binds #:posts #:clicks)
   (:export #:@get
            #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
            #:enable-two-factor-action #:disable-two-factor-action))
@@ -42,31 +43,31 @@
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-ok/10 text-ok" "Enabled"))
                (form :class "space-y-3"
-                     :hx-post (disable-two-factor-action) :hx-target "#two-factor" :hx-swap "outerHTML"
+                     :nm-bind (posts (disable-two-factor-action))
                  (~code-input :label "Enter a current code to turn it off")
                  (button :type "submit" :class "btn btn-danger" (~icon :name :close) "Disable two-factor login")))))
        (pending
         (hsx (<>
                (p :class "mb-4 text-sm" "Scan the QR code with your authenticator app, or enter the secret by hand, then type the code it shows to finish.")
                (div :class "mb-4 flex flex-wrap items-start gap-6"
-                 (div :class "rounded-md border border-line bg-white p-2" :data-qr (otpauth-uri pending))
+                 (div :class "rounded-md border border-line bg-white p-2" :data-qr (otpauth-uri pending)
+                      :nm-bind "{ oninit: () => koya.qr(this) }")
                  (dl :class "space-y-2 text-sm"
                    (dt :class "text-muted" "Secret")
                    (dd (code :class "select-all break-all" pending))
                    (dt :class "text-muted" "otpauth URI")
                    (dd (code :class "select-all break-all text-xs" (otpauth-uri pending)))))
                (form :class "space-y-3"
-                     :hx-post (enable-two-factor-action) :hx-target "#two-factor" :hx-swap "outerHTML"
+                     :nm-bind (posts (enable-two-factor-action))
                  (~code-input :label "Code shown by the app")
                  (div :class "flex gap-2"
                    (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Enable two-factor login")
-                   (button :type "submit" :formnovalidate t :class "btn"
-                           :hx-post (cancel-two-factor-action) :hx-target "#two-factor" :hx-swap "outerHTML"
+                   (button :type "button" :class "btn" :nm-bind (clicks (cancel-two-factor-action))
                      (~icon :name :close) "Cancel"))))))
        (t
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-line text-muted" "Disabled"))
-               (form :hx-post (begin-two-factor-action) :hx-target "#two-factor" :hx-swap "outerHTML"
+               (form :nm-bind (posts (begin-two-factor-action))
                  (button :type "submit" :class "btn btn-primary" (~icon :name :shield) "Set up two-factor login")))))))))
 
 (defcomp ~time-zone (&key error)
@@ -78,7 +79,7 @@
        "Stored values and the delivery API stay UTC.")
      (when error (hsx (p :class "mb-4 text-sm text-danger" error)))
      (form :class "flex flex-wrap items-end gap-3"
-           :hx-post (save-timezone-action) :hx-target "#time-zone" :hx-swap "outerHTML"
+           :nm-bind (posts (save-timezone-action))
        (div
          (label :for "timezone" :class "label" "IANA name")
          (input :type "text" :id "timezone" :name "timezone" :list "timezones" :required t :autocomplete "off"
@@ -120,7 +121,7 @@
 (defun answer (card message error)
   (when error (set-response-status 422))
   (if message
-      (hsx (<> card (~toast-oob :message message)))
+      (hsx (<> card (~toast :message message)))
       card))
 
 (defaction save-timezone-action :post (params)

@@ -1,5 +1,7 @@
 # An action answers the part of the page it changed
 
+Superseded by adr/2026-10-01-an-action-answers-the-elements-it-changed.md
+
 *2026-09-27, restating a decision of 2026-09-25*
 
 ## Context

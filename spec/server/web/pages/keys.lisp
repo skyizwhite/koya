@@ -1,8 +1,9 @@
 (defpackage #:koya-spec/server/web/pages/keys
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:import-from #:koya-spec/server/web/pages/support
-                #:request #:request-url #:call-action #:setup-pages #:log-in)
+                #:bound #:request #:request-url #:call-action #:setup-pages #:log-in #:count-ids)
   (:import-from #:koya-server/web/pages/s/<space>/keys #:create-key #:delete-key #:rotate-secret)
   (:import-from #:koya-server/usecases/keys #:list-delivery-keys #:list-management-keys
                 #:create-delivery-key #:create-management-key)
@@ -41,8 +42,11 @@
   (testing "the page's forms call the actions"
     (multiple-value-bind (status body) (request :get "/s/website/keys")
       (ok (= status 200))
-      (ok (search (format nil "hx-post=\"~a" (subseq (create-key) 0 (position #\? (create-key)))) body))
-      (ok (search "hx-confirm=" body) "deleting and rotating ask first")))
+      (ok (search (bound (posts (create-key :space "website" :kind "delivery"))) body))
+      (ok (search (bound (posts (rotate-secret :space "website")
+                                :confirm "Rotate the webhook secret? Receivers checking the old one start refusing."))
+                  body)
+          "rotating asks first, and so does deleting a key")))
   (testing "creating answers the section with the key shown once"
     (multiple-value-bind (status body) (call-action :post (create-key :space "website" :kind "delivery")
                                                     :form '(("label" . "site")))
@@ -58,7 +62,7 @@
                                                       :form `(("id" . ,id)))
         (ok (= status 200))
         (ok (search "No keys yet." body))
-        (ok (search "id=\"toast\" hx-swap-oob=\"true\"" body))
+        (ok (search "<div id=\"toast\"" body))
         (ok (search "Key deleted." body)))
       (ok (null (list-delivery-keys "website")))))
   (testing "rotating answers the secret's section"
@@ -68,12 +72,12 @@
         (ok (search (space-webhook-secret "website") body))
         (ng (search before body)))))
   (testing "a space or a kind that does not exist is refused, and the page is left alone"
-    (multiple-value-bind (status body headers) (call-action :post (create-key :space "nope" :kind "delivery"))
+    (multiple-value-bind (status body) (call-action :post (create-key :space "nope" :kind "delivery"))
       (ok (= status 404))
-      (ok (equal (getf headers :hx-reswap) "none"))
-      (ok (search "hx-swap-oob" body)))
+      (ok (eql 0 (search "<div id=\"toast\"" body)) "the toast alone")
+      (ok (= 1 (count-ids body)) "and nothing else to put in the page"))
     (ok (= 404 (call-action :post (create-key :space "website" :kind "admin")))))
-  (testing "only htmx reaches an action"
+  (testing "only the admin UI reaches an action"
     (ok (= 400 (request-url :post (create-key :space "website" :kind "delivery")
                             :headers '(("origin" . "http://localhost:3000")))))
     (ok (null (list-delivery-keys "website")) "and nothing was made")

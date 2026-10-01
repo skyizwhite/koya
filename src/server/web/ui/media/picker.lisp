@@ -1,6 +1,7 @@
 (defpackage #:koya-server/web/ui/media/picker
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/web/lib/binds #:js #:searches #:uploads #:+draws-refusals+)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
@@ -27,12 +28,9 @@
   (multiple-value-bind (items more) (picker-items space search 1)
     (hsx
      (div :id "media-picker-body" :class "space-y-4"
-       (form :hx-get (media-picker :space space) :hx-target "#media-picker-body" :hx-swap "outerHTML"
-             :hx-trigger "input changed delay:300ms from:'find input', submit" :class "flex gap-2"
+       (form :nm-data "...koya.search()" :nm-bind (searches (media-picker :space space)) :class "flex gap-2"
          (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
-       (form :hx-post (media-picker-upload :space space) :hx-target "#media-picker-body" :hx-swap "outerHTML"
-             :hx-encoding "multipart/form-data" :hx-trigger "change from:'find input[type=file]'"
-             :hx-config "timeout:0"
+       (form :nm-bind (uploads (media-picker-upload :space space))
              :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
          (label :class "btn" (~icon :name :upload) "Upload…"
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
@@ -57,7 +55,9 @@
   (let ((space (picker-space params)))
     (if space
         (multiple-value-bind (items more) (picker-items space (param params "q") (page-number params))
-          (hsx (~pick-cards :items items :more more)))
+          (let ((asked (media-picker-more :space space :q (or (param params "q") "") :page (page-number params))))
+            (hsx (<> (ul :id asked :nm-swap "before" (~pick-cards :items items :more more))
+                     (li :id asked :hidden t)))))
         (forbidden "Unknown space."))))
 
 (defaction media-picker-upload :post (params)
@@ -72,9 +72,13 @@
 
 (defcomp ~media-picker-dialog (&key space)
   (hsx
-   (dialog :id "media-picker" :data-picker-url (media-picker :space space) :class "koya-dialog koya-dialog-wide max-w-3xl"
+   (dialog :id "media-picker" :class "koya-dialog koya-dialog-wide max-w-3xl"
+           :nm-data (format nil "...koya.mediaPicker(this, ~a)" (js (media-picker :space space)))
+           :nm-bind (format nil "{ onclick: (e) => e.target === this && _close(), onopenpicker: (e) => _open(e.detail), ~a }"
+                            +draws-refusals+)
      (div :class "flex items-center justify-between border-b border-line px-4 py-3"
        (h2 :class "font-semibold" "Media")
-       (button :type "button" :class "btn btn-icon" :data-dialog-close t :aria-label "Close" (~icon :name :close)))
+       (button :type "button" :class "btn btn-icon" :nm-bind "{ onclick: () => _close() }" :aria-label "Close"
+         (~icon :name :close)))
      (div :id "media-picker-content" :class "max-h-[70vh] overflow-y-auto p-4"
        (div :id "media-picker-body" :class "text-sm text-muted" "Loading…")))))
