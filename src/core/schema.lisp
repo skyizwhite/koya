@@ -55,6 +55,7 @@
            #:schema-error-message
            #:schema-errors
            #:check-schema
+           #:check-deployable
            #:schema->jobject
            #:jobject->schema
            #:field->jobject
@@ -133,9 +134,7 @@
       (:options
        (unless (and (consp value) (every #'stringp value)) (bad "a non-empty list of strings"))
        (when (/= (length value) (length (remove-duplicates value :test #'string=)))
-         (bad "a list without duplicates"))
-       (when (some (lambda (option) (find #\, option)) value)
-         (bad "a list of strings without commas")))
+         (bad "a list without duplicates")))
       (:model
        (unless (slug-name-p value) (bad "a model name")))
       (:from
@@ -374,6 +373,18 @@
 
 (defun check-schema (schema)
   (let ((errors (schema-errors schema)))
+    (when errors
+      (fail "~{~a~^; ~}" errors)))
+  schema)
+
+(defun check-deployable (schema)
+  (let ((errors (loop :for model :in (schema-models schema)
+                      :append (loop :for field :in (model-fields model)
+                                    :for comma := (find-if (lambda (option) (find #\, option))
+                                                           (field-option field :options))
+                                    :when comma
+                                      :collect (format nil "model ~a: field ~s: option ~s holds a comma"
+                                                       (model-name model) (field-name field) comma)))))
     (when errors
       (fail "~{~a~^; ~}" errors)))
   schema)

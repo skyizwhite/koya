@@ -3,7 +3,8 @@
 
   const changed = (el) => setTimeout(() => el.dispatchEvent(new Event("change", { bubbles: true })));
 
-  const picker = () => document.getElementById("media-picker")?.nmProxy;
+  const pickMedia = (onpick) =>
+    document.getElementById("media-picker")?.dispatchEvent(new CustomEvent("openpicker", { detail: onpick }));
 
   koya.form = (form) => {
     const data = new FormData(form);
@@ -124,7 +125,7 @@
             ],
             handlers: {
               image: () =>
-                picker()?._open((item) => {
+                pickMedia((item) => {
                   const range = quill.getSelection(true);
                   quill.insertEmbed(range.index, "image", item.url, "user");
                   quill.setSelection(range.index + 1);
@@ -211,7 +212,7 @@
     _alt: file.alt,
     _name: file.name,
     _choose() {
-      picker()?._open((item) => this._set(item));
+      pickMedia((item) => this._set(item));
     },
     _clear() {
       this._set(null);
@@ -299,7 +300,7 @@
         headers: { "Content-Type": "application/octet-stream", "nm-request": "true" },
       });
       const text = await response.text();
-      if (!response.ok) throw new Error(textOf(text));
+      if (!response.ok) throw Object.assign(new Error(textOf(text)), { answer: text });
       return text;
     };
     const megabytes = (n) => `${(n / 1048576).toFixed(1)} MB`;
@@ -328,6 +329,10 @@
           this._status = "Making the space. The server answers nothing else until it is done.";
           this.$fetch(dataUrl(await post(`${form.dataset.importFinish}?id=${encodeURIComponent(id)}`)), "GET");
         } catch (e) {
+          if (e.answer && new DOMParser().parseFromString(e.answer, "text/html").getElementById("location")) {
+            this.$fetch(dataUrl(e.answer), "GET");
+            return;
+          }
           this._error = e.message || "The import could not be sent.";
           this._busy = false;
         }

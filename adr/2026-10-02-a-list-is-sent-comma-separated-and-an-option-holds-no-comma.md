@@ -19,11 +19,13 @@ own for lists alone.
   with commas. The actions read a list by splitting what they are sent on
   commas.
 - A select's option holds no comma; a schema with one is refused when it is
-  deployed.
+  deployed or planned. It is not refused when it is read: a schema stored or
+  exported before this rule is read, and imported, as it is.
 
 ## Consequences
 
 - A list is read the same way wherever it is sent from, a form posted by hand
   included.
 - A schema whose options carried a comma has to change them before its next
-  deploy.
+  deploy. Until then, a many select with such an option is split at the comma
+  when the admin UI saves it.

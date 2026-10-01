@@ -4,7 +4,6 @@
                 #:field-name #:field-type #:field-option #:field-required-p #:field-many-p)
   (:import-from #:koya-core/json
                 #:json-null #:to-json #:jobject)
-  (:import-from #:koya-server/web/lib/binds #:+draws-refusals+)
   (:import-from #:koya-server/web/lib/forms #:field-param-name #:value->string)
   (:import-from #:koya-server/domain/media #:media-filename #:media-alt)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
@@ -88,7 +87,7 @@
        (div :class "space-y-2 text-sm"
          (div :class "text-muted" :nm-bind "{ textContent: () => _name }" label)
          (div :class "flex gap-2"
-           (button :type "button" :class "btn" :nm-bind (format nil "{ onclick: () => _choose(), ~a }" +draws-refusals+)
+           (button :type "button" :class "btn" :nm-bind "{ onclick: () => _choose() }"
              (~icon :name :media) "Choose…")
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
              (~icon :name :close) "Clear")))))))

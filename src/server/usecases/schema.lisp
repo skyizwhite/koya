@@ -1,6 +1,6 @@
 (defpackage #:koya-server/usecases/schema
   (:use #:cl)
-  (:import-from #:koya-core/schema #:check-schema)
+  (:import-from #:koya-core/schema #:check-schema #:check-deployable)
   (:import-from #:koya-core/diff #:diff-schemas #:destructive-changes-p)
   (:import-from #:koya-server/domain/errors #:fail #:conflict #:not-found)
   (:import-from #:koya-server/usecases/ports/spaces
@@ -35,6 +35,7 @@
   (load-schema (existing-space name)))
 
 (defun plan (name schema)
+  (check-deployable schema)
   (diff-schemas (load-schema (existing-space name)) schema))
 
 (defun changes-of (space schema)
@@ -47,6 +48,7 @@
     changes))
 
 (defun deploy (name schema &key force)
+  (check-deployable schema)
   (let* ((space (existing-space name))
          (changes (changes-of space schema)))
     (when (and (destructive-changes-p changes) (not force))

@@ -6,7 +6,7 @@
                 #:schema-model #:schema-webhooks #:model-preview-url #:model-public-url
                 #:model-label #:make-webhook #:webhook-only #:webhook-covers-p #:schema-error
                 #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
-                #:model-options)
+                #:model-options #:check-deployable)
   (:import-from #:koya-core/json
                 #:to-json #:parse-json #:jget))
 (in-package #:koya-spec/core/schema)
@@ -59,8 +59,13 @@
     (ok (signals (make-field :x :text :required "yes") 'schema-error))
     (ok (signals (make-field :x :select :options "abc") 'schema-error) "options must be a list")
     (ok (signals (make-field :x :select :options '("a" "a")) 'schema-error) "no duplicate options")
-    (ok (signals (make-field :x :select :options '("a, b" "c")) 'schema-error)
-        "no comma in an option: the admin UI sends a list of them comma-separated")
+    (ok (make-field :x :select :options '("a, b" "c"))
+        "an option with a comma is a field still, so a schema stored with one is read")
+    (ok (signals (check-deployable (make-schema :models (list (make-model "m" :list (list (make-field :x :select :options '("a, b" "c")))))))
+                 'schema-error)
+        "but it is not deployed: the admin UI sends a list of options comma-separated")
+    (ok (check-deployable (make-schema :models (list (make-model "m" :list (list (make-field :x :select :options '("a" "b")))))))
+        "options without commas are")
     (ok (equal (field-option (make-field :x :select :options '(news tech)) :options) '("news" "tech"))
         "symbol options are downcased like model names")
     (ok (signals (make-schema :webhooks "https://x") 'schema-error) "webhooks must be a list")
