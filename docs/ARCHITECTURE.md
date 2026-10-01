@@ -218,12 +218,13 @@ drawn with the assets and no file fetched reads the session.
 
 In the browser, an element asks for an action with Nomini's `$get` or `$post` in its
 `nm-bind`, written by `web/lib/binds`, and Nomini swaps each element of the answer in
-where the element of its id is. A refused answer is drawn the same way, handed back to
-Nomini from `fetcherr`. A list is sent comma-separated. A part of a page that holds
-state in the browser is a Nomini scope made by a factory in `assets/js/koya.js`
-(`nm-data="...koya.bulk(this)"`). See
-`adr/2026-10-01-nomini-swaps-and-holds-the-pages-state.md` and
-`adr/2026-10-02-an-element-asks-the-server-with-nominis-get-and-post.md`.
+where the element of its id is. `koya.js` wraps `window.fetch` so that Nomini reads each
+answer whole and draws a refused one as any other. A list is sent comma-separated. A
+part of a page that holds state in the browser is a Nomini scope made by a factory in
+`assets/js/koya.js` (`nm-data="...koya.bulk(this)"`). See
+`adr/2026-10-01-nomini-swaps-and-holds-the-pages-state.md`,
+`adr/2026-10-02-an-element-asks-with-nominis-get-and-post.md` and
+`adr/2026-10-02-nomini-is-handed-each-answer-whole-and-drawable.md`.
 
 A space's archive moves whatever its size. The export writes it to a file under
 `archives/` beside the database and sends it from there; the page marks the

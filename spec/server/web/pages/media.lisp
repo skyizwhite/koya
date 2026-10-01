@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/media
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:searches #:reveals #:uploads #:+draws-refusals+)
+  (:import-from #:koya-server/web/lib/binds #:searches #:reveals #:uploads)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:request-url #:call-action #:setup-pages #:log-in)
@@ -81,10 +81,9 @@
         (ok (search "<dialog id=\"media-picker\"" body))
         (ok (search (format nil "nm-data=\"...koya.mediaPicker(this, &quot;~a&quot;)\"" (media-picker :space "website")) body)
             "and the picker who opened it")
-        (ok (search (bound (format nil "{ onclick: (e) => e.target === this && _close(), onopenpicker: (e) => _open(e.detail), ~a }"
-                                   +draws-refusals+))
+        (ok (search (bound "{ onclick: (e) => e.target === this && _close(), onopenpicker: (e) => _open(e.detail) }")
                     body)
-            "the picker opens itself, from whichever control asks, and draws what refuses it")
+            "the picker opens itself, from whichever control asks")
         (ok (search (media-picker :space "website") body) "dialog knows the picker URL")))
     (testing "picker fragment"
       (multiple-value-bind (status body) (call-action :get (media-picker :space "website"))

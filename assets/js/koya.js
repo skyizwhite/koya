@@ -3,12 +3,18 @@
 
   const fetchWhole = window.fetch;
   window.fetch = async (input, init) => {
-    const response = await fetchWhole(input, init);
-    if (!init?.headers?.["nm-request"]) return response;
-    return new Response(await response.arrayBuffer(), {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
+    if (!init?.headers?.["nm-request"]) return fetchWhole(input, init);
+    let ok = false;
+    let html = "";
+    try {
+      const response = await fetchWhole(input, init);
+      ok = response.ok;
+      html = await response.text();
+    } catch (error) {
+      if (error.name === "AbortError") throw error;
+    }
+    return new Response(ok || drawable(html) ? html : asToast(textOf(html)), {
+      headers: { "content-type": "text/html; charset=utf-8" },
     });
   };
 
@@ -56,14 +62,6 @@
     return answer && `data:text/html;charset=utf-8,${encodeURIComponent(answer)}`;
   };
 
-  koya.refused = (event, draw) => {
-    const error = event.detail.err;
-    if (error.name === "AbortError") return;
-    const message = error instanceof TypeError ? "" : error.message;
-    const url = dataUrl(message.slice(message.indexOf(": ") + 2));
-    if (url) draw(url);
-  };
-
   koya.search = () => ({
     _asked: null,
     _ask(url, form, always) {
@@ -94,7 +92,7 @@
       document.getElementById("toast")?.replaceWith(limit.content.cloneNode(true));
       return;
     }
-    const answer = await fetch(url, { method: "POST", body: new FormData(input.form), headers: { "nm-request": "true" } })
+    const answer = await fetchWhole(url, { method: "POST", body: new FormData(input.form), headers: { "nm-request": "true" } })
       .then((response) => response.text())
       .catch(() => "");
     const drawn = dataUrl(answer);
@@ -317,7 +315,7 @@
   koya.importer = (form) => {
     const pieceBytes = Number(form.dataset.importPieceBytes);
     const post = async (url, body) => {
-      const response = await fetch(url, {
+      const response = await fetchWhole(url, {
         method: "POST",
         body,
         headers: { "Content-Type": "application/octet-stream", "nm-request": "true" },

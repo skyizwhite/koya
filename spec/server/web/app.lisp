@@ -65,7 +65,8 @@
           (ng (search "nm-data" (subseq body 0 (search "<body" body))) "the page itself is no scope")
           (ok (search "<body class=" body))
           (ok (search "<div id=\"location\" hidden></div>" body)
-              "an answer that moves the browser is drawn here"))))))
+              "an answer that moves the browser is drawn here")
+          (ng (search "onfetcherr" body) "a refusal is drawn as any answer is, with nothing on the element"))))))
 
 (deftest every-page-offers-the-source
   (let ((version (asdf:component-version (asdf:find-system "koya-server"))))
