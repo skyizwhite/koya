@@ -65,8 +65,9 @@ the app rather than by calling handlers.
 - **`koya-core` and `koya-sdk` are MIT, `koya-server` is AGPL.** Moving a file
   across that line is a licensing change (see the ADR for which files). The
   server and the SDK share `koya-core` and do not use each other.
-- **`src/` and `spec/` have no comments and no docstrings.** What the code must
-  keep doing is a spec; why it is this way is an ADR. In `spec/`, what a check
+- **`src/`, `spec/` and `assets/js/koya.js` have no comments, and `src/` and
+  `spec/` no docstrings.** What the code must keep doing is a spec; why it is
+  this way is an ADR. In `spec/`, what a check
   means goes in its `testing` or `ok` description. The one exception is the
   site's API, the symbols the `koya-sdk` package exports: they keep their
   docstrings for a site's developer at the REPL. That package names each of

@@ -1,39 +1,10 @@
-// What the admin UI's pages do in the browser, on Nomini. An element asks the
-// server with Nomini's own $get and $post, written in its nm-bind (web/lib/binds
-// writes them), and Nomini swaps in each element of the answer by its id. A part
-// of a page that holds state is a Nomini scope made by one of the factories here
-// (nm-data="...koya.bulk(this)"); what needs no state but has to run on an
-// element -- on the page and in whatever is swapped in -- is called from its
-// oninit.
-//
-// A member of a scope here starts with _: Nomini sends every other member of
-// the scope a request is made from, and calls each such function to do so.
-// A scope's state is shallow: a list changes by being set again
-// (_chosen = [..._chosen, id]), not by push. A scope does not see the one around
-// it, so scopes that work together hold each other (the media field hands the
-// picker what to do with a file).
-//
-// What Nomini leaves to this file:
-// - A list goes as Nomini sends an array, comma-separated; koya.form makes a
-//   form's fields into what $get and $post send.
-// - A refused request (4xx) is drawn like any other answer: Nomini only reports
-//   it (fetcherr, with the body in the error's message), so koya.refused hands
-//   the body back to the scope's $fetch as a data: URL.
-// - A file is sent by koya.upload's own fetch, and its answer drawn the same way.
-// - An answer that moves the browser, or replaces the page's URL, is an element
-//   swapped into #location, which does it as it is drawn (ui/elements).
 {
   const koya = (window.koya ||= {});
 
-  // Nomini writes a bind to the element after an await, so a change sent as the
-  // state is set would find the element as it was: it is sent once the binds
-  // have run
   const changed = (el) => setTimeout(() => el.dispatchEvent(new Event("change", { bubbles: true })));
 
   const picker = () => document.getElementById("media-picker")?.nmProxy;
 
-  // a form's fields as $get and $post send them: a name given more than once
-  // (a selection, a many field) is a list
   koya.form = (form) => {
     const data = new FormData(form);
     const fields = {};
@@ -44,8 +15,6 @@
     return fields;
   };
 
-  // a link followed in place, unless it is asked for in a tab or a window of
-  // its own
   koya.follow = (event) => {
     if (event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
     event.preventDefault();
@@ -60,8 +29,6 @@
 
   const textOf = (html) => new DOMParser().parseFromString(html, "text/html").body.textContent.trim();
 
-  // what has nothing to draw is said in the toast, as the layout's toast-failed
-  // draws it
   const asToast = (message) => {
     const toast = document.getElementById("toast")?.cloneNode(false);
     const template = document.getElementById("toast-failed");
@@ -77,9 +44,6 @@
     return answer && `data:text/html;charset=utf-8,${encodeURIComponent(answer)}`;
   };
 
-  // Nomini's error for an answer that is not ok reads "<status text>: <body>";
-  // one that never came is a TypeError, and one cut off by a newer request of
-  // the same scope an AbortError, which has nothing to say
   koya.refused = (event, draw) => {
     const error = event.detail.err;
     if (error.name === "AbortError") return;
@@ -88,9 +52,6 @@
     if (url) draw(url);
   };
 
-  // A search form: what it asks goes as the typing stops or a select is picked,
-  // and only when it would ask something new (a select fires input and change
-  // both; a box fires change as it loses focus).
   koya.search = () => ({
     _asked: null,
     _ask(url, form, always) {
@@ -102,7 +63,6 @@
     },
   });
 
-  // the element asks for what it stands for once it comes into view
   koya.reveal = (event) => {
     const el = event.target;
     const observer = new IntersectionObserver((entries) => {
@@ -113,9 +73,6 @@
     observer.observe(el);
   };
 
-  // An upload form's files go as they are chosen, checked first against its
-  // <template data-upload-limit> (ui/media/grid): too large, the choice is
-  // cleared and the template's toast shown.
   koya.upload = async (input, url, draw) => {
     if (input.type !== "file" || input.files.length === 0) return;
     const limit = input.form.querySelector("template[data-upload-limit]");
@@ -132,22 +89,6 @@
     if (drawn) draw(drawn);
   };
 
-  // Rich text fields: a Quill editor per [data-quill-for] holder (every action on a
-  // content draws its editor again). It writes HTML back into the hidden input as
-  // the text changes -- unless the editor holds what it was opened with. Quill
-  // rewrites HTML it did not write itself (drops ids and figures, adds rel to
-  // links...), so writing back an untouched field would record a change nobody
-  // made. The server stores the HTML as it arrives, so what the editor writes is
-  // tidied here.
-  //
-  // Two Quill quirks are worked around here:
-  // - HTML Quill reads -- what the field was stored with, and what is pasted --
-  //   has every whitespace character (including U+3000, the ideographic space)
-  //   made an ASCII space, so U+3000 is swapped for a private-use placeholder
-  //   before Quill reads it, and the placeholder for U+3000 in the document
-  //   after, which Quill keeps as it is typed;
-  // - getSemanticHTML() turns every ASCII space into &nbsp;, which is undone for
-  //   single spaces (runs of two or more are kept, they are deliberate).
   {
     const IDEOGRAPHIC_SPACE = "　";
     const PLACEHOLDER = "";
@@ -157,9 +98,6 @@
       html
         .replace(/(^|[^;&])&nbsp;(?!&nbsp;)/g, "$1 ")
         .replace(/&nbsp;(?=\S)(?!&nbsp;)/g, " ");
-    // an empty paragraph is a blank line the site should show; a line break after
-    // every block keeps the stored source readable; this server's own media is
-    // stored by path, which the delivery API makes absolute again
     const BLOCK_END = /(<\/(?:p|h[1-6]|ul|ol|li|blockquote|pre|table|thead|tbody|tr|figure)>|<hr\s*\/?>)\s*/g;
     const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const ownMedia = new RegExp(`(src|href)="${escapeRegExp(location.origin)}/media/`, "g");
@@ -185,7 +123,6 @@
               ["clean"],
             ],
             handlers: {
-              // the image button opens the media picker instead of asking for a URL
               image: () =>
                 picker()?._open((item) => {
                   const range = quill.getSelection(true);
@@ -196,7 +133,6 @@
           },
         },
       });
-      // one character for one: no index moves
       const settle = () => {
         let index = 0;
         for (const op of quill.getContents().ops) {
@@ -222,11 +158,9 @@
       const write = () => {
         const html = tidy(restore(quill.getSemanticHTML()));
         input.value = html === opened ? original : html;
-        // a value set from script fires nothing; the editor form listens for this
         input.dispatchEvent(new Event("input", { bubbles: true }));
       };
       quill.on("text-change", write);
-      // a paste changes the text before it is settled, so it is written again
       const paste = quill.clipboard.onPaste.bind(quill.clipboard);
       quill.clipboard.onPaste = (range, { text, html }) => {
         paste(range, { text, html: html && protect(html) });
@@ -236,11 +170,6 @@
     };
   }
 
-  // Many-reference fields: the <select multiple> that is sent is hidden and
-  // follows `_chosen`. The server draws a chip and an "Add" option for every
-  // content that can be chosen, and `_chosen` shows one or the other. The select
-  // is changed from script, which fires nothing; the editor form listens for the
-  // change sent after.
   koya.references = (el) => ({
     _chosen: Array.from(el.querySelector("select[multiple]").selectedOptions, (option) => option.value),
     _has(id) {
@@ -257,9 +186,6 @@
     },
   });
 
-  // Media picker: one <dialog id="media-picker"> per editor page. Its body is
-  // fetched as it opens. A card ([data-pick-id]) clicked hands its file to
-  // whoever opened the picker: a :media field or a Quill editor.
   koya.mediaPicker = (dialog, url) => ({
     _onpick: null,
     _open(onpick) {
@@ -279,7 +205,6 @@
     },
   });
 
-  // A :media field: the file it holds, sent in its hidden input.
   koya.mediaField = (file) => ({
     _id: file.id,
     _url: file.url,
@@ -300,17 +225,11 @@
     },
   });
 
-  // Settings: draw a QR code for a [data-qr] element (the otpauth URI when
-  // setting up two-factor login). qrcode.min.js is davidshimjs/qrcodejs (MIT).
   koya.qr = (el) => {
     if (typeof QRCode === "undefined") return;
     new QRCode(el, { text: el.dataset.qr, width: 192, height: 192, correctLevel: QRCode.CorrectLevel.M });
   };
 
-  // Bulk selection: the ids of the [data-bulk-item] boxes in the scope, and
-  // which of them are chosen. A box may sit outside the form it belongs to,
-  // tied to it by its form attribute (the media grid does that), so the scope is
-  // what holds both.
   koya.bulk = (el) => ({
     _ids: Array.from(el.querySelectorAll("[data-bulk-item]"), (box) => box.value),
     _chosen: [],
@@ -334,12 +253,6 @@
     },
   });
 
-  // The editor's Save draft is on only while the form holds something the content
-  // does not: a draft that changes nothing is not saved (the server leaves it, or
-  // drops the draft when the form is the published data again). What the form was
-  // drawn with is the baseline, unless the server says it is unsaved -- a version
-  // being restored, or what was sent and refused. Publish is always on: publishing
-  // the same data again is a publish.
   koya.editor = (el, unsaved) => {
     const form = el.querySelector("#editor-form");
     const snapshot = () => new URLSearchParams(new FormData(form)).toString();
@@ -355,10 +268,6 @@
     };
   };
 
-  // Type to confirm: the dialog's submit button is on only while its
-  // [data-confirm-phrase] input holds that phrase exactly. The server checks it
-  // again, so this is for the owner, not a guard. Closed, the dialog forgets the
-  // phrase and the reason a refusal wrote, so it opens as new.
   koya.phrase = (dialog) => ({
     _typed: "",
     _phrase: dialog.querySelector("[data-confirm-phrase]").dataset.confirmPhrase,
@@ -368,12 +277,9 @@
     },
   });
 
-  // History: rich text is drawn in a sandboxed iframe, which is as tall as its
-  // document once that has loaded -- its stylesheet included.
   koya.fitContent = (frame) => {
     const fit = () => {
       const doc = frame.contentDocument;
-      // the body, not the root: the root is never shorter than the frame itself
       if (doc && doc.body) frame.style.height = `${Math.ceil(doc.body.getBoundingClientRect().height)}px`;
     };
     const track = () => {
@@ -384,13 +290,6 @@
     if (frame.contentDocument && frame.contentDocument.readyState === "complete") track();
   };
 
-  // Import: the archive goes to the import actions in pieces, each a request of
-  // its own that says where in the file it goes ([data-import-*] on the form).
-  // However large the space, no request is larger than a piece, and the server
-  // writes each one to the end of the upload. A piece is a body of its own, not
-  // a form, so these are fetches of their own that say they are from the admin
-  // UI, as an action requires. The last answer sends the browser to the page
-  // where the result waits as a toast.
   koya.importer = (form) => {
     const pieceBytes = Number(form.dataset.importPieceBytes);
     const post = async (url, body) => {
@@ -425,8 +324,6 @@
             await post(url, file.slice(offset, offset + pieceBytes));
             this._sent = Math.min(offset + pieceBytes, file.size);
           }
-          // the import itself is one step the server takes whole; the site waits
-          // for it, and so does this bar
           this.$refs.bar.removeAttribute("value");
           this._status = "Making the space. The server answers nothing else until it is done.";
           this.$fetch(dataUrl(await post(`${form.dataset.importFinish}?id=${encodeURIComponent(id)}`)), "GET");
