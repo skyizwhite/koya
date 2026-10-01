@@ -8,8 +8,8 @@
     let html = "";
     try {
       const response = await fetchWhole(input, init);
-      ok = response.ok;
       html = await response.text();
+      ok = response.ok;
     } catch (error) {
       if (error.name === "AbortError") throw error;
     }
