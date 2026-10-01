@@ -6,6 +6,7 @@
   (:import-from #:koya-server/web/ui/toast #:~toast)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
+  (:import-from #:koya-server/web/lib/binds #:reveals)
   (:export #:~media-grid
            #:~upload-limit
            #:~pick-cards
@@ -40,7 +41,7 @@
              :data-pick-url (media-url media :absolute nil)
              :data-pick-alt (media-alt media)
              :data-pick-name (media-filename media)
-             :nm-bind "{ onclick: () => pick(this.dataset) }"
+             :nm-bind "{ onclick: () => _pick(this.dataset) }"
        (~thumb :media media)
        (div :class "truncate" :title (media-filename media) (media-filename media))
        (div :class "text-muted" (dimensions media))))))
@@ -49,12 +50,12 @@
   (hsx
    (<> (loop :for media :in items :collect (hsx (~pick-card :media media)))
        (when more
-         (hsx (li :class "col-span-full py-2 text-center text-xs text-muted"
-                  :data-get more :nm-bind "{ oninit: koya.reveal }"
+         (hsx (li :id more :class "col-span-full py-2 text-center text-xs text-muted"
+                  :nm-bind (reveals more)
                 "Loading…"))))))
 
 (defcomp ~media-grid (&key items more)
   (if (null items)
       (hsx (~empty-state "No media yet. Upload an image above."))
-      (hsx (ul :id "media-picker-grid" :class "grid grid-cols-3 gap-3 sm:grid-cols-4"
+      (hsx (ul :class "grid grid-cols-3 gap-3 sm:grid-cols-4"
              (~pick-cards :items items :more more)))))

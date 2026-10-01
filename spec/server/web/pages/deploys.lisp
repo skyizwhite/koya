@@ -3,7 +3,7 @@
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-spec/server/web/pages/support
-                #:post-login #:*secret* #:*cookie* #:request #:call-action #:setup-pages #:log-in)
+                #:replaced-url #:post-login #:*secret* #:*cookie* #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/deploys #:browse-deploys)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/spaces #:delete-space)
@@ -105,12 +105,12 @@
 
 (deftest deploys-are-paged-in-place
   (log-in)
-  (multiple-value-bind (status body headers) (call-action :get (browse-deploys :space "website" :page 1))
+  (multiple-value-bind (status body) (call-action :get (browse-deploys :space "website" :page 1))
     (ok (= status 200))
     (ok (search "id=\"deploys\"" body))
     (ng (search "<html" body))
-    (ok (string= (getf headers :koya-replace-url) "/s/website/deploys")))
-  (ok (string= (getf (nth-value 2 (call-action :get (browse-deploys :space "website" :page 9))) :koya-replace-url)
+    (ok (string= (replaced-url body) "/s/website/deploys")))
+  (ok (string= (replaced-url (nth-value 1 (call-action :get (browse-deploys :space "website" :page 9))))
                "/s/website/deploys")
       "a page past the end is the last one")
   (ok (= 404 (call-action :get (browse-deploys :space "nope")))))

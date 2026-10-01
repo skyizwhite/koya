@@ -133,7 +133,9 @@
       (:options
        (unless (and (consp value) (every #'stringp value)) (bad "a non-empty list of strings"))
        (when (/= (length value) (length (remove-duplicates value :test #'string=)))
-         (bad "a list without duplicates")))
+         (bad "a list without duplicates"))
+       (when (some (lambda (option) (find #\, option)) value)
+         (bad "a list of strings without commas")))
       (:model
        (unless (slug-name-p value) (bad "a model name")))
       (:from

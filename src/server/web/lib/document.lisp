@@ -23,7 +23,7 @@
        (script :src (asset-url "js/nomini.js") :defer t)
        (script :src (asset-url "js/quill/quill.js") :defer t)
        (script :src (asset-url "js/qrcode.min.js") :defer t)
-       (script :src (asset-url "js/koya-fetch.js") :defer t)
        (script :src (asset-url "js/koya.js") :defer t))
-     (body :nm-data t :class "flex min-h-screen flex-col bg-base text-fg antialiased"
+     (body :class "flex min-h-screen flex-col bg-base text-fg antialiased"
+       (div :id "location" :hidden t)
        children))))

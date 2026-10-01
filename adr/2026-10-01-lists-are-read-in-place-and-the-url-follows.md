@@ -13,8 +13,9 @@ for a button.
 
 Searching, filtering, sorting and paging -- the content list, the media library,
 the webhook log, the deploy log and a content's history -- are actions. Each
-draws again the part of the page it changes and answers `Koya-Replace-Url` with
-the page's own URL for the new state, which the page puts in place of its URL.
+draws again the part of the page it changes, and with it an element for
+`#location` holding the page's own URL for the new state, which the page puts in
+place of its URL as the element is drawn.
 The page's GET still reads that state from the query string, so a reload, a
 bookmark or a shared link shows the same.
 
@@ -35,4 +36,4 @@ list asks the server for it at the URL it was left at, and it shows as it was
 left.
 
 A link inside a list keeps its `href` to the page's URL for that state, next to
-the `data-get` that is followed, so opening it in a new tab still works.
+the request its `nm-bind` makes, so opening it in a new tab still works.

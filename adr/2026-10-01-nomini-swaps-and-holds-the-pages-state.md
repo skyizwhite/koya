@@ -26,6 +26,12 @@ and change (`nm-bind`), bound again whenever something is swapped in.
 - What the server draws for a scope is all of it: a list of chips is drawn
   whole and the state shows or hides each one, since a scope cannot make
   elements.
+- Every member of a scope made in `koya.js` starts with `_`. Nomini sends the
+  other members of the scope a request is made from, and calls each function
+  among them to do so; a scope's state and its methods are the page's, not
+  something to send.
+- The page itself is no scope. State is held only where a part of the page
+  needs it.
 
 ## Consequences
 
@@ -35,5 +41,5 @@ and change (`nm-bind`), bound again whenever something is swapped in.
   by being set again, and an event sent after a change waits for the binds.
 - A scope does not see the one around it; scopes that work together hold each
   other, as the media field and the picker do.
-- Nomini does not send what HTMX sent, so a request goes through a wrapper of
-  koya's own (`adr/2026-10-01-requests-go-through-a-wrapper-around-nomini.md`).
+- An element asks the server with Nomini's own `$get` and `$post`
+  (`adr/2026-10-02-an-element-asks-the-server-with-nominis-get-and-post.md`).

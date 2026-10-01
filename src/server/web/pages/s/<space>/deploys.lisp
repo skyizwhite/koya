@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/deploys
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/usecases/schema #:list-deploys #:count-deploys #:+deploys-kept+)
   (:import-from #:koya-server/usecases/spaces #:find-space)
@@ -13,7 +13,7 @@
   (:import-from #:koya-server/web/lib/urls #:deploys-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:export #:@get #:browse-deploys))
@@ -74,8 +74,8 @@
   (let ((space (param params "space")))
     (cond ((not (and space (find-space space))) (action-refusal "Space not found." 404))
           (t (let ((page (min (page-number params) (last-page (count-deploys space)))))
-               (set-response-header :koya-replace-url (deploys-url space :page page))
-               (hsx (~deploys :space space :page page)))))))
+               (hsx (<> (~deploys :space space :page page)
+                        (~replace-url :url (deploys-url space :page page)))))))))
 
 (defun @get (params)
   (let ((space (path-param params :space)))

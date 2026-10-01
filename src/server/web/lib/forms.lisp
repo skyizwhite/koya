@@ -11,7 +11,7 @@
   (:import-from #:koya-server/domain/timezone #:iso->local-input #:local-input->iso)
   (:import-from #:koya-server/usecases/settings #:display-timezone)
   (:import-from #:koya-server/web/lib/http
-                #:form-values)
+                #:form-values #:form-list)
   (:export #:form->data
            #:field-param-name
            #:form-value
@@ -42,12 +42,12 @@
            (when raw (setf (gethash (field-name field) data) (or (parse-decimal raw) raw))))
           (:select
            (if (field-many-p field)
-               (let ((values (remove "" (form-values params name) :test #'string=)))
+               (let ((values (form-list params name)))
                  (when values (setf (gethash (field-name field) data) (coerce values 'vector))))
                (when raw (setf (gethash (field-name field) data) raw))))
           ((:reference :media)
            (if (field-many-p field)
-               (let ((ids (loop :for v :in (form-values params name) :append (split-ids v))))
+               (let ((ids (loop :for v :in (form-list params name) :append (split-ids v))))
                  (when ids (setf (gethash (field-name field) data) (coerce ids 'vector))))
                (when raw (setf (gethash (field-name field) data) raw))))
           (:datetime

@@ -1,11 +1,14 @@
 (defpackage #:koya-server/web/ui/elements
   (:use #:cl #:hsx)
   (:import-from #:koya-server/web/ui/icon #:~icon)
+  (:import-from #:koya-server/web/lib/binds #:follows)
   (:export #:~errors
            #:~empty-state
            #:~status-badge
            #:~pager
-           #:~confirm-dialog))
+           #:~confirm-dialog
+           #:~go-to
+           #:~replace-url))
 (in-package #:koya-server/web/ui/elements)
 
 (defcomp ~errors (&key errors)
@@ -27,8 +30,7 @@
 
 (defcomp ~pager (&key page pages href browse)
   (flet ((link (n)
-           (hsx (a :href (funcall href n) :data-get (funcall browse n)
-                   :nm-bind "{ onclick: koya.follow }" :class "btn"
+           (hsx (a :href (funcall href n) :nm-bind (follows (funcall browse n)) :class "btn"
                    (if (< n page)
                        (hsx (<> (~icon :name :prev) "Previous"))
                        (hsx (<> "Next" (~icon :name :next))))))))
@@ -50,3 +52,11 @@
      (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
        (button :type "button" :commandfor id :command "close" :class "btn" "Cancel")
        children))))
+
+(defcomp ~go-to (&key url)
+  (hsx (div :id "location" :hidden t :data-go url
+            :nm-bind "{ oninit: () => window.location.assign(this.dataset.go) }")))
+
+(defcomp ~replace-url (&key url)
+  (hsx (div :id "location" :hidden t :data-replace url
+            :nm-bind "{ oninit: () => history.replaceState(history.state, '', this.dataset.replace) }")))

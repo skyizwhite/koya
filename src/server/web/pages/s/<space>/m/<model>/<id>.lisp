@@ -1,7 +1,8 @@
 (defpackage #:koya-server/web/pages/s/<space>/m/<model>/<id>
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/web/lib/binds #:posts #:clicks)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url)
@@ -25,7 +26,7 @@
                 #:expand-url-template #:content-url #:model-url #:history-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors #:~confirm-dialog)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors #:~confirm-dialog #:~go-to #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
@@ -57,10 +58,9 @@
     (flet ((post ()
              (hsx (button :type "button" :class class
                           :commandfor dialog :command (and dialog "close")
-                          :form "editor-form" :data-post (editor-action :space space :model model :id id :op op)
-                          :nm-bind (if (equal op "save")
-                                       "{ onclick: koya.submit, disabled: () => unchanged() }"
-                                       "{ onclick: koya.submit }")
+                          :nm-bind (clicks (editor-action :space space :model model :id id :op op)
+                                           :data "koya.form($refs.form)"
+                                           :also (and (equal op "save") "disabled: () => _unchanged()"))
                     (when icon (hsx (~icon :name icon)))
                     children))))
       (if dialog
@@ -102,7 +102,7 @@
                                                 :id id :draft-key (content-draft-key content))))
          (public-url (and published (expand-url-template (model-public-url model) :id id))))
     (hsx
-     (div :id "editor" :nm-data "...koya.editor(this)"
+     (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring errors))
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (h1 :class "text-2xl font-bold" model-name
            (unless object-p
@@ -132,10 +132,9 @@
        (~errors :errors errors)
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
-       (form :id "editor-form" :class "space-y-6"
-             :data-post (editor-action :space space-name :model model-name :id id :op "save")
-             :data-unsaved (and (or restoring errors) t)
-             :nm-bind "{ onsubmit: koya.submit, oninput: () => track(), onchange: () => track() }"
+       (form :id "editor-form" :class "space-y-6" :nm-ref "form"
+             :nm-bind (posts (editor-action :space space-name :model model-name :id id :op "save")
+                             :also "oninput: () => _track(), onchange: () => _track()")
          (loop :for field :in (model-fields model) :collect
            (hsx (~field-input :field field
                               :value (and data (gethash (field-name field) data))
@@ -215,14 +214,13 @@
            (hsx (~editor-page :space space :model model :content content :data current))))))))
 
 (defun done (space model content message)
-  (set-response-header :koya-replace-url (content-url space (model-name model) (content-id content)))
   (hsx (<> (~editor :space space :model model :content content :data (content-data content :draft t))
+           (~replace-url :url (content-url space (model-name model) (content-id content)))
            (~toast :message message))))
 
 (defun move-on (url message)
   (set-toast message)
-  (set-response-header :koya-redirect url)
-  (hsx (<>)))
+  (hsx (~go-to :url url)))
 
 (defaction editor-action :post (params)
   (let* ((space (param params "space"))

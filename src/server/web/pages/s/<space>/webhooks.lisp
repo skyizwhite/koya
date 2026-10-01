@@ -1,7 +1,8 @@
 (defpackage #:koya-server/web/pages/s/<space>/webhooks
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/web/lib/binds #:searches #:follows)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
   (:import-from #:koya-server/usecases/webhooks
@@ -17,7 +18,7 @@
   (:import-from #:koya-server/web/lib/urls #:space-url #:content-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:import-from #:koya-server/usecases/schema #:load-schema)
@@ -68,8 +69,7 @@
      (<> (unless (and (null labels) (null models))
            (hsx
             (form :id "filters" :method "get" :action (format nil "~a/webhooks" (space-url space))
-                  :data-get (browse-deliveries :space space)
-                  :nm-bind "{ onsubmit: koya.submit, onchange: koya.search }"
+                  :nm-data "...koya.search()" :nm-bind (searches (browse-deliveries :space space) :typing nil)
                   :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
               (~filter-select :name "label" :label "Webhook" :all "All webhooks"
                               :options labels :selected label)
@@ -139,7 +139,7 @@
        (when (filtered-p label model)
          (hsx (p :class "-mt-3 mb-3 text-sm"
                 (a :href (webhook-log-url space)
-                   :data-get (browse-deliveries :space space :clear "1") :nm-bind "{ onclick: koya.follow }"
+                   :nm-bind (follows (browse-deliveries :space space :clear "1"))
                    :class "text-muted hover:text-fg hover:underline"
                   "Clear the filters"))))
        (if (null items)
@@ -171,8 +171,8 @@
          (page (and schema (min (page-number params) pages))))
     (cond ((null schema) (action-refusal "Space not found." 404))
           (t
-           (set-response-header :koya-replace-url (webhook-log-url space :label label :model model :page page))
            (hsx (<> (~deliveries :space space :label label :model model :page page)
+                    (~replace-url :url (webhook-log-url space :label label :model model :page page))
                     (~delivery-count :space space :label label :model model)
                     (if clear
                         (hsx (~filters :space space :schema schema))

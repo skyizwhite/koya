@@ -59,6 +59,8 @@
     (ok (signals (make-field :x :text :required "yes") 'schema-error))
     (ok (signals (make-field :x :select :options "abc") 'schema-error) "options must be a list")
     (ok (signals (make-field :x :select :options '("a" "a")) 'schema-error) "no duplicate options")
+    (ok (signals (make-field :x :select :options '("a, b" "c")) 'schema-error)
+        "no comma in an option: the admin UI sends a list of them comma-separated")
     (ok (equal (field-option (make-field :x :select :options '(news tech)) :options) '("news" "tech"))
         "symbol options are downcased like model names")
     (ok (signals (make-schema :webhooks "https://x") 'schema-error) "webhooks must be a list")

@@ -3,7 +3,8 @@
   (:import-from #:koya-core/schema
                 #:field-name #:field-type #:field-option #:field-required-p #:field-many-p)
   (:import-from #:koya-core/json
-                #:json-null)
+                #:json-null #:to-json #:jobject)
+  (:import-from #:koya-server/web/lib/binds #:+draws-refusals+)
   (:import-from #:koya-server/web/lib/forms #:field-param-name #:value->string)
   (:import-from #:koya-server/domain/media #:media-filename #:media-alt)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
@@ -36,23 +37,23 @@
      (select :id name :name name :multiple t :hidden t :nm-ref "select"
        (loop :for (id . label) :in choices :collect
          (hsx (option :value id :selected (selected-p value id)
-                      :nm-bind "{ selected: () => has(this.value) }"
+                      :nm-bind "{ selected: () => _has(this.value) }"
                 label))))
      (loop :for (id . label) :in choices :collect
        (hsx (span :class "badge inline-flex items-center gap-1 bg-line text-fg"
                   :data-id id :hidden (not (selected-p value id))
-                  :nm-bind "{ hidden: () => !has(this.dataset.id) }"
+                  :nm-bind "{ hidden: () => !_has(this.dataset.id) }"
               label
               (button :type "button" :class "text-muted hover:text-danger" :data-id id
                       :aria-label (format nil "Remove ~a" label)
-                      :nm-bind "{ onclick: () => remove(this.dataset.id) }"
+                      :nm-bind "{ onclick: () => _remove(this.dataset.id) }"
                 "×"))))
-     (select :aria-label "Add" :nm-bind "{ onchange: () => add(this) }"
+     (select :aria-label "Add" :nm-bind "{ onchange: () => _add(this) }"
        (option :value "" "Add…")
        (loop :for (id . label) :in choices :collect
          (let ((chosen (selected-p value id)))
            (hsx (option :value id :hidden chosen :disabled chosen
-                        :nm-bind "{ hidden: () => has(this.value), disabled: () => has(this.value) }"
+                        :nm-bind "{ hidden: () => _has(this.value), disabled: () => _has(this.value) }"
                   label))))))))
 
 (defcomp ~reference-select (&key field value references)
@@ -76,19 +77,20 @@
                      ((and value (plusp (length value))) (format nil "~a (missing)" value))
                      (t "No image"))))
     (hsx
-     (div :class "flex items-start gap-4" :nm-data "...koya.mediaField(this.dataset)"
-          :data-id (or value "") :data-url url :data-alt alt :data-name label
+     (div :class "flex items-start gap-4"
+          :nm-data (format nil "...koya.mediaField(~a)"
+                           (to-json (jobject "id" (or value "") "url" url "alt" alt "name" label)))
        (input :type "hidden" :id name :name name :value (or value "") :nm-ref "input"
-              :nm-bind "{ value: () => id }")
+              :nm-bind "{ value: () => _id }")
        (img :src url :alt alt
             :class (clsx "h-24 w-24 rounded-md border border-line bg-panel object-contain" (unless media "hidden"))
-            :nm-bind "{ src: () => url, alt: () => alt, 'class.hidden': () => !url }")
+            :nm-bind "{ src: () => _url, alt: () => _alt, 'class.hidden': () => !_url }")
        (div :class "space-y-2 text-sm"
-         (div :class "text-muted" :nm-bind "{ textContent: () => name }" label)
+         (div :class "text-muted" :nm-bind "{ textContent: () => _name }" label)
          (div :class "flex gap-2"
-           (button :type "button" :class "btn" :nm-bind "{ onclick: () => choose() }"
+           (button :type "button" :class "btn" :nm-bind (format nil "{ onclick: () => _choose(), ~a }" +draws-refusals+)
              (~icon :name :media) "Choose…")
-           (button :type "button" :class "btn" :nm-bind "{ onclick: () => clear() }"
+           (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
              (~icon :name :close) "Clear")))))))
 
 (defcomp ~field-input (&key field value error references media)

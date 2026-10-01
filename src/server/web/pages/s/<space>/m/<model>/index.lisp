@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/pages/s/<space>/m/<model>/index
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status #:set-response-header)
+  (:import-from #:jingle #:set-response-status)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
@@ -11,16 +11,17 @@
   (:import-from #:koya-server/web/lib/target #:target-model)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-data #:+statuses+ #:content-label)
-  (:import-from #:koya-server/web/lib/http #:path-param #:redirect-to #:param #:form-values #:blank-p)
+  (:import-from #:koya-server/web/lib/http #:path-param #:redirect-to #:param #:form-list #:blank-p)
   (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number)
   (:import-from #:koya-server/web/lib/display #:short-time)
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager #:~confirm-dialog)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager #:~confirm-dialog #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/web/lib/binds #:searches #:follows #:clicks)
   (:import-from #:koya-server/usecases/listing
                 #:parse-sort #:content-page #:page-media #:count-contents #:find-object-content
                 #:reference-labels)
@@ -132,8 +133,7 @@
 (defcomp ~filters (&key space model search-text status sort-key)
   (hsx
    (form :id "filters" :method "get" :action (model-url space model)
-         :data-get (browse-contents :space space :model model)
-         :nm-bind "{ onsubmit: koya.submit, 'oninput.debounce300': koya.search, onchange: koya.search }"
+         :nm-data "...koya.search()" :nm-bind (searches (browse-contents :space space :model model))
          :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
      (~sort-input :sort-key sort-key)
      (input :type "search" :name "q" :value (or search-text "") :placeholder "Search text and ids"
@@ -152,7 +152,7 @@
     (hsx
      (th :class "py-2 pr-4 font-medium"
        (a :href (list-url space model :search-text (getf state :search-text) :status (getf state :status) :sort-key next)
-          :data-get (browse-url space model state :sort-key next :page 1) :nm-bind "{ onclick: koya.follow }"
+          :nm-bind (follows (browse-url space model state :sort-key next :page 1))
           :class "flex items-center gap-1 hover:text-fg"
          (span :class (clsx "truncate" (column-width field)) name)
          (when active
@@ -169,12 +169,12 @@
                           (~icon :name icon) label)
                         (~confirm-dialog :id dialog :title title :message message
                           (button :type "button" :class class :commandfor dialog :command "close"
-                                  :data-post (url op) :nm-bind "{ onclick: koya.submit }"
+                                  :nm-bind (clicks (url op) :data "{ id: _chosen }")
                             (~icon :name icon) label)))))))
     (hsx
-     (div :hidden t :nm-bind "{ hidden: () => !count() }"
+     (div :hidden t :nm-bind "{ hidden: () => !_count() }"
           :class "mb-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel px-4 py-2 text-sm"
-       (span :class "mr-2 text-muted" :nm-bind "{ textContent: () => `${count()} selected` }" "0 selected")
+       (span :class "mr-2 text-muted" :nm-bind "{ textContent: () => `${_count()} selected` }" "0 selected")
        (action "publish" "btn" :publish "Publish" "Publish contents"
                "Publish the selected contents? The site shows each of them as it is now.")
        (action "unpublish" "btn" :unpublish "Unpublish" "Unpublish contents"
@@ -217,8 +217,7 @@
        (when (filtered-p state)
          (hsx (p :class "-mt-3 mb-3 text-sm"
                 (a :href (list-url space model-name :sort-key (getf state :sort-key))
-                   :data-get (browse-url space model-name state :search-text "" :status "" :page 1 :clear t)
-                   :nm-bind "{ onclick: koya.follow }"
+                   :nm-bind (follows (browse-url space model-name state :search-text "" :status "" :page 1 :clear t))
                    :class "text-muted hover:text-fg hover:underline"
                   "Clear the search and filter"))))
        (if (null contents)
@@ -232,7 +231,7 @@
                       (thead (tr :class "border-b border-line text-left text-muted"
                                (th :class "py-2 pl-4 pr-2"
                                  (input :type "checkbox"
-                                        :nm-bind "{ checked: () => all(), indeterminate: () => partly(), onchange: () => pickAll(this.checked) }"
+                                        :nm-bind "{ checked: () => _all(), indeterminate: () => _partly(), onchange: () => _pickAll(this.checked) }"
                                         :aria-label "Select every content on this page"))
                                (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
                                (loop :for field :in fields :collect
@@ -243,7 +242,7 @@
                           (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
                                  (td :class "relative z-10 py-2 pl-4 pr-2"
                                    (input :type "checkbox" :name "id" :value (content-id content) :data-bulk-item t
-                                          :nm-bind "{ checked: () => picked(this.value), onchange: () => pick(this.value, this.checked) }"
+                                          :nm-bind "{ checked: () => _picked(this.value), onchange: () => _pick(this.value, this.checked) }"
                                           :aria-label (format nil "Select ~a" (content-label content model))))
                                  (td :class "py-2 pr-4 whitespace-nowrap"
                                    (~status-badge :status (content-status content)))
@@ -282,10 +281,10 @@
       (setf (getf state :page) pages)
       (multiple-value-setq (contents total pages) (fetch-page space model state)))
     (let ((model-name (model-name model)))
-      (set-response-header :koya-replace-url
-                           (list-url space model-name :search-text (getf state :search-text) :status (getf state :status)
-                                                      :sort-key (getf state :sort-key) :page (getf state :page)))
       (hsx (<> (~content-list :space space :model model :state state :contents contents :pages pages)
+               (~replace-url :url (list-url space model-name :search-text (getf state :search-text)
+                                                             :status (getf state :status)
+                                                             :sort-key (getf state :sort-key) :page (getf state :page)))
                (~content-count :space space :model model :state state :total total)
                (if clear
                    (hsx (~filters :space space :model model-name :sort-key (getf state :sort-key)))
@@ -328,7 +327,7 @@
   (let* ((space (param params "space"))
          (model (target-model params))
          (op (param params "op"))
-         (ids (form-values params "id")))
+         (ids (form-list params "id")))
     (cond ((or (null model) (not (bulk-action-p op)))
            (action-refusal "Unknown model or action." 404))
           (t

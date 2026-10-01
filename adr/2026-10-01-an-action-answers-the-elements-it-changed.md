@@ -16,7 +16,7 @@ without a reload.
   page is left as it was. Where the page has a place for the reason, such as a
   dialog's error line, it answers that place under its id instead.
 - An action whose result is another page sends the browser there with
-  `Koya-Redirect`. A content just made, one deleted and a space imported all work
+  an element swapped into the document's `#location`. A content just made, one deleted and a space imported all work
   this way, and the toast waits in the session.
 
 ## Consequences

@@ -18,8 +18,8 @@ reloaded the editor, its schema and every reference it offered.
 
 ## Consequences
 
-- A form carries its action in `data-post` (or `data-get`) and no `method` or
-  `action` of its own, and a page has nothing to post to. The admin UI needs
+- A form calls its action from its `nm-bind` and has no `method` or `action` of
+  its own, and a page has nothing to post to. The admin UI needs
   JavaScript.
 - A view and the handler it calls cannot drift apart, and the specs call the
   same function.

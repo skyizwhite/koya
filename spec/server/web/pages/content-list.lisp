@@ -1,7 +1,8 @@
 (defpackage #:koya-spec/server/web/pages/content-list
   (:use #:cl #:rove)
+  (:import-from #:koya-server/web/lib/binds #:follows #:searches #:clicks)
   (:import-from #:koya-spec/server/web/pages/support
-                #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
+                #:replaced-url #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:setup-pages #:log-in #:asked-first)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
@@ -21,7 +22,7 @@
 
 (defun bulk (op ids &key (q "") (status "") (page 1))
   (call-action :post (bulk-contents :space "website" :model "blog" :op op :q q :status status :sort "" :page page)
-               :form (mapcar (lambda (id) (cons "id" id)) ids)))
+               :form (and ids `(("id" . ,(format nil "~{~a~^,~}" ids))))))
 
 (setup (setup-pages) (log-in))
 
@@ -43,7 +44,7 @@
       (ok (= status 200))
       (ok (search "Page 2 of 2" body))
       (ok (search "Page filler 000" body))
-      (ok (search "<a href=\"/s/website/m/blog\" data-get=" body)
+      (ok (search "<a href=\"/s/website/m/blog\" nm-bind=\"{ onclick: (e) => koya.follow(e) &amp;&amp; $get(" body)
           "and back, to the list's own URL: page 1 is not a query"))
     (multiple-value-bind (status body headers) (request :get "/s/website/m/blog" :query "page=9")
       (declare (ignore body))
@@ -158,12 +159,11 @@
                 "paging past the end of a search comes back to the search, not to an empty page")))))))
 
 (deftest list-columns-are-bounded
-  (multiple-value-bind (status body headers)
+  (multiple-value-bind (status body)
       (edit "/s/website/m/blog/new" :form '(("action" . "save") ("f-title" . "Columns") ("f-body" . "<p>x</p>"))
                :headers '(("origin" . "http://localhost:3000")))
-    (declare (ignore body))
     (ok (= status 200))
-    (let ((path (subseq (moved-to headers) 0 (position #\? (moved-to headers)))))
+    (let ((path (subseq (moved-to body) 0 (position #\? (moved-to body)))))
       (multiple-value-bind (status body) (request :get "/s/website/m/blog")
         (ok (= status 200))
         (ok (search ">related<" body) "every field keeps its column")
@@ -180,12 +180,12 @@
                                        :width 1 :height 1 :alt "A red door"))
         (paths '()))
     (flet ((save (title cover)
-             (multiple-value-bind (status body headers)
+             (multiple-value-bind (status body)
                  (edit "/s/website/m/blog/new"
                            :form `(("action" . "save") ("f-title" . ,title) ("f-cover" . ,cover))
                           :headers origin)
-               (declare (ignore status body))
-               (push (subseq (moved-to headers) 0 (position #\? (moved-to headers))) paths))))
+               (declare (ignore status))
+               (push (subseq (moved-to body) 0 (position #\? (moved-to body))) paths))))
       (save "With cover" (media-id media))
       (save "Lost cover" "01MISSINGMEDIA0000000000000")
       (save "No cover" "")
@@ -236,17 +236,17 @@
           (multiple-value-bind (status body) (request :get "/s/website/m/blog")
             (ok (= status 200))
             (ok (search "<form nm-data=\"...koya.bulk(this)\">" body) "the selection is the form's")
-            (ok (search "nm-bind=\"{ checked: () => all(), indeterminate: () => partly(), onchange: () => pickAll(this.checked) }\"" body)
+            (ok (search "nm-bind=\"{ checked: () => _all(), indeterminate: () => _partly(), onchange: () => _pickAll(this.checked) }\"" body)
                 "a box for the page")
-            (ok (search (format nil "name=\"id\" value=\"~a\" data-bulk-item nm-bind=\"{ checked: () => picked(this.value), onchange: () => pick(this.value, this.checked) }\"" one) body)
+            (ok (search (format nil "name=\"id\" value=\"~a\" data-bulk-item nm-bind=\"{ checked: () => _picked(this.value), onchange: () => _pick(this.value, this.checked) }\"" one) body)
                 "each row carries its id")
-            (ok (search "hidden nm-bind=\"{ hidden: () => !count() }\"" body) "the bar waits for a selection")
+            (ok (search "hidden nm-bind=\"{ hidden: () => !_count() }\"" body) "the bar waits for a selection")
             (dolist (op '("publish" "unpublish" "delete"))
               (ok (asked-first body (format nil "confirm-bulk-~a" op)
                                (bulk-contents :space "website" :model "blog" :op op
                                               :q "" :status "" :sort "" :page 1))
                   (format nil "~a opens a dialog, and the dialog does it" op)))
-            (ng (search "data-confirm" body) "not the browser's own confirm")))
+            (ng (search "confirm(" body) "not the browser's own confirm")))
         (testing "publishing a selection publishes each of them"
           (multiple-value-bind (status body) (bulk "publish" (list one two))
             (ok (= status 200))
@@ -272,9 +272,9 @@
                                                       :key #'content-id :test #'string=)))
                 "and the preview link it was holding still works")))
         (testing "the list comes back under the filters it was read with"
-          (multiple-value-bind (status body headers) (bulk "unpublish" (list two) :q "Bulk" :status "published")
+          (multiple-value-bind (status body) (bulk "unpublish" (list two) :q "Bulk" :status "published")
             (declare (ignore status))
-            (ok (string= (getf headers :koya-replace-url) "/s/website/m/blog?q=Bulk&status=published")
+            (ok (string= (replaced-url body) "/s/website/m/blog?q=Bulk&status=published")
                 "the URL keeps the search and the filter")
             (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
@@ -325,13 +325,14 @@
     (testing "the page's controls call the action"
       (let ((body (nth-value 1 (request :get "/s/website/m/blog"))))
         (ok (search "id=\"filters\"" body))
-        (ok (search "'oninput.debounce300': koya.search" body) "the search goes as the typing stops")
-        (ok (search "onchange: koya.search" body) "and the status as it is picked")
+        (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (searches (browse-contents :space "website" :model "blog"))))
+                    body)
+            "the search goes as the typing stops, and the status as it is picked")
         (ng (search ">Filter<" body) "so there is no button to press")
         (ok (search (subseq (browse-contents) 0 (position #\? (browse-contents))) body)
             "the headers and the pager too")))
     (testing "a search draws #contents, the count and the sort, and puts the state in the URL"
-      (multiple-value-bind (status body headers) (browse :q "an" :status "" :sort "title" :page 1)
+      (multiple-value-bind (status body) (browse :q "an" :status "" :sort "title" :page 1)
         (ok (= status 200))
         (ok (search "id=\"contents\"" body))
         (ok (search "Banana" body))
@@ -341,14 +342,14 @@
         (ok (search "id=\"filter-sort\" name=\"sort\" value=\"title\">" body)
             "the sort the filters send, beside it")
         (ng (search "id=\"filters\"" body) "but not the box being typed in")
-        (ok (string= (getf headers :koya-replace-url) "/s/website/m/blog?q=an&sort=title"))))
+        (ok (string= (replaced-url body) "/s/website/m/blog?q=an&sort=title"))))
     (testing "clearing puts the filters back empty"
-      (multiple-value-bind (status body headers) (browse :q "" :status "" :sort "" :page 1 :clear "1")
+      (multiple-value-bind (status body) (browse :q "" :status "" :sort "" :page 1 :clear "1")
         (ok (= status 200))
         (ok (search "id=\"filters\"" body))
         (ok (search "value=\"\" placeholder=\"Search text and ids\"" body))
-        (ok (string= (getf headers :koya-replace-url) "/s/website/m/blog"))))
+        (ok (string= (replaced-url body) "/s/website/m/blog"))))
     (testing "a page past the end is the last one"
-      (ok (string= (getf (nth-value 2 (browse :q "" :status "" :sort "" :page 9)) :koya-replace-url) "/s/website/m/blog")))
+      (ok (string= (replaced-url (nth-value 1 (browse :q "" :status "" :sort "" :page 9))) "/s/website/m/blog")))
     (testing "an object model has no list"
       (ok (= 404 (call-action :get (browse-contents :space "website" :model "about")))))))

@@ -15,6 +15,7 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:export #:@get #:create-key #:delete-key #:rotate-secret))
 (in-package #:koya-server/web/pages/s/<space>/keys)
 
@@ -53,9 +54,8 @@
                                 (key-label key)))
                           (td :class "py-2 pr-4 whitespace-nowrap text-muted" (short-time (key-created-at key)))
                           (td :class "py-2 pl-4 pr-4 text-right"
-                            (form :data-post (delete-key :space space :kind kind)
-                                  :data-confirm "Delete this key? Whatever uses it stops working."
-                                  :nm-bind "{ onsubmit: koya.submit }"
+                            (form :nm-bind (posts (delete-key :space space :kind kind)
+                                                  :confirm "Delete this key? Whatever uses it stops working.")
                               (input :type "hidden" :name "id" :value (key-id key))
                               (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete key"
                                 (~icon :name :delete)))))))))))))
@@ -68,7 +68,7 @@
        (p :class "mb-4 text-sm text-muted" (getf k :lead))
        (when new-key (hsx (~new-key :key new-key)))
        (~key-table :space space :kind kind :keys (funcall (getf k :list) space))
-       (form :data-post (create-key :space space :kind kind) :nm-bind "{ onsubmit: koya.submit }"
+       (form :nm-bind (posts (create-key :space space :kind kind))
              :class "mt-4 flex items-end gap-3"
          (div :class "flex-1"
            (label :class "label" "Label")
@@ -84,9 +84,8 @@
      (div :class "flex items-center gap-3"
        (code :class "select-all break-all rounded border border-line bg-panel px-2 py-1 font-mono text-sm"
          (space-webhook-secret space))
-       (form :data-post (rotate-secret :space space)
-             :data-confirm "Rotate the webhook secret? Receivers checking the old one start refusing."
-             :nm-bind "{ onsubmit: koya.submit }"
+       (form :nm-bind (posts (rotate-secret :space space)
+                            :confirm "Rotate the webhook secret? Receivers checking the old one start refusing.")
          (button :type "submit" :class "btn" (~icon :name :rotate) "Rotate"))))))
 
 (defcomp ~keys-page (&key space)

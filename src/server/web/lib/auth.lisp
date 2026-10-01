@@ -116,7 +116,7 @@
   (and (gethash path *public-paths*) t))
 
 (defun page-request-p (env)
-  (equal (gethash "koya-request" (getf env :headers)) "true"))
+  (equal (gethash "nm-request" (getf env :headers)) "true"))
 
 (defun login-location (env)
   (let* ((current (ignore-errors (uri (gethash "referer" (getf env :headers)))))
@@ -141,8 +141,9 @@
     (lambda (env)
       (if (session-env-owner-p env)
           (funcall app env)
-          (list 401 (list :content-type "text/html; charset=utf-8" :koya-redirect (login-location env))
-                (list "<p class=\"text-sm text-danger\">Log in again to continue.</p>"))))))
+          (list 401 (list :content-type "text/html; charset=utf-8")
+                (list (format nil "<div id=\"location\" hidden data-go=\"~a\" nm-bind=\"{ oninit: () => window.location.assign(this.dataset.go) }\"></div>"
+                              (uiop:frob-substrings (login-location env) '("&") "&amp;"))))))))
 
 (defparameter *action-actor*
   (lambda (app)

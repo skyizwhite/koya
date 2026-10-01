@@ -1,8 +1,9 @@
 (defpackage #:koya-spec/server/web/pages/webhooks
   (:use #:cl #:rove)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-server/web/lib/binds #:searches)
   (:import-from #:koya-spec/server/web/pages/support
-                #:blog-model #:request #:call-action #:setup-pages #:log-in)
+                #:replaced-url #:bound #:blog-model #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/webhooks #:browse-deliveries)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/webhooks #:record-delivery)
@@ -125,24 +126,23 @@
                                :ok t :status 200 :response "" :error "" :duration-ms 1))
   (testing "the selects call the action as they are picked"
     (let ((body (nth-value 1 (request :get "/s/website/webhooks"))))
-      (ok (search (format nil "data-get=\"~a\" nm-bind=\"{ onsubmit: koya.submit, onchange: koya.search }\""
-                          (browse-deliveries :space "website"))
+      (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (searches (browse-deliveries :space "website") :typing nil)))
                   body)
           "either select, as its change bubbles")
       (ng (search ">Filter<" body) "so there is no button to press")))
   (testing "a filter draws #deliveries and the count, and puts itself in the URL"
-    (multiple-value-bind (status body headers)
+    (multiple-value-bind (status body)
         (call-action :get (browse-deliveries :space "website" :label "" :model "about" :page 1))
       (ok (= status 200))
       (ok (search "id=\"deliveries\"" body))
       (ok (search "1 call matches." body) "the count, out of band")
       (ok (search "Clear the filters" body))
       (ng (search "id=\"filters\"" body) "the selects stay as they are")
-      (ok (string= (getf headers :koya-replace-url) "/s/website/webhooks?model=about"))))
+      (ok (string= (replaced-url body) "/s/website/webhooks?model=about"))))
   (testing "clearing puts the selects back"
-    (multiple-value-bind (status body headers) (call-action :get (browse-deliveries :space "website" :clear "1"))
+    (multiple-value-bind (status body) (call-action :get (browse-deliveries :space "website" :clear "1"))
       (ok (= status 200))
       (ok (search "id=\"filters\"" body))
       (ok (search "3 calls." body))
-      (ok (string= (getf headers :koya-replace-url) "/s/website/webhooks"))))
+      (ok (string= (replaced-url body) "/s/website/webhooks"))))
   (ok (= 404 (call-action :get (browse-deliveries :space "nope")))))

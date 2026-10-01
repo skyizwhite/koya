@@ -1,13 +1,27 @@
-// What the admin UI's pages do in the browser. A part of a page that holds
-// state is a Nomini scope made by one of these (nm-data="...koya.bulk(this)"),
-// and its elements read and change that state with nm-bind. What needs no state
-// but has to run on an element -- on the page and in whatever is swapped in --
-// is called from the element's oninit. Talking to the server is koya-fetch.js.
+// What the admin UI's pages do in the browser, on Nomini. An element asks the
+// server with Nomini's own $get and $post, written in its nm-bind (web/lib/binds
+// writes them), and Nomini swaps in each element of the answer by its id. A part
+// of a page that holds state is a Nomini scope made by one of the factories here
+// (nm-data="...koya.bulk(this)"); what needs no state but has to run on an
+// element -- on the page and in whatever is swapped in -- is called from its
+// oninit.
 //
+// A member of a scope here starts with _: Nomini sends every other member of
+// the scope a request is made from, and calls each such function to do so.
 // A scope's state is shallow: a list changes by being set again
-// (chosen = [...chosen, id]), not by push. A scope does not see the one around
+// (_chosen = [..._chosen, id]), not by push. A scope does not see the one around
 // it, so scopes that work together hold each other (the media field hands the
 // picker what to do with a file).
+//
+// What Nomini leaves to this file:
+// - A list goes as Nomini sends an array, comma-separated; koya.form makes a
+//   form's fields into what $get and $post send.
+// - A refused request (4xx) is drawn like any other answer: Nomini only reports
+//   it (fetcherr, with the body in the error's message), so koya.refused hands
+//   the body back to the scope's $fetch as a data: URL.
+// - A file is sent by koya.upload's own fetch, and its answer drawn the same way.
+// - An answer that moves the browser, or replaces the page's URL, is an element
+//   swapped into #location, which does it as it is drawn (ui/elements).
 {
   const koya = (window.koya ||= {});
 
@@ -17,6 +31,106 @@
   const changed = (el) => setTimeout(() => el.dispatchEvent(new Event("change", { bubbles: true })));
 
   const picker = () => document.getElementById("media-picker")?.nmProxy;
+
+  // a form's fields as $get and $post send them: a name given more than once
+  // (a selection, a many field) is a list
+  koya.form = (form) => {
+    const data = new FormData(form);
+    const fields = {};
+    for (const name of new Set(data.keys())) {
+      const values = data.getAll(name);
+      fields[name] = values.length > 1 ? values : values[0];
+    }
+    return fields;
+  };
+
+  // a link followed in place, unless it is asked for in a tab or a window of
+  // its own
+  koya.follow = (event) => {
+    if (event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    event.preventDefault();
+    return true;
+  };
+
+  const drawable = (html) => {
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    return Array.from(template.content.children).some((el) => el.id);
+  };
+
+  const textOf = (html) => new DOMParser().parseFromString(html, "text/html").body.textContent.trim();
+
+  // what has nothing to draw is said in the toast, as the layout's toast-failed
+  // draws it
+  const asToast = (message) => {
+    const toast = document.getElementById("toast")?.cloneNode(false);
+    const template = document.getElementById("toast-failed");
+    if (!toast || !template) return "";
+    const alert = template.content.firstElementChild.cloneNode(true);
+    if (message) alert.textContent = message;
+    toast.append(alert);
+    return toast.outerHTML;
+  };
+
+  const dataUrl = (html) => {
+    const answer = drawable(html) ? html : asToast(textOf(html));
+    return answer && `data:text/html;charset=utf-8,${encodeURIComponent(answer)}`;
+  };
+
+  // Nomini's error for an answer that is not ok reads "<status text>: <body>";
+  // one that never came is a TypeError, and one cut off by a newer request of
+  // the same scope an AbortError, which has nothing to say
+  koya.refused = (event, draw) => {
+    const error = event.detail.err;
+    if (error.name === "AbortError") return;
+    const message = error instanceof TypeError ? "" : error.message;
+    const url = dataUrl(message.slice(message.indexOf(": ") + 2));
+    if (url) draw(url);
+  };
+
+  // A search form: what it asks goes as the typing stops or a select is picked,
+  // and only when it would ask something new (a select fires input and change
+  // both; a box fires change as it loses focus).
+  koya.search = () => ({
+    _asked: null,
+    _ask(url, form, always) {
+      const data = koya.form(form);
+      const asked = `${url}?${new URLSearchParams(data)}`;
+      if (!always && asked === this._asked) return;
+      this._asked = asked;
+      this.$get(url, data);
+    },
+  });
+
+  // the element asks for what it stands for once it comes into view
+  koya.reveal = (event) => {
+    const el = event.target;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      el.dispatchEvent(new CustomEvent("revealed"));
+    });
+    observer.observe(el);
+  };
+
+  // An upload form's files go as they are chosen, checked first against its
+  // <template data-upload-limit> (ui/media/grid): too large, the choice is
+  // cleared and the template's toast shown.
+  koya.upload = async (input, url, draw) => {
+    if (input.type !== "file" || input.files.length === 0) return;
+    const limit = input.form.querySelector("template[data-upload-limit]");
+    const total = Array.from(input.files).reduce((sum, file) => sum + file.size, 0);
+    if (limit && total > Number(limit.dataset.uploadLimit)) {
+      input.value = "";
+      document.getElementById("toast")?.replaceWith(limit.content.cloneNode(true));
+      return;
+    }
+    const answer = await fetch(url, { method: "POST", body: new FormData(input.form), headers: { "nm-request": "true" } })
+      .then((response) => response.text())
+      .catch(() => "");
+    const drawn = dataUrl(answer);
+    if (drawn) draw(drawn);
+  };
 
   // Rich text fields: a Quill editor per [data-quill-for] holder (every action on a
   // content draws its editor again). It writes HTML back into the hidden input as
@@ -73,7 +187,7 @@
             handlers: {
               // the image button opens the media picker instead of asking for a URL
               image: () =>
-                picker()?.open((item) => {
+                picker()?._open((item) => {
                   const range = quill.getSelection(true);
                   quill.insertEmbed(range.index, "image", new URL(item.url, location.href).pathname, "user");
                   quill.setSelection(range.index + 1);
@@ -95,66 +209,65 @@
   }
 
   // Many-reference fields: the <select multiple> that is sent is hidden and
-  // follows `chosen`. The server draws a chip and an "Add" option for every
-  // content that can be chosen, and `chosen` shows one or the other. The select
+  // follows `_chosen`. The server draws a chip and an "Add" option for every
+  // content that can be chosen, and `_chosen` shows one or the other. The select
   // is changed from script, which fires nothing; the editor form listens for the
   // change sent after.
   koya.references = (el) => ({
-    chosen: Array.from(el.querySelector("select[multiple]").selectedOptions, (option) => option.value),
-    has(id) {
-      return this.chosen.includes(id);
+    _chosen: Array.from(el.querySelector("select[multiple]").selectedOptions, (option) => option.value),
+    _has(id) {
+      return this._chosen.includes(id);
     },
-    add(select) {
-      if (select.value && !this.has(select.value)) this.chosen = [...this.chosen, select.value];
+    _add(select) {
+      if (select.value && !this._has(select.value)) this._chosen = [...this._chosen, select.value];
       select.value = "";
       changed(this.$refs.select);
     },
-    remove(id) {
-      this.chosen = this.chosen.filter((chosen) => chosen !== id);
+    _remove(id) {
+      this._chosen = this._chosen.filter((chosen) => chosen !== id);
       changed(this.$refs.select);
     },
   });
 
   // Media picker: one <dialog id="media-picker"> per editor page. Its body is
-  // fetched from its data-get as it opens. A card ([data-pick-id]) clicked hands
-  // its file to whoever opened the picker: a :media field or a Quill editor.
-  koya.mediaPicker = (dialog) => ({
-    onpick: null,
-    open(onpick) {
-      this.onpick = onpick;
-      koya.get(dialog, dialog.dataset.get);
+  // fetched as it opens. A card ([data-pick-id]) clicked hands its file to
+  // whoever opened the picker: a :media field or a Quill editor.
+  koya.mediaPicker = (dialog, url) => ({
+    _onpick: null,
+    _open(onpick) {
+      this._onpick = onpick;
+      this.$get(url);
       dialog.showModal();
     },
-    close() {
-      this.onpick = null;
+    _close() {
+      this._onpick = null;
       dialog.close();
     },
-    pick(card) {
+    _pick(card) {
       const item = { id: card.pickId, url: card.pickUrl, alt: card.pickAlt, name: card.pickName };
-      const onpick = this.onpick;
-      this.close();
+      const onpick = this._onpick;
+      this._close();
       onpick?.(item);
     },
   });
 
-  // A :media field: the file it holds, drawn from its data-* and sent in its
-  // hidden input.
-  koya.mediaField = (data) => ({
-    id: data.id,
-    url: data.url,
-    alt: data.alt,
-    name: data.name,
-    choose() {
-      picker()?.open((item) => this.set(item));
+  // A :media field: the file it holds, sent in its hidden input.
+  koya.mediaField = (file) => ({
+    _id: file.id,
+    _url: file.url,
+    _alt: file.alt,
+    _name: file.name,
+    _choose() {
+      picker()?._open((item) => this._set(item));
     },
-    clear() {
-      this.set(null);
+    _clear() {
+      this._set(null);
     },
-    set(item) {
-      this.id = item ? item.id : "";
-      this.url = item ? item.url : "";
-      this.alt = item ? item.alt : "";
-      this.name = item ? item.name : "No image";
+    _set(item) {
+      this._id = item ? item.id : "";
+      this._url = item ? item.url : "";
+      this._alt = item ? item.alt : "";
+      this._name = item ? item.name : "No image";
       changed(this.$refs.input);
     },
   });
@@ -167,50 +280,49 @@
   };
 
   // Bulk selection: the ids of the [data-bulk-item] boxes in the scope, and
-  // which of them are chosen. A box may sit outside the form it is sent with,
+  // which of them are chosen. A box may sit outside the form it belongs to,
   // tied to it by its form attribute (the media grid does that), so the scope is
   // what holds both.
   koya.bulk = (el) => ({
-    ids: Array.from(el.querySelectorAll("[data-bulk-item]"), (box) => box.value),
-    chosen: [],
-    count() {
-      return this.chosen.length;
+    _ids: Array.from(el.querySelectorAll("[data-bulk-item]"), (box) => box.value),
+    _chosen: [],
+    _count() {
+      return this._chosen.length;
     },
-    picked(id) {
-      return this.chosen.includes(id);
+    _picked(id) {
+      return this._chosen.includes(id);
     },
-    pick(id, on) {
-      this.chosen = on ? [...this.chosen, id] : this.chosen.filter((chosen) => chosen !== id);
+    _pick(id, on) {
+      this._chosen = on ? [...this._chosen, id] : this._chosen.filter((chosen) => chosen !== id);
     },
-    all() {
-      return this.ids.length > 0 && this.chosen.length === this.ids.length;
+    _all() {
+      return this._ids.length > 0 && this._chosen.length === this._ids.length;
     },
-    partly() {
-      return this.chosen.length > 0 && this.chosen.length < this.ids.length;
+    _partly() {
+      return this._chosen.length > 0 && this._chosen.length < this._ids.length;
     },
-    pickAll(on) {
-      this.chosen = on ? [...this.ids] : [];
+    _pickAll(on) {
+      this._chosen = on ? [...this._ids] : [];
     },
   });
 
   // The editor's Save draft is on only while the form holds something the content
   // does not: a draft that changes nothing is not saved (the server leaves it, or
   // drops the draft when the form is the published data again). What the form was
-  // drawn with is the baseline, unless the server marks it data-unsaved -- a version
+  // drawn with is the baseline, unless the server says it is unsaved -- a version
   // being restored, or what was sent and refused. Publish is always on: publishing
   // the same data again is a publish.
-  koya.editor = (el) => {
+  koya.editor = (el, unsaved) => {
     const form = el.querySelector("#editor-form");
     const snapshot = () => new URLSearchParams(new FormData(form)).toString();
     const drawn = snapshot();
     return {
-      unsaved: "unsaved" in form.dataset,
-      current: drawn,
-      track() {
-        this.current = snapshot();
+      _current: drawn,
+      _track() {
+        this._current = snapshot();
       },
-      unchanged() {
-        return !this.unsaved && this.current === drawn;
+      _unchanged() {
+        return !unsaved && this._current === drawn;
       },
     };
   };
@@ -220,10 +332,10 @@
   // again, so this is for the owner, not a guard. Closed, the dialog forgets the
   // phrase and the reason a refusal wrote, so it opens as new.
   koya.phrase = (dialog) => ({
-    typed: "",
-    phrase: dialog.querySelector("[data-confirm-phrase]").dataset.confirmPhrase,
-    reset() {
-      this.typed = "";
+    _typed: "",
+    _phrase: dialog.querySelector("[data-confirm-phrase]").dataset.confirmPhrase,
+    _reset() {
+      this._typed = "";
       if (this.$refs.error) this.$refs.error.textContent = "";
     },
   });
@@ -249,52 +361,50 @@
   // However large the space, no request is larger than a piece, and the server
   // writes each one to the end of the upload. A piece is a body of its own, not
   // a form, so these are fetches of their own that say they are from the admin
-  // UI, as an action requires. The last answer names the page to go to in
-  // Koya-Redirect, where the result waits as a toast.
+  // UI, as an action requires. The last answer sends the browser to the page
+  // where the result waits as a toast.
   koya.importer = (form) => {
     const pieceBytes = Number(form.dataset.importPieceBytes);
     const post = async (url, body) => {
       const response = await fetch(url, {
         method: "POST",
         body,
-        headers: { "Content-Type": "application/octet-stream", "Koya-Request": "true" },
+        headers: { "Content-Type": "application/octet-stream", "nm-request": "true" },
       });
       const text = await response.text();
-      if (!response.ok) throw new Error(new DOMParser().parseFromString(text, "text/html").body.textContent);
-      return { text, response };
+      if (!response.ok) throw new Error(textOf(text));
+      return text;
     };
     const megabytes = (n) => `${(n / 1048576).toFixed(1)} MB`;
     return {
-      busy: false,
-      sent: 0,
-      total: 0,
-      status: "",
-      error: "",
-      async start(event) {
-        event.preventDefault();
+      _busy: false,
+      _sent: 0,
+      _total: 0,
+      _status: "",
+      _error: "",
+      async _start() {
         const file = this.$refs.file.files[0];
-        if (!file || this.busy) return;
-        this.error = "";
-        this.total = file.size;
-        this.sent = 0;
-        this.busy = true;
+        if (!file || this._busy) return;
+        this._error = "";
+        this._total = file.size;
+        this._sent = 0;
+        this._busy = true;
         try {
-          const id = (await post(form.dataset.importBegin)).text.trim();
+          const id = (await post(form.dataset.importBegin)).trim();
           for (let offset = 0; offset < file.size; offset += pieceBytes) {
-            this.status = `Uploading ${megabytes(offset)} of ${megabytes(file.size)}`;
+            this._status = `Uploading ${megabytes(offset)} of ${megabytes(file.size)}`;
             const url = `${form.dataset.importContinue}?id=${encodeURIComponent(id)}&offset=${offset}`;
             await post(url, file.slice(offset, offset + pieceBytes));
-            this.sent = Math.min(offset + pieceBytes, file.size);
+            this._sent = Math.min(offset + pieceBytes, file.size);
           }
           // the import itself is one step the server takes whole; the site waits
           // for it, and so does this bar
           this.$refs.bar.removeAttribute("value");
-          this.status = "Making the space. The server answers nothing else until it is done.";
-          const { response } = await post(`${form.dataset.importFinish}?id=${encodeURIComponent(id)}`);
-          window.location.href = response.headers.get("Koya-Redirect") || "/";
+          this._status = "Making the space. The server answers nothing else until it is done.";
+          this.$fetch(dataUrl(await post(`${form.dataset.importFinish}?id=${encodeURIComponent(id)}`)), "GET");
         } catch (e) {
-          this.error = e.message || "The import could not be sent.";
-          this.busy = false;
+          this._error = e.message || "The import could not be sent.";
+          this._busy = false;
         }
       },
     };

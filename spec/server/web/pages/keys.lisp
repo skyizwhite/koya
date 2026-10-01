@@ -1,8 +1,9 @@
 (defpackage #:koya-spec/server/web/pages/keys
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:import-from #:koya-spec/server/web/pages/support
-                #:request #:request-url #:call-action #:setup-pages #:log-in #:count-ids)
+                #:bound #:request #:request-url #:call-action #:setup-pages #:log-in #:count-ids)
   (:import-from #:koya-server/web/pages/s/<space>/keys #:create-key #:delete-key #:rotate-secret)
   (:import-from #:koya-server/usecases/keys #:list-delivery-keys #:list-management-keys
                 #:create-delivery-key #:create-management-key)
@@ -41,9 +42,10 @@
   (testing "the page's forms call the actions"
     (multiple-value-bind (status body) (request :get "/s/website/keys")
       (ok (= status 200))
-      (ok (search (format nil "data-post=\"~a" (subseq (create-key) 0 (position #\? (create-key)))) body))
-      (ok (search "nm-bind=\"{ onsubmit: koya.submit }\"" body))
-      (ok (search "data-confirm=\"Rotate the webhook secret? Receivers checking the old one start refusing.\"" body)
+      (ok (search (bound (posts (create-key :space "website" :kind "delivery"))) body))
+      (ok (search (bound (posts (rotate-secret :space "website")
+                                :confirm "Rotate the webhook secret? Receivers checking the old one start refusing."))
+                  body)
           "rotating asks first, and so does deleting a key")))
   (testing "creating answers the section with the key shown once"
     (multiple-value-bind (status body) (call-action :post (create-key :space "website" :kind "delivery")

@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/ui/layout
   (:use #:cl #:hsx)
   (:import-from #:jingle
-                #:set-response-header #:set-response-status)
+                #:set-response-status)
   (:import-from #:ningle-actions
                 #:defaction)
   (:import-from #:koya-server/web/lib/auth
@@ -10,8 +10,11 @@
                 #:asset-url)
   (:import-from #:koya-server/web/lib/urls
                 #:space-url)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:import-from #:koya-server/web/ui/icon
                 #:~icon)
+  (:import-from #:koya-server/web/ui/elements
+                #:~go-to)
   (:import-from #:koya-server/web/ui/toast
                 #:~toast #:~toast-message #:take-toast)
   (:export #:~layout
@@ -44,8 +47,7 @@
 (defaction logout :post (params)
   (declare (ignore params))
   (session-logout)
-  (set-response-header :koya-redirect "/login")
-  (hsx (<>)))
+  (hsx (~go-to :url "/login")))
 
 (defcomp ~layout (&key space crumbs children)
   (hsx
@@ -63,7 +65,7 @@
          (div :class "flex shrink-0 items-center gap-2"
            (a :href "/settings" :class "btn" :aria-label "Settings"
               (~icon :name :settings) (span :class "hidden sm:inline" "Settings"))
-           (form :data-post (logout) :nm-bind "{ onsubmit: koya.submit }"
+           (form :nm-bind (posts (logout))
              (button :type "submit" :class "btn" :aria-label "Log out"
                      (~icon :name :logout) (span :class "hidden sm:inline" "Log out"))))))
      (main :class "mx-auto w-full max-w-5xl flex-1 px-4 py-8"

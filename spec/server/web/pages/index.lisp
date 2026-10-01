@@ -1,7 +1,8 @@
 (defpackage #:koya-spec/server/web/pages/index
   (:use #:cl #:rove)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:import-from #:koya-spec/server/web/pages/support
-                #:request #:call-action #:setup-pages #:log-in)
+                #:bound #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/index #:create-space-action #:delete-space-action)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/spaces #:find-space)
@@ -21,7 +22,7 @@
     (ok (search "website" body))
     (ok (search "commandfor=\"new-space\"" body) "the form is behind a button")
     (ok (search "<dialog id=\"new-space\"" body) "and lives in a dialog on the page")
-    (ok (search (format nil "data-post=\"~a\" nm-bind=\"{ onsubmit: koya.submit }\"" (create-space-action)) body)))
+    (ok (search (bound (posts (create-space-action))) body)))
   (testing "a space is made here, and starts empty"
     (ok (= 200 (call-action :post (create-space-action) :form '(("name" . "shop")))))
     (ok (find-space "shop"))

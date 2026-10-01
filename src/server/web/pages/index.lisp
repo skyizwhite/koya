@@ -1,13 +1,14 @@
 (defpackage #:koya-server/web/pages/index
   (:use #:cl #:hsx)
   (:import-from #:jingle
-                #:set-response-status #:set-response-header #:*request* #:request-content)
+                #:set-response-status #:*request* #:request-content)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/http #:param)
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~go-to)
+  (:import-from #:koya-server/web/lib/binds #:posts)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
@@ -38,8 +39,8 @@
         (input (delete-phrase-id name)))
     (hsx
      (dialog :id id :closedby "any" :class "koya-dialog max-w-sm" :nm-data "...koya.phrase(this)"
-             :nm-bind "{ onclose: () => reset() }"
-       (form :data-post (delete-space-action) :nm-bind "{ onsubmit: koya.submit }"
+             :nm-bind "{ onclose: () => _reset() }"
+       (form :nm-bind (posts (delete-space-action))
          (input :type "hidden" :name "name" :value name)
          (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
            (h2 :class "font-semibold" "Delete space")
@@ -52,12 +53,12 @@
            (label :for input :class "label mt-4" "Type " (code (format nil "\"~a\"" phrase)) " to confirm")
            (input :type "text" :id input :name "confirm" :required t :autocomplete "off"
                   :spellcheck "false" :data-confirm-phrase phrase :class "input mt-1.5"
-                  :nm-bind "{ value: () => typed, oninput: () => typed = this.value }")
+                  :nm-bind "{ value: () => _typed, oninput: () => _typed = this.value }")
            (~delete-error :name name))
          (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
            (~dialog-close :dialog id "Cancel")
            (button :type "submit" :class "btn btn-danger" :disabled t
-                   :nm-bind "{ disabled: () => typed !== phrase }"
+                   :nm-bind "{ disabled: () => _typed !== _phrase }"
              (~icon :name :delete) "Delete space")))))))
 
 (defcomp ~space-row (&key space)
@@ -89,7 +90,7 @@
 (defcomp ~new-space-dialog ()
   (hsx
    (dialog :id "new-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :data-post (create-space-action) :nm-bind "{ onsubmit: koya.submit }"
+     (form :nm-bind (posts (create-space-action))
        (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
          (h2 :class "font-semibold" "New space")
          (button :type "button" :commandfor "new-space" :command "close" :class "btn btn-icon" :aria-label "Close"
@@ -111,7 +112,7 @@
 (defcomp ~import-space-dialog ()
   (hsx
    (dialog :id "import-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :nm-data "...koya.importer(this)" :nm-bind "{ onsubmit: (e) => start(e) }"
+     (form :nm-data "...koya.importer(this)" :nm-bind "{ 'onsubmit.prevent': () => _start() }"
            :data-import-begin (begin-import-action)
            :data-import-continue (continue-import-action)
            :data-import-finish (finish-import-action)
@@ -128,17 +129,17 @@
             "A zip from a space's " (strong "Export") ". The space is made again under its own name, "
             "with its models, webhooks, contents, history, media and keys. A space of that name must not "
             "exist yet, or must be empty: no models, media or keys. Nothing is sent to the webhooks.")
-         (div :class "mt-4" :hidden t :nm-bind "{ hidden: () => !busy }"
+         (div :class "mt-4" :hidden t :nm-bind "{ hidden: () => !_busy }"
            (progress :class "w-full" :max "100" :nm-ref "bar"
-                     :nm-bind "{ max: () => total || 1, value: () => sent }")
-           (p :class "mt-1 text-xs text-muted" :nm-bind "{ textContent: () => status }")))
+                     :nm-bind "{ max: () => _total || 1, value: () => _sent }")
+           (p :class "mt-1 text-xs text-muted" :nm-bind "{ textContent: () => _status }")))
        (p :class "px-4 pb-3 text-sm text-danger" :hidden t
-          :nm-bind "{ hidden: () => !error, textContent: () => error }")
+          :nm-bind "{ hidden: () => !_error, textContent: () => _error }")
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
          (~dialog-close :dialog "import-space" "Cancel")
-         (button :type "submit" :class "btn btn-primary" :nm-bind "{ disabled: () => busy }"
+         (button :type "submit" :class "btn btn-primary" :nm-bind "{ disabled: () => _busy }"
            (~icon :name :import)
-           (span :nm-bind "{ textContent: () => busy ? 'Importing…' : 'Import' }" "Import")))))))
+           (span :nm-bind "{ textContent: () => _busy ? 'Importing…' : 'Import' }" "Import")))))))
 
 (defcomp ~spaces-page (&key spaces)
   (hsx
@@ -203,8 +204,7 @@
       (koya-error (e) (action-refused e)))))
 
 (defaction finish-import-action :post (params)
-  (set-response-header :koya-redirect (import-archive (param params "id")))
-  (hsx (<>)))
+  (hsx (~go-to :url (import-archive (param params "id")))))
 
 (defun @get (params)
   (declare (ignore params))
