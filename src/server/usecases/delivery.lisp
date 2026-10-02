@@ -34,14 +34,16 @@
     (and content (content-published content)
          (deliver content target space :include include))))
 
-(defun check-include (include model)
+(defun check-include (space model include)
   (dolist (path include)
-    (let ((field (find (first path) (model-fields model) :key #'field-name :test #'string=)))
-      (unless (and field (eq (field-type field) :reference))
-        (bad-query "include: ~s is not a reference field" (first path))))))
+    (loop :for name :in path
+          :for at := model :then (and field (find-model space (field-option field :model)))
+          :for field := (and at (find name (model-fields at) :key #'field-name :test #'string=))
+          :for reached :from 1
+          :unless (and field (eq (field-type field) :reference))
+            :do (bad-query "include: ~s is not a reference field" (format nil "~{~a~^.~}" (subseq path 0 reached))))))
 
 (defun embed-references (object model space include)
-  (check-include include model)
   (dolist (field (model-fields model))
     (let* ((name (field-name field))
            (nested (loop :for path :in include
@@ -80,16 +82,19 @@
     (deliver content model space :draft draft :include (query-include query))))
 
 (defun delivered-list (space model query)
+  (check-include space model (query-include query))
   (multiple-value-bind (contents total) (list-contents space (model-name model) model query)
     (values (mapcar (lambda (c) (deliver c model space :include (query-include query))) contents)
             total)))
 
 (defun delivered-one (space model id query &key draft-key)
+  (check-include space model (query-include query))
   (let ((content (or (find-content space (model-name model) id)
                      (fail 'not-found "Content does not exist"))))
     (deliver-if-allowed space model content query draft-key)))
 
 (defun delivered-object (space model query &key draft-key)
+  (check-include space model (query-include query))
   (let ((content (or (find-object-content space (model-name model))
                      (fail 'not-found "Content does not exist"))))
     (deliver-if-allowed space model content query draft-key)))

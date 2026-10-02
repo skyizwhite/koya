@@ -85,7 +85,29 @@
         (ok (delivered-p (jget deep "favorite")))
         (ok (string= (jget (delivered-data (jget deep "favorite")) "name") "lisp"))))
     (testing "an include that names no reference field is a bad query"
-      (ok (signals (deliver post (model "post") "site" :include '(("title"))) 'query-error)))))
+      (ok (signals (delivered-list "site" (model "post") (query "include" "title")) 'query-error)))))
+
+(deftest an-include-is-checked-before-anything-is-read
+  (flet ((refused (thunk)
+           (handler-case (progn (funcall thunk) nil)
+             (query-error (e) (princ-to-string e)))))
+    (testing "on a list with nothing in it"
+      (ok (refused (lambda () (delivered-list "site" (model "post") (query "include" "title"))))
+          "a field that is no reference")
+      (ok (refused (lambda () (delivered-list "site" (model "post") (query "include" "bogus"))))
+          "a field the model does not have"))
+    (testing "a path is checked to its end, whatever the references hold"
+      (make "post" (list "title" "No tags" "tags" (vector)) :publish t)
+      (let ((message (refused (lambda () (delivered-list "site" (model "post") (query "include" "tags.name"))))))
+        (ok message "a segment that is no reference of the model it reaches")
+        (ok (search "tags.name" message) "named by its path"))
+      (ok (refused (lambda () (delivered-list "site" (model "post") (query "include" "author.favorite.name")))))
+      (ok (null (refused (lambda () (delivered-list "site" (model "post") (query "include" "author.favorite,tags")))))
+          "a path that only names references is fine"))
+    (testing "before one content is looked for"
+      (ok (refused (lambda () (delivered-one "site" (model "post") "nothing-here" (query "include" "title"))))
+          "a bad query, not a missing content")
+      (ok (refused (lambda () (delivered-object "site" (model "about") (query "include" "body"))))))))
 
 (deftest what-is-delivered-and-what-is-not
   (let* ((live (make "post" (list "title" "Live") :publish t))
