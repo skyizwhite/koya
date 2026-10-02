@@ -88,7 +88,7 @@ category[equals]tech[or]category[equals]life
 | `contains` `not_contains` | the text contains / does not contain this |
 | `begins_with` | the text starts with this |
 | `less_than` `greater_than` | for numbers and dates |
-| `exists` `not_exists` | the field has a value / is blank (takes no value) |
+| `exists` `not_exists` | the field has a value / is blank (takes no value); a boolean always has one, `false` when missing |
 
 On a `many` field, `equals` and `contains` mean "has this value". A value for a
 `number` field is a decimal of at most 64 characters, such as `42`, `-2.5` or

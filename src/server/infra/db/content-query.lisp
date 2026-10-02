@@ -20,9 +20,14 @@
 
 (defun field-expr (name model column)
   (or (system-column name)
-      (progn
-        (unless (model-field model name) (bad-query "unknown field ~s" name))
-        (format nil "json_extract(~a, '$.~a')" column name))))
+      (let ((field (or (model-field model name) (bad-query "unknown field ~s" name))))
+        (format nil (if (eq (field-type field) :boolean) "COALESCE(json_extract(~a, '$.~a'), 0)" "json_extract(~a, '$.~a')")
+                column name))))
+
+(defun present-sql (expr many)
+  (if many
+      (format nil "COALESCE(json_array_length(~a), 0) > 0" expr)
+      (format nil "(~a IS NOT NULL AND trim(~a, char(32, 9, 10, 13)) != '')" expr expr)))
 
 (defun coerce-value (name model value)
   (let ((field (model-field model name)))
@@ -56,8 +61,8 @@
                                            (values (format nil "NOT EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ?)" expr) (list value))
                                            (values (format nil "(~a IS NULL OR ~a NOT LIKE ? ESCAPE '\\')" expr expr) (list (format nil "%~a%" (escape-like value))))))
           ((string= op "begins_with") (values (format nil "~a LIKE ? ESCAPE '\\'" expr) (list (format nil "~a%" (escape-like value)))))
-          ((string= op "exists") (values (format nil "~a IS NOT NULL" expr) '()))
-          ((string= op "not_exists") (values (format nil "~a IS NULL" expr) '()))
+          ((string= op "exists") (values (present-sql expr many) '()))
+          ((string= op "not_exists") (values (format nil "NOT ~a" (present-sql expr many)) '()))
           (t (bad-query "unknown filter operator ~s" op)))))))
 
 (defun escape-like (string)
