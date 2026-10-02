@@ -13,7 +13,7 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:posts #:clicks)
+  (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:export #:@get
            #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
            #:enable-two-factor-action #:disable-two-factor-action))
@@ -43,7 +43,7 @@
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-ok/10 text-ok" "Enabled"))
                (form :class "space-y-3"
-                     :nm-bind (posts (disable-two-factor-action))
+                     :nm-bind (on-submit (disable-two-factor-action))
                  (~code-input :label "Enter a current code to turn it off")
                  (button :type "submit" :class "btn btn-danger" (~icon :name :close) "Disable two-factor login")))))
        (pending
@@ -58,16 +58,16 @@
                    (dt :class "text-muted" "otpauth URI")
                    (dd (code :class "select-all break-all text-xs" (otpauth-uri pending)))))
                (form :class "space-y-3"
-                     :nm-bind (posts (enable-two-factor-action))
+                     :nm-bind (on-submit (enable-two-factor-action))
                  (~code-input :label "Code shown by the app")
                  (div :class "flex gap-2"
                    (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Enable two-factor login")
-                   (button :type "button" :class "btn" :nm-bind (clicks (cancel-two-factor-action))
+                   (button :type "button" :class "btn" :nm-bind (on-click (cancel-two-factor-action))
                      (~icon :name :close) "Cancel"))))))
        (t
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-line text-muted" "Disabled"))
-               (form :nm-bind (posts (begin-two-factor-action))
+               (form :nm-bind (on-submit (begin-two-factor-action))
                  (button :type "submit" :class "btn btn-primary" (~icon :name :shield) "Set up two-factor login")))))))))
 
 (defcomp ~time-zone (&key error)
@@ -79,7 +79,7 @@
        "Stored values and the delivery API stay UTC.")
      (when error (hsx (p :class "mb-4 text-sm text-danger" error)))
      (form :class "flex flex-wrap items-end gap-3"
-           :nm-bind (posts (save-timezone-action))
+           :nm-bind (on-submit (save-timezone-action))
        (div
          (label :for "timezone" :class "label" "IANA name")
          (input :type "text" :id "timezone" :name "timezone" :list "timezones" :required t :autocomplete "off"

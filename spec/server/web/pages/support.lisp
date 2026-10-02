@@ -128,7 +128,7 @@
         :while start :count t))
 
 (defun asked-first (body dialog post)
-  (let* ((post (attribute (koya-server/web/lib/binds:js post)))
+  (let* ((post (attribute (koya-server/web/lib/binds:js-string post)))
          (start (search (format nil "<dialog id=\"~a\"" dialog) body))
          (end (and start (search "</dialog>" body :start2 start)))
          (at (search post body)))

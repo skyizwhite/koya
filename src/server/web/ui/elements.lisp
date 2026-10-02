@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/ui/elements
   (:use #:cl #:hsx)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/lib/binds #:follows)
+  (:import-from #:koya-server/web/lib/binds #:on-follow)
   (:export #:~errors
            #:~empty-state
            #:~status-badge
@@ -30,7 +30,7 @@
 
 (defcomp ~pager (&key page pages href browse)
   (flet ((link (n)
-           (hsx (a :href (funcall href n) :nm-bind (follows (funcall browse n)) :class "btn"
+           (hsx (a :href (funcall href n) :nm-bind (on-follow (funcall browse n)) :class "btn"
                    (if (< n page)
                        (hsx (<> (~icon :name :prev) "Previous"))
                        (hsx (<> "Next" (~icon :name :next))))))))

@@ -8,7 +8,7 @@
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~go-to)
-  (:import-from #:koya-server/web/lib/binds #:posts)
+  (:import-from #:koya-server/web/lib/binds #:on-submit)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
@@ -40,7 +40,7 @@
     (hsx
      (dialog :id id :closedby "any" :class "koya-dialog max-w-sm" :nm-data "...koya.phrase(this)"
              :nm-bind "{ onclose: () => _reset() }"
-       (form :nm-bind (posts (delete-space-action))
+       (form :nm-bind (on-submit (delete-space-action))
          (input :type "hidden" :name "name" :value name)
          (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
            (h2 :class "font-semibold" "Delete space")
@@ -90,7 +90,7 @@
 (defcomp ~new-space-dialog ()
   (hsx
    (dialog :id "new-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :nm-bind (posts (create-space-action))
+     (form :nm-bind (on-submit (create-space-action))
        (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
          (h2 :class "font-semibold" "New space")
          (button :type "button" :commandfor "new-space" :command "close" :class "btn btn-icon" :aria-label "Close"

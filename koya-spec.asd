@@ -32,6 +32,7 @@
                "koya-spec/server/web/admin-api/keys"
                "koya-spec/server/web/app"
                "koya-spec/server/web/lib/auth"
+               "koya-spec/server/web/lib/binds"
                "koya-spec/server/web/ui/elements"
                "koya-spec/server/web/pages/login"
                "koya-spec/server/web/pages/index"

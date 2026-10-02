@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/app
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:posts)
+  (:import-from #:koya-server/web/lib/binds #:on-submit)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id> #:editor-action)
   (:import-from #:koya-spec/server/web/pages/support #:bound #:edit #:*cookie* #:request #:location #:setup-pages #:log-in)
   (:import-from #:koya-server/web/app #:app #:*page-app*)
@@ -38,8 +38,8 @@
     (ok (search "data-quill-for=\"f-body\" nm-bind=\"{ oninit: () => koya.quill(this) }\"" body)
         "rich text gets a Quill holder")
     (ok (search (format nil "<form id=\"editor-form\" class=\"space-y-6\" nm-ref=\"form\" ~a"
-                        (bound (posts (editor-action :space "website" :model "blog" :id "new" :op "save")
-                                      :also "oninput: () => _track(), onchange: () => _track()")))
+                        (bound (on-submit (editor-action :space "website" :model "blog" :id "new" :op "save")
+                                          :binds "oninput: () => _track(), onchange: () => _track()")))
                 body)
         "the form is an action"))
   (multiple-value-bind (status) (request :get "/s/nope")

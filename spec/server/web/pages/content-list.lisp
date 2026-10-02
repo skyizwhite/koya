@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/content-list
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:follows #:searches #:clicks)
+  (:import-from #:koya-server/web/lib/binds #:on-follow #:on-search #:on-click)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:setup-pages #:log-in #:asked-first)
@@ -325,7 +325,7 @@
     (testing "the page's controls call the action"
       (let ((body (nth-value 1 (request :get "/s/website/m/blog"))))
         (ok (search "id=\"filters\"" body))
-        (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (searches (browse-contents :space "website" :model "blog"))))
+        (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (on-search (browse-contents :space "website" :model "blog"))))
                     body)
             "the search goes as the typing stops, and the status as it is picked")
         (ng (search ">Filter<" body) "so there is no button to press")

@@ -1,7 +1,7 @@
 (defpackage #:koya-spec/server/web/pages/keys
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
-  (:import-from #:koya-server/web/lib/binds #:posts)
+  (:import-from #:koya-server/web/lib/binds #:on-submit)
   (:import-from #:koya-spec/server/web/pages/support
                 #:bound #:request #:request-url #:call-action #:setup-pages #:log-in #:count-ids)
   (:import-from #:koya-server/web/pages/s/<space>/keys #:create-key #:delete-key #:rotate-secret)
@@ -42,9 +42,9 @@
   (testing "the page's forms call the actions"
     (multiple-value-bind (status body) (request :get "/s/website/keys")
       (ok (= status 200))
-      (ok (search (bound (posts (create-key :space "website" :kind "delivery"))) body))
-      (ok (search (bound (posts (rotate-secret :space "website")
-                                :confirm "Rotate the webhook secret? Receivers checking the old one start refusing."))
+      (ok (search (bound (on-submit (create-key :space "website" :kind "delivery"))) body))
+      (ok (search (bound (on-submit (rotate-secret :space "website")
+                                    :confirm "Rotate the webhook secret? Receivers checking the old one start refusing."))
                   body)
           "rotating asks first, and so does deleting a key")))
   (testing "creating answers the section with the key shown once"

@@ -6,7 +6,7 @@
   (:import-from #:koya-server/web/ui/toast #:~toast)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
-  (:import-from #:koya-server/web/lib/binds #:reveals)
+  (:import-from #:koya-server/web/lib/binds #:on-reveal)
   (:export #:~media-grid
            #:~upload-limit
            #:~pick-cards
@@ -51,7 +51,7 @@
    (<> (loop :for media :in items :collect (hsx (~pick-card :media media)))
        (when more
          (hsx (li :id more :class "col-span-full py-2 text-center text-xs text-muted"
-                  :nm-bind (reveals more)
+                  :nm-bind (on-reveal more)
                 "Loading…"))))))
 
 (defcomp ~media-grid (&key items more)

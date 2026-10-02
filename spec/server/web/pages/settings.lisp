@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/settings
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:clicks)
+  (:import-from #:koya-server/web/lib/binds #:on-click)
   (:import-from #:koya-spec/server/web/pages/support
                 #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:call-action #:setup-pages #:log-in)
@@ -138,7 +138,7 @@
         (ok (search "id=\"two-factor\"" body))
         (ok (search "data-qr=\"otpauth://" body))
         (ok (search "nm-bind=\"{ oninit: () => koya.qr(this) }\"" body) "drawn as it comes in")
-        (ok (search (format nil "<button type=\"button\" class=\"btn\" ~a" (bound (clicks (cancel-two-factor-action)))) body)
+        (ok (search (format nil "<button type=\"button\" class=\"btn\" ~a" (bound (on-click (cancel-two-factor-action)))) body)
             "cancelling sends no form, so it needs no code")
         (multiple-value-bind (match groups) (scan-to-strings "secret=([A-Z2-7]+)&amp;" body)
           (ok match)
