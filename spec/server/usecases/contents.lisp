@@ -188,8 +188,8 @@
       (ok (equal (titles (list-contents "website" "blog" model (q "filters" "featured[equals]true"))) '("Alpha")))
       (ok (equal (titles (list-contents "website" "blog" model (q "filters" "title[contains]et"))) '("Beta")))
       (ok (equal (titles (list-contents "website" "blog" model (q "filters" "title[begins_with]G"))) '("Gamma")))
-      (ok (equal (titles (list-contents "website" "blog" model (q "filters" "featured[exists]"))) '("Beta" "Alpha")))
-      (ok (equal (titles (list-contents "website" "blog" model (q "filters" "featured[not_exists]"))) '("Gamma")))
+      (ok (equal (titles (list-contents "website" "blog" model (q "filters" "count[exists]"))) '("Gamma" "Beta" "Alpha")))
+      (ok (null (list-contents "website" "blog" model (q "filters" "count[not_exists]"))))
       (ok (equal (titles (list-contents "website" "blog" model (q "filters" "tags[contains]01ARZ3NDEKTSV4RRFFQ69G5FAV"))) '("Alpha")))
       (ok (equal (titles (list-contents "website" "blog" model (q "filters" "day[greater_than]2026-01-15[and]count[less_than]10"))) '("Beta")))
       (ok (equal (titles (list-contents "website" "blog" model (q "filters" "title[not_equals]Beta"))) '("Gamma" "Alpha"))))
@@ -253,6 +253,28 @@
       (ok (= (nth-value 1 (list-contents "website" "blog" model (q "filters" "title[contains]Live")
                                          :status :all :only-status "published"))
              1)))))
+
+(deftest filters-read-blank-and-false-as-the-schema-does
+  (make "{\"title\": \"True\", \"featured\": true, \"body\": \"<p>x</p>\", \"tags\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"], \"count\": 0}" :publish t)
+  (make "{\"title\": \"False\", \"featured\": false, \"body\": \" \\t\\n \", \"tags\": []}" :publish t)
+  (make "{\"title\": \"Missing\"}" :publish t)
+  (make "{\"title\": \"Null\", \"featured\": null, \"body\": null, \"tags\": null, \"count\": null}" :publish t)
+  (flet ((found (filters)
+           (sort (titles (list-contents "website" "blog" (blog) (q "filters" filters))) #'string<)))
+    (testing "a missing or null boolean is false"
+      (ok (equal (found "featured[equals]false") '("False" "Missing" "Null")))
+      (ok (equal (found "featured[not_equals]true") '("False" "Missing" "Null")) "as not true finds it")
+      (ok (equal (found "featured[not_equals]false") '("True")))
+      (ok (equal (found "featured[equals]true") '("True"))))
+    (testing "exists is a value that is not blank"
+      (ok (equal (found "body[exists]") '("True")) "a string of whitespace is blank")
+      (ok (equal (found "body[not_exists]") '("False" "Missing" "Null")))
+      (ok (equal (found "tags[exists]") '("True")) "and so is [] on a many field")
+      (ok (equal (found "tags[not_exists]") '("False" "Missing" "Null")))
+      (ok (equal (found "count[exists]") '("True")) "zero is a value"))
+    (testing "and a boolean always has one"
+      (ok (equal (found "featured[exists]") '("False" "Missing" "Null" "True")))
+      (ok (null (found "featured[not_exists]"))))))
 
 (deftest parse-query-defaults
   (let ((query (q)))
