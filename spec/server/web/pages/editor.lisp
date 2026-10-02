@@ -34,9 +34,9 @@
       (ok (= status 422))
       (ok (search "is required" body))
       (ng (search "NIL" body))))
-  (testing "an empty Quill document counts as blank"
+  (testing "an emptied editor, which koya.js sends as nothing, is no value"
     (multiple-value-bind (status body)
-        (edit "/s/website/m/blog/new" :form '(("action" . "save") ("f-title" . "Blank body") ("f-body" . "<p><br></p>")))
+        (edit "/s/website/m/blog/new" :form '(("action" . "save") ("f-title" . "Blank body") ("f-body" . "")))
       (ok (= status 200))
       (let* ((loc (moved-to body)) (id (subseq loc (1+ (position #\/ loc :from-end t)))))
         (ok (null (jget (content-draft (first (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))) "body")))

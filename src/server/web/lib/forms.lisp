@@ -3,8 +3,6 @@
   (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p)
   (:import-from #:koya-core/json
                 #:json-null)
-  (:import-from #:koya-core/validate
-                #:blank-for-field-p)
   (:import-from #:cl-ppcre
                 #:split)
   (:import-from #:koya-server/domain/number #:parse-decimal)
@@ -53,9 +51,8 @@
           (:datetime
            (when raw (setf (gethash (field-name field) data) (local-input->iso raw :timezone (display-timezone)))))
           (:richtext
-           (let ((html (and raw (remove #\Return (first (form-values params name))))))
-             (when (and html (not (blank-for-field-p field html)))
-               (setf (gethash (field-name field) data) html))))
+           (when raw
+             (setf (gethash (field-name field) data) (remove #\Return (first (form-values params name))))))
           (t
            (when raw (setf (gethash (field-name field) data) raw))))))
     data))
