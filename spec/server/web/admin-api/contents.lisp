@@ -78,7 +78,10 @@
         (ok (= status 200)))
       (multiple-value-bind (status json) (delivery "/api/v1/website/blog" :query "filters=nope[equals]1")
         (ok (= status 400))
-        (ok (string= (jget json "error" "code") "bad_query"))))
+        (ok (string= (jget json "error" "code") "bad_query")))
+      (multiple-value-bind (status json) (delivery "/api/v1/website/blog" :query "offset=99999999999999999999999")
+        (ok (= status 400))
+        (ok (string= (jget json "error" "code") "bad_query") "an offset too large to bind is a bad query")))
     (testing "draft edits and preview with draftKey"
       (multiple-value-bind (status json) (admin :patch (format nil "/admin/api/contents/website/blog/~a" post-id) :body (jobject "data" (jobject "title" "Hello v2")))
         (ok (= status 200))

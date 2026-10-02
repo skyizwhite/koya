@@ -172,7 +172,11 @@
     (testing "limit/offset"
       (multiple-value-bind (contents total) (list-contents "website" "blog" model (q "limit" "1" "offset" "1"))
         (ok (= total 3))
-        (ok (equal (titles contents) '("Beta")))))
+        (ok (equal (titles contents) '("Beta"))))
+      (ok (null (list-contents "website" "blog" model (q "offset" "9223372036854775807")))
+          "the largest offset SQLite can hold reads past the end")
+      (ok (signals (q "offset" "9223372036854775808") 'query-error) "and one past it is refused")
+      (ok (= (query-limit (q "limit" "99999999999999999999")) 100) "a limit past the most is the most"))
     (testing "orders"
       (ok (equal (titles (list-contents "website" "blog" model (q "orders" "day"))) '("Alpha" "Beta" "Gamma")))
       (ok (equal (titles (list-contents "website" "blog" model (q "orders" "-count"))) '("Gamma" "Beta" "Alpha")))

@@ -50,6 +50,10 @@
       (declare (ignore body))
       (ok (= status 302) "a page past the end is the last page, not an empty one")
       (ok (string= (location headers) "/s/website/m/blog?page=2") "redirected to the last"))
+    (multiple-value-bind (status body headers) (request :get "/s/website/m/blog" :query "page=99999999999999999999")
+      (declare (ignore body))
+      (ok (= status 302) "however far past the end")
+      (ok (string= (location headers) "/s/website/m/blog?page=2")))
     (exec "DELETE FROM contents WHERE json_extract(COALESCE(draft, published), '$.title') LIKE 'Page filler %'")))
 
 (deftest list-search-filter-and-sort
@@ -359,6 +363,8 @@
         (ok (search "value=\"\" placeholder=\"Search text and ids\"" body))
         (ok (string= (replaced-url body) "/s/website/m/blog"))))
     (testing "a page past the end is the last one"
-      (ok (string= (replaced-url (nth-value 1 (browse :q "" :status "" :sort "" :page 9))) "/s/website/m/blog")))
+      (ok (string= (replaced-url (nth-value 1 (browse :q "" :status "" :sort "" :page 9))) "/s/website/m/blog"))
+      (ok (string= (replaced-url (nth-value 1 (browse :q "" :status "" :sort "" :page 99999999999999999999))) "/s/website/m/blog")
+          "however far past it"))
     (testing "an object model has no list"
       (ok (= 404 (call-action :get (browse-contents :space "website" :model "about")))))))

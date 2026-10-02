@@ -41,7 +41,9 @@
         default
         (let ((n (handler-case (parse-integer raw) (error () (bad-query "~a must be an integer" name)))))
           (when (< n min) (bad-query "~a must be at least ~a" name min))
-          (if (and max (> n max)) max n)))))
+          (cond ((and max (> n max)) max)
+                ((typep n '(signed-byte 64)) n)
+                (t (bad-query "~a is too large" name)))))))
 
 (defun split-csv (string)
   (remove "" (mapcar (lambda (s) (string-trim " " s)) (split "," string)) :test #'string=))
