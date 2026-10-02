@@ -13,6 +13,7 @@
                 #:*mw-mount* #:*mw-session* #:*mw-accesslog* #:make-cookie-state)
   (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
   (:import-from #:koya-server/web/lib/media #:media-app)
+  (:import-from #:koya-server/web/lib/health #:health-app)
   (:import-from #:koya-server/web/lib/http
                 #:make-json-app)
   (:import-from #:koya-server/web/lib/middlewares
@@ -72,6 +73,7 @@
                    :state (session-cookie-state)
                    :keep-empty nil)))
     (lack:builder
+     (with-args *mw-mount* "/health" #'health-app)
      *mw-temporary-file*
      *mw-accesslog*
      *mw-default-cache-control*

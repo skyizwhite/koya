@@ -212,7 +212,7 @@ login page. An action answers each part of the page it changed, under that part'
 the toast (`#toast`) among them, with its status; a refusal answers the toast alone, and
 a result on another page is an element for `#location` that sends the browser there,
 with the toast in the session. A path declared with `public-path` (`web/lib/auth`)
-needs no session: the login page and its action, and `/health`. `/assets/` and
+needs no session: the login page and its action. `/assets/` and
 `/media/` are served outside the session and the guards, so the login page is
 drawn with the assets and no file fetched reads the session.
 
@@ -250,7 +250,10 @@ through files one media file at a time.
 
 Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
 `KOYA_PORT` and `KOYA_ENV`. A `KOYA_SECRET` under 32 characters turns logging in
-off, and the server says so when it starts. `GET /health` is unauthenticated and touches the database.
+off, and the server says so when it starts. `GET /health` is answered ahead of
+everything else, so it opens no session and leaves no line in the access log: it
+reads a table and answers `{"status": "ok"}`, or 503 `unavailable` when the
+database cannot be read.
 
 Backups are the volume's; a space's Export is the portable copy of one space.
 Assets and media are served `immutable` (their URLs carry a version, and a media

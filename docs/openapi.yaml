@@ -120,12 +120,19 @@ paths:
       summary: Liveness, touching the database
       responses:
         "200":
-          description: The server and its database answer; the body is a small HTML page saying `ok`
+          description: The server answers and its database can be read
           content:
-            text/html:
-              schema: { type: string }
-        "500":
-          description: The database does not answer
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: ok }
+        "503":
+          description: "`unavailable`: the database cannot be read"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
 
   /admin/api/me:
     get:

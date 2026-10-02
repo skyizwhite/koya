@@ -227,6 +227,7 @@ that is answered with `413` and a plain-text body before koya reads it.
 | 413 | `too_large` | images over 20 MB, alone or together |
 | 422 | `validation_failed` `empty_file` `unsupported_type` | the content or file is not acceptable |
 | 500 | `internal_error` | the message is only detailed with `KOYA_ENV=dev` |
+| 503 | `unavailable` | `/health` only: the database cannot be read |
 
 Two codes carry `details`: `validation_failed` lists
 `{"field", "code", "message"}` for each problem (the codes are in
