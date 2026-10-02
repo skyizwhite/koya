@@ -6,6 +6,8 @@
                 #:format-timestring
                 #:parse-timestring
                 #:+utc-zone+)
+  (:import-from #:cl-ppcre
+                #:regex-replace)
   (:export #:now-iso
            #:iso-from-now
            #:format-iso
@@ -31,5 +33,6 @@ with milliseconds."
   "Parse an ISO 8601 string into a local-time timestamp, or NIL when invalid
 (including calendar-invalid dates, which local-time signals on)."
   (and (stringp string)
-       (handler-case (parse-timestring string :fail-on-error nil)
+       (handler-case (parse-timestring (regex-replace "(T\\d{2}:\\d{2})(?=Z|[+-]\\d{2}:\\d{2}$)" string "\\1:00")
+                                       :fail-on-error nil)
          (error () nil))))

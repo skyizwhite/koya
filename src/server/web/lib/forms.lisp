@@ -50,7 +50,7 @@
                (when raw (setf (gethash (field-name field) data) raw))))
           (:datetime
            (when raw (setf (gethash (field-name field) data) (local-input->iso raw :timezone (display-timezone)))))
-          (:richtext
+          ((:richtext :textarea)
            (when raw
              (setf (gethash (field-name field) data) (remove #\Return (first (form-values params name))))))
           (t

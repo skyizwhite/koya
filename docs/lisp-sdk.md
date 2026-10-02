@@ -147,7 +147,7 @@ far, `(koya-sdk:clear-schema)` empties the registry, and
 | `:number` | `:required` `:min` `:max` `:integer` | number |
 | `:boolean` | `:required` `:default` | true / false |
 | `:date` | `:required` | `"YYYY-MM-DD"` |
-| `:datetime` | `:required` | ISO 8601 with a zone, e.g. `"2026-09-20T10:00:00.000Z"` |
+| `:datetime` | `:required` | ISO 8601 with a zone, e.g. `"2026-09-20T10:00:00.000Z"`, kept to the minute in UTC |
 | `:select` | `:required` `:options` `:many` | one of `:options`, or an array of them |
 | `:media` | `:required` | media id (expanded to an object by the delivery API) |
 | `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |

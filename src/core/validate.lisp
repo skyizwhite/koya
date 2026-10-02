@@ -12,12 +12,13 @@
                 #:json-array-p)
   (:import-from #:cl-ppcre
                 #:scan)
-  (:import-from #:local-time
-                #:parse-timestring)
+  (:import-from #:koya-core/time
+                #:parse-iso)
   (:export #:validate-content
            #:validation-error
            #:validation-error-errors
            #:blank-value-p
+           #:datetime-string-p
            #:content-id-p))
 (in-package #:koya-core/validate)
 
@@ -42,19 +43,17 @@
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
 
-(defun parses-as-time-p (string)
-  (handler-case (and (parse-timestring string :fail-on-error nil) t)
-    (error () nil)))
-
 (defun date-string-p (value)
   (and (stringp value)
        (scan "^\\d{4}-\\d{2}-\\d{2}\\z" value)
-       (parses-as-time-p value)))
+       (parse-iso value)
+       t))
 
 (defun datetime-string-p (value)
   (and (stringp value)
        (scan "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:\\d{2})\\z" value)
-       (parses-as-time-p value)))
+       (parse-iso value)
+       t))
 
 (defun content-id-p (value)
   (and (stringp value) (scan "^[A-Za-z0-9_-]{1,64}\\z" value) t))

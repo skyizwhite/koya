@@ -19,7 +19,7 @@
                 #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-published #:content-draft #:content-draft-key #:content-data
-                #:merge-data #:fill-defaults #:fill-slugs #:new-content #:drafted #:published
+                #:merge-data #:fill-defaults #:fill-slugs #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
@@ -97,6 +97,7 @@
          (published-at (check-published-at published-at))
          (revised-at (check-timestamp "revisedAt" revised-at)))
     (fill-defaults model data)
+    (to-the-minute model data)
     (let ((content
             (with-transaction
               (when (and (eq (model-kind model) :object) (find-object-content space-name model-name))
@@ -127,7 +128,7 @@
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
          (live (content-published content))
-         (data (if replace patch (merge-data current patch))))
+         (data (to-the-minute model (if replace patch (merge-data current patch)))))
     (cond ((json-equal data current) (values content :unchanged))
           ((and live (json-equal data live))
            (check-transition content :discard)
@@ -146,7 +147,7 @@
 
 (defun publish-now (space model id data published-at)
   (let* ((content (resolve-content space (model-name model) id))
-         (data (or data (content-data content :draft t))))
+         (data (to-the-minute model (or data (content-data content :draft t)))))
     (check-transition content :publish)
     (check-content space model data :exclude-id id)
     (values (store (published content data :published-at published-at) "publish" data)

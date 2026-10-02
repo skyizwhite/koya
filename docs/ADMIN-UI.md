@@ -170,7 +170,7 @@ by its model's `label` field, or by its id.
 | `number` | number input |
 | `boolean` | checkbox — unchecked means `false`; a field with `default: true` starts checked on a new content |
 | `date` | date picker |
-| `datetime` | date and time picker, in the time zone chosen under **Settings** |
+| `datetime` | date and time picker to the minute, in the time zone chosen under **Settings** |
 | `select` | dropdown, or checkboxes when `many` |
 | `reference` | dropdown, or chips plus a dropdown when `many` |
 | `media` | thumbnail with **Choose…** (opens the media picker) and **Clear** |
