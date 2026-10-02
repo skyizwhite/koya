@@ -1,5 +1,8 @@
 # A write that names its origin must name this server
 
+Superseded by adr/2026-10-03-a-write-to-an-action-must-come-from-this-origin.md
+Superseded by adr/2026-10-03-the-apis-take-keys-and-the-admin-ui-the-session.md
+
 *2026-09-27, restating a decision of 2026-09-20*
 
 ## Context

@@ -18,10 +18,7 @@ info:
       with a **management key** (made on the space's *Keys* page) as a Bearer
       token. A key belongs to one space: every route but `/admin/api/me` names a
       space, and a key sent to another space's route is refused with 403. The
-      owner secret only logs into the admin UI. State-changing
-      requests that carry an `Origin` or `Referer` naming another site are
-      rejected with 403; requests without either header (non-browser clients) are
-      accepted.
+      owner secret and the admin UI's session only log into the admin UI.
 
     Bodies use camelCase keys. Timestamps are ISO 8601 in UTC with milliseconds
     (`2026-09-20T05:04:03.123Z`). Every error is
@@ -190,7 +187,7 @@ paths:
               schema: { $ref: "#/components/schemas/DeployResult" }
         "400": { $ref: "#/components/responses/InvalidSchema" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
           description: "`destructive_changes`: destructive changes without `force=true`; `details` lists every change"
@@ -225,7 +222,7 @@ paths:
               schema: { $ref: "#/components/schemas/Plan" }
         "400": { $ref: "#/components/responses/InvalidSchema" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /admin/api/contents/{space}/{model}:
@@ -278,7 +275,7 @@ paths:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
           description: "`conflict`: a content with this `id` already exists; `object_exists`: the `object` model already has its content"
@@ -331,7 +328,7 @@ paths:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
     delete:
@@ -351,7 +348,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /admin/api/contents/{space}/{model}/{id}/publish:
@@ -382,7 +379,7 @@ paths:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
@@ -414,7 +411,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /admin/api/contents/{space}/{model}/{id}/discard-draft:
@@ -435,7 +432,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
           description: "`not_published`: the content has no published version to fall back to; delete it instead. `no_draft`: it is published with no draft to discard"
@@ -467,7 +464,7 @@ paths:
                 properties:
                   draftKey: { type: string, examples: ["3f1c…"] }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /admin/api/keys/{space}:
@@ -508,7 +505,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/CreatedDeliveryKey" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /admin/api/keys/{space}/{id}:
@@ -523,7 +520,7 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Deleted" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /admin/api/media/{space}:
     parameters:
@@ -590,7 +587,7 @@ paths:
                     items: { $ref: "#/components/schemas/Media" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "413":
           description: "`too_large`: images over 20 MB, alone or together. A body over 21 MB gets 413 in plain text, with no error object."
@@ -642,7 +639,7 @@ paths:
               schema: { $ref: "#/components/schemas/Media" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: deleteMedia
@@ -658,7 +655,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/CrossOrigin" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
 components:
@@ -673,7 +670,7 @@ components:
     managementKey:
       type: http
       scheme: bearer
-      description: A management key (`koya_mgmt_…`) from the space's Keys page in the admin UI. It reaches that one space; another space's route is 403. The admin UI's session cookie works too and reaches every space; the owner secret does not work here at all.
+      description: A management key (`koya_mgmt_…`) from the space's Keys page in the admin UI. It reaches that one space; another space's route is 403. Nothing else reaches the admin API, neither the owner secret nor the admin UI's session.
 
   parameters:
     space:
@@ -766,11 +763,6 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
-    CrossOrigin:
-      description: "`forbidden`: a browser request from another origin"
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/ApiError" }
     NotFound:
       description: "`not_found`: unknown space, model, content, media or endpoint"
       content:
@@ -836,11 +828,9 @@ components:
 
     Me:
       type: object
-      required: [owner, management, space, version]
+      required: [space, version]
       properties:
-        owner: { type: boolean, description: "true when called with the admin UI's session" }
-        management: { type: boolean, description: "true when called with a management key" }
-        space: { type: [string, "null"], description: "the space a management key is limited to; null for the owner" }
+        space: { type: string, description: "the space the management key is limited to" }
         version: { type: string, examples: ["0.15.0"] }
 
     Schema:
