@@ -7,6 +7,7 @@
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
   (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
+  (:import-from #:koya-server/usecases/auth #:secure-string=)
   (:import-from #:koya-server/usecases/ports/media #:find-media)
   (:import-from #:koya-server/usecases/ports/contents
                 #:find-content #:find-object-content #:list-contents)
@@ -73,7 +74,7 @@
     (make-delivered content model data)))
 
 (defun draft-key-p (content draft-key)
-  (and draft-key (content-draft-key content) (string= draft-key (content-draft-key content))))
+  (and draft-key (content-draft-key content) (secure-string= draft-key (content-draft-key content))))
 
 (defun deliver-if-allowed (space model content query draft-key)
   (let ((draft (draft-key-p content draft-key)))

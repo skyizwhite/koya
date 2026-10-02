@@ -16,7 +16,7 @@
   (:import-from #:koya-server/web/lib/http
                 #:make-json-app)
   (:import-from #:koya-server/web/lib/middlewares
-                #:*mw-temporary-file* #:*mw-max-body*
+                #:*mw-temporary-file* #:*mw-max-body* #:*mw-session-cookie-renewal*
                 #:*mw-default-cache-control* #:*mw-delivery-cors* #:+max-body-bytes+)
   (:import-from #:smart-buffer)
   (:import-from #:koya-server/usecases/auth #:make-session-store #:+session-seconds+)
@@ -82,10 +82,10 @@
      (with-args *mw-mount* "/assets" (make-instance 'lack-app-file :root #p"assets/"))
      (with-args *mw-mount* "/media" #'media-app)
      (with-args *mw-mount* "/admin/api"
-       (lack:builder *mw-trim-trailing-slash* session *mw-admin-auth* *admin-api-app*))
+       (lack:builder *mw-trim-trailing-slash* session *mw-session-cookie-renewal* *mw-admin-auth* *admin-api-app*))
      (with-args *mw-mount* "/actions"
-       (lack:builder session *mw-actions-auth* *actions-app*))
-     (lack:builder *mw-trim-trailing-slash* session *mw-pages-auth* *page-app*))))
+       (lack:builder session *mw-session-cookie-renewal* *mw-actions-auth* *actions-app*))
+     (lack:builder *mw-trim-trailing-slash* session *mw-session-cookie-renewal* *mw-pages-auth* *page-app*))))
 
 (defvar *app* nil)
 

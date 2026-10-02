@@ -43,7 +43,8 @@ secret is the owner.
 - With a `KOYA_SECRET` shorter than that, the page says so and asks for nothing;
   the rest of the server runs as usual until a longer one is set and the server
   restarted.
-- A session lasts a day and survives a server restart or a redeploy.
+- A session stays open while the admin UI is in use, ends between half a day
+  and a day after the last request, and survives a server restart or a redeploy.
 - A page opened without a session goes to the login page and comes back to that
   page after logging in. So does a button pressed on a page left open after the
   session ended: it comes back to the page, and what it sent is not replayed.

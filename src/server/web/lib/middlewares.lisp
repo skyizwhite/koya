@@ -8,8 +8,17 @@
            #:*mw-default-cache-control*
            #:*mw-delivery-cors*
            #:*mw-max-body*
+           #:*mw-session-cookie-renewal*
            #:+max-body-bytes+))
 (in-package #:koya-server/web/lib/middlewares)
+
+(defparameter *mw-session-cookie-renewal*
+  (lambda (app)
+    (lambda (env)
+      (let ((session (getf env :lack.session)))
+        (when (and session (plusp (hash-table-count session)))
+          (setf (getf (getf env :lack.session.options) :new-session) t)))
+      (funcall app env))))
 
 (defparameter *mw-default-cache-control*
   (with-args *mw-cache-control*
