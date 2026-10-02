@@ -9,9 +9,10 @@
 (in-package #:koya-server/web/lib/paging)
 
 (defparameter +page-size+ 20)
+(defparameter +max-page+ (expt 2 32))
 
 (defun page-number (params)
-  (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1)))
+  (min +max-page+ (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1))))
 
 (defun last-page (total &optional (size +page-size+))
   (max 1 (ceiling total size)))
