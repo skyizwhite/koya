@@ -26,6 +26,7 @@
   (:import-from #:koya-server/domain/query
                 #:parse-query #:make-query #:query-limit #:query-offset #:query-orders
                 #:query-filters #:query-fields #:query-include #:query-error)
+  (:import-from #:koya-core/validate #:validation-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-core/json #:parse-json #:jget))
 (in-package #:koya-spec/server/usecases/contents)
@@ -45,6 +46,7 @@
   (replace-schema "website"
                (make-schema :models (list (blog-model)
                                           (make-model "tag" :list (list (make-field :name :text)))
+                                          (make-model "event" :list (list (make-field :at :datetime)))
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
 
 (teardown (disconnect-db))
@@ -275,6 +277,29 @@
     (testing "and a boolean always has one"
       (ok (equal (found "featured[exists]") '("False" "Missing" "Null" "True")))
       (ok (null (found "featured[not_exists]"))))))
+
+(deftest a-datetime-is-kept-to-the-minute-in-utc
+  (let ((model (find-model "website" "event")))
+    (flet ((at (json) (jget (content-draft (create "website" model (data json))) "at")))
+      (ok (string= (at "{\"at\": \"2024-01-01T10:00:30.500Z\"}") "2024-01-01T10:00:00.000Z")
+          "the seconds are dropped, as the editor gives none")
+      (ok (string= (at "{\"at\": \"2024-01-01T19:05+09:00\"}") "2024-01-01T10:05:00.000Z")
+          "and the zone it was given in becomes UTC")
+      (ok (string= (at "{\"at\": \"2024-01-01T10:05:00.000Z\"}") "2024-01-01T10:05:00.000Z"))
+      (dolist (value '("2024-01-01" "2024-01-01T10:00:00" "10:00:00"))
+        (ok (signals (at (format nil "{\"at\": ~s}" value)) 'validation-error)
+            (format nil "~s is no datetime, and is not made one" value))))
+    (let* ((content (create "website" model (data "{\"at\": \"2024-01-01T10:05:00.000Z\"}")))
+           (id (content-id content)))
+      (testing "a change to the same minute is no change"
+        (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"at\": \"2024-01-01T10:05:59Z\"}")))
+                :unchanged))
+        (ok (= (count-revisions id) 1)))
+      (testing "a change and a publish keep it to the minute too"
+        (update-draft "website" model id (data "{\"at\": \"2024-03-01T08:30:15+01:00\"}"))
+        (ok (string= (jget (content-draft (get-content id)) "at") "2024-03-01T07:30:00.000Z"))
+        (publish "website" model id (data "{\"at\": \"2024-04-01T00:00:01Z\"}"))
+        (ok (string= (jget (content-published (get-content id)) "at") "2024-04-01T00:00:00.000Z"))))))
 
 (deftest parse-query-defaults
   (let ((query (q)))

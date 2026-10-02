@@ -65,6 +65,12 @@
 (deftest type-errors
   (ok (equal (codes "{\"title\": 1, \"eventAt\": \"nope\"}")
              '(("title" . "type") ("eventAt" . "type"))))
+  (ok (null (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T19:00+09:00\"}"))
+      "a datetime may leave out its seconds, in any zone")
+  (ok (null (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T10:00Z\"}")))
+  (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T10:00\"}")
+             '(("eventAt" . "type")))
+      "but not its zone")
   (ok (equal (codes "{\"title\": \"Toolongtitle!\", \"eventAt\": \"2026-09-20T00:00:00Z\"}")
              '(("title" . "max_length"))))
   (ok (equal (codes "{\"title\": \"lower\", \"eventAt\": \"2026-09-20T00:00:00Z\"}")

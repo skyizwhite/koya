@@ -3,11 +3,13 @@
   (:import-from #:koya-core/schema
                 #:model-fields #:model-label #:field-name #:field-type #:field-option)
   (:import-from #:koya-core/validate
-                #:blank-value-p)
+                #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
                 #:json-null)
   (:import-from #:koya-core/time
-                #:now-iso)
+                #:now-iso #:parse-iso #:format-iso)
+  (:import-from #:local-time
+                #:timestamp-minimize-part #:+utc-zone+)
   (:import-from #:cl-ppcre
                 #:regex-replace-all)
   (:import-from #:ironclad
@@ -36,6 +38,7 @@
            #:default-data
            #:fill-defaults
            #:fill-slugs
+           #:to-the-minute
            #:slugify))
 (in-package #:koya-server/domain/content)
 
@@ -173,6 +176,15 @@
                (setf (gethash key data) value)))
            (default-data model))
   data)
+
+(defun to-the-minute (model data)
+  (dolist (field (model-fields model) data)
+    (when (eq (field-type field) :datetime)
+      (let* ((value (gethash (field-name field) data))
+             (timestamp (and (datetime-string-p value) (parse-iso value))))
+        (when timestamp
+          (setf (gethash (field-name field) data)
+                (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+))))))))
 
 (defun slugify (string)
   (let* ((lower (string-downcase string))

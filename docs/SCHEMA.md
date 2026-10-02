@@ -217,7 +217,7 @@ boolean is `false`. Otherwise:
 | `number` | number | `integer` (`integer`), `min` (`min`), `max` (`max`) |
 | `boolean` | `true` / `false` | |
 | `date` | `"YYYY-MM-DD"`, a real calendar date | |
-| `datetime` | ISO 8601 with seconds optional and an explicit zone: `2026-09-20T10:00:00.000Z`, `2026-09-20T19:00+09:00` | |
+| `datetime` | ISO 8601 with seconds optional and an explicit zone: `2026-09-20T10:00:00.000Z`, `2026-09-20T19:00+09:00`. Stored to the minute in UTC: seconds are dropped, so the second example is kept as `2026-09-20T10:00:00.000Z` | |
 | `select` | one of `options` (`option`) | |
 | `media` `reference` | an id: `^[A-Za-z0-9_-]{1,64}$` | |
 
