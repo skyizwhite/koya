@@ -62,6 +62,15 @@
        (loop :for value :in options :collect
          (hsx (option :value value :selected (equal value selected) value)))))))
 
+(defcomp ~filters-clear (&key space label model)
+  (hsx
+   (span :id "filters-clear"
+     (when (filtered-p label model)
+       (hsx (a :href (webhook-log-url space)
+               :nm-bind (on-follow (browse-deliveries :space space :clear "1"))
+               :class "btn"
+              "Clear"))))))
+
 (defcomp ~filters (&key space schema label model)
   (let ((labels (union-options (webhook-labels schema) (delivery-labels space) label))
         (models (union-options (model-names schema) (delivery-models space) model)))
@@ -74,7 +83,8 @@
               (~filter-select :name "label" :label "Webhook" :all "All webhooks"
                               :options labels :selected label)
               (~filter-select :name "model" :label "Model" :all "All models"
-                              :options models :selected model))))))))
+                              :options models :selected model)
+              (~filters-clear :space space :label label :model model))))))))
 
 (defcomp ~field (&key label children)
   (hsx
@@ -136,12 +146,6 @@
                                        :limit +page-size+ :offset (page-offset page))))
     (hsx
      (div :id "deliveries"
-       (when (filtered-p label model)
-         (hsx (p :class "-mt-3 mb-3 text-sm"
-                (a :href (webhook-log-url space)
-                   :nm-bind (on-follow (browse-deliveries :space space :clear "1"))
-                   :class "text-muted hover:text-fg hover:underline"
-                  "Clear the filters"))))
        (if (null items)
            (hsx (~empty-state (if (filtered-p label model)
                                   "Nothing matches these filters."
@@ -176,7 +180,7 @@
                     (~delivery-count :space space :label label :model model)
                     (if clear
                         (hsx (~filters :space space :schema schema))
-                        (hsx (<>)))))))))
+                        (hsx (~filters-clear :space space :label label :model model)))))))))
 
 (defun @get (params)
   (let* ((name (path-param params :space))

@@ -130,20 +130,31 @@
 (defcomp ~sort-input (&key sort-key)
   (hsx (input :type "hidden" :id "filter-sort" :name "sort" :value (or sort-key ""))))
 
-(defcomp ~filters (&key space model search-text status sort-key)
+(defcomp ~filters-clear (&key space model state)
   (hsx
-   (form :id "filters" :method "get" :action (model-url space model)
-         :nm-data "...koya.search()" :nm-bind (on-search (browse-contents :space space :model model))
-         :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
-     (~sort-input :sort-key sort-key)
-     (input :type "search" :name "q" :value (or search-text "") :placeholder "Search text and ids"
-            :aria-label "Search" :class "input w-64 max-w-full")
-     (span :class "flex items-center gap-2"
-       (label :for "status" :class "text-sm text-muted" "Status")
-       (select :id "status" :name "status" :class "text-sm"
-         (option :value "" :selected (blank-p status) "All")
-         (loop :for value :in +statuses+ :collect
-           (hsx (option :value value :selected (equal value status) value))))))))
+   (span :id "filters-clear"
+     (when (filtered-p state)
+       (hsx (a :href (list-url space model :sort-key (getf state :sort-key))
+               :nm-bind (on-follow (browse-url space model state :search-text "" :status "" :page 1 :clear t))
+               :class "btn"
+              "Clear"))))))
+
+(defcomp ~filters (&key space model state)
+  (let ((status (getf state :status)))
+    (hsx
+     (form :id "filters" :method "get" :action (model-url space model)
+           :nm-data "...koya.search()" :nm-bind (on-search (browse-contents :space space :model model))
+           :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
+       (~sort-input :sort-key (getf state :sort-key))
+       (input :type "search" :name "q" :value (or (getf state :search-text) "") :placeholder "Search text and ids"
+              :aria-label "Search" :class "input w-64 max-w-full")
+       (span :class "flex items-center gap-2"
+         (label :for "status" :class "text-sm text-muted" "Status")
+         (select :id "status" :name "status" :class "text-sm"
+           (option :value "" :selected (blank-p status) "All")
+           (loop :for value :in +statuses+ :collect
+             (hsx (option :value value :selected (equal value status) value)))))
+       (~filters-clear :space space :model model :state state)))))
 
 (defcomp ~column-header (&key space model field state)
   (let* ((name (field-name field))
@@ -214,12 +225,6 @@
          (status (getf state :status)))
     (hsx
      (div :id "contents"
-       (when (filtered-p state)
-         (hsx (p :class "-mt-3 mb-3 text-sm"
-                (a :href (list-url space model-name :sort-key (getf state :sort-key))
-                   :nm-bind (on-follow (browse-url space model-name state :search-text "" :status "" :page 1 :clear t))
-                   :class "text-muted hover:text-fg hover:underline"
-                  "Clear the search and filter"))))
        (if (null contents)
            (hsx (~empty-state (cond ((not (blank-p search-text)) "Nothing matches this search.")
                                     ((not (blank-p status)) "No contents with this status.")
@@ -271,8 +276,7 @@
                      (~icon :name :webhook) "Webhooks")))
            (a :href (content-url space model-name "new") :class "btn btn-primary"
               (~icon :name :plus) "New content")))
-       (~filters :space space :model model-name :search-text (getf state :search-text)
-                 :status (getf state :status) :sort-key (getf state :sort-key))
+       (~filters :space space :model model-name :state state)
        (~content-list :space space :model model :state state :contents contents :pages pages)))))
 
 (defun answer-list (space model state &key message kind clear)
@@ -287,8 +291,9 @@
                                                              :sort-key (getf state :sort-key) :page (getf state :page)))
                (~content-count :space space :model model :state state :total total)
                (if clear
-                   (hsx (~filters :space space :model model-name :sort-key (getf state :sort-key)))
-                   (hsx (~sort-input :sort-key (getf state :sort-key))))
+                   (hsx (~filters :space space :model model-name :state (list :sort-key (getf state :sort-key))))
+                   (hsx (<> (~sort-input :sort-key (getf state :sort-key))
+                            (~filters-clear :space space :model model-name :state state))))
                (if message (hsx (~toast :message message :kind kind)) (hsx (<>))))))))
 
 (defun @get (params)

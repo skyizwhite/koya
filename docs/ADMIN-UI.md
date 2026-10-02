@@ -138,7 +138,7 @@ is no button.
   can be sorted by as well.
 
 The count beside the heading reads *3 of 120* while anything is filtered.
-*Clear the search and filter*, above the table, drops both and keeps the sort.
+**Clear**, beside the status filter, drops both and keeps the sort.
 All three are in the URL, so the list as you are reading it is a link.
 
 ### Doing it to several at once
@@ -282,7 +282,7 @@ has no body here, only its status (see [SCHEMA.md](SCHEMA.md#webhook)).
 Two selects above the list narrow it to one webhook, to one model, or to both.
 The same views are reached by link: a webhook row on the space page opens that
 webhook's calls, and **Webhooks** on a model's page opens the calls a change to
-that model set off. *Clear the filters* drops both.
+that model set off. **Clear**, beside the selects, drops both.
 
 Nothing here is retried, and nothing is kept beyond the newest 200 calls of a
 space: this is a log to glance at after a publish, not an audit trail.
