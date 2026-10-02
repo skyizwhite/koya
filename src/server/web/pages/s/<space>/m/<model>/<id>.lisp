@@ -2,7 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:posts #:clicks)
+  (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url)
@@ -58,9 +58,9 @@
     (flet ((post ()
              (hsx (button :type "button" :class class
                           :commandfor dialog :command (and dialog "close")
-                          :nm-bind (clicks (editor-action :space space :model model :id id :op op)
-                                           :data "koya.form($refs.form)"
-                                           :also (and (equal op "save") "disabled: () => _unchanged()"))
+                          :nm-bind (on-click (editor-action :space space :model model :id id :op op)
+                                             :data "koya.form($refs.form)"
+                                             :binds (and (equal op "save") "disabled: () => _unchanged()"))
                     (when icon (hsx (~icon :name icon)))
                     children))))
       (if dialog
@@ -133,8 +133,8 @@
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
        (form :id "editor-form" :class "space-y-6" :nm-ref "form"
-             :nm-bind (posts (editor-action :space space-name :model model-name :id id :op "save")
-                             :also "oninput: () => _track(), onchange: () => _track()")
+             :nm-bind (on-submit (editor-action :space space-name :model model-name :id id :op "save")
+                                 :binds "oninput: () => _track(), onchange: () => _track()")
          (loop :for field :in (model-fields model) :collect
            (hsx (~field-input :field field
                               :value (and data (gethash (field-name field) data))

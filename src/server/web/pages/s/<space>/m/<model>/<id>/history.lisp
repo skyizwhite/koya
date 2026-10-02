@@ -3,7 +3,7 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:follows)
+  (:import-from #:koya-server/web/lib/binds #:on-follow)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-field #:field-type #:field-option)
   (:import-from #:koya-core/json #:json-array-p)
@@ -131,7 +131,7 @@
                :after (revision-data revision)))))
 
 (defcomp ~tab (&key href browse active children)
-  (hsx (a :href href :nm-bind (follows browse)
+  (hsx (a :href href :nm-bind (on-follow browse)
           :class (clsx "border-b-2 px-3 py-2 text-sm"
                        (if active "border-accent font-medium text-fg" "border-transparent text-muted hover:text-fg"))
           children)))

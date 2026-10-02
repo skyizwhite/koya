@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/media
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:searches #:reveals #:uploads)
+  (:import-from #:koya-server/web/lib/binds #:on-search #:on-reveal #:on-pick)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:request-url #:call-action #:setup-pages #:log-in)
@@ -36,7 +36,7 @@
     (multiple-value-bind (status body) (request :get "/s/website/media")
       (ok (= status 200))
       (ok (search "No media yet" body))
-      (ok (search (bound (uploads (upload-media :space "website" :q "" :page 1))) body)
+      (ok (search (bound (on-pick (upload-media :space "website" :q "" :page 1))) body)
           "a file goes as it is chosen"))
     (testing "upload from the library page"
       (multiple-value-bind (status body)
@@ -65,7 +65,7 @@
             "with the count beside it")
         (ng (search "Search file names" body) "and not the box being typed in")
         (ok (string= (replaced-url body) "/s/website/media?q=second")))
-      (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (searches (browse-media :space "website"))))
+      (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (on-search (browse-media :space "website"))))
                   (nth-value 1 (request :get "/s/website/media")))
           "the box searches as the typing stops")
       (multiple-value-bind (status body)
@@ -92,8 +92,8 @@
         (ok (search "data-pick-url=\"/media/website/" body))
         (ok (not (search "<html" body)) "a fragment, not a page")
         (ok (search "nm-bind=\"{ onclick: () => _pick(this.dataset) }\"" body) "a card hands its file over")
-        (ok (search (bound (searches (media-picker :space "website"))) body) "the box searches as the typing stops")
-        (ok (search (bound (uploads (media-picker-upload :space "website"))) body)))
+        (ok (search (bound (on-search (media-picker :space "website"))) body) "the box searches as the typing stops")
+        (ok (search (bound (on-pick (media-picker-upload :space "website"))) body)))
       (let ((*cookie* nil))
         (multiple-value-bind (status) (call-action :get (media-picker :space "website"))
           (ok (= status 401) "the picker needs the owner session")))
@@ -196,7 +196,7 @@
         (ok (= (cards body) 12) "the picker opens on three rows of four")
         (let ((more (media-picker-more :space "website" :q "" :page 2)))
           (ok (search (format nil "<li id=\"~a\" class=\"col-span-full py-2 text-center text-xs text-muted\" ~a"
-                              (escaped more) (bound (reveals more)))
+                              (escaped more) (bound (on-reveal more)))
                       body)
               "and fetches the next ones as its last row comes into view")))
       (let* ((url (media-picker-more :space "website" :q "" :page pages))
@@ -209,5 +209,5 @@
             "and the placeholder put out of sight"))
       (let ((body (answer (media-picker :space "website" :q "paged-"))))
         (ok (= (cards body) 12) "a search is fetched the same way")
-        (ok (search (bound (reveals (media-picker-more :space "website" :q "paged-" :page 2))) body)))
+        (ok (search (bound (on-reveal (media-picker-more :space "website" :q "paged-" :page 2))) body)))
       (ok (= (cards (answer (media-picker-more :space "website" :q "paged-" :page 2))) 5)))))

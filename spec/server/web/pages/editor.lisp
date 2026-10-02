@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/usecases/schema #:replace-schema #:resolve-model)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id>/history #:browse-history)
-  (:import-from #:koya-server/web/lib/binds #:clicks #:posts)
+  (:import-from #:koya-server/web/lib/binds #:on-click #:on-submit)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages
                 #:log-in #:asked-first)
@@ -366,7 +366,7 @@
           (testing (format nil "~a opens a dialog, and the dialog does it" op)
             (ok (asked-first body (format nil "confirm-~a" op) (post id op)))))
         (testing "saving a draft is not asked"
-          (ok (search (bound (clicks (post id "save") :data "koya.form($refs.form)" :also "disabled: () => _unchanged()"))
+          (ok (search (bound (on-click (post id "save") :data "koya.form($refs.form)" :binds "disabled: () => _unchanged()"))
                       body)
               "its button posts the draft itself")
           (ng (search "confirm-save" body)))

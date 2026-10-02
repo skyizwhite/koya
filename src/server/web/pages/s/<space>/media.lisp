@@ -3,7 +3,7 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:posts #:follows #:searches #:uploads)
+  (:import-from #:koya-server/web/lib/binds #:on-submit #:on-follow #:on-search #:on-pick)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
@@ -54,13 +54,13 @@
               :class "absolute left-1 top-1 z-10 h-4 w-4 cursor-pointer"
               :aria-label (format nil "Select ~a" (media-filename media)))
        (button :type "button" :class "block w-full cursor-zoom-in"
-               :nm-bind (follows (preview-media :space space :id id :q (or search "") :page page))
+               :nm-bind (on-follow (preview-media :space space :id id :q (or search "") :page page))
                :title (media-filename media)
                :aria-label (format nil "Preview ~a" (media-filename media))
          (~thumb :media media))
        (form :class "absolute right-1 top-1"
-             :nm-bind (posts (delete-media-action :space space :q (or search "") :page page)
-                             :confirm (delete-confirmation media references))
+             :nm-bind (on-submit (delete-media-action :space space :q (or search "") :page page)
+                                 :confirm (delete-confirmation media references))
          (input :type "hidden" :name "id" :value id)
          (button :type "submit" :class "btn btn-danger btn-icon"
                  :disabled in-use
@@ -77,7 +77,7 @@
          (q (or search "")))
     (hsx
      (div :id "library" :nm-data "...koya.bulk(this)"
-       (form :nm-bind (uploads (upload-media :space space :q q :page page))
+       (form :nm-bind (on-pick (upload-media :space space :q q :page page))
              :class "mb-8 flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
          (label :class "btn" (~icon :name :upload) "Upload"
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp"
@@ -94,9 +94,9 @@
                          :nm-bind "{ checked: () => _all(), indeterminate: () => _partly(), onchange: () => _pickAll(this.checked) }")
                   "Select all on this page")
                 (form :id +bulk-form+
-                      :nm-bind (posts (delete-selected-media :space space :q q :page page)
-                                      :data "{ id: _chosen }"
-                                      :confirm "Delete the selected files? This cannot be undone.")
+                      :nm-bind (on-submit (delete-selected-media :space space :q q :page page)
+                                          :data "{ id: _chosen }"
+                                          :confirm "Delete the selected files? This cannot be undone.")
                   (div :hidden t :nm-bind "{ hidden: () => !_count() }" :class "flex flex-wrap items-center gap-2 text-sm"
                     (span :class "mr-1 text-muted" :nm-bind "{ textContent: () => `${_count()} selected` }" "0 selected")
                     (button :type "submit" :class "btn btn-danger" (~icon :name :delete) "Delete"))))
@@ -117,7 +117,7 @@
    (div :class "mb-6 flex flex-wrap items-center justify-between gap-4"
      (h1 :class "text-2xl font-bold" "Media" (~media-count :space space :search search))
      (form :method "get" :action (media-page-url space) :class "flex gap-2"
-           :nm-data "...koya.search()" :nm-bind (searches (browse-media :space space))
+           :nm-data "...koya.search()" :nm-bind (on-search (browse-media :space space))
        (input :type "search" :name "q" :value (or search "") :placeholder "Search file names"
               :aria-label "Search" :class "input")))))
 
@@ -140,8 +140,8 @@
                   (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media))
                           (short-time (media-created-at media)))))
               (div :class "flex shrink-0 items-center gap-2"
-                (form :nm-bind (posts (delete-media-action :space space :q (or search "") :page page)
-                                      :confirm (delete-confirmation media references))
+                (form :nm-bind (on-submit (delete-media-action :space space :q (or search "") :page page)
+                                          :confirm (delete-confirmation media references))
                   (input :type "hidden" :name "id" :value (media-id media))
                   (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete"
                           :disabled in-use :title (and in-use (delete-confirmation media references))
@@ -151,7 +151,7 @@
             (div :class "flex max-h-[65vh] items-center justify-center bg-fg/5 p-4"
               (img :src (media-url media :absolute nil) :alt (media-alt media)
                    :class "max-h-[60vh] max-w-full object-contain"))
-            (form :nm-bind (posts (save-alt :space space :id (media-id media)))
+            (form :nm-bind (on-submit (save-alt :space space :id (media-id media)))
                   :class "flex items-center gap-2 border-t border-line px-4 py-3"
               (input :type "text" :name "alt" :value (media-alt media) :placeholder "alt text"
                      :class "input" :aria-label "alt text")

@@ -13,7 +13,7 @@
   (:import-from #:koya-server/web/ui/layout #:~footer)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/elements #:~go-to)
-  (:import-from #:koya-server/web/lib/binds #:posts)
+  (:import-from #:koya-server/web/lib/binds #:on-submit)
   (:export #:@get #:log-in))
 (in-package #:koya-server/web/pages/login)
 
@@ -29,7 +29,7 @@
 (defcomp ~login-fields (&key error next)
   (hsx
    (form :id "login" :class "space-y-4"
-         :nm-bind (posts (log-in))
+         :nm-bind (on-submit (log-in))
      (when next (hsx (input :type "hidden" :name "next" :value next)))
      (div
        (label :for "secret" :class "label" "Owner secret")

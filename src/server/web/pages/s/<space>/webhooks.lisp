@@ -2,7 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:searches #:follows)
+  (:import-from #:koya-server/web/lib/binds #:on-search #:on-follow)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
   (:import-from #:koya-server/usecases/webhooks
@@ -69,7 +69,7 @@
      (<> (unless (and (null labels) (null models))
            (hsx
             (form :id "filters" :method "get" :action (format nil "~a/webhooks" (space-url space))
-                  :nm-data "...koya.search()" :nm-bind (searches (browse-deliveries :space space) :typing nil)
+                  :nm-data "...koya.search()" :nm-bind (on-search (browse-deliveries :space space) :typing nil)
                   :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
               (~filter-select :name "label" :label "Webhook" :all "All webhooks"
                               :options labels :selected label)
@@ -139,7 +139,7 @@
        (when (filtered-p label model)
          (hsx (p :class "-mt-3 mb-3 text-sm"
                 (a :href (webhook-log-url space)
-                   :nm-bind (follows (browse-deliveries :space space :clear "1"))
+                   :nm-bind (on-follow (browse-deliveries :space space :clear "1"))
                    :class "text-muted hover:text-fg hover:underline"
                   "Clear the filters"))))
        (if (null items)

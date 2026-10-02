@@ -21,7 +21,7 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:searches #:follows #:clicks)
+  (:import-from #:koya-server/web/lib/binds #:on-search #:on-follow #:on-click)
   (:import-from #:koya-server/usecases/listing
                 #:parse-sort #:content-page #:page-media #:count-contents #:find-object-content
                 #:reference-labels)
@@ -133,7 +133,7 @@
 (defcomp ~filters (&key space model search-text status sort-key)
   (hsx
    (form :id "filters" :method "get" :action (model-url space model)
-         :nm-data "...koya.search()" :nm-bind (searches (browse-contents :space space :model model))
+         :nm-data "...koya.search()" :nm-bind (on-search (browse-contents :space space :model model))
          :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
      (~sort-input :sort-key sort-key)
      (input :type "search" :name "q" :value (or search-text "") :placeholder "Search text and ids"
@@ -152,7 +152,7 @@
     (hsx
      (th :class "py-2 pr-4 font-medium"
        (a :href (list-url space model :search-text (getf state :search-text) :status (getf state :status) :sort-key next)
-          :nm-bind (follows (browse-url space model state :sort-key next :page 1))
+          :nm-bind (on-follow (browse-url space model state :sort-key next :page 1))
           :class "flex items-center gap-1 hover:text-fg"
          (span :class (clsx "truncate" (column-width field)) name)
          (when active
@@ -169,7 +169,7 @@
                           (~icon :name icon) label)
                         (~confirm-dialog :id dialog :title title :message message
                           (button :type "button" :class class :commandfor dialog :command "close"
-                                  :nm-bind (clicks (url op) :data "{ id: _chosen }")
+                                  :nm-bind (on-click (url op) :data "{ id: _chosen }")
                             (~icon :name icon) label)))))))
     (hsx
      (div :hidden t :nm-bind "{ hidden: () => !_count() }"
@@ -217,7 +217,7 @@
        (when (filtered-p state)
          (hsx (p :class "-mt-3 mb-3 text-sm"
                 (a :href (list-url space model-name :sort-key (getf state :sort-key))
-                   :nm-bind (follows (browse-url space model-name state :search-text "" :status "" :page 1 :clear t))
+                   :nm-bind (on-follow (browse-url space model-name state :search-text "" :status "" :page 1 :clear t))
                    :class "text-muted hover:text-fg hover:underline"
                   "Clear the search and filter"))))
        (if (null contents)
