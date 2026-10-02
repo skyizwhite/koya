@@ -45,6 +45,16 @@
   (multiple-value-bind (status body) (request :get "/")
     (ok (= status 200))
     (ok (search "website" body) "space listed"))
+  (testing "every answer to the logged-in owner sends the cookie again, so it lasts as long as the session"
+    (let ((cookie *cookie*))
+      (setf *set-cookie* nil)
+      (request :get "/")
+      (ok (and *set-cookie* (search "expires=" *set-cookie* :test #'char-equal)) "with a new expiry")
+      (ok (string= *cookie* cookie) "for the same session")))
+  (testing "a request with no session gets no cookie"
+    (let ((*cookie* nil) (*set-cookie* nil))
+      (request :get "/login")
+      (ok (null *set-cookie*))))
   (testing "two-factor login once a secret is stored"
     (let ((secret "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"))
       (enable-totp secret)
