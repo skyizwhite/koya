@@ -62,7 +62,8 @@
   (with-db-transaction (funcall thunk)))
 
 (defmethod store-reachable-p ()
-  (and (fetch-one "SELECT 1 AS ok") t))
+  (handler-case (and (fetch-one "SELECT count(*) AS n FROM spaces") t)
+    (error () nil)))
 
 (defun exec (sql &rest params)
   (with-db (do-sql *db* sql params)))

@@ -1,0 +1,15 @@
+(defpackage #:koya-server/web/lib/health
+  (:use #:cl)
+  (:import-from #:koya-core/json #:jobject)
+  (:import-from #:koya-server/usecases/system #:store-reachable-p)
+  (:import-from #:koya-server/web/lib/http #:json-response #:error-object)
+  (:export #:health-app))
+(in-package #:koya-server/web/lib/health)
+
+(defun health-app (env)
+  (declare (ignore env))
+  (destructuring-bind (status headers body)
+      (if (store-reachable-p)
+          (json-response 200 (jobject "status" "ok"))
+          (json-response 503 (error-object "unavailable" "The database cannot be read")))
+    (list status (append headers '(:cache-control "no-store")) body)))

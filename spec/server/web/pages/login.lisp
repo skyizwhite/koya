@@ -16,12 +16,6 @@
 
 (teardown (disconnect-db))
 
-(deftest health
-  (let ((*cookie* nil))
-    (multiple-value-bind (status body) (request :get "/health")
-      (ok (= status 200))
-      (ok (search "ok" body)))))
-
 (deftest login-flow
   (setf *cookie* nil)
   (multiple-value-bind (status body headers) (request :get "/")

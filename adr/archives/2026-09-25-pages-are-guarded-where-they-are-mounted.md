@@ -1,5 +1,8 @@
 # Pages are guarded where they are mounted, as the admin API and the actions are
 
+Superseded by adr/2026-10-03-pages-are-guarded-where-they-are-mounted.md
+Superseded by adr/2026-10-03-health-is-answered-ahead-of-everything.md
+
 *2026-09-25*
 
 ## Context
