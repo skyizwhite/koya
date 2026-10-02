@@ -175,11 +175,14 @@
         quill.clipboard.dangerouslyPasteHTML(protect(input.value));
         settle();
       }
-      const opened = tidy(restore(quill.getSemanticHTML()));
+      const empty = () =>
+        quill.getContents().ops.every((op) => typeof op.insert === "string") && quill.getText().trim() === "";
+      const html = () => (empty() ? "" : tidy(restore(quill.getSemanticHTML())));
+      const opened = html();
       const original = input.value;
       const write = () => {
-        const html = tidy(restore(quill.getSemanticHTML()));
-        input.value = html === opened ? original : html;
+        const now = html();
+        input.value = now === opened ? original : now;
         input.dispatchEvent(new Event("input", { bubbles: true }));
       };
       quill.on("text-change", write);

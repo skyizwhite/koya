@@ -34,14 +34,10 @@
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
       (and (json-array-p value) (zerop (length value)))))
 
-(defun empty-richtext-p (value)
-  (and (stringp value) (scan "^\\s*(?:<p>(?:<br\\s*/?>)?</p>\\s*)*$" value) t))
-
 (defun blank-for-field-p (field value)
   (or (json-null-p value)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
-      (and (field-many-p field) (json-array-p value) (zerop (length value)))
-      (and (eq (field-type field) :richtext) (empty-richtext-p value))))
+      (and (field-many-p field) (json-array-p value) (zerop (length value)))))
 
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
