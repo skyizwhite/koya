@@ -1,5 +1,8 @@
 # Reading content and managing it are two APIs
 
+Superseded by adr/2026-10-03-reading-and-managing-content-are-two-apis.md
+Superseded by adr/2026-10-03-the-apis-take-keys-and-the-admin-ui-the-session.md
+
 *2026-09-27, restating a decision of 2026-09-20*
 
 ## Context

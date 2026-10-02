@@ -84,8 +84,8 @@
                         :headers `(("origin" . "http://localhost:3000")
                                    ("authorization" . ,(format nil "Bearer ~a" key))))
              (ok (= status 200)))
-           (ok (string= (deploy-by (first (list-deploys "witnessed"))) "owner")
-               "a session and a key together is the owner deploying, not the key"))
+           (ok (string= (deploy-by (first (list-deploys "witnessed"))) "key:ci")
+               "a session and a key together is the key deploying: the admin API knows no session"))
       (delete-space "witnessed")))
   (testing "and a key on its own is named by its label"
     (create-space "by-key")

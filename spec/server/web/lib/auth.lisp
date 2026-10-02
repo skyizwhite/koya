@@ -66,18 +66,18 @@
     (ng (public-p "/login/extra"))
     (ng (public-p "/%zz") "a path that does not decode is not public")))
 
-(deftest the-owner-on-the-admin-api
-  (multiple-value-bind (status body)
-      (request :post "/admin/api/schema/website/plan" :json "{\"koyaSchema\":1}"
-               :headers '(("origin" . "https://evil.test")))
-    (ok (= status 403) "the session writes same-origin only")
-    (ok (search "Cross-origin" body)))
+(deftest the-admin-api-is-called-with-a-key-not-the-session
+  (ok (= 401 (request :get "/admin/api/me")) "the owner's session does not reach it")
+  (ok (= 401 (request :post "/admin/api/schema/website/plan" :json "{\"koyaSchema\":1}"
+                      :headers '(("origin" . "http://localhost:3000")))))
   (create-space "elsewhere")
   (let ((key (create-management-key "elsewhere" :label "k")))
     (multiple-value-bind (status body)
         (request :get "/admin/api/me" :headers `(("authorization" . ,(format nil "Bearer ~a" key))))
-      (ok (= status 200) "a session and a key of another space: the owner's")
-      (ok (search "\"owner\":true" body)))))
+      (ok (= status 200) "with the session and a key of another space, the key decides")
+      (ok (search "\"space\":\"elsewhere\"" body)))
+    (ng (search "lack.session" (or (getf (nth-value 2 (request :get "/admin/api/me" :headers `(("authorization" . ,(format nil "Bearer ~a" key))))) :set-cookie) ""))
+        "and it is sent no cookie")))
 
 (deftest what-an-action-refuses
   (ok (= 400 (request-url :get (koya-server/web/pages/login:log-in))) "a plain GET")
@@ -88,7 +88,6 @@
        (progn
          (call-action :post (koya-server/web/ui/layout::logout))
          (ok (= 302 (request :get "/s/website")) "the pages")
-         (ok (= 401 (request :get "/admin/api/me")) "the admin API")
          (ok (= 401 (call-action :post (koya-server/web/ui/layout::logout))) "the actions"))
     (log-in)))
 

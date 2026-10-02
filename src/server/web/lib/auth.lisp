@@ -11,7 +11,7 @@
   (:import-from #:jingle
                 #:*request* #:context #:request-env)
   (:import-from #:lack-mw
-                #:mw-every #:mw-some #:mw-except)
+                #:mw-every #:mw-except)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri #:url-decode)
   (:export #:calling-space
            #:*mw-admin-auth*
@@ -75,21 +75,13 @@
           (funcall reject)
           (funcall app env)))))
 
-(defparameter *owner-session*
-  (lambda (app)
-    (lambda (env)
-      (if (session-env-owner-p env)
-          (let ((*actor* +owner+))
-            (funcall app env))
-          (json-response 401 (error-object "unauthorized" "Log in"))))))
-
 (defparameter *management-key*
   (lambda (app)
     (lambda (env)
       (let* ((key (bearer-token env))
              (space (space-for-management-key key)))
         (cond ((null space)
-               (json-response 401 (error-object "unauthorized" "Log in, or send a management key as a Bearer token")))
+               (json-response 401 (error-object "unauthorized" "Send a management key as a Bearer token")))
               ((not (space-path-p space (getf env :path-info)))
                (json-response 403 (error-object "forbidden"
                                                 (format nil "This management key only reaches space ~a" space))))
@@ -97,10 +89,7 @@
                                   (if label (key-actor label) "unknown"))))
                    (funcall app env))))))))
 
-(defparameter *mw-admin-auth*
-  (mw-every (mw-some *owner-session* *management-key*)
-            (same-origin-writes
-             (lambda () (json-response 403 (error-object "forbidden" "Cross-origin request rejected"))))))
+(defparameter *mw-admin-auth* *management-key*)
 
 (defun html-forbidden (message)
   (list 403 (list :content-type "text/html; charset=utf-8")

@@ -192,7 +192,7 @@ apps mounted together, so each decides its own response type. A request first
 goes through what every answer needs (the deletion of a temporary file once sent,
 the access log, Cache-Control, the error page, the body limit), then to the app
 mounted at its path, which carries the middlewares it needs: CORS and a guard
-for the delivery API, the session and a guard for the admin API, the actions and
+for the delivery API, a guard for the admin API, the session for the actions and
 the pages; the assets and the media need none.
 The two APIs, the actions and the pages are each guarded where they are mounted
 (`*mw-delivery-auth*`, `*mw-admin-auth*`, `*mw-actions-auth*`, `*mw-pages-auth*`),

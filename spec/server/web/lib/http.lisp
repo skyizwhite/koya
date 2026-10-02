@@ -8,7 +8,7 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook)
   (:import-from #:koya-server/web/lib/http #:origin-allowed-p)
-  (:import-from #:koya-core/json #:jobject #:jget)
+  (:import-from #:koya-core/json #:jobject #:jget #:jkeys)
   (:import-from #:alexandria #:alist-hash-table))
 (in-package #:koya-spec/server/web/lib/http)
 
@@ -47,24 +47,13 @@
     (ok (= status 401)))
   (multiple-value-bind (status json) (admin :get "/admin/api/me")
     (ok (= status 200))
-    (ok (eq (jget json "management") t) "a Bearer caller is a management key")
-    (ok (string= (jget json "space") "website") "and says which space it may reach")
-    (ok (null (jget json "owner"))))
-  (testing "writes need a matching origin when a browser sends one"
-    (multiple-value-bind (status json)
-        (request :post "/admin/api/schema/website/plan" :body (jobject "koyaSchema" 1)
-                 :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)) ("origin" . "https://evil.example")))
-      (ok (= status 403))
-      (ok (string= (jget json "error" "code") "forbidden")))
+    (ok (string= (jget json "space") "website") "a management key says which space it may reach")
+    (ok (equal (sort (jkeys json) #'string<) '("space" "version"))))
+  (testing "the key decides, wherever the request comes from"
     (multiple-value-bind (status)
         (request :post "/admin/api/schema/website/plan" :body (jobject "koyaSchema" 1 "models" #())
-                 :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)) ("origin" . "http://localhost:3000")
-                            ("host" . "localhost:3000")))
-      (ok (= status 200)))
-    (multiple-value-bind (status)
-        (request :get "/admin/api/me"
-                 :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)) ("origin" . "https://evil.example")))
-      (ok (= status 200) "reads are not gated"))))
+                 :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*)) ("origin" . "https://elsewhere.example")))
+      (ok (= status 200) "a write from another origin, as a key sends no cookie to forge"))))
 
 (deftest api-cache-control
   (multiple-value-bind (status json raw) (delivery "/api/v1/website/blog")

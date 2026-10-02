@@ -221,7 +221,7 @@ that is answered with `413` and a plain-text body before koya reads it.
 |---|---|---|
 | 400 | `bad_request` `bad_json` `bad_query` `invalid_schema` | the request is malformed |
 | 401 | `unauthorized` | no key, or a wrong one |
-| 403 | `forbidden` | a key of another space, or a cross-origin write |
+| 403 | `forbidden` | a key of another space |
 | 404 | `not_found` | no such space, model, content or media |
 | 409 | `conflict` `destructive_changes` `in_use` `not_published` `no_draft` `object_exists` | refused as things stand |
 | 413 | `too_large` | images over 20 MB, alone or together |
