@@ -244,8 +244,9 @@ itself is not among them — that is done in the admin UI, with its own
 confirmation. The exact list, and the shape of each change, is in
 [SCHEMA.md, "Changes"](SCHEMA.md#changes). A rename declared with `:was` carries
 existing content through, and removing a field or changing its type or target
-model takes its values out of every published object, draft and revision; rows
-that no longer fit tightened options stay as they are.
+model takes its values out of every published object, draft and revision;
+changing a model's kind deletes its contents, as removing it would; rows that no
+longer fit tightened options stay as they are.
 
 Every deploy that changed something is recorded — what it changed, and the label
 of the management key that sent it — and is read afterwards in the admin UI at

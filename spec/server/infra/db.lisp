@@ -206,6 +206,25 @@
         (store-session (make-session-store) "sid-3" session)
         (ok (fetch-session (make-session-store) "sid-3"))))))
 
+(deftest a-change-of-kind-makes-the-model-anew
+  (create-space "catalog")
+  (flet ((deploy-kind (kind)
+           (replace-schema "catalog" (make-schema :models (list (make-model "item" kind (list (make-field :title :text)))))))
+         (contents () (fetch "SELECT id FROM contents WHERE space = ?" "catalog"))
+         (revisions () (col (fetch-one "SELECT COUNT(*) AS n FROM content_revisions r JOIN contents c ON c.id = r.content_id WHERE c.space = ?" "catalog") "n")))
+    (deploy-kind :list)
+    (create "catalog" (find-model "catalog" "item") (jobject "title" "One") :publish t)
+    (create "catalog" (find-model "catalog" "item") (jobject "title" "Two"))
+    (let ((changes (deploy-kind :object)))
+      (ok (equal (mapcar (lambda (c) (getf c :op)) changes) '(:change-kind)))
+      (ok (null (contents)) "a list turned into an object keeps none of its contents")
+      (ok (zerop (revisions)) "nor their history"))
+    (ok (create "catalog" (find-model "catalog" "item") (jobject "title" "Only"))
+        "and takes its one content as a model made new")
+    (deploy-kind :list)
+    (ok (null (contents)) "an object turned into a list starts empty too")
+    (delete-space "catalog")))
+
 (deftest a-rename-carries-the-content-with-it
   (create-space "magazine")
   (replace-schema "magazine"
