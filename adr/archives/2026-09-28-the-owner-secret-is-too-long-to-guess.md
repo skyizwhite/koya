@@ -1,5 +1,8 @@
 # The owner secret is too long to guess, and failed logins lock nobody out
 
+Superseded by adr/2026-10-04-the-owner-secret-is-too-long-to-guess.md
+Superseded by adr/2026-10-04-wrong-two-factor-codes-are-limited-each-step.md
+
 *2026-09-28*
 
 ## Context

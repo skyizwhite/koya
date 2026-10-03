@@ -7,9 +7,10 @@
   (:import-from #:koya-server/usecases/ports/config
                 #:owner-secret)
   (:import-from #:koya-server/usecases/settings
-                #:totp-enabled-p #:totp-code-valid-p)
+                #:totp-enabled-p #:totp-code-valid-p #:wrong-codes #:count-wrong-code)
   (:import-from #:koya-server/usecases/ports/sessions
                 #:make-session-store #:delete-sessions #:+session-seconds+)
+  (:import-from #:koya-server/domain/totp #:unix-now)
   (:export #:secure-string=
            #:+min-secret-length+
            #:owner-secret-long-enough-p
@@ -29,11 +30,15 @@
 (defun owner-secret-long-enough-p ()
   (>= (length (owner-secret)) +min-secret-length+))
 
-(defun check-login (secret &optional code)
+(defparameter +wrong-codes-per-step+ 5)
+
+(defun check-login (secret code &key (time (unix-now)))
   (cond ((not (owner-secret-long-enough-p)) :short-secret)
+        ((and (totp-enabled-p) (>= (wrong-codes time) +wrong-codes-per-step+)) :too-many-codes)
         ((not (secure-string= secret (owner-secret))) nil)
-        ((and (totp-enabled-p) (not (totp-code-valid-p code))) :code)
-        (t t)))
+        ((not (totp-enabled-p)) t)
+        ((totp-code-valid-p code :time time) t)
+        (t (count-wrong-code time) :code)))
 
 (defun end-other-sessions (session-id)
   (delete-sessions :except session-id))

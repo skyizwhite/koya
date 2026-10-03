@@ -18,6 +18,7 @@
                "koya-spec/server/domain/references"
                "koya-spec/server/domain/content"
                "koya-spec/server/usecases/settings"
+               "koya-spec/server/usecases/auth"
                "koya-spec/server/infra/db"
                "koya-spec/server/infra/webhook-sender"
                "koya-spec/server/usecases/contents"
