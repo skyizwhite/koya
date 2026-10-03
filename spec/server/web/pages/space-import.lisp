@@ -14,7 +14,7 @@
                 #:create-delivery-key #:list-delivery-keys #:create-management-key
                 #:space-for-delivery-key #:space-for-management-key)
   (:import-from #:koya-server/domain/content
-                #:content-status #:content-published #:content-draft #:content-id
+                #:make-content #:content-status #:content-published #:content-draft #:content-id
                 #:content-draft-key #:content-created-at #:content-published-at)
   (:import-from #:koya-server/usecases/ports/media
                 #:list-media #:media-file-path #:write-media-file #:delete-media-file)
@@ -27,7 +27,7 @@
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-revisions #:count-revisions #:get-content)
+                #:list-revisions #:count-revisions #:get-content #:insert-content)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
   (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
@@ -294,3 +294,20 @@
         (ok (search "nm-data=\"...koya.importer(this)\"" page) "the form holds how far the import is")
         (ok (search (format nil "data-import-begin=\"~a\"" (begin-import-action)) page))
         (ok (search "data-import-piece-bytes=" page)))))))
+
+(deftest an-import-refuses-a-content-id-the-admin-ui-cannot-open
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (loop :for (id . shown) :in '(("new" . "&quot;new&quot;") ("a/b" . "&quot;a&#x2F;b&quot;"))
+        :do (create-space "odd")
+            (replace-schema "odd" (make-schema :models (list (make-model "tag" :list (list (make-field :name :text))))))
+            (insert-content (make-content :id id :space "odd" :model "tag"
+                                          :published (alist-hash-table '(("name" . "x")) :test 'equal)
+                                          :created-at "2024-01-01T00:00:00.000Z" :updated-at "2024-01-01T00:00:00.000Z"
+                                          :published-at "2024-01-01T00:00:00.000Z" :revised-at "2024-01-01T00:00:00.000Z"))
+            (let ((octets (nth-value 1 (request :get "/s/odd/export"))))
+              (delete-space "odd")
+              (ok (string= (nth-value 1 (import-archive octets)) "/"))
+              (ok (search (format nil "~a is not a content id" shown) (nth-value 1 (request :get "/")))
+                  (format nil "~s is refused, and the toast names it" id))
+              (ng (find-space "odd") "and nothing is imported"))))
