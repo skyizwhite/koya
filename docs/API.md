@@ -185,7 +185,8 @@ POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a previ
   dropped, as `discard-draft` would.
 - Publishing takes `data` when given, else the draft, else re-publishes.
 - Creating may give `id` and the four timestamps, for imports that keep another
-  system's ids and dates. An object model holds one content: once it has it,
+  system's ids and dates. A timestamp needs a date, a time and an offset or
+  `Z`, and is stored in UTC with milliseconds. An object model holds one content: once it has it,
   creating another is refused (`409 object_exists`), and that one is changed
   through its id.
 - A content another content refers to, in its published data or its draft,

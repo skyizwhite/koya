@@ -265,6 +265,8 @@ paths:
       description: |
         Saved as a draft unless `publish` is true. `id` and the system timestamps
         may be supplied, for imports that keep another system's ids and dates;
+        a timestamp needs a date, a time and an offset or `Z`, and is stored in
+        UTC with milliseconds.
         `publishedAt` and `revisedAt` are only stored when publishing. An
         `object` model that already has its content refuses a second one; change
         that one through its id.

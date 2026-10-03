@@ -3,9 +3,9 @@
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-option #:model-name)
   (:import-from #:koya-core/validate
-                #:validate-content #:validation-error #:blank-value-p #:content-id-p
+                #:validate-content #:validation-error #:blank-value-p #:content-id-p #:datetime-string-p
                 #:validation-error-errors)
-  (:import-from #:koya-core/time #:parse-iso)
+  (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-server/domain/errors
@@ -58,7 +58,7 @@
 
 (defun check-timestamp (name value)
   (cond ((null value) nil)
-        ((parse-iso value) value)
+        ((datetime-string-p value) (format-iso (parse-iso value)))
         (t (fail 'invalid-input (format nil "\"~a\" must be an ISO 8601 datetime" name)))))
 
 (defun check-published-at (value)

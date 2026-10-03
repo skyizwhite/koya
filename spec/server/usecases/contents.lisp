@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/usecases/contents
   (:use #:cl #:rove)
-  (:import-from #:koya-server/domain/errors #:conflict)
+  (:import-from #:koya-server/domain/errors #:conflict #:invalid-input)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
@@ -17,7 +17,8 @@
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
-                #:content-published-at #:content-revised-at #:content-draft-key)
+                #:content-published-at #:content-revised-at #:content-draft-key
+                #:content-created-at #:content-updated-at)
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by)
   (:import-from #:koya-server/usecases/keys
@@ -336,6 +337,29 @@
         "nor is a patch that blanks it")
     (ok (string= (content-status (get-content id)) "published"))
     (ok (= (count-revisions id) 1))))
+
+(deftest system-timestamps-given-on-create-are-kept-in-utc
+  (let ((c (make "{\"title\": \"Dated\"}" :publish t
+                 :created-at "2024-01-01T10:00+09:00"
+                 :updated-at "2024-01-02T03:04:05.5+01:00"
+                 :published-at "2024-01-01T00:00:00Z"
+                 :revised-at "2024-01-03T00:00:00.000Z")))
+    (ok (string= (content-created-at c) "2024-01-01T01:00:00.000Z") "the zone it was given in becomes UTC")
+    (ok (string= (content-updated-at c) "2024-01-02T02:04:05.500Z") "with milliseconds, as the server writes")
+    (ok (string= (content-published-at c) "2024-01-01T00:00:00.000Z"))
+    (ok (string= (content-revised-at c) "2024-01-03T00:00:00.000Z"))
+    (ok (string= (content-created-at (get-content (content-id c))) "2024-01-01T01:00:00.000Z")
+        "and that is what is stored"))
+  (testing "a timestamp needs a date, a time and a zone"
+    (dolist (value '("10:00" "2024-01-01" "2024-01-01T10:00:00"))
+      (ok (signals (make "{\"title\": \"Undated\"}" :created-at value) 'invalid-input)
+          (format nil "~s is no point in time, and is not made one" value))))
+  (testing "so the default order is the order in time"
+    (make "{\"title\": \"Tokyo\"}" :publish t :published-at "2024-06-01T08:00:00+09:00")
+    (make "{\"title\": \"UTC\"}" :publish t :published-at "2024-05-31T23:30:00Z")
+    (ok (equal (titles (list-contents "website" "blog" (blog) (q)))
+               '("UTC" "Tokyo" "Dated"))
+        "half past eleven UTC is after eight in Tokyo the next morning")))
 
 (deftest parse-query-defaults
   (let ((query (q)))
