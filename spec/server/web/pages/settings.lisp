@@ -1,12 +1,12 @@
 (defpackage #:koya-spec/server/web/pages/settings
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:on-click)
+  (:import-from #:koya-server/web/lib/binds #:on-click #:on-submit)
   (:import-from #:koya-spec/server/web/pages/support
                 #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/settings
                 #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
-                #:enable-two-factor-action #:disable-two-factor-action)
+                #:enable-two-factor-action #:disable-two-factor-action #:end-other-sessions-action)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/contents #:list-contents)
   (:import-from #:koya-server/domain/content #:content-draft #:content-id)
@@ -22,6 +22,21 @@
 (setup (setup-pages) (log-in))
 
 (teardown (disconnect-db))
+
+(defun forget-used-code () (setf *totp-last-counter* -1))
+
+(defun another-session (&optional code)
+  (let ((*cookie* nil))
+    (post-login :form `(("secret" . ,*secret*) ,@(and code `(("code" . ,code)))))
+    *cookie*))
+
+(defun owner-p (cookie)
+  (let ((*cookie* cookie))
+    (= 200 (request :get "/settings"))))
+
+(defun setup-secret ()
+  (aref (nth-value 1 (scan-to-strings "secret=([A-Z2-7]+)&amp;" (nth-value 1 (call-action :post (begin-two-factor-action)))))
+        0))
 
 (deftest two-factor-settings
   (let ((origin '(("origin" . "http://localhost:3000"))))
@@ -44,7 +59,7 @@
       (multiple-value-bind (status body) (call-action :post (enable-two-factor-action) :form '(("code" . "000000")))
         (ok (= status 422))
         (ok (search "did not match" body)))
-      (setf *totp-last-counter* -1)
+      (forget-used-code)
       (multiple-value-bind (status body)
           (call-action :post (enable-two-factor-action) :form `(("code" . ,(totp secret))))
         (ok (= status 200))
@@ -57,7 +72,7 @@
         (let ((*cookie* nil))
           (multiple-value-bind (status) (post-login :form `(("secret" . ,*secret*)))
             (ok (= status 401)))
-          (setf *totp-last-counter* -1)
+          (forget-used-code)
           (multiple-value-bind (status) (post-login :form `(("secret" . ,*secret*) ("code" . ,(totp secret))))
             (ok (= status 200)))))
       (testing "disabling needs a code too"
@@ -65,7 +80,7 @@
           (ok (= status 422))
           (ok (search "still on" body)))
         (ok (totp-enabled-p))
-        (setf *totp-last-counter* -1)
+        (forget-used-code)
         (ok (= 200 (call-action :post (disable-two-factor-action) :form `(("code" . ,(totp secret))))))
         (ok (not (totp-enabled-p)))
         (let ((*cookie* nil))
@@ -153,13 +168,13 @@
         (ok (= status 422))
         (ok (search "did not match" body))
         (ok (search "data-qr=" body) "and the setup stays open"))
-      (setf *totp-last-counter* -1)
+      (forget-used-code)
       (multiple-value-bind (status body) (call-action :post (enable-two-factor-action) :form `(("code" . ,(totp secret))))
         (ok (= status 200))
         (ok (search "Two-factor login is on" body))
         (ok (search "Disable two-factor login" body)))
       (ok (totp-enabled-p))
-      (setf *totp-last-counter* -1)
+      (forget-used-code)
       (multiple-value-bind (status body) (call-action :post (disable-two-factor-action) :form `(("code" . ,(totp secret))))
         (ok (= status 200))
         (ok (search "Two-factor login is off." body)))
@@ -167,3 +182,31 @@
   (testing "no session, no action"
     (let ((*cookie* nil))
       (ok (= 401 (call-action :post (begin-two-factor-action)))))))
+
+(deftest turning-two-factor-on-or-off-ends-every-other-session
+  (log-in)
+  (let ((other (another-session))
+        (secret (setup-secret)))
+    (forget-used-code)
+    (ok (= 200 (call-action :post (enable-two-factor-action) :form `(("code" . ,(totp secret))))))
+    (ng (owner-p other) "a session from before is over")
+    (ok (owner-p *cookie*) "while the one that turned it on goes on")
+    (forget-used-code)
+    (let ((other (another-session (totp secret))))
+      (ok (owner-p other))
+      (forget-used-code)
+      (ok (= 200 (call-action :post (disable-two-factor-action) :form `(("code" . ,(totp secret))))))
+      (ng (owner-p other) "and turning it off ends the others too")
+      (ok (owner-p *cookie*)))))
+
+(deftest other-sessions-are-ended-from-the-settings-page
+  (log-in)
+  (let ((other (another-session)))
+    (let ((body (nth-value 1 (request :get "/settings"))))
+      (ok (search "Log out other sessions" body))
+      (ok (search (bound (on-submit (end-other-sessions-action))) body)))
+    (multiple-value-bind (status body) (call-action :post (end-other-sessions-action))
+      (ok (= status 200))
+      (ok (search "Every other session has ended." body)))
+    (ng (owner-p other))
+    (ok (owner-p *cookie*) "this one goes on")))

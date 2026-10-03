@@ -4,6 +4,7 @@
   (:import-from #:koya-server/domain/timezone #:find-timezone #:timezone-name-p)
   (:import-from #:koya-server/usecases/ports/settings #:get-setting #:set-setting #:delete-setting)
   (:import-from #:koya-server/domain/totp #:code-step #:unix-now)
+  (:import-from #:koya-server/usecases/ports/sessions #:delete-sessions)
   (:export #:display-timezone-name
            #:display-timezone
            #:set-display-timezone
@@ -37,14 +38,16 @@
 
 (defun totp-enabled-p () (and (totp-secret) t))
 
-(defun enable-totp (secret)
+(defun enable-totp (secret &key keep-session)
   (set-setting "totp_secret" secret)
   (setf *totp-last-counter* -1)
+  (delete-sessions :except keep-session)
   secret)
 
-(defun disable-totp ()
+(defun disable-totp (&key keep-session)
   (delete-setting "totp_secret")
-  (setf *totp-last-counter* -1))
+  (setf *totp-last-counter* -1)
+  (delete-sessions :except keep-session))
 
 (defun totp-code-valid-p (code &key (secret (totp-secret)) (time (unix-now)))
   (let ((step (code-step code secret :time time :after *totp-last-counter*)))

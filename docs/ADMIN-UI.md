@@ -26,7 +26,7 @@ source code.
 - [Schema deploys](#schema-deploys)
 - [Media](#media)
 - [Keys](#keys)
-- [Settings: time zone and two-factor login](#settings-time-zone-and-two-factor-login)
+- [Settings: time zone, two-factor login and sessions](#settings-time-zone-two-factor-login-and-sessions)
 - [What the UI leaves out](#what-the-ui-leaves-out)
 
 ## Logging in
@@ -43,8 +43,9 @@ secret is the owner.
 - With a `KOYA_SECRET` shorter than that, the page says so and asks for nothing;
   the rest of the server runs as usual until a longer one is set and the server
   restarted.
-- A session stays open while the admin UI is in use, ends between half a day
-  and a day after the last request, and survives a server restart or a redeploy.
+- A session stays open while the admin UI is in use, ends a day after the last
+  request, and survives a server restart or a redeploy. Starting the server with
+  another `KOYA_SECRET` ends every session.
 - A page opened without a session goes to the login page and comes back to that
   page after logging in. So does a button pressed on a page left open after the
   session ended: it comes back to the page, and what it sent is not replayed.
@@ -367,7 +368,7 @@ page holds all of it.
 
 How a site sends each key is in [API.md](API.md).
 
-## Settings: time zone and two-factor login
+## Settings: time zone, two-factor login and sessions
 
 **Settings** in the header holds what applies to the whole server rather than
 to one space. Keys are not here: they belong to a space, and are made on its
@@ -383,11 +384,15 @@ The default is UTC. What the delivery API returns is not affected: it stays UTC.
 
 **Two-factor login** adds a one-time code to the login page. **Set up two-factor
 login** shows a QR code to scan with an authenticator app; entering a current
-code turns it on. Turning it off asks for a current code as well.
+code turns it on. Turning it off asks for a current code as well. Either way,
+every other session ends; this one goes on.
 
 With the authenticator lost, stop the server and delete the secret from the
 database on the volume — `sqlite3 /data/koya.db "DELETE FROM settings WHERE key
 = 'totp_secret'"` — and the owner secret alone logs in again.
+
+**Log out other sessions** ends every session but this one, such as a browser
+left logged in somewhere else.
 
 ## What the UI leaves out
 
