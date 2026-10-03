@@ -1,5 +1,8 @@
 # A forced field change takes its values with it
 
+Superseded by adr/2026-10-04-a-forced-field-change-takes-its-values-with-it.md
+Superseded by adr/2026-10-04-stored-content-always-fits-its-schema.md
+
 *2026-09-30*
 
 ## Context

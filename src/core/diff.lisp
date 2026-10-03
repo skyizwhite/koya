@@ -12,6 +12,7 @@
   (:export #:diff-schemas
            #:destructive-change-p
            #:destructive-changes-p
+           #:tightened-change-p
            #:format-change
            #:change->jobject))
 (in-package #:koya-core/diff)
@@ -31,10 +32,11 @@
         (and (f :options) (set-difference (f :options) (n :options) :test #'equal) t))))
 
 (defun destructive-change-p (change)
-  (let ((op (getf change :op)))
-    (or (and (member op *destructive-ops*) t)
-        (and (eq op :change-field-options)
-             (options-tightened-p (getf change :from) (getf change :to))))))
+  (and (member (getf change :op) *destructive-ops*) t))
+
+(defun tightened-change-p (change)
+  (and (eq (getf change :op) :change-field-options)
+       (options-tightened-p (getf change :from) (getf change :to))))
 
 (defun destructive-changes-p (changes)
   (some #'destructive-change-p changes))
@@ -162,9 +164,13 @@
 (defun path (change)
   (format nil "~@[~a~]~@[.~a~]" (or (getf change :model) "webhooks") (getf change :field)))
 
+(defun misfit-note (change)
+  (let ((ids (remove-duplicates (mapcar (lambda (m) (getf m :id)) (getf change :misfits)) :test #'equal)))
+    (and ids (format nil "~a content~:p ~:*~[~;does~:;do~] not fit" (length ids)))))
+
 (defun format-change (change)
   (let ((op (getf change :op)))
-    (format nil "~:[ ~;!~] ~a ~a~@[ (~(~a~))~]~@[ ~a~]"
+    (format nil "~:[ ~;!~] ~a ~a~@[ (~(~a~))~]~@[ ~a~]~@[, ~a~]"
             (destructive-change-p change)
             (case op
               ((:add-model :add-field) "+")
@@ -185,13 +191,23 @@
                        (getf change :from) (getf change :from-target)
                        (getf change :to) (getf change :to-target)))
               (:change-field-options
-               (options-detail change (if (destructive-change-p change) "options tightened" "options changed")))
+               (options-detail change (if (tightened-change-p change) "options tightened" "options changed")))
               (:change-model-options (options-detail change "options changed"))
               (:change-webhooks "changed")
-              (t nil)))))
+              (t nil))
+            (misfit-note change))))
+
+(defun misfit->jobject (misfit)
+  (jobject "id" (getf misfit :id)
+           "field" (getf misfit :field)
+           "version" (getf misfit :version)
+           "message" (getf misfit :message)))
 
 (defun change->jobject (change)
-  (jobject "op" (string-downcase (substitute #\_ #\- (symbol-name (getf change :op))))
-           "path" (path change)
-           "destructive" (destructive-change-p change)
-           "description" (string-trim " " (format-change change))))
+  (let ((object (jobject "op" (string-downcase (substitute #\_ #\- (symbol-name (getf change :op))))
+                         "path" (path change)
+                         "destructive" (destructive-change-p change)
+                         "description" (string-trim " " (format-change change)))))
+    (when (getf change :misfits)
+      (setf (gethash "misfits" object) (map 'vector #'misfit->jobject (getf change :misfits))))
+    object))

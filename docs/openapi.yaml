@@ -197,7 +197,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: "`destructive_changes`: destructive changes without `force=true`; `details` lists every change"
+          description: "`destructive_changes`: destructive changes without `force=true`; `contents_do_not_fit`: stored contents do not fit a tightened option or a required field added, with or without `force`. `details` lists every change, with its `misfits`"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
@@ -817,7 +817,7 @@ components:
             code: { type: string, examples: [validation_failed] }
             message: { type: string }
             details:
-              description: "`validation_failed` lists problems, `destructive_changes` changes"
+              description: "`validation_failed` lists problems, `destructive_changes` and `contents_do_not_fit` changes"
               oneOf:
                 - type: array
                   items: { $ref: "#/components/schemas/ValidationProblem" }
@@ -1081,6 +1081,19 @@ components:
         path: { type: string, examples: ["blog.title"] }
         destructive: { type: boolean }
         description: { type: string, examples: ["+ blog.title (text)"] }
+        misfits:
+          description: Stored contents that do not fit a tightened option or a required field added; present only when there are some
+          type: array
+          items: { $ref: "#/components/schemas/Misfit" }
+
+    Misfit:
+      type: object
+      required: [id, field, version, message]
+      properties:
+        id: { type: string }
+        field: { type: string }
+        version: { type: string, enum: [published, draft] }
+        message: { type: string, examples: ["must be at most 50 characters"] }
 
     Plan:
       type: object

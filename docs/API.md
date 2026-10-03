@@ -224,16 +224,17 @@ that is answered with `413` and a plain-text body before koya reads it.
 | 401 | `unauthorized` | no key, or a wrong one |
 | 403 | `forbidden` | a key of another space |
 | 404 | `not_found` | no such space, model, content or media |
-| 409 | `conflict` `destructive_changes` `in_use` `not_published` `no_draft` `object_exists` | refused as things stand |
+| 409 | `conflict` `destructive_changes` `contents_do_not_fit` `in_use` `not_published` `no_draft` `object_exists` | refused as things stand |
 | 413 | `too_large` | images over 20 MB, alone or together |
 | 422 | `validation_failed` `empty_file` `unsupported_type` | the content or file is not acceptable |
 | 500 | `internal_error` | the message is only detailed with `KOYA_ENV=dev` |
 | 503 | `unavailable` | `/health` only: the database cannot be read |
 
-Two codes carry `details`: `validation_failed` lists
+Three codes carry `details`: `validation_failed` lists
 `{"field", "code", "message"}` for each problem (the codes are in
-[SCHEMA.md](SCHEMA.md#content-values)), and `destructive_changes` lists the
-changes a deploy refused.
+[SCHEMA.md](SCHEMA.md#content-values)), and `destructive_changes` and
+`contents_do_not_fit` list the changes a deploy refused, the latter with the
+contents that do not fit them (see [SCHEMA.md](SCHEMA.md#changes)).
 
 ## Webhooks
 

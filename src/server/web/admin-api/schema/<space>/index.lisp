@@ -18,7 +18,7 @@
          (changes (handler-case (deploy space (jobject->schema (read-json-body))
                                         :force (equal (param params "force") "true"))
                     (conflict (e)
-                      (if (equal (koya-error-code e) "destructive_changes")
+                      (if (member (koya-error-code e) '("destructive_changes" "contents_do_not_fit") :test #'equal)
                           (fail-api 409 (koya-error-code e) (koya-error-message e)
                                     (changes->jarray (koya-error-details e)))
                           (error e))))))

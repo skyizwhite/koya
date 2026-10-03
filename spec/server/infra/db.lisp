@@ -356,7 +356,8 @@
 (deftest a-deploy-leaves-a-record
   (create-space "logged")
   (replace-schema "logged"
-               (make-schema :models (list (make-model "post" :list (list (make-field :title :text)))))
+               (make-schema :models (list (make-model "post" :list (list (make-field :title :text)
+                                                                         (make-field :lede :text)))))
                :by "key:ci")
   (replace-schema "logged"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t))))))
@@ -364,17 +365,18 @@
     (ok (= (count-deploys "logged") 2))
     (ok (= (length deploys) 2))
 
-    (let ((first-deploy (find 2 deploys :key #'deploy-change-count))
-          (second-deploy (find 1 deploys :key #'deploy-change-count)))
-      (ok (= (deploy-change-count first-deploy) 2) "a model and the field in it")
+    (let ((first-deploy (find 3 deploys :key #'deploy-change-count))
+          (second-deploy (find 2 deploys :key #'deploy-change-count)))
+      (ok (= (deploy-change-count first-deploy) 3) "a model and the fields in it")
       (ok (string= (deploy-by first-deploy) "key:ci")
           "stored as what the server knew, not as the words a page shows")
       (ng (deploy-destructive first-deploy))
-      (ok (equal (mapcar #'change-op (deploy-changes first-deploy)) '("add_model" "add_field")))
-      (ok (deploy-destructive second-deploy) "requiring a field can reject what is stored")
+      (ok (equal (mapcar #'change-op (deploy-changes first-deploy)) '("add_model" "add_field" "add_field")))
+      (ok (deploy-destructive second-deploy) "removing a field takes its values")
       (ok (string= (deploy-by second-deploy) "") "a deploy with nobody named says so by saying nothing")
       (ok (search "options tightened (required none -> true)"
-                  (change-description (first (deploy-changes second-deploy))))
+                  (change-description (find "change_field_options" (deploy-changes second-deploy)
+                                            :key #'change-op :test #'equal)))
           "the log says which option moved and where to, not only that one did")))
   (testing "a deploy that changed nothing is not an event"
     (replace-schema "logged"
