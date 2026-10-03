@@ -278,14 +278,37 @@
     },
   });
 
+  let leaving = false;
+  const unsavedEdits = new Set();
+
+  koya.go = (url) => {
+    leaving = true;
+    window.location.assign(url);
+  };
+
+  koya.mayLeave = () =>
+    ![...unsavedEdits].some((unsaved) => unsaved()) ||
+    window.confirm("This page has changes that are not saved. Leave it anyway?");
+
+  koya.closeDialogs = () => {
+    for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
+  };
+
   koya.editor = (el, unsaved) => {
     const form = el.querySelector("#editor-form");
     const snapshot = () => new URLSearchParams(new FormData(form)).toString();
     const drawn = snapshot();
+    let current = drawn;
+    const pending = () => el.isConnected && (unsaved || current !== drawn);
+    unsavedEdits.add(pending);
+    window.addEventListener("beforeunload", (event) => {
+      if (!leaving && pending()) event.preventDefault();
+    });
     return {
       _current: drawn,
       _track() {
         this._current = snapshot();
+        current = this._current;
       },
       _unchanged() {
         return !unsaved && this._current === drawn;
@@ -334,10 +357,12 @@
       _total: 0,
       _status: "",
       _error: "",
+      _login: "",
       async _start() {
         const file = this.$refs.file.files[0];
         if (!file || this._busy) return;
         this._error = "";
+        this._login = "";
         this._total = file.size;
         this._sent = 0;
         this._busy = true;
@@ -353,8 +378,16 @@
           this._status = "Making the space. The server answers nothing else until it is done.";
           this.$fetch(dataUrl(await post(`${form.dataset.importFinish}?id=${encodeURIComponent(id)}`)), "GET");
         } catch (e) {
-          if (e.answer && new DOMParser().parseFromString(e.answer, "text/html").getElementById("location")) {
+          const answer = e.answer && new DOMParser().parseFromString(e.answer, "text/html");
+          if (answer && answer.getElementById("location")) {
             this.$fetch(dataUrl(e.answer), "GET");
+            return;
+          }
+          const login = answer && answer.querySelector("#toast a[href]");
+          if (login) {
+            this._error = "The session has ended.";
+            this._login = login.getAttribute("href");
+            this._busy = false;
             return;
           }
           this._error = e.message || "The import could not be sent.";

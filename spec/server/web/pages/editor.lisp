@@ -38,6 +38,7 @@
     (multiple-value-bind (status body)
         (edit "/s/website/m/blog/new" :form '(("action" . "save") ("f-title" . "Blank body") ("f-body" . "")))
       (ok (= status 200))
+      (ok (search "koya.go(this.dataset.go)" body) "the page of the new content is reached on purpose")
       (let* ((loc (moved-to body)) (id (subseq loc (1+ (position #\/ loc :from-end t)))))
         (ok (null (jget (content-draft (first (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))) "body")))
         (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "delete"))))))

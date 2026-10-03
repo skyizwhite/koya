@@ -293,7 +293,9 @@
       (let ((page (nth-value 1 (request :get "/"))))
         (ok (search "nm-data=\"...koya.importer(this)\"" page) "the form holds how far the import is")
         (ok (search (format nil "data-import-begin=\"~a\"" (begin-import-action)) page))
-        (ok (search "data-import-piece-bytes=" page)))))))
+        (ok (search "data-import-piece-bytes=" page))
+        (ok (search "nm-bind=\"{ href: () => _login }\"" page)
+            "and the dialog, which hides the page's toast, has its own way to log in again"))))))
 
 (deftest an-import-refuses-a-content-id-the-admin-ui-cannot-open
   (setf *cookie* nil)
