@@ -35,6 +35,7 @@
   (:import-from #:koya-core/json
                 #:jobject #:jget #:json-null #:json-null-p #:json-array-p #:parse-json #:to-json)
   (:import-from #:koya-core/time #:now-iso)
+  (:import-from #:koya-core/validate #:content-id-p)
   (:import-from #:cl-ppcre #:scan)
   (:import-from #:babel #:string-to-octets #:octets-to-string)
   (:import-from #:bordeaux-threads-2 )
@@ -147,6 +148,7 @@
          (published (data-field object "published"))
          (draft (data-field object "draft"))
          (revisions (or (nullable (jget object "revisions")) #())))
+    (unless (and (content-id-p id) (string/= id "new")) (fail "~s is not a content id" id))
     (unless (schema-model schema model) (fail "Content ~a belongs to ~a, which the schema has no model for" id model))
     (unless (or published draft) (fail "Content ~a has neither published data nor a draft" id))
     (unless (json-array-p revisions) (fail "The revisions of content ~a must be an array" id))
