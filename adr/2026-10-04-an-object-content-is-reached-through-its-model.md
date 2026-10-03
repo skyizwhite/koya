@@ -21,7 +21,8 @@ model's own address:
   model, and those object routes answer `404` for a list model.
 - The first draft saved, or the first publish with data, makes the content.
   Until then there is nothing to read, and the read is a `404`.
-- The admin UI edits it at the model's URL; `…/{id}` and `…/new` lead there.
+- The admin UI edits it at the model's URL; `…/{id}` and `…/new` are not
+  found for an object model.
 - The Lisp SDK has functions that take the model and no id.
 
 ## Consequences
@@ -31,5 +32,3 @@ model's own address:
 - `GET` on a model answers a list or a content, as the delivery API does.
 - Its id still names it in webhooks, revisions and the history page, where it
   is what a stored record carries.
-- A caller that changed an object content by id now gets `404`, and moves to
-  the model's routes.
