@@ -171,3 +171,14 @@
         (ok (= (length (list-delivery-keys)) 2))
         (delete-delivery-key id)
         (ok (= (length (list-delivery-keys)) 1))))))
+
+(deftest a-missing-setting-names-its-variable
+  (let ((saved (uiop:getenv "KOYA_URL"))
+        (koya-sdk/client:*base-url* nil))
+    (sb-posix:unsetenv "KOYA_URL")
+    (unwind-protect
+         (let ((message (handler-case (progn (get-list 'blog) nil)
+                          (error (e) (princ-to-string e)))))
+           (ok (search "set koya-sdk:*base-url* or KOYA_URL" message)
+               "the message names the variable to set, not its value"))
+      (when saved (setf (uiop:getenv "KOYA_URL") saved)))))
