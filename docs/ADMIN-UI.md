@@ -51,8 +51,10 @@ secret is the owner.
   request, and survives a server restart or a redeploy. Starting the server with
   another `KOYA_SECRET` ends every session.
 - A page opened without a session goes to the login page and comes back to that
-  page after logging in. So does a button pressed on a page left open after the
-  session ended: it comes back to the page, and what it sent is not replayed.
+  page after logging in. A button pressed on a page left open after the session
+  ended leaves the page as it is, with what was typed in it, and says so at the
+  top with a link that logs in in a new tab; after that, press it again.
+- An editor with changes that are not saved asks before the page is left.
 - **Log out** is in the header of every page.
 - The result of what is done on a page shows briefly at the top of the screen.
 - The UI works on a phone as well.

@@ -135,6 +135,11 @@
            (p :class "mt-1 text-xs text-muted" :nm-bind "{ textContent: () => _status }")))
        (p :class "px-4 pb-3 text-sm text-danger" :hidden t
           :nm-bind "{ hidden: () => !_error, textContent: () => _error }")
+       (p :class "px-4 pb-3 text-sm" :hidden t :nm-bind "{ hidden: () => !_login }"
+         (a :target "_blank" :rel "noopener" :class "font-semibold text-danger underline"
+            :nm-bind "{ href: () => _login }"
+            "Log in in a new tab")
+         ", then import again.")
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
          (~dialog-close :dialog "import-space" "Cancel")
          (button :type "submit" :class "btn btn-primary" :nm-bind "{ disabled: () => _busy }"

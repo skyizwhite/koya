@@ -47,7 +47,7 @@
 (defaction logout :post (params)
   (declare (ignore params))
   (session-logout)
-  (hsx (~go-to :url "/login")))
+  (hsx (~go-to :url "/login" :on-purpose t)))
 
 (defcomp ~layout (&key space crumbs children)
   (hsx
@@ -65,7 +65,7 @@
          (div :class "flex shrink-0 items-center gap-2"
            (a :href "/settings" :class "btn" :aria-label "Settings"
               (~icon :name :settings) (span :class "hidden sm:inline" "Settings"))
-           (form :nm-bind (on-submit (logout))
+           (form :nm-bind (on-submit (logout) :guard "koya.mayLeave()")
              (button :type "submit" :class "btn" :aria-label "Log out"
                      (~icon :name :logout) (span :class "hidden sm:inline" "Log out"))))))
      (main :class "mx-auto w-full max-w-5xl flex-1 px-4 py-8"

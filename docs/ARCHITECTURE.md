@@ -207,11 +207,16 @@ A page route answers GET and draws a page; everything done on it is an action
 (`defaction`), defined beside the page that calls it, or with the `ui/`
 component that cannot work without it (the media picker, Log out). The actions middleware lets
 through requests from the admin UI only (`nm-request`, which Nomini sends), from the
-owner's session and this origin, and sends a request that has lost its session to the
-login page. An action answers each part of the page it changed, under that part's id,
+owner's session and this origin, and answers a request that has lost its session with
+a toast linking to the login page in a new tab, so the page and what was typed in it
+stay. An action answers each part of the page it changed, under that part's id,
 the toast (`#toast`) among them, with its status; a refusal answers the toast alone, and
 a result on another page is an element for `#location` that sends the browser there,
-with the toast in the session. A path declared with `public-path` (`web/lib/auth`)
+with the toast in the session. An editor with unsaved changes asks before the page
+is left, so a move the server sends asks too, unless it goes through `koya.go`: the
+editor moving on after its own write, and Log out, which asks (`koya.mayLeave`)
+before it ends the session rather than after. The toast for a lost session closes
+any open dialog, which would otherwise hide it. A path declared with `public-path` (`web/lib/auth`)
 needs no session: the login page and its action. `/assets/` and
 `/media/` are served outside the session and the guards, so the login page is
 drawn with the assets and no file fetched reads the session.

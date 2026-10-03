@@ -83,9 +83,13 @@
   (testing "logging out is an action that sends the browser to the login page"
     (multiple-value-bind (status body) (call-action :post (logout))
       (ok (= status 200))
-      (ok (equal (moved-to body) "/login")))
+      (ok (equal (moved-to body) "/login"))
+      (ok (search "koya.go(this.dataset.go)" body)
+          "and leaves without asking, as the page asked before logging out"))
     (ok (= 302 (request :get "/")) "and the session is gone")
-    (log-in)))
+    (log-in)
+    (ok (search "koya.mayLeave() &amp;&amp; $post" (nth-value 1 (request :get "/settings")))
+        "unsaved edits are asked about before the session is ended, not after")))
 
 (deftest a-login-does-not-keep-the-session-id-it-was-sent
   (let* ((planted (format nil "lack.session=~a" (make-string 40 :initial-element #\a)))
@@ -114,13 +118,18 @@
         (post-login :form `(("secret" . ,*secret*) ("next" . "/s/website/media?page=2")))
       (ok (= status 200))
       (ok (string= (moved-to body) "/s/website/media?page=2"))))
-  (testing "an action without a session returns to the page it was sent from"
+  (testing "an action without a session leaves the page as it is, and offers the login page in a new tab"
     (let ((*cookie* nil))
       (multiple-value-bind (status body)
           (call-action :post (create-key :space "website" :kind "delivery")
                        :headers '(("referer" . "http://localhost:3000/s/website/keys")))
         (ok (= status 401))
-        (ok (string= (moved-to body) "/login?next=%2Fs%2Fwebsite%2Fkeys")))))
+        (ng (moved-to body) "the browser is not sent away, so what was typed stays")
+        (ok (search "<div id=\"toast\"" body) "it says so in the toast")
+        (ok (search "href=\"/login?next=%2Fs%2Fwebsite%2Fkeys\" target=\"_blank\"" body)
+            "with a link that logs in elsewhere and comes back to this page there")
+        (ok (search "koya.closeDialogs()" body)
+            "and closes any dialog left open, which would hide the toast and its link"))))
   (testing "next never leaves the server"
     (dolist (next '("//evil.test/" "/\\evil.test/" "https://evil.test/" "evil"))
       (let ((*cookie* nil))

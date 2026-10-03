@@ -53,9 +53,11 @@
        (button :type "button" :commandfor id :command "close" :class "btn" "Cancel")
        children))))
 
-(defcomp ~go-to (&key url)
+(defcomp ~go-to (&key url on-purpose)
   (hsx (div :id "location" :hidden t :data-go url
-            :nm-bind "{ oninit: () => window.location.assign(this.dataset.go) }")))
+            :nm-bind (if on-purpose
+                         "{ oninit: () => koya.go(this.dataset.go) }"
+                         "{ oninit: () => window.location.assign(this.dataset.go) }"))))
 
 (defcomp ~replace-url (&key url)
   (hsx (div :id "location" :hidden t :data-replace url

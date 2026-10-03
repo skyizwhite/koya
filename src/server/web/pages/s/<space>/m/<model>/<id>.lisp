@@ -220,7 +220,7 @@
 
 (defun move-on (url message)
   (set-toast message)
-  (hsx (~go-to :url url)))
+  (hsx (~go-to :url url :on-purpose t)))
 
 (defaction editor-action :post (params)
   (let* ((space (param params "space"))

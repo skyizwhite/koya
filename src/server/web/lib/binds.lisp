@@ -15,11 +15,12 @@
 (defun binds (&rest entries)
   (format nil "{ ~{~a~^, ~} }" (remove nil entries)))
 
-(defun request (method url data confirm)
-  (format nil "~@[confirm(~a) && ~]$~a(~a~@[, ~a~])" (and confirm (js-string confirm)) method (js-string url) data))
+(defun request (method url data confirm &optional guard)
+  (format nil "~@[~a && ~]~@[confirm(~a) && ~]$~a(~a~@[, ~a~])"
+          guard (and confirm (js-string confirm)) method (js-string url) data))
 
-(defun on-submit (url &key (data "koya.form(this)") confirm binds)
-  (binds (format nil "'onsubmit.prevent': () => ~a" (request "post" url data confirm))
+(defun on-submit (url &key (data "koya.form(this)") confirm guard binds)
+  (binds (format nil "'onsubmit.prevent': () => ~a" (request "post" url data confirm guard))
          binds))
 
 (defun on-click (url &key data confirm binds)

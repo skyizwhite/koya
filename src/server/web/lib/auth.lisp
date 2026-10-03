@@ -13,6 +13,8 @@
   (:import-from #:lack-mw
                 #:mw-every #:mw-except)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri #:url-decode)
+  (:import-from #:hsx #:hsx #:render-to-string)
+  (:import-from #:koya-server/web/lib/toast #:~toast)
   (:export #:calling-space
            #:*mw-admin-auth*
            #:*mw-actions-auth*
@@ -129,14 +131,21 @@
           (funcall app env)
           (list 400 (list :content-type "text/plain; charset=utf-8") (list "Bad Request"))))))
 
+(defun session-ended (login)
+  (render-to-string
+   (hsx (~toast :kind :error :clickable t :binds "{ oninit: () => koya.closeDialogs() }"
+                :message (hsx (<> "The session has ended. "
+                                  (a :href login :target "_blank" :rel "noopener" :class "font-semibold underline"
+                                     "Log in in a new tab")
+                                  ", then try again here."))))))
+
 (defparameter *action-session*
   (lambda (app)
     (lambda (env)
       (if (session-env-owner-p env)
           (funcall app env)
           (list 401 (list :content-type "text/html; charset=utf-8")
-                (list (format nil "<div id=\"location\" hidden data-go=\"~a\" nm-bind=\"{ oninit: () => window.location.assign(this.dataset.go) }\"></div>"
-                              (uiop:frob-substrings (login-location env) '("&") "&amp;"))))))))
+                (list (session-ended (login-location env))))))))
 
 (defparameter *action-actor*
   (lambda (app)
