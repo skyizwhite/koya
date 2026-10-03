@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/contents/<space>/<model>/index
   (:use #:cl)
-  (:import-from #:koya-core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject #:json-null)
   (:import-from #:koya-server/web/lib/http
                 #:path-param #:read-json-body #:body-field #:fail-api #:ok-status)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
@@ -23,6 +23,8 @@
     (let* ((body (read-json-body))
            (data (body-field body "data")))
       (unless (hash-table-p data) (fail-api 400 "bad_request" "\"data\" must be an object"))
+      (unless (member (body-field body "publish") (list t nil json-null))
+        (fail-api 400 "bad_request" "\"publish\" must be true or false"))
       (let ((content (create space model data :publish (eq (body-field body "publish") t)
                              :id (body-field body "id")
                              :created-at (body-field body "createdAt")

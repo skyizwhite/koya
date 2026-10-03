@@ -5,7 +5,8 @@
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/domain/key
-                #:new-delivery-key #:new-management-key #:hash-key #:new-webhook-secret)
+                #:new-delivery-key #:new-management-key #:hash-key #:new-webhook-secret #:key-id)
+  (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/usecases/ports/keys
                 #:insert-delivery-key #:list-delivery-keys #:delete-delivery-key
                 #:space-by-delivery-key-hash
@@ -16,6 +17,7 @@
   (:export #:create-delivery-key
            #:list-delivery-keys
            #:delete-delivery-key
+           #:remove-delivery-key
            #:space-for-delivery-key
            #:create-management-key
            #:list-management-keys
@@ -51,3 +53,8 @@
   (let ((secret (new-webhook-secret)))
     (set-webhook-secret space secret)
     secret))
+
+(defun remove-delivery-key (space id)
+  (unless (find id (list-delivery-keys space) :key #'key-id :test #'equal)
+    (fail 'not-found (format nil "Key ~a does not exist" id)))
+  (delete-delivery-key space id))

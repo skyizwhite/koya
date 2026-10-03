@@ -80,7 +80,10 @@
   (make-instance 'json-app))
 
 (defmethod lack/component:call :around ((app json-app) env)
-  (handler-case (call-next-method)
+  (handler-case (let ((answer (call-next-method)))
+                  (if (equal answer '(400 () ("Bad Request")))
+                      (json-response 400 (error-object "bad_json" "Request body could not be read"))
+                      answer))
     (api-error (e)
       (json-response (api-error-status e)
                      (error-object (api-error-code e) (api-error-message e) (api-error-details e))))
