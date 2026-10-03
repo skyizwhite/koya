@@ -83,7 +83,11 @@ they are made and deleted.
   instance. The name must be free, or the space must be empty; otherwise the
   import is refused and nothing changes. So is an archive whose `space.json` is
   over 100 MB or a media file over the upload limit, and one whose entries are
-  not the size their headers say. Nothing is sent to the webhooks. A bar
+  not the size their headers say. Every content is checked as creating it would
+  be — it must fit its model, its ids and unique values must not repeat, and its
+  timestamps need a date, a time and a zone (they are kept in UTC) — and a media
+  or key that another space already holds is refused; the first problem is named
+  and nothing changes. Nothing is sent to the webhooks. A bar
   shows the upload; the server then makes the space in one step and answers
   nothing else until it is done.
 

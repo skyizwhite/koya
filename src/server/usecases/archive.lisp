@@ -9,7 +9,8 @@
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/usecases/ports/keys
                 #:stored-delivery-keys #:insert-delivery-key #:stored-management-keys
-                #:insert-management-key)
+                #:insert-management-key #:space-by-delivery-key-hash #:space-by-management-key-hash)
+  (:import-from #:koya-server/usecases/schema #:unique-misfits)
   (:import-from #:koya-server/usecases/ports/contents
                 #:space-contents #:insert-content #:content-history #:record-revision)
   (:import-from #:koya-server/domain/content
@@ -20,7 +21,7 @@
                 #:revision-event #:revision-data #:revision-by #:revision-created-at)
   (:import-from #:koya-server/usecases/ports/media
                 #:space-media #:insert-media #:count-media #:media-file-exists-p #:write-media-file
-                #:delete-media-file)
+                #:delete-media-file #:media-id-taken-p)
   (:import-from #:koya-server/usecases/ports/archives
                 #:write-archive #:create-upload #:upload-size #:append-to-upload #:delete-upload
                 #:call-with-upload #:archive-entry-size #:archive-entry-bytes #:purge-stale-archives)
@@ -31,11 +32,13 @@
   (:import-from #:koya-server/domain/key
                 #:key-id #:key-hash #:key-label #:key-created-at #:new-webhook-secret)
   (:import-from #:koya-core/schema
-                #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p)
+                #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p
+                #:model-name #:model-fields #:field-name #:field-option)
   (:import-from #:koya-core/json
                 #:jobject #:jget #:json-null #:json-null-p #:json-array-p #:parse-json #:to-json)
   (:import-from #:koya-core/time #:now-iso)
-  (:import-from #:koya-core/validate #:content-id-p)
+  (:import-from #:koya-core/validate #:content-id-p #:validate-content #:datetime-string-p)
+  (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:cl-ppcre #:scan)
   (:import-from #:babel #:string-to-octets #:octets-to-string)
   (:import-from #:bordeaux-threads-2 )
@@ -141,6 +144,18 @@
     (unless (or (null value) (hash-table-p value)) (fail "~a must be an object or null" key))
     value))
 
+(defun timestamp-field (object key id &key required)
+  (let ((value (nullable (jget object key))))
+    (cond ((and (null value) (not required)) nil)
+          ((and (stringp value) (datetime-string-p value)) (format-iso (parse-iso value)))
+          (t (fail "Content ~a: ~a must be an ISO 8601 datetime with a date, a time and a zone" id key)))))
+
+(defun check-fits (id model data)
+  (when data
+    (let ((error (first (validate-content model data))))
+      (when error
+        (fail "Content ~a: ~a ~a" id (getf error :field) (getf error :message))))))
+
 (defun parse-content (object space schema)
   (unless (hash-table-p object) (fail "Each content must be an object"))
   (let* ((id (string-field object "id" :required t))
@@ -152,20 +167,22 @@
     (unless (schema-model schema model) (fail "Content ~a belongs to ~a, which the schema has no model for" id model))
     (unless (or published draft) (fail "Content ~a has neither published data nor a draft" id))
     (unless (json-array-p revisions) (fail "The revisions of content ~a must be an array" id))
+    (check-fits id (schema-model schema model) published)
+    (check-fits id (schema-model schema model) draft)
     (list
      (make-content :id id :space space :model model :published published :draft draft
                    :draft-key (and draft (string-field object "draftKey"))
-                   :created-at (string-field object "createdAt" :required t)
-                   :updated-at (string-field object "updatedAt" :required t)
-                   :published-at (and published (string-field object "publishedAt"))
-                   :revised-at (and published (string-field object "revisedAt")))
+                   :created-at (timestamp-field object "createdAt" id :required t)
+                   :updated-at (timestamp-field object "updatedAt" id :required t)
+                   :published-at (and published (timestamp-field object "publishedAt" id :required t))
+                   :revised-at (and published (timestamp-field object "revisedAt" id :required t)))
      (map 'list (lambda (r)
                   (unless (and (hash-table-p r) (hash-table-p (jget r "data")))
                     (fail "A revision of content ~a has no data" id))
                   (list :event (string-field r "event" :required t)
                         :data (jget r "data")
                         :by (or (string-field r "writtenBy") "")
-                        :created-at (string-field r "createdAt" :required t)))
+                        :created-at (timestamp-field r "createdAt" id :required t)))
           revisions))))
 
 (defun parse-media (object archive)
@@ -243,15 +260,39 @@
          (schema (jobject->schema (jget document "schema"))))
     (unless (slug-name-p space) (fail "~s is not a space name" space))
     (check-target space)
-    (import-into space archive schema
-                 (map 'list (lambda (o) (parse-content o space schema))
-                      (or (nullable (jget document "contents")) #()))
-                 (map 'list (lambda (o) (parse-media o archive))
-                      (or (nullable (jget document "media")) #()))
-                 :secret (string-field document "webhookSecret")
-                 :delivery-keys (parse-keys document "deliveryKeys")
-                 :management-keys (parse-keys document "managementKeys")
-                 :by by)))
+    (let ((contents (map 'list (lambda (o) (parse-content o space schema))
+                         (or (nullable (jget document "contents")) #())))
+          (media (map 'list (lambda (o) (parse-media o archive))
+                      (or (nullable (jget document "media")) #())))
+          (delivery-keys (parse-keys document "deliveryKeys"))
+          (management-keys (parse-keys document "managementKeys")))
+      (check-contents-together schema (mapcar #'first contents))
+      (check-unclaimed media delivery-keys management-keys)
+      (import-into space archive schema contents media
+                   :secret (string-field document "webhookSecret")
+                   :delivery-keys delivery-keys
+                   :management-keys management-keys
+                   :by by))))
+
+(defun check-contents-together (schema contents)
+  (loop :for (content . rest) :on contents
+        :when (find (content-id content) rest :key #'content-id :test #'equal)
+          :do (fail "Content ~a appears twice in the archive" (content-id content)))
+  (dolist (model (schema-models schema))
+    (let ((of-model (remove-if-not (lambda (c) (equal (content-model c) (model-name model))) contents)))
+      (dolist (field (model-fields model))
+        (when (field-option field :unique)
+          (let ((misfit (first (unique-misfits of-model field (field-name field)))))
+            (when misfit
+              (fail "Content ~a: ~a ~a" (getf misfit :id) (getf misfit :field) (getf misfit :message)))))))))
+
+(defun check-unclaimed (media delivery-keys management-keys)
+  (dolist (m media)
+    (when (media-id-taken-p (getf m :id))
+      (fail "Media ~a is already in another space" (getf m :id))))
+  (when (or (some (lambda (k) (space-by-delivery-key-hash (getf k :hash))) delivery-keys)
+            (some (lambda (k) (space-by-management-key-hash (getf k :hash))) management-keys))
+    (fail "A key in the archive is already a key of another space")))
 
 (defun import-into (space archive schema contents media &key secret delivery-keys management-keys by)
   (let ((written (list '()))

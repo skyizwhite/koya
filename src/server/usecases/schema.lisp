@@ -22,6 +22,7 @@
            #:resolve-model
            #:space-schema
            #:plan
+           #:unique-misfits
            #:deploy
            #:replace-schema
            #:list-deploys
