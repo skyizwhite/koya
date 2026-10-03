@@ -23,7 +23,7 @@
   (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish #:destroy)
   (:import-from #:koya-core/diff
                 #:destructive-changes-p)
-  (:import-from #:koya-server/usecases/ports/sessions #:make-session-store)
+  (:import-from #:koya-server/usecases/ports/sessions #:make-session-store #:delete-sessions)
   (:import-from #:koya-server/infra/db/sessions #:purge-expired-sessions)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-model #:content-published #:content-draft)
@@ -150,6 +150,9 @@
     (let ((loaded (fetch-session (make-session-store) "sid-1")))
       (ok (hash-table-p loaded))
       (ok (gethash "owner" loaded) "the owner flag survives"))
+    (testing "the id is not stored, so the database holds no session anyone can use"
+      (ok (= (session-count) 1))
+      (ng (fetch-one "SELECT id FROM sessions WHERE id = ?" "sid-1")))
     (testing "every use moves the end a full day away"
       (exec "UPDATE sessions SET expires_at = ?" (iso-from-now 3600))
       (store-session (make-session-store) "sid-1" (owner-session))
@@ -165,6 +168,43 @@
       (remove-session (make-session-store) "sid-2")
       (ng (fetch-session (make-session-store) "sid-2"))
       (ok (zerop (session-count))))))
+
+(deftest a-new-secret-ends-every-session
+  (exec "DELETE FROM sessions")
+  (with-secret ("first-secret-long-enough-to-log-in-with")
+    (store-session (make-session-store) "sid-1" (owner-session)))
+  (with-secret ("second-secret-long-enough-to-log-in-with")
+    (ng (fetch-session (make-session-store) "sid-1") "a session made under another secret is no session"))
+  (with-secret ("first-secret-long-enough-to-log-in-with")
+    (ok (fetch-session (make-session-store) "sid-1") "and the secret alone decides it")))
+
+(deftest sessions-end-all-but-one
+  (exec "DELETE FROM sessions")
+  (with-secret ("first-secret-long-enough-to-log-in-with")
+    (dolist (sid '("sid-1" "sid-2" "sid-3"))
+      (store-session (make-session-store) sid (owner-session)))
+    (delete-sessions :except "sid-2")
+    (ok (fetch-session (make-session-store) "sid-2") "the one kept")
+    (ng (fetch-session (make-session-store) "sid-1"))
+    (ng (fetch-session (make-session-store) "sid-3"))
+    (delete-sessions)
+    (ok (zerop (session-count)) "and with none kept, every one")))
+
+(deftest a-session-ended-during-a-request-stays-ended
+  (exec "DELETE FROM sessions")
+  (with-secret ("first-secret-long-enough-to-log-in-with")
+    (store-session (make-session-store) "sid-1" (owner-session))
+    (let ((session (fetch-session (make-session-store) "sid-1")))
+      (delete-sessions)
+      (store-session (make-session-store) "sid-1" session)
+      (ng (fetch-session (make-session-store) "sid-1")
+          "writing back what the request read does not bring it back"))
+    (testing "while a login moves what was read to a new id"
+      (store-session (make-session-store) "sid-2" (owner-session))
+      (let ((session (fetch-session (make-session-store) "sid-2")))
+        (remove-session (make-session-store) "sid-2")
+        (store-session (make-session-store) "sid-3" session)
+        (ok (fetch-session (make-session-store) "sid-3"))))))
 
 (deftest a-rename-carries-the-content-with-it
   (create-space "magazine")

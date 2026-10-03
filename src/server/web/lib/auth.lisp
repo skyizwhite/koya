@@ -21,6 +21,7 @@
            #:public-path
            #:local-path-p
            #:session-login
+           #:session-id
            #:session-logout
            #:session-owner-p))
 (in-package #:koya-server/web/lib/auth)
@@ -35,6 +36,9 @@
 
 (defun renew-session-id ()
   (setf (getf (getf (request-env *request*) :lack.session.options) :change-id) t))
+
+(defun session-id ()
+  (getf (getf (request-env *request*) :lack.session.options) :id))
 
 (defun session-login (secret &optional code)
   (let ((result (check-login secret code)))

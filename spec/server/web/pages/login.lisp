@@ -71,7 +71,8 @@
                  (multiple-value-bind (status body) (post-login :form `(("secret" . ,*secret*) ("code" . ,code)))
                    (ok (= status 401))
                    (ok (search "one-time code" body) "the same code cannot log in twice")))))
-        (disable-totp))))
+        (disable-totp)
+        (log-in))))
   (testing "cross-origin actions are rejected"
     (ok (= 403 (call-action :post (logout) :headers '(("origin" . "https://evil.example")))))
     (ok (= 403 (call-action :post (create-key :space "website" :kind "delivery")

@@ -9,11 +9,12 @@
   (:import-from #:koya-server/usecases/settings
                 #:totp-enabled-p #:totp-code-valid-p)
   (:import-from #:koya-server/usecases/ports/sessions
-                #:make-session-store #:+session-seconds+)
+                #:make-session-store #:delete-sessions #:+session-seconds+)
   (:export #:secure-string=
            #:+min-secret-length+
            #:owner-secret-long-enough-p
            #:check-login
+           #:end-other-sessions
            #:make-session-store
            #:+session-seconds+))
 (in-package #:koya-server/usecases/auth)
@@ -33,3 +34,6 @@
         ((not (secure-string= secret (owner-secret))) nil)
         ((and (totp-enabled-p) (not (totp-code-valid-p code))) :code)
         (t t)))
+
+(defun end-other-sessions (session-id)
+  (delete-sessions :except session-id))

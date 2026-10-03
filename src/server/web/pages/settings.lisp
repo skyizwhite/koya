@@ -4,6 +4,8 @@
   (:import-from #:koya-server/usecases/settings
                 #:totp-enabled-p #:totp-code-valid-p #:enable-totp #:disable-totp
                 #:display-timezone-name #:display-timezone #:set-display-timezone)
+  (:import-from #:koya-server/usecases/auth #:end-other-sessions)
+  (:import-from #:koya-server/web/lib/auth #:session-id)
   (:import-from #:koya-server/domain/totp #:generate-totp-secret #:otpauth-uri)
   (:import-from #:koya-server/domain/timezone #:timezone-names #:format-local)
   (:import-from #:koya-core/time #:now-iso)
@@ -16,7 +18,7 @@
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:export #:@get
            #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
-           #:enable-two-factor-action #:disable-two-factor-action))
+           #:enable-two-factor-action #:disable-two-factor-action #:end-other-sessions-action))
 (in-package #:koya-server/web/pages/settings)
 
 (defun pending-secret () (gethash "totp_pending" (context :session)))
@@ -89,12 +91,23 @@
        (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Save"))
      (p :class "mt-3 text-xs text-muted" "Now: " (format-local (now-iso) :timezone (display-timezone))))))
 
+(defcomp ~sessions ()
+  (hsx
+   (section :id "sessions" :class "rounded-md border border-line bg-panel p-6"
+     (h2 :class "mb-1 text-lg font-bold" "Sessions")
+     (p :class "mb-4 text-sm text-muted"
+       "End every session but this one, such as a browser you are no longer at. "
+       "Turning two-factor login on or off does the same, and a new owner secret ends them all.")
+     (form :nm-bind (on-submit (end-other-sessions-action))
+       (button :type "submit" :class "btn btn-danger" (~icon :name :logout) "Log out other sessions")))))
+
 (defcomp ~settings-page (&key pending)
   (hsx (~layout :crumbs (list (cons "Settings" nil))
          (h1 :class "mb-6 text-2xl font-bold" "Settings")
          (div :class "space-y-6"
            (~time-zone)
-           (~two-factor :pending pending)))))
+           (~two-factor :pending pending)
+           (~sessions)))))
 
 (defun save-timezone (params)
   (let ((name (string-trim " " (or (param params "timezone") ""))))
@@ -106,7 +119,7 @@
   (let ((pending (pending-secret)))
     (cond ((null pending) (values nil nil))
           ((totp-code-valid-p (param params "code") :secret pending)
-           (enable-totp pending)
+           (enable-totp pending :keep-session (session-id))
            (setf (pending-secret) nil)
            (values "Two-factor login is on. Keep the secret somewhere safe." nil))
           (t (values nil "That code did not match. Check the app and try again.")))))
@@ -114,7 +127,7 @@
 (defun disable-two-factor (params)
   (cond ((not (totp-enabled-p)) (values nil nil))
         ((totp-code-valid-p (param params "code"))
-         (disable-totp)
+         (disable-totp :keep-session (session-id))
          (values "Two-factor login is off." nil))
         (t (values nil "That code did not match; two-factor login is still on."))))
 
@@ -141,6 +154,11 @@
 (defaction enable-two-factor-action :post (params)
   (multiple-value-bind (message error) (enable-two-factor params)
     (answer (hsx (~two-factor :pending (pending-secret) :error error)) message error)))
+
+(defaction end-other-sessions-action :post (params)
+  (declare (ignore params))
+  (end-other-sessions (session-id))
+  (hsx (<> (~sessions) (~toast :message "Every other session has ended."))))
 
 (defaction disable-two-factor-action :post (params)
   (multiple-value-bind (message error) (disable-two-factor params)
