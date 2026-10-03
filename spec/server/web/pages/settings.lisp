@@ -12,8 +12,8 @@
   (:import-from #:koya-server/domain/content #:content-draft #:content-id)
   (:import-from #:koya-server/domain/totp #:totp)
   (:import-from #:koya-server/domain/timezone #:find-timezone)
-  (:import-from #:koya-server/usecases/settings
-                #:*totp-last-counter* #:totp-enabled-p #:display-timezone-name)
+  (:import-from #:koya-server/usecases/settings #:totp-enabled-p #:display-timezone-name)
+  (:import-from #:koya-server/usecases/ports/settings #:delete-setting)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:cl-ppcre #:scan-to-strings)
   (:import-from #:koya-core/json #:jget))
@@ -23,7 +23,7 @@
 
 (teardown (disconnect-db))
 
-(defun forget-used-code () (setf *totp-last-counter* -1))
+(defun forget-used-code () (delete-setting "totp_last_step"))
 
 (defun another-session (&optional code)
   (let ((*cookie* nil))

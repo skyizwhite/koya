@@ -8,7 +8,7 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:fetch-one #:col)
   (:import-from #:koya-server/usecases/keys #:list-delivery-keys)
   (:import-from #:koya-server/usecases/settings #:enable-totp #:disable-totp)
-  (:import-from #:koya-server/domain/totp #:totp)
+  (:import-from #:koya-server/domain/totp #:totp #:unix-now)
   (:import-from #:koya-server/web/pages/settings #:begin-two-factor-action))
 (in-package #:koya-spec/server/web/pages/login)
 
@@ -189,3 +189,19 @@
              (ok (= secret-status code-status 401))
              (ok (string= secret-body code-body) "a wrong secret and a wrong code read the same")))
       (disable-totp))))
+
+(deftest five-wrong-codes-wait-for-the-next-one
+  (let ((secret "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")
+        (*cookie* nil))
+    (enable-totp secret)
+    (unwind-protect
+         (progn
+           (loop :while (> (mod (unix-now) 30) 25) :do (sleep 1))
+           (dotimes (i 5)
+             (post-login :form `(("secret" . ,*secret*) ("code" . "not a code"))))
+           (multiple-value-bind (status body) (post-login :form `(("secret" . ,*secret*) ("code" . ,(totp secret))))
+             (ok (= status 429))
+             (ok (search "Too many wrong codes" body))
+             (ok (search "Owner secret" body) "and the form is there to try again")))
+      (disable-totp)
+      (log-in))))

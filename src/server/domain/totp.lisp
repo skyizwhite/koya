@@ -10,6 +10,7 @@
            #:hotp
            #:totp
            #:code-step
+           #:time-step
            #:unix-now
            #:generate-totp-secret
            #:otpauth-uri))
@@ -60,12 +61,15 @@
 (defun unix-now ()
   (- (get-universal-time) #.(encode-universal-time 0 0 0 1 1 1970 0)))
 
+(defun time-step (&optional (time (unix-now)))
+  (floor time +step-seconds+))
+
 (defun totp (secret &key (time (unix-now)))
-  (hotp (base32-decode secret) (floor time +step-seconds+)))
+  (hotp (base32-decode secret) (time-step time)))
 
 (defun code-step (code secret &key (time (unix-now)) (window 1) (after -1))
   (let ((code (remove #\Space (or code "")))
-        (now (floor time +step-seconds+))
+        (now (time-step time))
         (key (base32-decode secret)))
     (loop :for step :from (max (- now window) (1+ after)) :to (+ now window)
           :when (ironclad:constant-time-equal (babel:string-to-octets (hotp key step))

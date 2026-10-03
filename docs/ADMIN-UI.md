@@ -38,8 +38,12 @@ started with — and, when two-factor login is on, for the current **one-time
 code** from an authenticator app. There are no user accounts: whoever knows the
 secret is the owner.
 
-- A failed attempt never says which of the two was wrong, and failures lock
+- A failed attempt never says which of the two was wrong. A wrong secret locks
   nobody out: the secret is at least 32 characters, too long to guess.
+- A one-time code is short enough to guess, so after five wrong codes within
+  the same 30 seconds every attempt is refused until the next code comes up.
+  Only an attempt with the right secret counts, and a code once used does not
+  log in again, even after a restart.
 - With a `KOYA_SECRET` shorter than that, the page says so and asks for nothing;
   the rest of the server runs as usual until a longer one is set and the server
   restarted.
