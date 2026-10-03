@@ -6,7 +6,7 @@
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages
                 #:log-in #:asked-first)
-  (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id> #:editor-action)
+  (:import-from #:koya-server/web/ui/content/editor #:editor-action)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:list-revisions #:count-revisions #:get-content #:count-contents
@@ -163,13 +163,57 @@
         (ok (string= (moved-to body) "/s/website/m/blog")))
       (ok (null (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all)))))
   (testing "object model editor upserts"
-    (multiple-value-bind (status body) (edit "/s/website/m/about/new" :form '(("action" . "publish") ("f-body" . "about")))
+    (multiple-value-bind (status body) (edit "/s/website/m/about" :form '(("action" . "publish") ("f-body" . "about")))
       (ok (= status 200))
-      (ok (search "/s/website/m/about/" (moved-to body))))
-    (multiple-value-bind (status body headers) (request :get "/s/website/m/about")
-      (declare (ignore body))
-      (ok (= status 302))
-      (ng (search "/new" (location headers)) "now redirects to the existing content"))))
+      (ok (string= (moved-to body) "/s/website/m/about")))
+    (multiple-value-bind (status body) (request :get "/s/website/m/about")
+      (ok (= status 200))
+      (ok (search "about" body)))))
+
+(deftest an-object-is-edited-at-its-model
+  (exec "DELETE FROM contents")
+  (testing "the model opens its editor, empty before the first save"
+    (multiple-value-bind (status body) (request :get "/s/website/m/about")
+      (ok (= status 200))
+      (ok (search "id=\"editor\"" body))
+      (ng (search "Danger zone" body) "and nothing to take off the site yet")))
+  (let ((id nil))
+    (testing "the first save makes its content and stays at the model"
+      (multiple-value-bind (status body) (edit "/s/website/m/about" :form '(("action" . "save") ("f-body" . "first")))
+        (ok (= status 200))
+        (ok (search "Draft saved." body))
+        (ok (string= (moved-to body) "/s/website/m/about")))
+      (setf id (content-id (first (list-contents "website" "about" (nth-value 1 (resolve-model "website" "about")) (parse-query nil) :status :all)))))
+    (testing "a later save changes that content"
+      (edit "/s/website/m/about" :form `(("action" . "save") ("f-body" . "second")
+                                         ("updated-at" . ,(content-updated-at (get-content "website" id)))))
+      (ok (= 1 (count-contents "website" "about")))
+      (ok (string= (jget (content-draft (get-content "website" id)) "body") "second")))
+    (testing "its id and new lead to the model"
+      (dolist (path (list (format nil "/s/website/m/about/~a" id) "/s/website/m/about/new"))
+        (multiple-value-bind (status body headers) (request :get path)
+          (declare (ignore body))
+          (ok (= status 302) path)
+          (ok (string= (location headers) "/s/website/m/about")))))
+    (testing "it has no delete"
+      (edit "/s/website/m/about" :form '(("action" . "publish") ("f-body" . "live")))
+      (multiple-value-bind (status body) (request :get "/s/website/m/about")
+        (ok (= status 200))
+        (ok (search "Unpublish" body) "unpublishing is what takes it off the site")
+        (ng (search "Delete" body)))
+      (ok (<= 400 (edit "/s/website/m/about" :form '(("action" . "delete"))) 499))
+      (ok (get-content "website" id) "and the action does not delete it either"))
+    (testing "its history restores at the model"
+      (multiple-value-bind (status body) (request :get (format nil "/s/website/m/about/~a/history" id))
+        (ok (= status 200))
+        (ok (search "href=\"/s/website/m/about?revision=" body))
+        (ok (search "href=\"/s/website/m/about\"" body) "and leads back to it"))
+      (multiple-value-bind (status body)
+          (request :get "/s/website/m/about"
+                   :query (format nil "revision=~a" (revision-id (car (last (list-revisions "website" id))))))
+        (ok (= status 200))
+        (ok (search "Restoring the version of" body))
+        (ok (search "value=\"first\"" body))))))
 
 (deftest richtext-is-stored-as-sent
   (exec "DELETE FROM contents")

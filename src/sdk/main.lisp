@@ -9,6 +9,8 @@
                 #:get-list #:get-item #:get-object
                 #:list-contents #:get-content #:create-content #:update-content #:delete-content
                 #:publish-content #:unpublish-content #:discard-draft #:draft-key
+                #:get-object-content #:update-object #:publish-object #:unpublish-object
+                #:discard-object-draft #:object-draft-key
                 #:list-media #:get-media #:upload-media #:update-media #:delete-media
                 #:list-delivery-keys #:create-delivery-key #:delete-delivery-key #:webhook-secret
                 #:koya-error #:koya-error-status #:koya-error-code #:koya-error-message
@@ -21,6 +23,8 @@
            #:get-list #:get-item #:get-object
            #:list-contents #:get-content #:create-content #:update-content #:delete-content
            #:publish-content #:unpublish-content #:discard-draft #:draft-key
+           #:get-object-content #:update-object #:publish-object #:unpublish-object
+           #:discard-object-draft #:object-draft-key
            #:list-media #:get-media #:upload-media #:update-media #:delete-media
            #:list-delivery-keys #:create-delivery-key #:delete-delivery-key #:webhook-secret
            #:koya-error #:koya-error-status #:koya-error-code #:koya-error-message

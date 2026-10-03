@@ -24,7 +24,7 @@
   (:import-from #:koya-server/web/lib/assets #:asset-url)
   (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/lib/display #:short-time #:caller-name)
-  (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:history-url)
+  (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:history-url #:editor-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
@@ -35,7 +35,7 @@
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/<id>/history)
 
 (defun restore-url (space model id revision-id)
-  (render-uri (make-uri :path (content-url space model id) :query `(("revision" . ,revision-id)))))
+  (render-uri (make-uri :path (editor-url space model id) :query `(("revision" . ,revision-id)))))
 
 (defparameter +events+
   '(("draft" . "Draft saved")
@@ -122,7 +122,7 @@
          (span :class "whitespace-nowrap text-muted" (short-time (revision-created-at revision)))
          (unless (blank-value-p (caller-name (revision-by revision)))
            (hsx (span :class "text-muted" (format nil "· ~a" (caller-name (revision-by revision)))))))
-       (a :href (restore-url space (model-name model) id (revision-id revision)) :class "btn"
+       (a :href (restore-url space model id (revision-id revision)) :class "btn"
           (~icon :name :history) "Restore"))
      (when (null previous)
        (hsx (p :class "mb-2 text-sm text-muted" "The oldest version in this view.")))
@@ -177,7 +177,7 @@
     (hsx
      (~layout :space space
               :crumbs (if (eq (model-kind model) :object)
-                          (list (cons model-name (content-url space model-name id)) (cons "History" nil))
+                          (list (cons model-name (model-url space model-name)) (cons "History" nil))
                           (list (cons model-name (model-url space model-name))
                                 (cons (content-label content model) (content-url space model-name id))
                                 (cons "History" nil)))

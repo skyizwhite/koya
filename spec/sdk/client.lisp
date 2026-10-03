@@ -13,7 +13,8 @@
                 #:update-content #:publish-content #:unpublish-content #:discard-draft
                 #:delete-content #:draft-key #:list-delivery-keys #:delete-delivery-key
                 #:webhook-secret #:list-media #:get-media #:upload-media #:update-media
-                #:delete-media #:deploy)
+                #:delete-media #:deploy #:get-object-content #:update-object #:publish-object
+                #:unpublish-object #:discard-object-draft #:object-draft-key)
   (:import-from #:koya-spec/server/usecases/media #:png-bytes #:*media-root*)
   (:import-from #:usocket #:socket-connect #:socket-close #:socket-error))
 (in-package #:koya-spec/sdk/client)
@@ -116,8 +117,15 @@
       (ok (string= (getf (get-content 'blog (getf post :id)) :status) "published+draft"))
       (ok (= (getf (list-contents 'blog) :total-count) 1)))
     (testing "object model"
-      (create-content 'about '(:body "about") :publish t)
-      (ok (string= (getf (get-object 'about) :body) "about")))
+      (ok (string= (getf (update-object 'about '(:body "about")) :status) "draft") "the first save makes its content")
+      (ok (string= (getf (publish-object 'about) :status) "published"))
+      (ok (string= (getf (get-object 'about) :body) "about"))
+      (update-object 'about '(:body "about v2"))
+      (ok (string= (getf (get-object 'about :query (list :draft-key (object-draft-key 'about))) :body) "about v2"))
+      (ok (string= (getf (get-object-content 'about) :status) "published+draft"))
+      (ok (string= (getf (discard-object-draft 'about) :status) "published"))
+      (ok (string= (getf (getf (publish-object 'about :data '(:body "given")) :published) :body) "given"))
+      (ok (string= (getf (unpublish-object 'about) :status) "draft")))
     (testing "errors become koya-error"
       (let ((e (handler-case (get-item 'blog "01ARZ3NDEKTSV4RRFFQ69G5FAV") (koya-error (e) e))))
         (ok (= (koya-error-status e) 404))

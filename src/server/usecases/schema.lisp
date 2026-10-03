@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
-                #:field-name #:field-option)
+                #:field-name #:field-option #:model-kind)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/usecases/ports/contents #:space-contents)
@@ -20,6 +20,8 @@
   (:export #:load-schema
            #:find-model
            #:resolve-model
+           #:resolve-list-model
+           #:resolve-object-model
            #:space-schema
            #:plan
            #:unique-misfits
@@ -38,6 +40,18 @@
   (let* ((space (resolve-space space-name))
          (model (or (find-model space model-name)
                     (fail 'not-found (format nil "Model ~a does not exist" model-name)))))
+    (values space model)))
+
+(defun resolve-list-model (space-name model-name)
+  (multiple-value-bind (space model) (resolve-model space-name model-name)
+    (when (eq (model-kind model) :object)
+      (fail 'not-found (format nil "~a is an object model; its content is reached through the model, not an id" model-name)))
+    (values space model)))
+
+(defun resolve-object-model (space-name model-name)
+  (multiple-value-bind (space model) (resolve-model space-name model-name)
+    (unless (eq (model-kind model) :object)
+      (fail 'not-found (format nil "~a is a list model; a content of it is reached through its id" model-name)))
     (values space model)))
 
 (defun space-schema (name)

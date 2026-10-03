@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/web/app #:app)
-  (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id> #:editor-action)
+  (:import-from #:koya-server/web/ui/content/editor #:editor-action)
   (:import-from #:koya-server/infra/db/connection #:connect-db)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
   (:import-from #:koya-server/usecases/spaces #:create-space)
@@ -99,7 +99,7 @@
     (apply #'request method (subseq url 0 q) :query (and q (subseq url (1+ q))) args)))
 
 (defun edit (path &key form headers)
-  (destructuring-bind (s space m model id) (rest (uiop:split-string path :separator "/"))
+  (destructuring-bind (s space m model &optional id) (rest (uiop:split-string path :separator "/"))
     (declare (ignore s m))
     (call-action :post (editor-action :space space :model model :id id
                                       :op (or (cdr (assoc "action" form :test #'equal)) "save"))
