@@ -3,4 +3,4 @@
   (:export #:webhook-payload))
 (in-package #:koya-server/usecases/ports/presenters)
 
-(defgeneric webhook-payload (space model id event old new))
+(defgeneric webhook-payload (space model id event old new &key changes))

@@ -63,9 +63,9 @@ Every webhook belongs to the space and fires for **every model**, unless `only`
 narrows it to the models it names. Absent, empty or missing `only` means every
 model, including models added later.
 
-Every webhook is sent every event -- `publish`, `unpublish`, `delete`, `draft`
-and `discard` -- and the payload names the event; there is nothing to subscribe
-to.
+Every webhook is sent every event -- `publish`, `unpublish`, `delete`, `draft`,
+`discard` and `deploy` -- and the payload names the event; there is nothing to
+subscribe to.
 Any other key on input (older schemas carried an `events` list) is ignored.
 The payload is described in [API.md](API.md#webhooks).
 

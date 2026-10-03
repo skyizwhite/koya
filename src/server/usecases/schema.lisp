@@ -1,10 +1,12 @@
 (defpackage #:koya-server/usecases/schema
   (:use #:cl)
-  (:import-from #:koya-core/schema #:check-schema #:check-deployable)
+  (:import-from #:koya-core/schema #:check-schema #:check-deployable #:schema-model)
+  (:import-from #:koya-server/domain/deploy #:changes-by-served-model)
+  (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-core/diff #:diff-schemas #:destructive-changes-p)
   (:import-from #:koya-server/domain/errors #:fail #:conflict #:not-found)
   (:import-from #:koya-server/usecases/ports/spaces
-                #:find-space #:load-schema #:find-model #:save-schema)
+                #:find-space #:load-schema #:find-model #:save-schema #:space-webhook-secret)
   (:import-from #:koya-server/usecases/ports/deploys
                 #:list-deploys #:count-deploys #:+deploys-kept+)
   (:import-from #:koya-server/usecases/actor #:*actor*)
@@ -47,12 +49,20 @@
     (save-schema space schema changes :by by)
     changes))
 
+(defun notify-deploy (space before changes)
+  (loop :for (model-name . model-changes) :in (changes-by-served-model changes)
+        :for model := (or (find-model space model-name) (schema-model before model-name))
+        :do (notify-webhooks space model nil :deploy :changes model-changes
+                                                     :secret (space-webhook-secret space))))
+
 (defun deploy (name schema &key force)
   (check-deployable schema)
   (let* ((space (existing-space name))
+         (before (load-schema space))
          (changes (changes-of space schema)))
     (when (and (destructive-changes-p changes) (not force))
       (fail 'conflict "Schema deploy contains destructive changes; retry with force=true"
             :code "destructive_changes" :details changes))
     (save-schema space schema changes :by *actor*)
+    (notify-deploy space before changes)
     changes))
