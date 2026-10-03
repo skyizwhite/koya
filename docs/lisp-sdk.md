@@ -263,7 +263,7 @@ These need a delivery key and return published data only.
 
 ```lisp
 (koya-sdk:get-list 'blog)
-(koya-sdk:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :fields "id,title,publishedAt"))
+(koya-sdk:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :fields "title"))
 (koya-sdk:get-list 'blog :query '(:include "tags"))          ; embed referenced contents
 (koya-sdk:get-item 'blog "01J…")
 (koya-sdk:get-item 'blog "01J…" :query '(:draft-key "…"))    ; preview a draft
@@ -293,7 +293,7 @@ are the same.
 | `:limit` | default 10, values above 100 are clamped to 100 |
 | `:offset` | default 0 |
 | `:orders` | comma-separated field names, `-` for descending; default newest published first |
-| `:fields` | keys to keep in each content |
+| `:fields` | fields to keep in each content; the system fields are always kept |
 | `:filters` | see below |
 | `:include` | reference fields to embed |
 | `:draft-key` | with `get-item` / `get-object`, serves that content's draft |

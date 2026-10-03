@@ -132,8 +132,9 @@ A content is its fields plus the system fields:
   `url`; one whose file is gone is `null`.
 - **Rich text** is HTML whose `/media/` sources are rewritten to absolute URLs,
   so it renders on any site.
-- **`fields`** applies last, after embedding and expansion, and drops system
-  fields it does not name too.
+- **`fields`** applies last, after embedding and expansion, and narrows the
+  content's own fields; the system fields (`id`, `createdAt`, `updatedAt`,
+  `publishedAt`, `revisedAt`) are always there.
 - `publishedAt` is the first publish, `revisedAt` the latest; both are `null`
   while a content is not published. Timestamps are ISO 8601 in UTC with
   milliseconds.

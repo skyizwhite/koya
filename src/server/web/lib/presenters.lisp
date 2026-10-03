@@ -58,11 +58,13 @@
             (setf (gethash (field-name field) object)
                   (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))))))
 
+(defparameter +system-fields+ '("id" "createdAt" "updatedAt" "publishedAt" "revisedAt"))
+
 (defun select-fields (object fields)
   (if (null fields)
       object
       (let ((out (make-hash-table :test 'equal)))
-        (dolist (name fields)
+        (dolist (name (append +system-fields+ fields))
           (multiple-value-bind (v found) (gethash name object)
             (when found (setf (gethash name out) v))))
         out)))

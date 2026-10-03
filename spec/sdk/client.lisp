@@ -97,8 +97,10 @@
         (ok (string= (getf (first (getf item :tags)) :name) "lisp") "included references expand into plists")
         (ok (getf item :published-at))))
     (ok (stringp (first (getf (get-item 'blog (getf post :id)) :tags))) "references are ids by default")
-    (let ((item (get-item 'blog (getf post :id) :query '(:fields "id,title"))))
-      (ok (equal (sort (loop :for k :in item :by #'cddr :collect k) #'string<) '(:id :title))))
+    (let ((item (get-item 'blog (getf post :id) :query '(:fields "title"))))
+      (ok (equal (sort (loop :for k :in item :by #'cddr :collect k) #'string<)
+                 '(:created-at :id :published-at :revised-at :title :updated-at))
+          "fields narrows the data, and the system fields stay"))
     (testing "an unpublished draft previews with a nil publishedAt"
       (let* ((draft (create-content 'blog '(:title "Only a draft")))
              (item (get-item 'blog (getf draft :id) :query (list :draft-key (getf draft :draft-key)))))
