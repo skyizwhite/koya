@@ -17,7 +17,7 @@
                 #:make-content #:content-status #:content-published #:content-draft #:content-id
                 #:content-draft-key #:content-created-at #:content-published-at)
   (:import-from #:koya-server/usecases/ports/media
-                #:list-media #:media-file-path #:write-media-file #:delete-media-file)
+                #:list-media #:media-file-path #:write-media-file #:delete-media-file #:insert-media)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-space #:media-mime #:media-alt
                 #:+max-upload-bytes+)
@@ -115,6 +115,7 @@
                                            :publish t)))
          (old-secret (space-webhook-secret "archive"))
          (delivery-key (create-delivery-key "archive" :label "site"))
+         (delivery-key-id (key-id (first (list-delivery-keys "archive"))))
          (management-key (create-management-key "archive" :label "repl"))
          (sent 0)
          octets)
@@ -272,7 +273,7 @@
       (ng (find-space "archive")))
     (testing "a transaction that fails takes away the files it wrote"
       (create-space "clash")
-      (insert-delivery-key "clash" :id "01ARZ3NDEKTSV4RRFFQ69G5FAV" :hash (hash-key delivery-key)
+      (insert-delivery-key "clash" :id delivery-key-id :hash (hash-key "another key")
                                    :label "" :created-at "2020-01-01T00:00:00.000Z")
       (ok (string= (nth-value 1 (import-archive octets)) "/"))
       (ng (find-space "archive"))
@@ -313,3 +314,64 @@
               (ok (search (format nil "~a is not a content id" shown) (nth-value 1 (request :get "/")))
                   (format nil "~s is refused, and the toast names it" id))
               (ng (find-space "odd") "and nothing is imported"))))
+
+(defun odd-archive (&key contents media key)
+  (create-space "odd")
+  (replace-schema "odd" (make-schema :models (list (make-model "tag" :list (list (make-field :name :text :required t :unique t))))))
+  (dolist (c contents)
+    (insert-content (apply #'make-content (append c (list :space "odd" :model "tag"
+                                                          :created-at "2024-01-01T00:00:00.000Z"
+                                                          :updated-at "2024-01-01T00:00:00.000Z")))))
+  (let ((stored (and media (store-upload "odd" (png-bytes 2 2) :filename "a.png")))
+        (made (and key (create-delivery-key "odd" :label "site"))))
+    (let ((octets (nth-value 1 (request :get "/s/odd/export"))))
+      (delete-space "odd")
+      (remove-space-media "odd")
+      (values octets stored made))))
+
+(defun tag (name) (alist-hash-table `(("name" . ,name)) :test 'equal))
+
+(defun refusal (octets)
+  (and (string= (nth-value 1 (import-archive octets)) "/")
+       (not (find-space "odd"))
+       (let* ((page (nth-value 1 (request :get "/")))
+              (at (search "Import failed: " page)))
+         (and at (subseq page (+ at 15) (search "<" page :start2 at))))))
+
+(deftest an-import-holds-what-it-writes-to-the-schema-it-brings
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (testing "a content that does not fit its model is refused, named"
+    (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (alist-hash-table '() :test 'equal)))))
+               "Content t1: name is required")))
+  (testing "nor two that share a unique value"
+    (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (tag "lisp"))
+                                                     (list :id "t2" :draft (tag "lisp")))))
+               "Content t1: name must be unique")))
+  (testing "a published content needs the dates of its publishing"
+    (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :published (tag "lisp")))))
+               "Content t1: publishedAt must be an ISO 8601 datetime with a date, a time and a zone")))
+  (testing "a timestamp without a zone is refused"
+    (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (tag "lisp") :created-at "2024-01-01"))))
+               "Content t1: createdAt must be an ISO 8601 datetime with a date, a time and a zone")))
+  (testing "one with a zone is kept in UTC"
+    (ok (string= (nth-value 1 (import-archive
+                               (odd-archive :contents (list (list :id "t1" :draft (tag "lisp")
+                                                                  :created-at "2024-01-01T10:00+09:00")))))
+                 "/s/odd"))
+    (ok (string= (content-created-at (get-content "odd" "t1")) "2024-01-01T01:00:00.000Z"))
+    (delete-space "odd"))
+  (testing "a media or a key another space holds is named before anything is written"
+    (multiple-value-bind (octets stored) (odd-archive :media t)
+      (create-space "elsewhere")
+      (insert-media "elsewhere" :id (media-id stored) :filename "b.png" :mime "image/png" :size 1
+                                :width 1 :height 1 :alt "" :created-at "2024-01-01T00:00:00.000Z")
+      (ok (equal (refusal octets) (format nil "Media ~a is already in another space" (media-id stored))))
+      (delete-space "elsewhere"))
+    (multiple-value-bind (octets stored key) (odd-archive :key t)
+      (declare (ignore stored))
+      (create-space "elsewhere")
+      (insert-delivery-key "elsewhere" :id "01ARZ3NDEKTSV4RRFFQ69G5FAZ" :hash (hash-key key)
+                                       :label "" :created-at "2024-01-01T00:00:00.000Z")
+      (ok (equal (refusal octets) "A key in the archive is already a key of another space"))
+      (delete-space "elsewhere"))))

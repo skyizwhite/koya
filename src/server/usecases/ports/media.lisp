@@ -2,6 +2,7 @@
   (:use #:cl)
   (:export #:insert-media
            #:find-media
+           #:media-id-taken-p
            #:find-media-by-ids
            #:list-media
            #:space-media
@@ -18,6 +19,8 @@
 (defgeneric insert-media (space &key filename mime size width height alt id created-at))
 
 (defgeneric find-media (space id))
+
+(defgeneric media-id-taken-p (id))
 
 (defgeneric find-media-by-ids (space ids))
 

@@ -8,7 +8,7 @@
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/media
-                #:insert-media #:find-media #:find-media-by-ids #:list-media #:space-media
+                #:insert-media #:find-media #:media-id-taken-p #:find-media-by-ids #:list-media #:space-media
                 #:count-media #:update-media #:delete-media))
 (in-package #:koya-server/infra/db/media)
 
@@ -27,6 +27,9 @@
 (defmethod find-media (space id)
   (let ((row (fetch-one "SELECT * FROM media WHERE space = ? AND id = ?" space id)))
     (and row (row->media row))))
+
+(defmethod media-id-taken-p (id)
+  (and (fetch-one "SELECT 1 FROM media WHERE id = ?" id) t))
 
 (defmethod find-media-by-ids (space ids)
   (let ((table (make-hash-table :test 'equal))
