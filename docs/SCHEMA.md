@@ -186,8 +186,9 @@ left under the old key, where the editor cannot see them.
 The deploy renames it and moves the stored content with it — the contents to the
 new model name, the key in every published object and draft — in the same
 transaction as the schema write. Nothing is lost, so a rename is **not**
-destructive and needs no `force`; changing the type or tightening the options at
-the same time still is, and is reported as its own change.
+destructive and needs no `force`; changing the type at the same time still is,
+and tightening the options is checked against the stored content (see
+[Changes](#changes)). Either is reported as its own change.
 
 `was` is an instruction to the deploy, not part of the shape:
 
@@ -251,7 +252,7 @@ the difference between the space's stored schema and the one sent as a list of
 | `rename_model` `rename_field` | a `was` was matched, see [Renames](#renames) | no |
 | `change_kind` | a model's `kind` changed; its contents are deleted | **yes** |
 | `change_field_type` | a field's `type` changed, or the `model` a `reference` points at | **yes** |
-| `change_field_options` | a field's options changed | yes when tightened, see below |
+| `change_field_options` | a field's options changed | no; when tightened, refused while stored content does not fit, see below |
 | `change_model_options` | `previewUrl` / `publicUrl` / `label` changed | no |
 | `change_webhooks` | the space's webhooks changed | no |
 
@@ -259,6 +260,17 @@ Options are **tightened** when they can reject content the old ones accepted:
 `required`, `unique` or `integer` turned on, `many` switched either way,
 `maxLength` or `max` lowered, `min` raised, `pattern` changed, or a value dropped
 from `options`.
+
+A tightened option, or a `required` field added to a model that has contents, is
+checked against every stored published object and draft of the model (not the
+history), unless the same deploy changes the model's `kind`, which deletes them. A value that does not fit it is listed under the change, as
+`"misfits": [{"id", "field", "version", "message"}]` with `version` `published`
+or `draft`, and its description ends with how many contents do not fit. A deploy
+with any is refused with `409 contents_do_not_fit`, `force` or not and before
+`destructive_changes` is, and the
+changes in `details`: change those contents under the schema as it is, then
+deploy again. Stored content always fits the schema it is stored under. A
+tightened option that every stored value fits is applied without `force`.
 
 `path` is `webhooks` (the space's own), `model` or `model.field`. A `PUT` whose changes
 include a destructive one is refused with `409 destructive_changes` (the changes
@@ -268,7 +280,7 @@ whose type or target model changed, out of every published object, draft and
 revision, in the same transaction. Changing a model's `kind` makes it anew: its
 contents and their history are deleted, as if the model were removed and added
 again under the same name. A field added later under that name starts
-empty. Rows that no longer fit tightened options stay as they are.
+empty.
 
 ## Example
 

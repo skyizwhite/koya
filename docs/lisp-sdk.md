@@ -203,7 +203,8 @@ are left under the old key. `:was` says it is the same thing under a new name:
 The deploy renames it and moves the content with it — the contents to the new
 model, the key in every published object and draft — in the same transaction as
 the schema write. Nothing is lost, so a rename is not destructive and needs no
-`:force`; changing the type or tightening the options at the same time still is.
+`:force`; changing the type at the same time still is, and tightening the options
+is checked against the stored content.
 
 `:was` is an instruction to the deploy, not part of the schema: the server stores
 the new name alone, so `pull` never brings one back. Leaving it in the source is
@@ -239,14 +240,18 @@ asking, so a script never applies a destructive change by accident.
 
 Destructive means a change that can hide or invalidate content already stored:
 removing a model or field, changing a kind or a field type (for a reference,
-the model it points at), or tightening a field's options. Deleting the space
+the model it points at). Deleting the space
 itself is not among them — that is done in the admin UI, with its own
 confirmation. The exact list, and the shape of each change, is in
 [SCHEMA.md, "Changes"](SCHEMA.md#changes). A rename declared with `:was` carries
 existing content through, and removing a field or changing its type or target
 model takes its values out of every published object, draft and revision;
-changing a model's kind deletes its contents, as removing it would; rows that no
-longer fit tightened options stay as they are.
+changing a model's kind deletes its contents, as removing it would.
+
+Tightening a field's options, or adding a `:required` field to a model that has
+contents, is not destructive but is checked: `plan` lists under the change every
+content whose stored value does not fit, and `deploy` is refused with
+`contents_do_not_fit`, `:force` or not, until they are changed to fit.
 
 Every deploy that changed something is recorded — what it changed, and the label
 of the management key that sent it — and is read afterwards in the admin UI at
@@ -380,8 +385,9 @@ Anything but a 2xx signals `koya-sdk:koya-error`, with readers
 The status and code of every error each endpoint can return are listed in
 [openapi.yaml](openapi.yaml). Two carry `details`: `422 validation_failed`, where
 it is a list of `(:field … :code … :message …)` plists (codes in
-[SCHEMA.md](SCHEMA.md#content-values)), and `409 destructive_changes` from
-`deploy`, where it is the list of changes. A `500` only carries the underlying
+[SCHEMA.md](SCHEMA.md#content-values)), and `409 destructive_changes` and
+`409 contents_do_not_fit` from `deploy`, where it is the list of changes, each
+with its `:misfits`. A `500` only carries the underlying
 message when the server runs with `KOYA_ENV=dev`.
 
 ```lisp

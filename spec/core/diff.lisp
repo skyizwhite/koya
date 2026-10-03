@@ -5,6 +5,7 @@
   (:import-from #:koya-core/diff
                 #:diff-schemas
                 #:destructive-changes-p
+                #:tightened-change-p
                 #:format-change
                 #:change->jobject)
   (:import-from #:koya-core/json
@@ -81,22 +82,36 @@
     (testing "case-only changes are seen"
       (let ((change (only (diff-schemas (blog :pattern "^[A-Z]") (blog :pattern "^[a-z]")))))
         (ok (eq (getf change :op) :change-field-options))
-        (ok (destructive-changes-p (list change)) "a different pattern can reject existing content")))
-    (testing "loosening is not destructive"
-      (ng (destructive-changes-p (diff-schemas (blog :max-length 50) (blog :max-length 100))))
-      (ng (destructive-changes-p (diff-schemas (blog :required t) (blog)))))
-    (testing "tightening is destructive"
-      (ok (destructive-changes-p (diff-schemas (blog) (blog :required t))))
-      (ok (destructive-changes-p (diff-schemas (blog :max-length 100) (blog :max-length 50))))
-      (ok (destructive-changes-p (diff-schemas (blog) (blog :unique t))))
+        (ok (tightened-change-p change) "a different pattern can reject existing content")))
+    (testing "loosening is not tightening"
+      (ng (tightened-change-p (only (diff-schemas (blog :max-length 50) (blog :max-length 100)))))
+      (ng (tightened-change-p (only (diff-schemas (blog :required t) (blog))))))
+    (testing "tightening is seen, and is not destructive: the server checks what is stored instead of asking for force"
+      (ok (tightened-change-p (only (diff-schemas (blog) (blog :required t)))))
+      (ok (tightened-change-p (only (diff-schemas (blog :max-length 100) (blog :max-length 50)))))
+      (ok (tightened-change-p (only (diff-schemas (blog) (blog :unique t)))))
+      (ng (destructive-changes-p (diff-schemas (blog) (blog :required t))))
       (ok (search "options tightened" (format-change (only (diff-schemas (blog) (blog :required t)))))))
-    (testing "changing single/many and dropping select options is destructive"
+    (testing "changing single/many and dropping select options is tightening"
       (flet ((sel (&rest options)
                (make-schema :models (list (make-model "blog" :list
                                                       (list (apply #'make-field :cat :select options)))))))
-        (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b") :many t) (sel :options '("a" "b")))))
-        (ok (destructive-changes-p (diff-schemas (sel :options '("a" "b")) (sel :options '("a")))))
-        (ng (destructive-changes-p (diff-schemas (sel :options '("a")) (sel :options '("a" "b")))))))))
+        (ok (tightened-change-p (only (diff-schemas (sel :options '("a" "b") :many t) (sel :options '("a" "b"))))))
+        (ok (tightened-change-p (only (diff-schemas (sel :options '("a" "b")) (sel :options '("a"))))))
+        (ng (tightened-change-p (only (diff-schemas (sel :options '("a")) (sel :options '("a" "b"))))))))
+    (testing "contents that do not fit are counted in the description and listed in the object"
+      (let ((change (append (only (diff-schemas (blog) (blog :required t)))
+                            (list :misfits (list (list :id "a" :field "title" :version "draft" :message "is required")
+                                                 (list :id "a" :field "title" :version "published" :message "is required")
+                                                 (list :id "b" :field "title" :version "draft" :message "is required"))))))
+        (ok (search "2 contents do not fit" (format-change change)))
+        (let ((misfits (jget (change->jobject change) "misfits")))
+          (ok (= (length misfits) 3))
+          (ok (equal (jget (aref misfits 0) "id") "a"))
+          (ok (equal (jget (aref misfits 0) "version") "draft"))
+          (ok (equal (jget (aref misfits 0) "message") "is required")))
+        (ng (jget (change->jobject (only (diff-schemas (blog) (blog :required t)))) "misfits")
+            "and a change with none has no list")))))
 
 (deftest renames
   (flet ((posts (&rest fields)
@@ -121,7 +136,7 @@
       (let ((changes (diff-schemas (posts (make-field :lede :text))
                                    (posts (make-field :subtitle :text :required t :was :lede)))))
         (ok (equal (ops changes) '(:rename-field :change-field-options)))
-        (ok (destructive-changes-p changes) "the rename is free, the new constraint is not")))
+        (ok (tightened-change-p (second changes)) "the rename is free, the new constraint is checked")))
     (testing "a leftover :was is not a change"
       (ok (null (diff-schemas (posts (make-field :subtitle :text))
                               (posts (make-field :subtitle :text :was :lede))))

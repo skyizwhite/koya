@@ -307,10 +307,10 @@ is the diff, one line per change, as `koya plan` prints it:
 | Line | Meaning |
 |---|---|
 | `+ blog.title (text)` | something new, in green |
-| `- blog.summary (text)` | something gone, in red |
 | `~ blog.title renamed from heading` | a rename |
 | `~ blog options changed (publicUrl none -> "https://…")` | a change, with what moved |
-| `! ~ blog.title options tightened (maxLength 100 -> 50)` | a change that can reject content already stored |
+| `! - blog.summary (text)` | something gone, with what was stored in it, in red |
+| `~ blog.title options tightened (maxLength 100 -> 50)` | options that accept less; every stored value fitted them |
 
 A `!` marks a change that can hide or invalidate stored content — the ones a
 deploy refuses without `force`.

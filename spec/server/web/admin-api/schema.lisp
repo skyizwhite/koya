@@ -86,3 +86,82 @@
         (ok (= status 200))
         (ok (= (length (jget json "models")) 1)))
       (ok (= 200 (nth-value 0 (admin :get "/admin/api/contents/website/blog")))))))
+
+(deftest a-tightened-option-waits-for-the-contents-to-fit
+  (flet ((notes (&rest code-options)
+           (make-schema :models (list (make-model "note" :list (list (make-field :title :text)
+                                                                     (apply #'make-field :code :text code-options))))))
+         (add-note (data &key publish)
+           (jget (nth-value 1 (admin :post "/admin/api/contents/website/note"
+                                     :body (jobject "data" data "publish" publish)))
+                 "id"))
+         (misfits (json path)
+           (loop :for change :across (apply #'jget json path) :append (coerce (or (jget change "misfits") #()) 'list))))
+    (replace-schema "website" (notes))
+    (unwind-protect
+         (let ((long (add-note (jobject "title" "Long" "code" "abcdefgh") :publish t))
+               (none (add-note (jobject "title" "None")))
+               (twin (add-note (jobject "title" "Twin" "code" "abcdefgh"))))
+           (multiple-value-bind (status json) (admin :post "/admin/api/schema/website/plan"
+                                                     :body (schema->jobject (notes :max-length 5)))
+             (ok (= status 200))
+             (ng (jget json "destructive") "tightening asks for no force")
+             (ok (equal (sort (mapcar (lambda (m) (jget m "id")) (misfits json '("changes"))) #'string<)
+                        (sort (list long twin) #'string<))
+                 "the plan names every content whose value no longer fits")
+             (ok (search "2 contents do not fit" (jget (aref (jget json "changes") 0) "description"))))
+           (dolist (query '(nil "force=true"))
+             (multiple-value-bind (status json) (admin :put "/admin/api/schema/website"
+                                                       :body (schema->jobject (notes :max-length 5)) :query query)
+               (ok (= status 409) (format nil "the deploy is refused~@[ with ~a~]" query))
+               (ok (string= (jget json "error" "code") "contents_do_not_fit"))
+               (ok (= (length (misfits json '("error" "details"))) 2))))
+           (ok (plusp (length (jget (nth-value 1 (admin :post "/admin/api/schema/website/plan"
+                                                         :body (schema->jobject (notes :max-length 5))))
+                                    "changes")))
+               "and nothing is applied")
+           (testing "unique and required are checked the same way"
+             (ok (= 2 (length (misfits (nth-value 1 (admin :post "/admin/api/schema/website/plan"
+                                                          :body (schema->jobject (notes :unique t))))
+                                       '("changes"))))
+                 "the two contents that share a value")
+             (ok (equal (mapcar (lambda (m) (jget m "id"))
+                                (misfits (nth-value 1 (admin :post "/admin/api/schema/website/plan"
+                                                             :body (schema->jobject (notes :required t))))
+                                         '("changes")))
+                        (list none))
+                 "the content without one"))
+           (testing "once they fit, the deploy goes through"
+             (admin :patch (format nil "/admin/api/contents/website/note/~a" long) :body (jobject "data" (jobject "code" "abc")))
+             (admin :post (format nil "/admin/api/contents/website/note/~a/publish" long))
+             (admin :patch (format nil "/admin/api/contents/website/note/~a" twin) :body (jobject "data" (jobject "code" "xyz")))
+             (ok (= 200 (admin :put "/admin/api/schema/website" :body (schema->jobject (notes :max-length 5))))))
+           (testing "a required field added to a model with contents waits for them too"
+             (let ((with-lede (make-schema :models (list (make-model "note" :list
+                                                                     (list (make-field :title :text)
+                                                                           (make-field :code :text :max-length 5)
+                                                                           (make-field :lede :text :required t)))))))
+               (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (schema->jobject with-lede))
+                 (ok (= status 409))
+                 (ok (= (length (misfits json '("error" "details"))) 3)
+                     "every stored version of every content lacks it")))))
+      (replace-schema "website" (test-schema)))))
+
+(deftest misfits-are-told-first-and-not-of-contents-that-go
+  (flet ((notes (kind &rest code-options)
+           (make-schema :models (list (make-model "note" kind (list (make-field :title :text)
+                                                                    (apply #'make-field :code :text code-options)))))))
+    (replace-schema "website" (notes :list))
+    (unwind-protect
+         (progn
+           (admin :post "/admin/api/contents/website/note" :body (jobject "data" (jobject "title" "Long" "code" "abcdefgh")))
+           (testing "a deploy that could never go through says why before it asks for force"
+             (let ((without-title (make-schema :models (list (make-model "note" :list
+                                                                         (list (make-field :code :text :max-length 5)))))))
+               (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (schema->jobject without-title))
+                 (ok (= status 409))
+                 (ok (string= (jget json "error" "code") "contents_do_not_fit")))))
+           (testing "a model made anew is not checked, as its contents go"
+             (ok (= 200 (admin :put "/admin/api/schema/website" :body (schema->jobject (notes :object :max-length 5))
+                                                                :query "force=true")))))
+      (replace-schema "website" (test-schema)))))

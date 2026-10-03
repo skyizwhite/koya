@@ -24,7 +24,8 @@
   (post-login :form `(("secret" . ,*secret*)))
   (create-space "deployed")
   (replace-schema "deployed"
-               (make-schema :models (list (make-model "post" :list (list (make-field :title :text)))))
+               (make-schema :models (list (make-model "post" :list (list (make-field :title :text)
+                                                                         (make-field :lede :text)))))
                :by "key:ci")
   (replace-schema "deployed"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t))))))
@@ -37,11 +38,13 @@
            (testing "each change is the line plan prints, coloured by what it does"
              (ok (search "<div class=\"text-ok\">+ post.title (text)" body) "something new is green")
              (ok (search "<div class=\"text-ok\">+ post (list)" body))
-             (ok (search "<div class=\"text-danger\">! ~ post.title options tightened (required none -&gt; true)" body)
-                 "and a change that can reject stored content is red, and says which option moved"))
+             (ok (search "<div class=\"text-danger\">! - post.lede (text)" body)
+                 "a change that takes stored content away is red")
+             (ok (search "<div class=\"text-muted\">~ post.title options tightened (required none -&gt; true)" body)
+                 "and a tightened option, which the server checks against what is stored, says which option moved"))
            (testing "and each deploy says how much it changed, by whom, and whether it was destructive"
+             (ok (search "3 changes" body))
              (ok (search "2 changes" body))
-             (ok (search "1 change<" body))
              (ok (search "(management key: ci)" body) "a stored key:ci is read out in words")
              (ok (search "destructive" body))))
          (testing "a deploy with no key behind it was the owner's"
