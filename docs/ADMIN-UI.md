@@ -207,6 +207,12 @@ content can be seen on the left, what can be done to it on the right:
 | **Save draft** | saves the form as a draft, leaving what is published untouched — on only while the form holds a change |
 | **Publish** | validates and publishes the form as it stands — asks first |
 
+**Save draft** and **Publish** store the whole form, and **Discard draft** throws
+away the draft the editor shows, so they are refused when the content was
+changed elsewhere — through the admin API, or in another tab — after
+the editor was opened. The page stays as it is, with what was typed, and says so
+with a link that opens the content again to see the change.
+
 At the bottom, the **Danger zone** holds **Unpublish** (takes the content off the
 delivery API, keeping its data as a draft) and **Delete** (removes it for good;
 for an object model it starts the single content over). Both ask first. A

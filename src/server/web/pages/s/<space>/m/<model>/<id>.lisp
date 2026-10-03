@@ -18,7 +18,7 @@
   (:import-from #:koya-server/web/lib/http
                 #:path-param #:param)
   (:import-from #:koya-server/domain/errors
-                #:koya-error #:not-found)
+                #:koya-error #:koya-error-code #:not-found)
   (:import-from #:koya-server/web/lib/forms #:form->data)
   (:import-from #:koya-server/usecases/listing #:reference-options)
   (:import-from #:koya-server/web/lib/display #:short-time)
@@ -135,6 +135,8 @@
        (form :id "editor-form" :class "space-y-6" :nm-ref "form"
              :nm-bind (on-submit (editor-action :space space-name :model model-name :id id :op "save")
                                  :binds "oninput: () => _track(), onchange: () => _track()")
+         (when content
+           (hsx (input :type "hidden" :name "updated-at" :value (content-updated-at content))))
          (loop :for field :in (model-fields model) :collect
            (hsx (~field-input :field field
                               :value (and data (gethash (field-name field) data))
@@ -218,6 +220,13 @@
            (~replace-url :url (content-url space (model-name model) (content-id content)))
            (~toast :message message))))
 
+(defun changed-elsewhere (url)
+  (set-response-status 409)
+  (hsx (~toast :kind :error :clickable t
+               :message (hsx (<> "This content was changed elsewhere after you opened it. "
+                                 (a :href url :class "font-semibold underline" "Open it again")
+                                 " to see the change; what you typed stays here until you do.")))))
+
 (defun move-on (url message)
   (set-toast message)
   (hsx (~go-to :url url :on-purpose t)))
@@ -245,15 +254,18 @@
                ((string= op "unpublish")
                 (done space model (unpublish space model (content-id content)) "Unpublished."))
                ((string= op "discard")
-                (done space model (discard space model (content-id content)) "Draft discarded."))
+                (done space model (discard space model (content-id content) :since (param params "updated-at"))
+                      "Draft discarded."))
                ((null content)
                 (let ((made (create space model data :publish (string= op "publish"))))
                   (move-on (content-url space model-name (content-id made))
                       (if (string= op "publish") "Published." "Draft saved."))))
                ((string= op "publish")
-                (done space model (publish space model (content-id content) data) "Published."))
+                (done space model (publish space model (content-id content) data :since (param params "updated-at"))
+                      "Published."))
                (t
-                (multiple-value-bind (saved outcome) (update-draft space model (content-id content) data :replace t)
+                (multiple-value-bind (saved outcome) (update-draft space model (content-id content) data :replace t
+                                                                   :since (param params "updated-at"))
                   (done space model saved (case outcome
                                             (:unchanged "Nothing to save.")
                                             (:published "Back to the published version: the draft is gone.")
@@ -262,4 +274,7 @@
              (set-response-status 422)
              (hsx (~editor :space space :model model :content content :data data
                            :errors (validation-error-errors e))))
-           (koya-error (e) (action-refused e))))))))
+           (koya-error (e)
+             (if (equal (koya-error-code e) "changed_elsewhere")
+                 (changed-elsewhere (content-url space model-name (content-id content)))
+                 (action-refused e)))))))))

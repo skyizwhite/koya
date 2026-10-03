@@ -18,7 +18,7 @@
                 #:find-object-content #:unique-value-taken-p #:get-content #:find-content
                 #:contents-mentioning)
   (:import-from #:koya-server/domain/content
-                #:content-id #:content-space #:content-published #:content-draft #:content-draft-key #:content-data
+                #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
                 #:merge-data #:same-data-p #:fill-defaults #:fill-slugs #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition)
   (:import-from #:koya-server/usecases/delivery #:deliver)
@@ -116,19 +116,24 @@
           (notify space model (content-id content) :draft :new (draft-view space model content)))
       content)))
 
-(defun update-draft (space model id patch &key replace)
+(defun check-unchanged-since (content since)
+  (when (and since (string/= since (content-updated-at content)))
+    (fail 'conflict "This content was changed elsewhere after it was opened" :code "changed_elsewhere")))
+
+(defun update-draft (space model id patch &key replace since)
   (multiple-value-bind (saved outcome old)
-      (with-transaction (update-draft-now space model id patch replace))
+      (with-transaction (update-draft-now space model id patch replace since))
     (case outcome
       (:saved (notify space model id :draft :old (published-view space model saved) :new (draft-view space model saved)))
       (:published (notify space model id :discard :old old :new (published-view space model saved))))
     (values saved outcome)))
 
-(defun update-draft-now (space model id patch replace)
+(defun update-draft-now (space model id patch replace since)
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
          (live (content-published content))
          (data (fill-slugs model (to-the-minute model (if replace patch (merge-data current patch))))))
+    (check-unchanged-since content since)
     (cond ((same-data-p model data current) (values content :unchanged))
           ((and live (same-data-p model data live))
            (check-transition content :discard)
@@ -138,16 +143,17 @@
            (check-content space model data :exclude-id id)
            (values (store (drafted content data) "draft" data) :saved)))))
 
-(defun publish (space model id &optional data &key published-at)
+(defun publish (space model id &optional data &key published-at since)
   (let ((published-at (check-published-at published-at)))
     (multiple-value-bind (live old)
-        (with-transaction (publish-now space model id data published-at))
+        (with-transaction (publish-now space model id data published-at since))
       (notify space model id :publish :old old :new (published-view space model live))
       live)))
 
-(defun publish-now (space model id data published-at)
+(defun publish-now (space model id data published-at since)
   (let* ((content (resolve-content space (model-name model) id))
          (data (to-the-minute model (or data (content-data content :draft t)))))
+    (check-unchanged-since content since)
     (check-transition content :publish)
     (check-content space model data :exclude-id id)
     (values (store (published content data :published-at published-at) "publish" data)
@@ -174,12 +180,13 @@
       (notify space model id :unpublish :old old)
       next)))
 
-(defun discard (space model id)
+(defun discard (space model id &key since)
   (let ((space-name space)
         (model-name (model-name model)))
     (multiple-value-bind (next old)
         (with-transaction
           (let ((content (resolve-content space-name model-name id)))
+            (check-unchanged-since content since)
             (check-transition content :discard)
             (values (store (discarded content) "discard" (content-published content))
                     (draft-view space model content))))
