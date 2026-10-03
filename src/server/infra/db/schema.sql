@@ -1,13 +1,15 @@
-CREATE TABLE content_revisions (
+CREATE TABLE "content_revisions" (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  content_id TEXT NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
+  space TEXT NOT NULL,
+  content_id TEXT NOT NULL,
   event TEXT NOT NULL,
   data TEXT NOT NULL,
   written_by TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL);
-CREATE INDEX content_revisions_by_content ON content_revisions (content_id, id DESC);
-CREATE TABLE contents (
-  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (space, content_id) REFERENCES contents(space, id) ON DELETE CASCADE);
+CREATE INDEX content_revisions_by_content ON content_revisions (space, content_id, id DESC);
+CREATE TABLE "contents" (
+  id TEXT NOT NULL,
   space TEXT NOT NULL,
   model TEXT NOT NULL,
   status TEXT NOT NULL,
@@ -18,6 +20,7 @@ CREATE TABLE contents (
   updated_at TEXT NOT NULL,
   published_at TEXT,
   revised_at TEXT,
+  PRIMARY KEY (space, id),
   FOREIGN KEY (space, model) REFERENCES models(space, name) ON DELETE CASCADE);
 CREATE INDEX contents_by_model ON contents (space, model, status, published_at);
 CREATE TABLE "delivery_keys" (

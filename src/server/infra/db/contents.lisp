@@ -29,8 +29,8 @@
 
 (defun json-column (value) (and value (to-json value)))
 
-(defmethod get-content (id)
-  (let ((row (fetch-one "SELECT * FROM contents WHERE id = ?" id)))
+(defmethod get-content (space id)
+  (let ((row (fetch-one "SELECT * FROM contents WHERE space = ? AND id = ?" space id)))
     (and row (row->content row))))
 
 (defmethod find-contents-by-ids (space model ids)
@@ -58,15 +58,15 @@
 
 (defmethod update-content (content)
   (exec "UPDATE contents SET status = ?, published = ?, draft = ?, draft_key = ?, updated_at = ?,
-           published_at = ?, revised_at = ? WHERE id = ?"
+           published_at = ?, revised_at = ? WHERE space = ? AND id = ?"
         (content-status content)
         (json-column (content-published content)) (json-column (content-draft content))
         (content-draft-key content) (content-updated-at content)
         (content-published-at content) (content-revised-at content)
-        (content-id content)))
+        (content-space content) (content-id content)))
 
-(defmethod delete-content (id)
-  (exec "DELETE FROM contents WHERE id = ?" id))
+(defmethod delete-content (space id)
+  (exec "DELETE FROM contents WHERE space = ? AND id = ?" space id))
 
 (defmethod contents-mentioning (space needle &key exclude-id)
   (mapcar #'row->content

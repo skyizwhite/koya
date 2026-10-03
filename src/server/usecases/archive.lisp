@@ -13,7 +13,7 @@
   (:import-from #:koya-server/usecases/ports/contents
                 #:space-contents #:insert-content #:content-history #:record-revision)
   (:import-from #:koya-server/domain/content
-                #:make-content #:content-id #:content-model #:content-published #:content-draft
+                #:make-content #:content-id #:content-space #:content-model #:content-published #:content-draft
                 #:content-draft-key #:content-created-at #:content-updated-at #:content-published-at
                 #:content-revised-at)
   (:import-from #:koya-server/domain/revision
@@ -78,7 +78,7 @@
            "updatedAt" (content-updated-at content)
            "publishedAt" (or-null (content-published-at content))
            "revisedAt" (or-null (content-revised-at content))
-           "revisions" (map 'vector #'revision->jobject (content-history (content-id content)))))
+           "revisions" (map 'vector #'revision->jobject (content-history (content-space content) (content-id content)))))
 
 (defun media-entry-name (id mime)
   (format nil "media/~a.~a" id (image-extension mime)))
@@ -273,7 +273,7 @@
              (loop :for (content revisions) :in contents
                    :do (insert-content content)
                        (dolist (r revisions)
-                         (record-revision (content-id content) (getf r :event) (getf r :data)
+                         (record-revision space (content-id content) (getf r :event) (getf r :data)
                                           :by (getf r :by) :created-at (getf r :created-at)))))
            (setf done t))
       (unless done

@@ -106,9 +106,10 @@
            (in-published (and published (rename-key published from to)))
            (in-draft (and draft (rename-key draft from to))))
       (when (or in-published in-draft)
-        (exec "UPDATE contents SET published = ?, draft = ? WHERE id = ?"
-              (and published (to-json published)) (and draft (to-json draft)) (col row "id")))))
-  (dolist (row (fetch "SELECT r.id, r.data FROM content_revisions r JOIN contents c ON c.id = r.content_id
+        (exec "UPDATE contents SET published = ?, draft = ? WHERE space = ? AND id = ?"
+              (and published (to-json published)) (and draft (to-json draft)) space (col row "id")))))
+  (dolist (row (fetch "SELECT r.id, r.data FROM content_revisions r
+                        JOIN contents c ON c.space = r.space AND c.id = r.content_id
                         WHERE c.space = ? AND c.model = ?"
                       space model))
     (let ((data (parse-json (col row "data"))))
@@ -121,8 +122,8 @@
            WHERE space = ? AND model = ?"
           path path space model)
     (exec "UPDATE content_revisions SET data = json_remove(data, ?)
-           WHERE content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
-          path space model)))
+           WHERE space = ? AND content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
+          path space space model)))
 
 (defun drop-model-contents (space model)
   (exec "DELETE FROM contents WHERE space = ? AND model = ?" space model))

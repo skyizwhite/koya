@@ -20,28 +20,29 @@
                  :by (col row "written_by")
                  :created-at (col row "created_at")))
 
-(defmethod record-revision (content-id event data &key (by "") created-at)
-  (exec "INSERT INTO content_revisions (content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?)"
-        content-id event (to-json data) (or by "") (or created-at (now-iso))))
+(defmethod record-revision (space content-id event data &key (by "") created-at)
+  (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+        space content-id event (to-json data) (or by "") (or created-at (now-iso))))
 
 (defun where (published-only)
-  (format nil "content_id = ?~:[~; AND event = 'publish'~]" published-only))
+  (format nil "space = ? AND content_id = ?~:[~; AND event = 'publish'~]" published-only))
 
-(defmethod list-revisions (content-id &key published-only (limit 20) (offset 0))
+(defmethod list-revisions (space content-id &key published-only (limit 20) (offset 0))
   (mapcar #'row->revision
           (fetch (format nil "SELECT * FROM content_revisions WHERE ~a ORDER BY id DESC LIMIT ? OFFSET ?"
                          (where published-only))
-                 content-id limit offset)))
+                 space content-id limit offset)))
 
-(defmethod count-revisions (content-id &key published-only)
+(defmethod count-revisions (space content-id &key published-only)
   (col (fetch-one (format nil "SELECT COUNT(*) AS n FROM content_revisions WHERE ~a" (where published-only))
-                  content-id)
+                  space content-id)
        "n"))
 
-(defmethod find-revision (content-id id)
-  (let ((row (fetch-one "SELECT * FROM content_revisions WHERE content_id = ? AND id = ?" content-id id)))
+(defmethod find-revision (space content-id id)
+  (let ((row (fetch-one "SELECT * FROM content_revisions WHERE space = ? AND content_id = ? AND id = ?"
+                        space content-id id)))
     (and row (row->revision row))))
 
-(defmethod content-history (content-id)
+(defmethod content-history (space content-id)
   (mapcar #'row->revision
-          (fetch "SELECT * FROM content_revisions WHERE content_id = ? ORDER BY id" content-id)))
+          (fetch "SELECT * FROM content_revisions WHERE space = ? AND content_id = ? ORDER BY id" space content-id)))

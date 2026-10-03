@@ -18,7 +18,7 @@
                 #:find-object-content #:unique-value-taken-p #:get-content #:find-content
                 #:contents-mentioning)
   (:import-from #:koya-server/domain/content
-                #:content-id #:content-published #:content-draft #:content-draft-key #:content-data
+                #:content-id #:content-space #:content-published #:content-draft #:content-draft-key #:content-data
                 #:merge-data #:same-data-p #:fill-defaults #:fill-slugs #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition)
   (:import-from #:koya-server/usecases/delivery #:deliver)
@@ -64,11 +64,11 @@
 (defun check-published-at (value)
   (check-timestamp "publishedAt" value))
 
-(defun check-new-id (id)
+(defun check-new-id (space id)
   (cond ((null id) nil)
         ((not (content-id-p id)) (fail 'invalid-input "\"id\" must be 1-64 letters, digits, '-' or '_'"))
         ((string= id "new") (fail 'invalid-input "\"id\" cannot be \"new\""))
-        ((get-content id) (fail 'conflict (format nil "Content ~a already exists" id)))
+        ((get-content space id) (fail 'conflict (format nil "Content ~a already exists" id)))
         (t id)))
 
 (defun published-view (space model content)
@@ -86,7 +86,7 @@
 
 (defun store (content event data)
   (update-content content)
-  (record-revision (content-id content) event data :by *actor*)
+  (record-revision (content-space content) (content-id content) event data :by *actor*)
   content)
 
 (defun create (space model data &key publish id created-at updated-at published-at revised-at)
@@ -104,12 +104,12 @@
                 (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
                       :code "object_exists"))
               (check-content space-name model data)
-              (let ((content (new-content (or (check-new-id id) (make-ulid)) space-name model-name data
+              (let ((content (new-content (or (check-new-id space-name id) (make-ulid)) space-name model-name data
                                           :publish publish
                                           :created-at created-at :updated-at updated-at
                                           :published-at published-at :revised-at revised-at)))
                 (insert-content content)
-                (record-revision (content-id content) (if publish "publish" "draft") data :by *actor*)
+                (record-revision space-name (content-id content) (if publish "publish" "draft") data :by *actor*)
                 content))))
       (if publish
           (notify space model (content-id content) :publish :new (published-view space model content))
@@ -196,7 +196,7 @@
             (check-unreferenced space-name model-name (content-id content) "delete")
             (let ((live (published-view space model content))
                   (draft (draft-view space model content)))
-              (delete-content id)
+              (delete-content space-name id)
               (values live draft))))
       (if live
           (notify space model id :delete :old live)

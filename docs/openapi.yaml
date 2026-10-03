@@ -264,7 +264,8 @@ paths:
       summary: Create a content
       description: |
         Saved as a draft unless `publish` is true. `id` and the system timestamps
-        may be supplied, for imports that keep another system's ids and dates;
+        may be supplied, for imports that keep another system's ids and dates; an
+        id need only be unique within the space;
         a timestamp needs a date, a time and an offset or `Z`, and is stored in
         UTC with milliseconds.
         `publishedAt` and `revisedAt` are only stored when publishing. An
@@ -287,7 +288,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: "`conflict`: a content with this `id` already exists; `object_exists`: the `object` model already has its content"
+          description: "`conflict`: a content with this `id` already exists in the space; `object_exists`: the `object` model already has its content"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }

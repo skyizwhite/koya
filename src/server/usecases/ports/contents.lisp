@@ -19,7 +19,7 @@
            #:content-history))
 (in-package #:koya-server/usecases/ports/contents)
 
-(defgeneric get-content (id))
+(defgeneric get-content (space id))
 
 (defgeneric find-content (space model id))
 
@@ -37,18 +37,18 @@
 
 (defgeneric update-content (content))
 
-(defgeneric delete-content (id))
+(defgeneric delete-content (space id))
 
 (defgeneric unique-value-taken-p (space model field value &key exclude-id))
 
 (defgeneric contents-mentioning (space needle &key exclude-id))
 
-(defgeneric record-revision (content-id event data &key by created-at))
+(defgeneric record-revision (space content-id event data &key by created-at))
 
-(defgeneric list-revisions (content-id &key published-only limit offset))
+(defgeneric list-revisions (space content-id &key published-only limit offset))
 
-(defgeneric count-revisions (content-id &key published-only))
+(defgeneric count-revisions (space content-id &key published-only))
 
-(defgeneric find-revision (content-id id))
+(defgeneric find-revision (space content-id id))
 
-(defgeneric content-history (content-id))
+(defgeneric content-history (space content-id))

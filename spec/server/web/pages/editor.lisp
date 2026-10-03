@@ -188,14 +188,14 @@
     (testing "an untouched field comes back as it was, less the CRLF of the form"
       (edit path :form `(("action" . "save") ("f-title" . "Renamed")
                                   ("f-body" . ,(format nil "<h2 id=\"intro\">Intro</h2><p>a</p>~c~%<p>b</p>" #\Return))))
-      (ok (string= (jget (content-draft (get-content id)) "body") html)))
+      (ok (string= (jget (content-draft (get-content "website" id)) "body") html)))
     (testing "the whitespace around it is kept too"
       (let ((spaced (format nil "~%<p>a</p>~%")))
         (edit path :form `(("action" . "save") ("f-title" . "Renamed") ("f-body" . ,spaced)))
-        (ok (string= (jget (content-draft (get-content id)) "body") spaced))))
+        (ok (string= (jget (content-draft (get-content "website" id)) "body") spaced))))
     (testing "an edited one is stored as the editor wrote it"
       (edit path :form '(("action" . "save") ("f-title" . "Renamed") ("f-body" . "<p>c</p><p>d</p>")))
-      (ok (string= (jget (content-draft (get-content id)) "body") "<p>c</p><p>d</p>")))))
+      (ok (string= (jget (content-draft (get-content "website" id)) "body") "<p>c</p><p>d</p>")))))
 
 (deftest slugify-test
   (ok (string= (slugify "Hello, World!") "hello-world"))
@@ -222,8 +222,8 @@
          (url (format nil "/s/website/m/blog/~a" id)))
     (edit url  :form (cons '("action" . "publish") first))
     (edit url  :form '(("action" . "save") ("f-title" . "Second") ("f-category" . "tech")))
-    (ok (equal (mapcar #'revision-event (list-revisions id)) '("draft" "publish" "draft")))
-    (ok (string= (revision-by (first (list-revisions id))) "owner") "the editor writes as the owner")
+    (ok (equal (mapcar #'revision-event (list-revisions "website" id)) '("draft" "publish" "draft")))
+    (ok (string= (revision-by (first (list-revisions "website" id))) "owner") "the editor writes as the owner")
     (testing "the editor links to the history"
       (multiple-value-bind (status body) (request :get url)
         (ok (= status 200))
@@ -234,7 +234,7 @@
         (ok (search "All changes (3)" body))
         (ok (search "Published (1)" body))
         (ok (search "Draft saved" body))
-        (let ((ids (mapcar #'revision-id (list-revisions id))))
+        (let ((ids (mapcar #'revision-id (list-revisions "website" id))))
           (ok (< (search (format nil "revision=~a\"" (first ids)) body)
                  (search (format nil "revision=~a\"" (car (last ids))) body))
               "newest first"))
@@ -255,8 +255,8 @@
         (ng (search "Draft saved" body))
         (ok (search "Published" body))))
 
-    (update-content (unpublished (get-content unpublished)))
-    (delete-content deleted)
+    (update-content (unpublished (get-content "website" unpublished)))
+    (delete-content "website" deleted)
     (delete-media "website" media)
     (replace-schema "website"
                  (make-schema :models (list (make-model "blog" :list
@@ -270,8 +270,8 @@
                                                         :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
                                                         :public-url "https://site.test/blog/{CONTENT_ID}")
                                             (make-model "about" :object (list (make-field :body :richtext))))))
-    (let* ((published (find "publish" (list-revisions id) :key #'revision-event :test #'string=))
-           (before (count-revisions id)))
+    (let* ((published (find "publish" (list-revisions "website" id) :key #'revision-event :test #'string=))
+           (before (count-revisions "website" id)))
       (testing "a restore fills the editor with what can come back, and says what cannot"
         (multiple-value-bind (status body)
             (request :get url :query (format nil "revision=~a" (revision-id published)))
@@ -290,14 +290,14 @@
           (ng (search media body) "the media that is gone is not in the form")
           (ng (search "NIL" body))))
       (testing "and writes nothing until it is saved"
-        (ok (= (count-revisions id) before))
-        (ok (string= (jget (content-draft (get-content id)) "title") "Second")))
+        (ok (= (count-revisions "website" id) before))
+        (ok (string= (jget (content-draft (get-content "website" id)) "title") "Second")))
       (testing "saving it is an ordinary draft save"
         (edit url  :form `(("action" . "save") ("f-title" . "First") ("f-slug" . "first")
                                    ("f-category" . "tech") ("f-related" . ,kept)))
-        (ok (= (count-revisions id) (1+ before)))
-        (ok (string= (jget (content-draft (get-content id)) "title") "First"))
-        (ok (string= (content-status (get-content id)) "published+draft") "what is live is untouched")))
+        (ok (= (count-revisions "website" id) (1+ before)))
+        (ok (string= (jget (content-draft (get-content "website" id)) "title") "First"))
+        (ok (string= (content-status (get-content "website" id)) "published+draft") "what is live is untouched")))
     (testing "a revision this content does not have"
       (multiple-value-bind (status body) (request :get url :query "revision=999999")
         (ok (= status 200))
@@ -305,7 +305,7 @@
         (ng (search "Restoring the version of" body))))
     (testing "a deleted content has no history left"
       (edit url  :form '(("action" . "delete")))
-      (ok (= (count-revisions id) 0))
+      (ok (= (count-revisions "website" id) 0))
       (ok (= (request :get (format nil "~a/history" url)) 404))))
   (replace-schema "website"
                (make-schema :models (list (blog-model)
@@ -351,7 +351,7 @@
         (ng (search "id=\"editor\"" body) "the editor stays as it is")
         (ok (null (moved-to body)) "and on this content, not the list")
         (ok (search "referenced by 1 other content" body) "the toast says why")
-        (ok (get-content target) "it is still there")))))
+        (ok (get-content "website" target) "it is still there")))))
 
 (deftest the-editor-asks-before-it-acts
   (exec "DELETE FROM contents")
@@ -402,23 +402,23 @@
             "the form tells it of every change")
         (ok (search "disabled: () => _unchanged()" body))))
     (testing "saving what is published already writes nothing"
-      (let ((before (count-revisions id)))
+      (let ((before (count-revisions "website" id)))
         (multiple-value-bind (status body) (edit path :form (cons '("action" . "save") form))
           (ok (= status 200))
           (ok (search "Nothing to save." body)))
-        (ok (= (count-revisions id) before) "no revision")
-        (ok (string= (content-status (get-content id)) "published") "and no draft")))
+        (ok (= (count-revisions "website" id) before) "no revision")
+        (ok (string= (content-status (get-content "website" id)) "published") "and no draft")))
     (testing "a draft taken back to the published data is dropped, and the history says so"
       (edit path :form '(("action" . "save") ("f-title" . "Changed") ("f-slug" . "live")))
-      (ok (string= (content-status (get-content id)) "published+draft"))
+      (ok (string= (content-status (get-content "website" id)) "published+draft"))
       (multiple-value-bind (status body) (edit path :form (cons '("action" . "save") form))
         (ok (= status 200))
         (ok (search "Back to the published version" body)))
-      (ok (string= (content-status (get-content id)) "published") "the draft is gone")
-      (ok (string= (revision-event (first (list-revisions id))) "discard")
+      (ok (string= (content-status (get-content "website" id)) "published") "the draft is gone")
+      (ok (string= (revision-event (first (list-revisions "website" id))) "discard")
           "and it went as a discard, which has something to show"))
     (testing "a restore is marked unsaved"
-      (let ((revision (revision-id (car (last (list-revisions id))))))
+      (let ((revision (revision-id (car (last (list-revisions "website" id))))))
         (ok (search "koya.editor(this, true)" (nth-value 1 (request :get path :query (format nil "revision=~a" revision)))))))))
 
 (deftest an-unknown-editor-action-is-refused
@@ -428,8 +428,8 @@
            (path (format nil "/s/website/m/blog/~a" id)))
       (ok (= 404 (edit path :form '(("action" . "foo") ("title" . "Changed"))))
           "an op the editor does not know answers 404")
-      (ok (string= (jget (content-draft (get-content id)) "title") "Kept") "and saves nothing")
-      (ok (= 1 (count-revisions id)) "nor records anything")
+      (ok (string= (jget (content-draft (get-content "website" id)) "title") "Kept") "and saves nothing")
+      (ok (= 1 (count-revisions "website" id)) "nor records anything")
       (ok (= 404 (edit "/s/website/m/blog/new" :form '(("action" . "foo") ("title" . "Made"))))
           "on the new-content form too")
       (ok (= 1 (count-contents "website" "blog")) "which creates nothing"))))

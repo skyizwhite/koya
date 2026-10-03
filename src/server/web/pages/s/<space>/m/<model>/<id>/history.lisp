@@ -136,15 +136,15 @@
                        (if active "border-accent font-medium text-fg" "border-transparent text-muted hover:text-fg"))
           children)))
 
-(defun page-count (id published-only)
-  (last-page (count-revisions id :published-only published-only)))
+(defun page-count (space id published-only)
+  (last-page (count-revisions space id :published-only published-only)))
 
 (defcomp ~revisions (&key space model content published-only page)
   (let* ((model-name (model-name model))
          (id (content-id content))
-         (pages (page-count id published-only))
+         (pages (page-count space id published-only))
          (page (min page pages))
-         (rows (list-revisions id :published-only published-only
+         (rows (list-revisions space id :published-only published-only
                                   :limit (1+ +page-size+) :offset (page-offset page)))
          (items (subseq rows 0 (min +page-size+ (length rows))))
          (view (if published-only "published" "")))
@@ -154,12 +154,12 @@
          (~tab :href (history-url space model-name id)
                :browse (browse-history :space space :model model-name :id id :view "" :page 1)
                :active (not published-only)
-               (format nil "All changes (~a)" (count-revisions id)))
+               (format nil "All changes (~a)" (count-revisions space id)))
          (span :class "text-sm text-muted" :aria-hidden "true" "/")
          (~tab :href (history-url space model-name id :published-only t)
                :browse (browse-history :space space :model model-name :id id :view "published" :page 1)
                :active published-only
-               (format nil "Published (~a)" (count-revisions id :published-only t))))
+               (format nil "Published (~a)" (count-revisions space id :published-only t))))
        (if (null items)
            (hsx (~empty-state (if published-only "This content has never been published." "No history yet.")))
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
@@ -193,7 +193,7 @@
     (cond ((null content) (action-refusal "Content not found." 404))
           (t
            (let* ((published-only (equal (param params "view") "published"))
-                  (page (min (page-number params) (page-count (content-id content) published-only))))
+                  (page (min (page-number params) (page-count space (content-id content) published-only))))
              (hsx (<> (~revisions :space space :model model :content content
                                   :published-only published-only :page page)
                       (~replace-url :url (history-url space (model-name model) (content-id content)

@@ -162,7 +162,45 @@
                  WHERE e.key IN (SELECT json_extract(f.value, '$.name')
                                    FROM contents c, models m, json_each(m.definition, '$.fields') f
                                   WHERE c.id = content_revisions.content_id
-                                    AND m.space = c.space AND m.name = c.model))")))
+                                    AND m.space = c.space AND m.name = c.model))")
+    (13
+     :foreign-keys-off
+     "CREATE TABLE contents_by_space (
+        id TEXT NOT NULL,
+        space TEXT NOT NULL,
+        model TEXT NOT NULL,
+        status TEXT NOT NULL,
+        published TEXT,
+        draft TEXT,
+        draft_key TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        published_at TEXT,
+        revised_at TEXT,
+        PRIMARY KEY (space, id),
+        FOREIGN KEY (space, model) REFERENCES models(space, name) ON DELETE CASCADE)"
+     "INSERT INTO contents_by_space (id, space, model, status, published, draft, draft_key,
+                                     created_at, updated_at, published_at, revised_at)
+        SELECT id, space, model, status, published, draft, draft_key,
+               created_at, updated_at, published_at, revised_at FROM contents"
+     "CREATE TABLE content_revisions_by_space (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        space TEXT NOT NULL,
+        content_id TEXT NOT NULL,
+        event TEXT NOT NULL,
+        data TEXT NOT NULL,
+        written_by TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (space, content_id) REFERENCES contents(space, id) ON DELETE CASCADE)"
+     "INSERT INTO content_revisions_by_space (id, space, content_id, event, data, written_by, created_at)
+        SELECT r.id, c.space, r.content_id, r.event, r.data, r.written_by, r.created_at
+          FROM content_revisions r JOIN contents c ON c.id = r.content_id"
+     "DROP TABLE content_revisions"
+     "DROP TABLE contents"
+     "ALTER TABLE contents_by_space RENAME TO contents"
+     "ALTER TABLE content_revisions_by_space RENAME TO content_revisions"
+     "CREATE INDEX contents_by_model ON contents (space, model, status, published_at)"
+     "CREATE INDEX content_revisions_by_content ON content_revisions (space, content_id, id DESC)")))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))
@@ -171,12 +209,23 @@
   (ensure-version-table)
   (or (col (fetch-one "SELECT MAX(version) AS version FROM schema_version") "version") 0))
 
+(defun apply-migration (version statements &key check-keys)
+  (with-db-transaction
+    (dolist (sql statements) (exec sql))
+    (when (and check-keys (fetch "PRAGMA foreign_key_check"))
+      (error "Migration ~a leaves rows whose foreign keys point nowhere" version))
+    (exec "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)" version (now-iso))))
+
 (defun migrate ()
   (let ((applied '()))
     (loop :for (version . statements) :in *migrations*
+          :for keys-off := (eq (first statements) :foreign-keys-off)
           :when (> version (current-version))
-            :do (with-db-transaction
-                  (dolist (sql statements) (exec sql))
-                  (exec "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)" version (now-iso)))
+            :do (if keys-off
+                    (progn
+                      (exec "PRAGMA foreign_keys = OFF")
+                      (unwind-protect (apply-migration version (rest statements) :check-keys t)
+                        (exec "PRAGMA foreign_keys = ON")))
+                    (apply-migration version statements))
                 (push version applied))
     (nreverse applied)))
