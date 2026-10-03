@@ -31,6 +31,7 @@
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
+  (setf (uiop:getenv "KOYA_BASE_URL") (format nil "http://127.0.0.1:~a" *port*))
   (setf *webhook-async* nil)
   (setf *webhook-sender* (lambda (url payload headers) (declare (ignore url payload headers))))
   (start :server :woo :port *port* :db ":memory:")

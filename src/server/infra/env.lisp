@@ -4,7 +4,11 @@
                 #:load-env)
   (:import-from #:koya-server/usecases/ports/config
                 #:public-url #:owner-secret #:dev-mode-p)
+  (:import-from #:quri #:uri #:uri-scheme #:uri-host)
   (:export #:env
+           #:setting-error
+           #:setting-error-problems
+           #:check-settings
            #:koya-env
            #:db-path
            #:media-dir
@@ -28,5 +32,29 @@
 (defun archive-dir ()
   (merge-pathnames "archives/" (uiop:pathname-directory-pathname (db-path))))
 (defun server-port () (parse-integer (env "KOYA_PORT" "3100")))
-(defmethod public-url ()
-  (env "KOYA_BASE_URL" (format nil "http://localhost:~a" (server-port))))
+(defmethod public-url () (env "KOYA_BASE_URL"))
+
+(define-condition setting-error (error)
+  ((problems :initarg :problems :reader setting-error-problems))
+  (:report (lambda (condition stream)
+             (format stream "~{~a~^~%~}" (setting-error-problems condition)))))
+
+(defun port-problem ()
+  (let* ((value (env "KOYA_PORT" "3100"))
+         (port (parse-integer value :junk-allowed t)))
+    (unless (and port (= (length (princ-to-string port)) (length value)) (<= 1 port 65535))
+      (format nil "KOYA_PORT must be a port number from 1 to 65535, not ~s" value))))
+
+(defun base-url-problem ()
+  (let ((value (env "KOYA_BASE_URL")))
+    (cond ((null value)
+           "KOYA_BASE_URL is not set: give the URL the server is reached at, such as https://cms.example.com")
+          ((not (let ((uri (ignore-errors (uri value))))
+                  (and uri (member (uri-scheme uri) '("http" "https") :test #'equal)
+                       (plusp (length (or (uri-host uri) ""))))))
+           (format nil "KOYA_BASE_URL must be an http or https URL, not ~s" value)))))
+
+(defun check-settings ()
+  (let ((problems (remove nil (list (base-url-problem) (port-problem)))))
+    (when problems
+      (error 'setting-error :problems problems))))

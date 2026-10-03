@@ -250,7 +250,10 @@ through files one media file at a time.
 
 Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
 `KOYA_PORT` and `KOYA_ENV`. A `KOYA_SECRET` under 32 characters turns logging in
-off, and the server says so when it starts. `GET /health` is answered ahead of
+off, and the server says so when it starts. A missing or malformed
+`KOYA_BASE_URL`, or a `KOYA_PORT` that is not a port number, stops it before it
+starts: `main` exits 1 with a line naming each, and `start` signals
+`setting-error`. `GET /health` is answered ahead of
 everything else, so it opens no session and leaves no line in the access log: it
 reads a table and answers `{"status": "ok"}`, or 503 `unavailable` when the
 database cannot be read.

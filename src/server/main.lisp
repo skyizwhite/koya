@@ -4,7 +4,8 @@
   (:import-from #:clack)
   (:import-from #:ironclad)
   (:import-from #:koya-server/infra/main
-                #:db-path #:server-port #:open-store #:close-store #:write-snapshot)
+                #:db-path #:server-port #:open-store #:close-store #:write-snapshot
+                #:check-settings #:setting-error #:setting-error-problems)
   (:import-from #:koya-server/web/app #:app #:*app* #:install-routes)
   (:import-from #:koya-server/web/lib/assets #:refresh-asset-version)
   (:import-from #:koya-server/domain/totp #:totp)
@@ -31,13 +32,15 @@
     (format t "~&[koya] KOYA_SECRET is shorter than ~a characters: logging in is off until it is replaced~%"
             +min-secret-length+)))
 
-(defun start (&key (server :hunchentoot) (address "127.0.0.1") (port (server-port)) (db (db-path)))
+(defun start (&key (server :hunchentoot) (address "127.0.0.1") port (db (db-path)))
   (when *server*
     (restart-case (error "Server is already running.")
       (restart-server () :report "Restart the server" (stop))))
+  (check-settings)
   (open-store db)
   (warn-about-a-short-secret)
-  (setf *server* (clack:clackup (app) :server server :address address :port port :debug (dev-mode-p)))
+  (setf *server* (clack:clackup (app) :server server :address address :port (or port (server-port))
+                                      :debug (dev-mode-p)))
   *server*)
 
 (defun stop ()
@@ -56,6 +59,10 @@
   (start))
 
 (defun main ()
+  (handler-case (check-settings)
+    (setting-error (e)
+      (format *error-output* "~{[koya] ~a~%~}" (setting-error-problems e))
+      (uiop:quit 1)))
   (open-store (db-path))
   (warn-about-a-short-secret)
   (clack:clackup (app) :server :woo :address "0.0.0.0" :port (server-port) :debug nil :use-thread nil)
