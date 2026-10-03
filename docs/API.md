@@ -259,6 +259,7 @@ its `only` names — and the payload says which:
 | `draft` | a draft is saved or created | the published data or `null` / the draft |
 | `discard` | a draft is discarded, or saved back to the published data | the draft / the published data |
 | `discard` | a content that is only a draft is deleted | the draft / `null` |
+| `deploy` | a deploy changes what the delivery API serves of a model | `null` / `null` |
 
 Each entry a content's history keeps is sent as its kind. Deleting a content
 is sent as what it changes: `delete` when it was published, `discard` when it
@@ -266,6 +267,25 @@ was only a draft. A write that changes nothing sends nothing, and neither does
 importing a space. The bodies have the delivery API's shape. `draft` and
 `discard` change only a draft; the others change what the delivery API serves.
 What to act on is up to the receiver.
+
+A deploy is sent once for every model it changes the delivery API's answers of:
+one renamed, removed or turned from `list` to `object` or back, or one with a
+field renamed, removed or given another type. `id` is `null`, and `changes`
+lists that model's changes in the shape of a plan (see
+[SCHEMA.md](SCHEMA.md#changes)). A removed model is sent to the
+webhooks that covered it. A deploy that only adds, or changes options, sends
+nothing, and neither does a plan:
+
+```json
+{
+  "space": "website",
+  "model": "blog",
+  "id": null,
+  "event": "deploy",
+  "contents": { "old": null, "new": null },
+  "changes": [{ "op": "remove_field", "path": "blog.summary", "destructive": true, "description": "! - blog.summary (text)" }]
+}
+```
 
 Every call carries the space's webhook secret, from its **Keys** page, in
 `X-KOYA-WEBHOOK-KEY`; check it before acting:

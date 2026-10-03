@@ -116,10 +116,11 @@
      (div :class "space-y-2 border-t border-line bg-base/50 px-4 py-3 text-sm"
        (~field :label "event" (delivery-event delivery))
        (~field :label "POST" (code :class "text-xs" (delivery-url delivery)))
-       (~field :label "content"
-         (a :href (content-url space (delivery-model delivery) (delivery-content-id delivery))
-            :class "hover:underline"
-            (code :class "text-xs" (delivery-content-id delivery))))
+       (when (plusp (length (delivery-content-id delivery)))
+         (hsx (~field :label "content"
+                (a :href (content-url space (delivery-model delivery) (delivery-content-id delivery))
+                   :class "hover:underline"
+                   (code :class "text-xs" (delivery-content-id delivery))))))
        (~field :label "took"
          (if (delivery-duration-ms delivery)
              (hsx (format nil "~a ms" (delivery-duration-ms delivery)))

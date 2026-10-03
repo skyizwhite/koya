@@ -12,7 +12,8 @@
                 #:delivery-ok #:delivery-status #:delivery-response #:delivery-error
                 #:delivery-event #:delivery-model #:delivery-label #:delivery-url
                 #:delivery-content-id #:delivery-duration-ms)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema-models)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema-models
+                #:schema->jobject)
   (:import-from #:koya-core/json #:jobject #:jget #:json-null #:parse-json))
 (in-package #:koya-spec/server/usecases/webhooks)
 
@@ -231,3 +232,52 @@
     (ok (equal (mapcar #'first (reverse inside)) '("draft" "publish" "unpublish" "publish" "delete")))
     (ok (notany #'second inside) "none of them from inside the transaction that made the change"))
   (replace-schema "website" (test-schema)))
+
+(deftest a-deploy-that-changes-what-is-served-is-sent-as-deploy
+  (let ((hooks (list (make-webhook "hook" "https://example.com/hook")
+                     (make-webhook "preview" "https://example.com/preview" :only '(blog))))
+        (*webhook-sender* (lambda (url payload headers)
+                            (declare (ignore headers))
+                            (push (list url (parse-json payload)) *webhooks*)
+                            (values 200 "" nil))))
+    (replace-schema "website" (make-schema :webhooks hooks :models (schema-models (test-schema))))
+    (setf *webhooks* '())
+    (unwind-protect
+         (let ((deployed (make-schema :webhooks hooks
+                                      :models (list (make-model "blog" :list
+                                                                (list (make-field :title :text :required t :unique t)
+                                                                      (make-field :content :richtext :was :body)
+                                                                      (make-field :featured :boolean :default t)))
+                                                    (make-model "about" :object (list (make-field :body :richtext)))))))
+           (ok (= 200 (admin :put "/admin/api/schema/website" :body (schema->jobject deployed) :query "force=true")))
+           (flet ((sent (model) (remove-if-not (lambda (w) (equal (jget (second w) "model") model)) (reverse *webhooks*)))
+                  (ops (w) (sort (map 'list (lambda (c) (jget c "op")) (jget (second w) "changes")) #'string<)))
+             (ok (equal (mapcar #'first (sent "blog")) '("https://example.com/hook" "https://example.com/preview"))
+                 "each model it changed is sent once to every hook that covers it")
+             (ok (equal (mapcar #'first (sent "tag")) '("https://example.com/hook"))
+                 "a removed model too, to the hooks that covered it")
+             (ok (null (sent "about")) "and a model it left as it was is not")
+             (let ((payload (second (first (sent "blog")))))
+               (ok (string= (jget payload "event") "deploy"))
+               (ok (eq (jget payload "id") json-null) "no one content is meant")
+               (ok (eq (jget payload "contents" "old") json-null))
+               (ok (eq (jget payload "contents" "new") json-null)))
+             (ok (equal (ops (first (sent "blog"))) '("remove_field" "remove_field" "rename_field"))
+                 "with what changed in that model")
+             (ok (equal (ops (first (sent "tag"))) '("remove_model")))
+             (ok (equal (mapcar #'delivery-event (list-deliveries "website")) '("deploy" "deploy" "deploy"))
+                 "and each call is in the delivery log")
+             (ok (every (lambda (d) (equal (delivery-content-id d) "")) (list-deliveries "website"))))
+           (testing "a deploy that changes nothing served sends nothing"
+             (setf *webhooks* '())
+             (let ((more (make-schema :webhooks hooks
+                                      :models (list (make-model "blog" :list
+                                                                (list (make-field :title :text :required t :unique t)
+                                                                      (make-field :content :richtext)
+                                                                      (make-field :featured :boolean :default t)
+                                                                      (make-field :lede :text)))
+                                                    (make-model "about" :object (list (make-field :body :richtext)))))))
+               (ok (= 200 (admin :post "/admin/api/schema/website/plan" :body (schema->jobject more))))
+               (ok (= 200 (admin :put "/admin/api/schema/website" :body (schema->jobject more))))
+               (ok (null *webhooks*) "neither a plan nor a field added"))))
+      (replace-schema "website" (test-schema)))))

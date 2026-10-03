@@ -79,13 +79,16 @@
     (absolutize-richtext object (delivered-model delivered))
     (select-fields object fields)))
 
-(defmethod webhook-payload (space model id event old new)
-  (to-json (jobject "space" space
-                    "model" model
-                    "id" id
-                    "event" (string-downcase (symbol-name event))
-                    "contents" (jobject "old" (if old (delivered->jobject old) json-null)
-                                        "new" (if new (delivered->jobject new) json-null)))))
+(defmethod webhook-payload (space model id event old new &key changes)
+  (let ((payload (jobject "space" space
+                          "model" model
+                          "id" (or id json-null)
+                          "event" (string-downcase (symbol-name event))
+                          "contents" (jobject "old" (if old (delivered->jobject old) json-null)
+                                              "new" (if new (delivered->jobject new) json-null)))))
+    (when changes
+      (setf (gethash "changes" payload) (changes->jarray changes)))
+    (to-json payload)))
 
 (defun copy-object (object)
   (let ((out (make-hash-table :test 'equal)))

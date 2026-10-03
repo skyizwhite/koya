@@ -20,7 +20,7 @@
            #:+deliveries-kept+))
 (in-package #:koya-server/usecases/webhooks)
 
-(defparameter +events+ '(:publish :unpublish :delete :draft :discard))
+(defparameter +events+ '(:publish :unpublish :delete :draft :discard :deploy))
 
 (defun webhooks-for (space-name model)
   (let ((name (model-name model)))
@@ -69,7 +69,7 @@
                          :url (webhook-url hook)
                          :model model
                          :event event
-                         :content-id id
+                         :content-id (or id "")
                          :ok (and (null failure) (ok-status-p status))
                          :status (and (integerp status) status)
                          :response body
@@ -77,14 +77,14 @@
                          :duration-ms (elapsed-ms start))
       (error (e) (format *error-output* "~&[koya] webhook log failed: ~a~%" e)))))
 
-(defun notify-webhooks (space-name model id event &key old new (async *webhook-async*) secret)
+(defun notify-webhooks (space-name model id event &key old new changes (async *webhook-async*) secret)
   (assert (member event +events+))
   (let ((hooks (webhooks-for space-name model))
         (headers (and secret (list (cons "X-KOYA-WEBHOOK-KEY" secret)))))
     (when hooks
       (let* ((model-name (model-name model))
              (event-name (string-downcase (symbol-name event)))
-             (payload (webhook-payload space-name model-name id event old new)))
+             (payload (webhook-payload space-name model-name id event old new :changes changes)))
         (flet ((send ()
                  (dolist (hook hooks)
                    (send-and-log hook space-name model-name id event-name payload headers))))
