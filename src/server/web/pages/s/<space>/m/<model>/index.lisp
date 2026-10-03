@@ -31,6 +31,7 @@
   (:import-from #:koya-server/domain/media #:media-alt)
   (:import-from #:koya-server/usecases/schema #:find-model)
   (:import-from #:koya-server/usecases/webhooks #:space-webhooks)
+  (:import-from #:koya-server/web/ui/content/editor #:show-editor)
   (:export #:@get #:bulk-contents #:browse-contents))
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/index)
 
@@ -302,8 +303,7 @@
          (model (and (find-space space) (find-model space model-name))))
     (cond ((null model) (hsx (~missing :what "Model" :space (find-space space))))
           ((eq (model-kind model) :object)
-           (let ((content (find-object-content space model-name)))
-             (redirect-to (content-url space model-name (if content (content-id content) "new")) 302)))
+           (show-editor params space model (find-object-content space model-name)))
           (t
            (set-title (format nil "~a · ~a · koya" model-name space))
            (let ((state (read-state params model)))

@@ -146,6 +146,8 @@ A content is its fields plus the system fields:
 The admin API sees drafts as well, and returns contents in their stored shape:
 both versions, with references and media as ids.
 
+A list model's contents are reached through their ids:
+
 ```
 GET    /admin/api/contents/{space}/{model}                   every content, drafts included
 POST   /admin/api/contents/{space}/{model}                   create (a draft, unless "publish": true)
@@ -157,6 +159,25 @@ POST   /admin/api/contents/{space}/{model}/{id}/unpublish
 POST   /admin/api/contents/{space}/{model}/{id}/discard-draft
 POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a preview URL
 ```
+
+An object model's one content is part of the model, and is reached through the
+model:
+
+```
+GET    /admin/api/contents/{space}/{model}                   its content
+POST   /admin/api/contents/{space}/{model}                   create it (a draft, unless "publish": true)
+PATCH  /admin/api/contents/{space}/{model}                   save a draft
+POST   /admin/api/contents/{space}/{model}/publish
+POST   /admin/api/contents/{space}/{model}/unpublish
+POST   /admin/api/contents/{space}/{model}/discard-draft
+POST   /admin/api/contents/{space}/{model}/draft-key         the key for a preview URL
+```
+
+Until its first write it has no content, and `GET` is a `404`. The first `PATCH`,
+or a `publish` with `data`, makes it. It is never deleted: it goes when its model
+does. Its id does not reach it — the routes with `{id}` answer `404` for an object
+model — and a list model has none of the routes above that an object model has
+alone (`404`).
 
 ```json
 {
@@ -179,6 +200,8 @@ POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a previ
   | `published` | `published+draft` | `published` | `draft` | `no_draft` | gone |
   | `published+draft` | `published+draft` | `published` | `draft` | `published` | gone |
 
+  An object model's content has no delete.
+
 - Saving a draft (`PATCH`, `{"data": {…}}`) **merges** onto the current draft, or
   the published data when there is none: keys given replace, `null` removes a key.
   When the result is what the content holds already, nothing is written (no
@@ -190,7 +213,7 @@ POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a previ
   content of the same id. A timestamp needs a date, a time and an offset or
   `Z`, and is stored in UTC with milliseconds. An object model holds one content: once it has it,
   creating another is refused (`409 object_exists`), and that one is changed
-  through its id.
+  through the model.
 - A content another content refers to, in its published data or its draft,
   through a `reference` field of the current schema, cannot be deleted, nor
   unpublished while it is published (`409 in_use`, naming how many). Take the

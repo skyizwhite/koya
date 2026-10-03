@@ -4,9 +4,11 @@
   (:import-from #:cl-ppcre
                 #:regex-replace-all)
   (:import-from #:koya-server/web/lib/http #:blank-p)
+  (:import-from #:koya-core/schema #:model-kind #:model-name)
   (:export #:space-url
            #:model-url
            #:content-url
+           #:editor-url
            #:history-url
            #:deploys-url
            #:webhook-log-url
@@ -16,6 +18,11 @@
 (defun space-url (space) (format nil "/s/~a" space))
 (defun model-url (space model) (format nil "/s/~a/m/~a" space model))
 (defun content-url (space model id) (format nil "/s/~a/m/~a/~a" space model id))
+
+(defun editor-url (space model id)
+  (if (eq (model-kind model) :object)
+      (model-url space (model-name model))
+      (content-url space (model-name model) id)))
 
 (defun history-url (space model id &key published-only page)
   (render-uri (make-uri :path (format nil "~a/history" (content-url space model id))

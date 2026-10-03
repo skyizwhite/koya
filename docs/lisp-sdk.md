@@ -329,6 +329,18 @@ These use the management key and see drafts as well.
 (koya-sdk:draft-key 'blog "01J…")                     ; for a preview URL
 ```
 
+An `:object` model's content is reached through the model, with no id:
+
+```lisp
+(koya-sdk:get-object-content 'about)
+(koya-sdk:update-object 'about '(:body "<p>…</p>"))     ; save a draft; the first one makes the content
+(koya-sdk:publish-object 'about)
+(koya-sdk:publish-object 'about :data '(:body "…"))
+(koya-sdk:unpublish-object 'about)
+(koya-sdk:discard-object-draft 'about)
+(koya-sdk:object-draft-key 'about)
+```
+
 - `list-contents` returns `(:contents (…) :total-count n :offset n :limit n)` where
   each content is `(:id … :status … :published {…} :draft {…} :draft-key … :created-at …)`.
   `status` is `"draft"`, `"published"` or `"published+draft"`.
@@ -340,7 +352,9 @@ These use the management key and see drafts as well.
   and dates. Ids are 1–64 characters from `A-Za-z0-9_-`; without one a ULID is
   generated. A duplicate id is a 409.
 - An `:object` model holds one content: once it has it, `create-content` is
-  refused (`object_exists`), and that one is changed through its id.
+  refused (`object_exists`), and that one is changed through the model. The
+  functions that take an id answer 404 for it, and it has no delete: it goes
+  with its model.
 - Saving a draft issues a new draft key, so older preview links stop working.
 - What a content's `status` cannot do is refused with a 409 and changes nothing:
   `unpublish-content` needs a published content (`not_published`), and

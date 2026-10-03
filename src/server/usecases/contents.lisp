@@ -34,6 +34,9 @@
            #:discard
            #:destroy
            #:draft-key
+           #:object-content
+           #:save-object
+           #:publish-object
            #:resolve-content
            #:find-content
            #:bulk-action-p
@@ -194,6 +197,9 @@
       next)))
 
 (defun destroy (space model id)
+  (when (eq (model-kind model) :object)
+    (fail 'conflict (format nil "The content of ~a goes only with its model; unpublish it instead" (model-name model))
+          :code "object_stays"))
   (let ((space-name space)
         (model-name (model-name model)))
     (multiple-value-bind (live draft)
@@ -209,6 +215,22 @@
           (notify space model id :delete :old live)
           (notify space model id :discard :old draft))
       t)))
+
+(defun object-content (space model)
+  (or (find-object-content space (model-name model))
+      (fail 'not-found (format nil "~a has no content yet" (model-name model)))))
+
+(defun save-object (space model data &key replace since)
+  (let ((content (find-object-content space (model-name model))))
+    (if content
+        (update-draft space model (content-id content) data :replace replace :since since)
+        (create space model data))))
+
+(defun publish-object (space model &optional data &key published-at since)
+  (let ((content (find-object-content space (model-name model))))
+    (cond (content (publish space model (content-id content) data :published-at published-at :since since))
+          (data (create space model data :publish t :published-at published-at))
+          (t (object-content space model)))))
 
 (defun draft-key (space-name model-name id)
   (resolve-model space-name model-name)

@@ -130,9 +130,10 @@ opens the delivery log filtered to this model.
 ### Object models
 
 An `object` model holds exactly one content — an about page, the site's
-settings — so it has no list. Its link goes straight to that content's editor,
-or to a new one while it has none. The editor carries the **Webhooks** button
-the list would have, and **Delete** starts the content over.
+settings — so it has no list. The content is part of the model: the model's
+link opens its editor, empty until the first save, and the editor stays at the
+model's URL. It carries the **Webhooks** button the list would have, and has no
+**Delete**: the content goes only with its model.
 
 ### Finding one
 
@@ -215,7 +216,7 @@ with a link that opens the content again to see the change.
 
 At the bottom, the **Danger zone** holds **Unpublish** (takes the content off the
 delivery API, keeping its data as a draft) and **Delete** (removes it for good;
-for an object model it starts the single content over). Both ask first. A
+an object model's content has none). Both ask first. A
 content that another content refers to through a `reference` field — in its
 published data or its draft — can be neither: the page comes back saying how
 many refer to it. Take it out of those contents first.

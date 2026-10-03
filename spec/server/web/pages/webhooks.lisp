@@ -48,7 +48,7 @@
                                             :models (list (blog-model)
                                                           (make-model "about" :object (list (make-field :body :richtext)))))))
                (replace-schema "website" narrow)
-               (unwind-protect (request :get "/s/website/m/about/new")
+               (unwind-protect (request :get "/s/website/m/about")
                  (replace-schema "website" hooked)))
                (ok (= status 200))
                (ng (search "/s/website/webhooks?model=about" body))))
@@ -57,7 +57,7 @@
                (ok (= status 200))
                (ok (search "/s/website/webhooks?model=blog" body))))
            (testing "an object model has no list page, so its editor carries the link"
-             (multiple-value-bind (status body) (request :get "/s/website/m/about/new")
+             (multiple-value-bind (status body) (request :get "/s/website/m/about")
                (ok (= status 200))
                (ok (search "/s/website/webhooks?model=about" body))))
            (testing "the log shows the outcome and what came back"
@@ -116,7 +116,7 @@
     (multiple-value-bind (status body) (request :get "/s/website/m/blog")
       (ok (= status 200))
       (ng (search "/s/website/webhooks" body)))
-    (multiple-value-bind (status body) (request :get "/s/website/m/about/new")
+    (multiple-value-bind (status body) (request :get "/s/website/m/about")
       (ok (= status 200))
       (ng (search "/s/website/webhooks" body)))))
 

@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/usecases/contents
   (:use #:cl #:rove)
-  (:import-from #:koya-server/domain/errors #:conflict #:invalid-input)
+  (:import-from #:koya-server/domain/errors #:conflict #:invalid-input #:not-found #:koya-error-code)
   (:import-from #:koya-server/domain/key #:key-id #:key-label)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
@@ -13,7 +13,8 @@
                 #:find-object-content #:unique-value-taken-p #:list-revisions
                 #:count-revisions #:find-revision)
   (:import-from #:koya-server/usecases/contents
-                #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key)
+                #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key
+                #:object-content #:save-object #:publish-object)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -151,6 +152,36 @@
   (ng (find-object-content "website" "about"))
   (create "website" (find-model "website" "about") (data "{\"body\": \"hi\"}") :publish t)
   (ok (string= (jget (content-published (find-object-content "website" "about")) "body") "hi")))
+
+(deftest an-object-is-written-through-its-model
+  (let ((about (find-model "website" "about")))
+    (testing "before its first write it has no content to read"
+      (ok (signals (object-content "website" about) 'not-found)))
+    (testing "the first save makes its content, as a draft"
+      (let ((saved (save-object "website" about (data "{\"body\": \"draft\"}"))))
+        (ok (string= (content-status saved) "draft"))
+        (ok (string= (content-id saved) (content-id (object-content "website" about))))))
+    (testing "a later save merges onto that content"
+      (let ((id (content-id (object-content "website" about))))
+        (save-object "website" about (data "{}"))
+        (ok (string= (jget (content-draft (object-content "website" about)) "body") "draft"))
+        (ok (string= (content-id (object-content "website" about)) id) "and makes no second")))
+    (testing "publishing publishes the draft, or the data given"
+      (ok (string= (jget (content-published (publish-object "website" about)) "body") "draft"))
+      (ok (string= (jget (content-published (publish-object "website" about (data "{\"body\": \"given\"}"))) "body")
+                   "given"))))
+  (testing "a first write can publish at once"
+    (exec "DELETE FROM contents")
+    (let ((about (find-model "website" "about")))
+      (ok (signals (publish-object "website" about) 'not-found) "though not with no data at all")
+      (ok (string= (content-status (publish-object "website" about (data "{\"body\": \"live\"}"))) "published")))))
+
+(deftest an-object-content-is-not-deleted
+  (let* ((about (find-model "website" "about"))
+         (content (save-object "website" about (data "{\"body\": \"stays\"}")))
+         (e (handler-case (destroy "website" about (content-id content)) (conflict (e) e))))
+    (ok (string= (koya-error-code e) "object_stays") "it goes only with its model")
+    (ok (object-content "website" about))))
 
 (deftest uniqueness
   (let ((c (make "{\"title\": \"Taken\"}" :publish t)))

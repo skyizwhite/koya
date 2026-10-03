@@ -20,6 +20,8 @@
            #:get-list #:get-item #:get-object
            #:list-contents #:get-content #:create-content #:update-content
            #:publish-content #:unpublish-content #:discard-draft #:delete-content #:draft-key
+           #:get-object-content #:update-object #:publish-object #:unpublish-object
+           #:discard-object-draft #:object-draft-key
            #:create-delivery-key #:list-delivery-keys #:delete-delivery-key #:webhook-secret
            #:list-media #:get-media #:upload-media #:update-media #:delete-media))
 (in-package #:koya-sdk/client)
@@ -209,6 +211,35 @@ can be given explicitly, e.g. when importing from another CMS."
 (defun draft-key (model id &key space)
   "The draft key of content ID for previews."
   (jget (request :post (admin-path space model id "draft-key") :body (jobject) :auth :management) "draftKey"))
+
+(defun get-object-content (model &key space)
+  "The content of object model MODEL as the admin API has it, draft included."
+  (jvalue->lisp (request :get (admin-path space model) :auth :management)))
+
+(defun update-object (model data &key space)
+  "Save DATA (kebab plist) as the draft of object model MODEL, merged onto the
+current data. The first save makes its content."
+  (jvalue->lisp (request :patch (admin-path space model) :body (jobject "data" (lisp->jvalue data)) :auth :management)))
+
+(defun publish-object (model &key space data published-at)
+  "Publish the draft of object model MODEL, or DATA when given; DATA makes its
+content when it has none yet. PUBLISHED-AT overrides the publish date."
+  (let ((body (jobject)))
+    (when data (setf (gethash "data" body) (lisp->jvalue data)))
+    (when published-at (setf (gethash "publishedAt" body) published-at))
+    (jvalue->lisp (request :post (admin-path space model nil "publish") :body body :auth :management))))
+
+(defun unpublish-object (model &key space)
+  "Take object model MODEL off the delivery API, keeping its content as a draft."
+  (jvalue->lisp (request :post (admin-path space model nil "unpublish") :body (jobject) :auth :management)))
+
+(defun discard-object-draft (model &key space)
+  "Drop the draft of object model MODEL, leaving the published version."
+  (jvalue->lisp (request :post (admin-path space model nil "discard-draft") :body (jobject) :auth :management)))
+
+(defun object-draft-key (model &key space)
+  "The draft key of object model MODEL for previews."
+  (jget (request :post (admin-path space model nil "draft-key") :body (jobject) :auth :management) "draftKey"))
 
 (defun create-delivery-key (&key space (label ""))
   "Create a delivery key for SPACE. Returns (values key id); it is shown only once."
