@@ -15,13 +15,13 @@
   (:import-from #:koya-server/web/lib/http #:path-param #:param #:blank-p)
   (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/lib/display #:short-time)
-  (:import-from #:koya-server/web/lib/urls #:space-url #:content-url #:webhook-log-url)
+  (:import-from #:koya-server/web/lib/urls #:space-url #:content-url #:editor-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
-  (:import-from #:koya-server/usecases/schema #:load-schema)
+  (:import-from #:koya-server/usecases/schema #:load-schema #:find-model)
   (:export #:@get #:browse-deliveries))
 (in-package #:koya-server/web/pages/s/<space>/webhooks)
 
@@ -118,7 +118,10 @@
        (~field :label "POST" (code :class "text-xs" (delivery-url delivery)))
        (when (plusp (length (delivery-content-id delivery)))
          (hsx (~field :label "content"
-                (a :href (content-url space (delivery-model delivery) (delivery-content-id delivery))
+                (a :href (let ((model (find-model space (delivery-model delivery))))
+                           (if model
+                               (editor-url space model (delivery-content-id delivery))
+                               (content-url space (delivery-model delivery) (delivery-content-id delivery))))
                    :class "hover:underline"
                    (code :class "text-xs" (delivery-content-id delivery))))))
        (~field :label "took"

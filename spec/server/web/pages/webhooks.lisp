@@ -154,3 +154,15 @@
       (ok (search "3 calls." body))
       (ok (string= (replaced-url body) "/s/website/webhooks"))))
   (ok (= 404 (call-action :get (browse-deliveries :space "nope")))))
+
+(deftest a-delivery-links-to-where-its-content-is-edited
+  (exec "DELETE FROM webhook_deliveries")
+  (dolist (model '("blog" "about"))
+    (record-delivery "website" :label "revalidate" :url "https://site.test/api/revalidate"
+                               :model model :event "publish" :content-id "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+                               :ok t :status 200 :response "" :error "" :duration-ms 1))
+  (let ((body (nth-value 1 (request :get "/s/website/webhooks"))))
+    (ok (search "href=\"/s/website/m/blog/01ARZ3NDEKTSV4RRFFQ69G5FAV\"" body) "a list content by its id")
+    (ok (search "href=\"/s/website/m/about\"" body) "an object content at its model")
+    (ng (search "href=\"/s/website/m/about/" body)))
+  (exec "DELETE FROM webhook_deliveries"))
