@@ -78,7 +78,9 @@
             (gamma (save "Gamma" "<p>c</p>")))
         (post beta "publish" "Beta")
         (post gamma "publish" "Gamma")
-        (post gamma "save" "Gamma")
+        (edit (format nil "/s/website/m/blog/~a" gamma)
+              :form '(("action" . "save") ("f-title" . "Gamma") ("f-body" . "<p>y</p>"))
+              :headers origin)
         (testing "the list carries the search box and the status filter"
           (multiple-value-bind (status body) (request :get "/s/website/m/blog")
             (ok (= status 200))

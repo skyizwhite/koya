@@ -47,6 +47,8 @@
                (make-schema :models (list (blog-model)
                                           (make-model "tag" :list (list (make-field :name :text)))
                                           (make-model "event" :list (list (make-field :at :datetime)))
+                                          (make-model "page" :list (list (make-field :title :text)
+                                                                         (make-field :slug :slug :from :title)))
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
 
 (teardown (disconnect-db))
@@ -322,6 +324,18 @@
         "and null over false changes nothing either")
     (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": true}"))) :saved)
         "while true is a change")))
+
+(deftest an-emptied-slug-that-comes-back-the-same-is-no-change
+  (let* ((model (find-model "website" "page"))
+         (id (content-id (create "website" model (data "{\"title\": \"Hello World\"}") :publish t))))
+    (ok (string= (jget (content-published (get-content id)) "slug") "hello-world"))
+    (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"title\": \"Hello World\"}") :replace t))
+            :unchanged)
+        "a save with the slug emptied makes the same slug again, and that is no change")
+    (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"slug\": \"\"}"))) :unchanged)
+        "nor is a patch that blanks it")
+    (ok (string= (content-status (get-content id)) "published"))
+    (ok (= (count-revisions id) 1))))
 
 (deftest parse-query-defaults
   (let ((query (q)))
