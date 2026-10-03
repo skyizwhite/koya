@@ -39,13 +39,13 @@ given; the others keep their values."
   (values))
 
 (defun setting (var env-name what)
-  (or var (uiop:getenv env-name)
-      (error "koya client: ~a is not configured (set koya:~(~a~) or ~a)" what var env-name)))
+  (or (symbol-value var) (uiop:getenv env-name)
+      (error "koya client: ~a is not configured (set koya-sdk:~(~a~) or ~a)" what var env-name)))
 
-(defun base-url () (string-right-trim "/" (setting *base-url* "KOYA_URL" "the server URL")))
-(defun management-key () (setting *management-key* "KOYA_MANAGEMENT_KEY" "a management key"))
-(defun delivery-key () (setting *delivery-key* "KOYA_DELIVERY_KEY" "a delivery key"))
-(defun space-name (space) (string-downcase (string (or space (setting *space* "KOYA_SPACE" "the space")))))
+(defun base-url () (string-right-trim "/" (setting '*base-url* "KOYA_URL" "the server URL")))
+(defun management-key () (setting '*management-key* "KOYA_MANAGEMENT_KEY" "a management key"))
+(defun delivery-key () (setting '*delivery-key* "KOYA_DELIVERY_KEY" "a delivery key"))
+(defun space-name (space) (string-downcase (string (or space (setting '*space* "KOYA_SPACE" "the space")))))
 
 (define-condition koya-error (error)
   ((status :initarg :status :reader koya-error-status)
