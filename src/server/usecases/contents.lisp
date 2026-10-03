@@ -6,7 +6,7 @@
                 #:validate-content #:validation-error #:blank-value-p #:content-id-p
                 #:validation-error-errors)
   (:import-from #:koya-core/time #:parse-iso)
-  (:import-from #:koya-core/json #:json-null #:json-equal)
+  (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:invalid-input #:not-found #:koya-error #:koya-error-message)
@@ -19,7 +19,7 @@
                 #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-published #:content-draft #:content-draft-key #:content-data
-                #:merge-data #:fill-defaults #:fill-slugs #:to-the-minute #:new-content #:drafted #:published
+                #:merge-data #:same-data-p #:fill-defaults #:fill-slugs #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
@@ -129,8 +129,8 @@
          (current (content-data content :draft t))
          (live (content-published content))
          (data (to-the-minute model (if replace patch (merge-data current patch)))))
-    (cond ((json-equal data current) (values content :unchanged))
-          ((and live (json-equal data live))
+    (cond ((same-data-p model data current) (values content :unchanged))
+          ((and live (same-data-p model data live))
            (check-transition content :discard)
            (values (store (discarded content) "discard" live) :published (draft-view space model content)))
           (t

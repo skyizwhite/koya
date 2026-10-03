@@ -5,7 +5,7 @@
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
-                #:json-null)
+                #:json-null #:json-equal)
   (:import-from #:koya-core/time
                 #:now-iso #:parse-iso #:format-iso)
   (:import-from #:local-time
@@ -35,6 +35,7 @@
            #:check-transition
            #:content-label
            #:merge-data
+           #:same-data-p
            #:default-data
            #:fill-defaults
            #:fill-slugs
@@ -163,6 +164,16 @@
     (when base (maphash (lambda (k v) (setf (gethash k out) v)) base))
     (maphash (lambda (k v) (if (eq v json-null) (remhash k out) (setf (gethash k out) v))) patch)
     out))
+
+(defun booleans-filled (model data)
+  (let ((out (merge-data data (make-hash-table :test 'equal))))
+    (dolist (field (model-fields model) out)
+      (when (and (eq (field-type field) :boolean)
+                 (member (gethash (field-name field) out json-null) (list nil json-null)))
+        (setf (gethash (field-name field) out) nil)))))
+
+(defun same-data-p (model a b)
+  (json-equal (booleans-filled model a) (booleans-filled model b)))
 
 (defun default-data (model)
   (let ((data (make-hash-table :test 'equal)))
