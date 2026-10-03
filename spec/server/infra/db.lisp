@@ -128,24 +128,43 @@
     (ok (find-space "site") "the space itself stays")
     (ok (null (fetch "SELECT * FROM models")))))
 
-(deftest sessions-outlive-the-store
+(defun owner-session ()
   (let ((session (make-hash-table :test 'equal)))
     (setf (gethash "owner" session) t)
-    (store-session (make-session-store) "sid-1" session))
-  (let ((loaded (fetch-session (make-session-store) "sid-1")))
-    (ok (hash-table-p loaded))
-    (ok (gethash "owner" loaded) "the owner flag survives"))
-  (testing "a session that has run out is refused and purged"
-    (exec "UPDATE sessions SET expires_at = ? WHERE id = ?" "2000-01-01T00:00:00.000Z" "sid-1")
-    (ng (fetch-session (make-session-store) "sid-1"))
-    (purge-expired-sessions)
-    (ng (fetch-one "SELECT id FROM sessions WHERE id = ?" "sid-1")))
-  (testing "logging out drops the row"
-    (let ((session (make-hash-table :test 'equal)))
-      (setf (gethash "owner" session) t)
-      (store-session (make-session-store) "sid-2" session))
-    (remove-session (make-session-store) "sid-2")
-    (ng (fetch-session (make-session-store) "sid-2"))))
+    session))
+
+(defun session-count ()
+  (col (fetch-one "SELECT COUNT(*) AS n FROM sessions") "n"))
+
+(defmacro with-secret ((secret) &body body)
+  (let ((saved (gensym)))
+    `(let ((,saved (uiop:getenv "KOYA_SECRET")))
+       (setf (uiop:getenv "KOYA_SECRET") ,secret)
+       (unwind-protect (progn ,@body)
+         (setf (uiop:getenv "KOYA_SECRET") (or ,saved ""))))))
+
+(deftest sessions-outlive-the-store
+  (exec "DELETE FROM sessions")
+  (with-secret ("first-secret-long-enough-to-log-in-with")
+    (store-session (make-session-store) "sid-1" (owner-session))
+    (let ((loaded (fetch-session (make-session-store) "sid-1")))
+      (ok (hash-table-p loaded))
+      (ok (gethash "owner" loaded) "the owner flag survives"))
+    (testing "every use moves the end a full day away"
+      (exec "UPDATE sessions SET expires_at = ?" (iso-from-now 3600))
+      (store-session (make-session-store) "sid-1" (owner-session))
+      (ok (string> (col (fetch-one "SELECT expires_at FROM sessions") "expires_at") (iso-from-now (- (* 24 3600) 60)))
+          "although the data did not change"))
+    (testing "a session that has run out is refused and purged"
+      (exec "UPDATE sessions SET expires_at = ?" "2000-01-01T00:00:00.000Z")
+      (ng (fetch-session (make-session-store) "sid-1"))
+      (purge-expired-sessions)
+      (ok (zerop (session-count))))
+    (testing "logging out drops the row"
+      (store-session (make-session-store) "sid-2" (owner-session))
+      (remove-session (make-session-store) "sid-2")
+      (ng (fetch-session (make-session-store) "sid-2"))
+      (ok (zerop (session-count))))))
 
 (deftest a-rename-carries-the-content-with-it
   (create-space "magazine")
@@ -343,26 +362,16 @@
   (ok (= (count-deploys "rolled") 1) "and the deploy is not in the log")
   (delete-space "rolled"))
 
-(deftest a-session-row-is-written-only-when-it-has-to-be
-  (testing "a row that cannot be read is no session"
-    (exec "INSERT INTO sessions (id, data, expires_at) VALUES (?, ?, ?)"
-          "sid-broken" "{not json" (iso-from-now 3600))
-    (ng (fetch-session (make-session-store) "sid-broken")))
-  (let ((session (make-hash-table :test 'equal)))
-    (setf (gethash "owner" session) t)
-    (store-session (make-session-store) "sid-3" session)
-    (flet ((expires () (col (fetch-one "SELECT expires_at FROM sessions WHERE id = ?" "sid-3") "expires_at")))
-      (testing "an unchanged session early in its life is left alone"
-        (exec "UPDATE sessions SET expires_at = ? WHERE id = ?" "2999-01-01T00:00:00.000Z" "sid-3")
-        (store-session (make-session-store) "sid-3" session)
-        (ok (string= (expires) "2999-01-01T00:00:00.000Z")))
-      (testing "one past half its life is renewed"
-        (let ((soon (iso-from-now 60)))
-          (exec "UPDATE sessions SET expires_at = ? WHERE id = ?" soon "sid-3")
-          (store-session (make-session-store) "sid-3" session)
-          (ok (string< soon (expires)))))
+(deftest a-session-row-holds-what-it-was-last-given
+  (exec "DELETE FROM sessions")
+  (with-secret ("first-secret-long-enough-to-log-in-with")
+    (let ((session (owner-session)))
+      (store-session (make-session-store) "sid-3" session)
       (testing "a changed one is written"
-        (exec "UPDATE sessions SET expires_at = ? WHERE id = ?" "2999-01-01T00:00:00.000Z" "sid-3")
         (setf (gethash "toast" session) "saved")
         (store-session (make-session-store) "sid-3" session)
-        (ok (string= (jget (fetch-session (make-session-store) "sid-3") "toast") "saved"))))))
+        (ok (string= (jget (fetch-session (make-session-store) "sid-3") "toast") "saved"))
+        (ok (= (session-count) 1) "in the same row"))
+      (testing "a row that cannot be read is no session"
+        (exec "UPDATE sessions SET data = ?" "{not json")
+        (ng (fetch-session (make-session-store) "sid-3"))))))

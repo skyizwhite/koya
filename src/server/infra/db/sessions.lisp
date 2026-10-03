@@ -22,16 +22,9 @@
         (error () nil)))))
 
 (defmethod store-session ((store session-store) sid session)
-  (let ((data (to-json session))
-        (row (fetch-one "SELECT data, expires_at FROM sessions WHERE id = ?" sid)))
-    (cond ((null row)
-           (exec "INSERT INTO sessions (id, data, expires_at) VALUES (?, ?, ?)"
-                 sid data (iso-from-now +session-seconds+)))
-          ((and (equal data (col row "data"))
-                (string< (iso-from-now (floor +session-seconds+ 2)) (col row "expires_at"))))
-          (t
-           (exec "UPDATE sessions SET data = ?, expires_at = ? WHERE id = ?"
-                 data (iso-from-now +session-seconds+) sid)))))
+  (exec "INSERT INTO sessions (id, data, expires_at) VALUES (?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires_at = excluded.expires_at"
+        sid (to-json session) (iso-from-now +session-seconds+)))
 
 (defmethod remove-session ((store session-store) sid)
   (exec "DELETE FROM sessions WHERE id = ?" sid))
