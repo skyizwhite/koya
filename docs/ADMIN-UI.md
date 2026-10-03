@@ -46,7 +46,7 @@ secret is the owner.
   log in again, even after a restart.
 - With a `KOYA_SECRET` shorter than that, the page says so and asks for nothing;
   the rest of the server runs as usual until a longer one is set and the server
-  restarted.
+  restarted. Sessions made under the secret before end as well.
 - A session stays open while the admin UI is in use, ends a day after the last
   request, and survives a server restart or a redeploy. Starting the server with
   another `KOYA_SECRET` ends every session.

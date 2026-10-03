@@ -1,6 +1,6 @@
 # A short owner secret turns logging in off, not the server
 
-*2026-09-28*
+*2026-10-04*
 
 ## Context
 
@@ -15,10 +15,13 @@ that concerns only logging in.
   and says at startup that logging in is off.
 - The login page says why and asks for nothing; the login action refuses even
   the short secret itself.
-- Sessions already made keep working.
 
 ## Consequences
 
 - Replacing the secret and restarting is all it takes. The secret is read from
   the environment and kept nowhere else, so nothing is migrated.
 - Delivery keys, management keys and webhooks work throughout.
+- A short or missing secret is another secret, so the sessions made under the
+  one before end with it
+  (`adr/2026-10-04-a-session-is-stored-under-the-owner-secret.md`): the admin
+  UI is closed until a long one is set.
