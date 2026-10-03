@@ -128,7 +128,7 @@
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
          (live (content-published content))
-         (data (to-the-minute model (if replace patch (merge-data current patch)))))
+         (data (fill-slugs model (to-the-minute model (if replace patch (merge-data current patch))))))
     (cond ((same-data-p model data current) (values content :unchanged))
           ((and live (same-data-p model data live))
            (check-transition content :discard)
