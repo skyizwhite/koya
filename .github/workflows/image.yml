@@ -42,7 +42,7 @@ jobs:
 
       - name: Start it and ask for /health
         run: |
-          docker run -d --name koya -p 3100:3100 -e KOYA_SECRET=check koya:check
+          docker run -d --name koya -p 3100:3100 -e KOYA_SECRET=check -e KOYA_BASE_URL=http://localhost:3100 koya:check
           for _ in $(seq 1 60); do
             if curl -fsS http://localhost:3100/health > /dev/null; then
               docker stop koya
