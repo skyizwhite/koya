@@ -301,6 +301,28 @@
         (publish "website" model id (data "{\"at\": \"2024-04-01T00:00:01Z\"}"))
         (ok (string= (jget (content-published (get-content id)) "at") "2024-04-01T00:00:00.000Z"))))))
 
+(deftest a-missing-boolean-and-false-are-the-same-draft
+  (let ((id (content-id (make "{\"title\": \"Flag\"}" :publish t))))
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": false}"))) :unchanged)
+        "false over a missing boolean changes nothing")
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"title\": \"Flag\", \"featured\": false}")
+                                       :replace t))
+            :unchanged)
+        "nor does the editor's save, which always sends the key")
+    (ok (string= (content-status (get-content id)) "published"))
+    (ok (= (count-revisions id) 1))
+    (testing "and a draft that comes back to the published data with false is dropped"
+      (update-draft "website" (blog) id (data "{\"title\": \"Changed\"}"))
+      (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"title\": \"Flag\", \"featured\": false}")
+                                         :replace t))
+              :published))
+      (ok (string= (content-status (get-content id)) "published"))))
+  (let ((id (content-id (make "{\"title\": \"Off\", \"featured\": false}" :publish t))))
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": null}"))) :unchanged)
+        "and null over false changes nothing either")
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": true}"))) :saved)
+        "while true is a change")))
+
 (deftest parse-query-defaults
   (let ((query (q)))
     (ok (= (query-limit query) 10))
