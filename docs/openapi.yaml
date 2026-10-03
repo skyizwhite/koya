@@ -731,8 +731,8 @@ components:
       in: query
       schema: { type: string }
       description: |
-        Comma-separated keys to keep in each content; applied after `include` and
-        media expansion. System fields not named are dropped too.
+        Comma-separated fields to keep in each content; applied after `include` and
+        media expansion. The system fields are always kept.
     include:
       name: include
       in: query
@@ -1156,8 +1156,8 @@ components:
         Delivery shape: the data with the system fields merged in. `media` fields
         are expanded to Media objects (or `null` when the file is gone); `richtext`
         HTML has its `/media/` URLs made absolute; `reference` fields are ids
-        unless embedded through `include`. With `fields`, only the named keys
-        are present, system fields included.
+        unless embedded through `include`. With `fields`, only the named data
+        fields are present; the system fields always are.
       required: [id, createdAt, updatedAt, publishedAt, revisedAt]
       properties:
         id: { type: string }
