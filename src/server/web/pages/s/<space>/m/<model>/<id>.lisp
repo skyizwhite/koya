@@ -11,7 +11,7 @@
                 #:find-content #:create #:update-draft #:publish #:unpublish #:discard #:destroy)
   (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content
-                #:content-id #:content-status #:content-published #:content-draft
+                #:content-id #:content-space #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
                 #:default-data #:content-label)
   (:import-from #:koya-server/usecases/spaces #:find-space)
@@ -192,7 +192,7 @@
   (let ((raw (param params "revision")))
     (when (and raw content)
       (let* ((n (ignore-errors (parse-integer raw)))
-             (revision (and n (find-revision (content-id content) n))))
+             (revision (and n (find-revision (content-space content) (content-id content) n))))
         (values revision (null revision))))))
 
 (defun @get (params)

@@ -156,8 +156,8 @@
         (ok (string= (space-for-management-key management-key) "archive"))
         (ok (equal (mapcar #'key-label (list-delivery-keys "archive")) '("site"))))
       (testing "contents keep their ids, state, draft, timestamps and history"
-        (let ((tag-content (get-content tag))
-              (post-content (get-content post)))
+        (let ((tag-content (get-content "archive" tag))
+              (post-content (get-content "archive" post)))
           (ok (string= (content-created-at tag-content) "2020-01-01T00:00:00.000Z"))
           (ok (string= (content-published-at tag-content) "2020-01-02T00:00:00.000Z"))
           (ok (string= (content-status post-content) "published+draft"))
@@ -165,8 +165,8 @@
           (ok (string= (jget (content-draft post-content) "title") "New"))
           (ok (equalp (jget (content-published post-content) "tags") (vector tag)))
           (ok (content-draft-key post-content) "the preview link still works")
-          (ok (= (count-revisions post) 2))
-          (ok (equal (mapcar #'revision-event (list-revisions post)) '("draft" "publish")))))
+          (ok (= (count-revisions "archive" post) 2))
+          (ok (equal (mapcar #'revision-event (list-revisions "archive" post)) '("draft" "publish")))))
       (testing "media keep their ids, metadata and files"
         (let ((copy (find (media-id media) (list-media "archive") :key #'media-id :test #'string=)))
           (ok copy)
@@ -198,14 +198,14 @@
         (create-delivery-key "archive")
         (ok (string= (nth-value 1 (import-archive octets)) "/"))
         (ok (search "is not empty" (nth-value 1 (request :get "/"))))
-        (ng (get-content post)))
+        (ng (get-content "archive" post)))
       (testing "one that has only webhooks is imported into, and they are replaced"
         (delete-space "archive")
         (remove-space-media "archive")
         (create-space "archive")
         (replace-schema "archive" (make-schema :webhooks (list (make-webhook "old" "https://old.test/hook"))))
         (ok (string= (nth-value 1 (import-archive octets)) "/s/archive"))
-        (ok (get-content post))
+        (ok (get-content "archive" post))
         (ok (equal (mapcar #'webhook-url (space-webhooks "archive")) '("https://site.test/hook")))
         (ok (string= (space-webhook-secret "archive") old-secret))))
     (testing "a file that is not an archive changes nothing"

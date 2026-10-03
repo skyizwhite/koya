@@ -90,9 +90,9 @@
             (ok (null (content-published-at u)) "an unpublished content has no publish date")
             (ok (null (content-revised-at u)) "nor a revision date")
             (ok (string= (jget (content-draft u) "title") "Edited") "unpublish keeps the data as draft")
-            (ok (string= (content-status (get-content (content-id c))) "draft") "and that is what is stored"))))
+            (ok (string= (content-status (get-content "website" (content-id c))) "draft") "and that is what is stored"))))
       (destroy "website" (blog) (content-id c))
-      (ng (get-content (content-id c))))))
+      (ng (get-content "website" (content-id c))))))
 
 (deftest every-write-leaves-a-revision
   (let* ((c (let ((*actor* "owner")) (make "{\"title\": \"One\"}")))
@@ -103,7 +103,7 @@
     (update-draft "website" (blog) id (data "{\"title\": \"Three\"}"))
     (discard "website" (blog) id)
     (unpublish "website" (blog) id)
-    (let ((revisions (list-revisions id)))
+    (let ((revisions (list-revisions "website" id)))
       (ok (equal (mapcar #'revision-event revisions) '("unpublish" "discard" "draft" "publish" "draft" "draft"))
           "newest first; the second save of the same data is not an event")
       (ok (equal (mapcar (lambda (r) (jget (revision-data r) "title")) revisions)
@@ -112,22 +112,22 @@
       (ok (equal (mapcar #'revision-by (last revisions 2)) '("key:ci" "owner")))
       (ok (string= (revision-by (first revisions)) "") "a write that names nobody stores nobody"))
     (testing "the published ones are the versions that were live"
-      (ok (= (count-revisions id :published-only t) 1))
-      (ok (equal (mapcar #'revision-event (list-revisions id :published-only t)) '("publish"))))
+      (ok (= (count-revisions "website" id :published-only t) 1))
+      (ok (equal (mapcar #'revision-event (list-revisions "website" id :published-only t)) '("publish"))))
     (testing "what changes nothing that was live is not an event"
       (let* ((draft (make "{\"title\": \"Never live\"}"))
              (live (make "{\"title\": \"Live\"}" :publish t)))
         (ok (signals (unpublish "website" (blog) (content-id draft)) 'conflict)
             "a content that was never published cannot be unpublished")
-        (ok (equal (mapcar #'revision-event (list-revisions (content-id draft))) '("draft")) "and nothing is kept")
+        (ok (equal (mapcar #'revision-event (list-revisions "website" (content-id draft))) '("draft")) "and nothing is kept")
         (ok (signals (discard "website" (blog) (content-id draft)) 'conflict)
             "a content that was never published has no draft to discard, only itself")
         (ok (signals (discard "website" (blog) (content-id live)) 'conflict)
             "a published content with no draft has none to discard")
-        (ok (equal (mapcar #'revision-event (list-revisions (content-id live))) '("publish")) "and nothing is kept")))
+        (ok (equal (mapcar #'revision-event (list-revisions "website" (content-id live))) '("publish")) "and nothing is kept")))
     (testing "a revision belongs to its content"
       (let ((other (make "{\"title\": \"Other\"}")))
-        (ng (find-revision (content-id other) (revision-id (first (list-revisions id)))))))
+        (ng (find-revision "website" (content-id other) (revision-id (first (list-revisions "website" id)))))))
     (testing "deleting the content deletes its history"
       (destroy "website" (blog) id)
       (ok (zerop (col (fetch-one "SELECT COUNT(*) AS n FROM content_revisions WHERE content_id = ?" id) "n"))))))
@@ -145,7 +145,7 @@
       (ok (null (content-draft-key p)) "published content has no key")
       (let ((made (draft-key "website" "blog" (content-id p))))
         (ok (= (length made) 32) "but one can be made on demand")
-        (ok (string= made (content-draft-key (get-content (content-id p)))) "and is kept")))))
+        (ok (string= made (content-draft-key (get-content "website" (content-id p)))) "and is kept")))))
 
 (deftest object-content
   (ng (find-object-content "website" "about"))
@@ -297,12 +297,12 @@
       (testing "a change to the same minute is no change"
         (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"at\": \"2024-01-01T10:05:59Z\"}")))
                 :unchanged))
-        (ok (= (count-revisions id) 1)))
+        (ok (= (count-revisions "website" id) 1)))
       (testing "a change and a publish keep it to the minute too"
         (update-draft "website" model id (data "{\"at\": \"2024-03-01T08:30:15+01:00\"}"))
-        (ok (string= (jget (content-draft (get-content id)) "at") "2024-03-01T07:30:00.000Z"))
+        (ok (string= (jget (content-draft (get-content "website" id)) "at") "2024-03-01T07:30:00.000Z"))
         (publish "website" model id (data "{\"at\": \"2024-04-01T00:00:01Z\"}"))
-        (ok (string= (jget (content-published (get-content id)) "at") "2024-04-01T00:00:00.000Z"))))))
+        (ok (string= (jget (content-published (get-content "website" id)) "at") "2024-04-01T00:00:00.000Z"))))))
 
 (deftest a-missing-boolean-and-false-are-the-same-draft
   (let ((id (content-id (make "{\"title\": \"Flag\"}" :publish t))))
@@ -312,14 +312,14 @@
                                        :replace t))
             :unchanged)
         "nor does the editor's save, which always sends the key")
-    (ok (string= (content-status (get-content id)) "published"))
-    (ok (= (count-revisions id) 1))
+    (ok (string= (content-status (get-content "website" id)) "published"))
+    (ok (= (count-revisions "website" id) 1))
     (testing "and a draft that comes back to the published data with false is dropped"
       (update-draft "website" (blog) id (data "{\"title\": \"Changed\"}"))
       (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"title\": \"Flag\", \"featured\": false}")
                                          :replace t))
               :published))
-      (ok (string= (content-status (get-content id)) "published"))))
+      (ok (string= (content-status (get-content "website" id)) "published"))))
   (let ((id (content-id (make "{\"title\": \"Off\", \"featured\": false}" :publish t))))
     (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": null}"))) :unchanged)
         "and null over false changes nothing either")
@@ -329,14 +329,14 @@
 (deftest an-emptied-slug-that-comes-back-the-same-is-no-change
   (let* ((model (find-model "website" "page"))
          (id (content-id (create "website" model (data "{\"title\": \"Hello World\"}") :publish t))))
-    (ok (string= (jget (content-published (get-content id)) "slug") "hello-world"))
+    (ok (string= (jget (content-published (get-content "website" id)) "slug") "hello-world"))
     (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"title\": \"Hello World\"}") :replace t))
             :unchanged)
         "a save with the slug emptied makes the same slug again, and that is no change")
     (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"slug\": \"\"}"))) :unchanged)
         "nor is a patch that blanks it")
-    (ok (string= (content-status (get-content id)) "published"))
-    (ok (= (count-revisions id) 1))))
+    (ok (string= (content-status (get-content "website" id)) "published"))
+    (ok (= (count-revisions "website" id) 1))))
 
 (deftest system-timestamps-given-on-create-are-kept-in-utc
   (let ((c (make "{\"title\": \"Dated\"}" :publish t
@@ -348,7 +348,7 @@
     (ok (string= (content-updated-at c) "2024-01-02T02:04:05.500Z") "with milliseconds, as the server writes")
     (ok (string= (content-published-at c) "2024-01-01T00:00:00.000Z"))
     (ok (string= (content-revised-at c) "2024-01-03T00:00:00.000Z"))
-    (ok (string= (content-created-at (get-content (content-id c))) "2024-01-01T01:00:00.000Z")
+    (ok (string= (content-created-at (get-content "website" (content-id c))) "2024-01-01T01:00:00.000Z")
         "and that is what is stored"))
   (testing "a timestamp needs a date, a time and a zone"
     (dolist (value '("10:00" "2024-01-01" "2024-01-01T10:00:00"))

@@ -19,7 +19,7 @@
                 #:schema-webhooks #:schema-models #:model-name #:model-field
                 #:schema->jobject)
   (:import-from #:koya-server/usecases/ports/contents
-                #:get-content #:list-revisions)
+                #:get-content #:list-revisions #:count-revisions)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish #:destroy)
   (:import-from #:koya-core/diff
                 #:destructive-changes-p)
@@ -52,33 +52,43 @@
   (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
                                                             (make-field :event-at :datetime))))))
 
+(defun migrated-to (version)
+  (connect-db ":memory:")
+  (let ((koya-server/infra/db/migrations::*migrations*
+          (remove version koya-server/infra/db/migrations::*migrations* :key #'car :test #'<)))
+    (migrate)))
+
+(defun migrated-fully ()
+  (connect-db ":memory:")
+  (migrate))
+
 (deftest migrations
-  (ok (= (current-version) 12))
+  (ok (= (current-version) 13))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
 (deftest stored-url-templates-that-are-not-web-addresses-are-dropped
+  (migrated-to 9)
   (create-space "legacy")
   (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
         "legacy" "about" "object"
         "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
         0)
-  (exec "DELETE FROM schema_version WHERE version >= 10")
-  (ok (equal (migrate) '(10 11 12)))
+  (ok (equal (migrate) '(10 11 12 13)))
   (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
     (ng (search "previewUrl" definition))
     (ok (search "https://x/about" definition) "a web address is kept"))
-  (delete-space "legacy"))
+  (migrated-fully))
 
 (deftest stored-webhooks-that-are-not-web-addresses-are-dropped
+  (migrated-to 10)
   (create-space "legacy")
   (exec "UPDATE spaces SET webhooks = ? WHERE name = 'legacy'"
         "[{\"label\":\"bare\",\"url\":\"example.com/hook\"},{\"label\":\"site\",\"url\":\"https://x/hook\"},{\"label\":\"ftp\",\"url\":\"ftp://x/hook\"}]")
-  (exec "DELETE FROM schema_version WHERE version >= 11")
-  (ok (equal (migrate) '(11 12)))
+  (ok (equal (migrate) '(11 12 13)))
   (ok (equal (mapcar (lambda (hook) (getf hook :label)) (space-webhooks "legacy")) '("site"))
       "the space still reads, with the one hook that can be sent")
-  (delete-space "legacy"))
+  (migrated-fully))
 
 (deftest schema-snapshot-matches-the-migrations
 
@@ -241,17 +251,17 @@
       (ng (destructive-changes-p changes) "a rename loses nothing, so it needs no force"))
     (ok (equal (mapcar #'model-name (schema-models (load-schema "magazine"))) '("article")))
     (testing "the published data moved with the model and the field"
-      (let ((content (get-content (content-id published))))
+      (let ((content (get-content "magazine" (content-id published))))
         (ok (string= (content-model content) "article"))
         (ok (string= (jget (content-published content) "subtitle") "First words"))
         (ng (jget (content-published content) "lede") "the orphaned key is gone")
         (ok (string= (jget (content-published content) "title") "One") "the rest is untouched")))
     (testing "so did the draft"
-      (let ((content (get-content (content-id drafted))))
+      (let ((content (get-content "magazine" (content-id drafted))))
         (ok (string= (content-model content) "article"))
         (ok (string= (jget (content-draft content) "subtitle") "Later words"))))
     (testing "and the history, so an old version still restores into the field"
-      (let ((data (revision-data (first (list-revisions (content-id published))))))
+      (let ((data (revision-data (first (list-revisions "magazine" (content-id published))))))
         (ok (string= (jget data "subtitle") "First words"))
         (ng (jget data "lede"))))
     (testing "the stored schema keeps the shape, not the rename"
@@ -279,17 +289,17 @@
                                                                              (make-field :rank :number))))))))
       (ok (equal (mapcar (lambda (c) (getf c :op)) changes) '(:remove-field :change-field-type))))
     (testing "the published data loses the removed field and the retyped one"
-      (let ((published (content-published (get-content id))))
+      (let ((published (content-published (get-content "trimmed" id))))
         (ng (nth-value 1 (gethash "summary" published)))
         (ng (nth-value 1 (gethash "rank" published)))
         (ok (string= (jget published "title") "One") "the rest is untouched")))
     (testing "so does the draft"
-      (let ((draft (content-draft (get-content id))))
+      (let ((draft (content-draft (get-content "trimmed" id))))
         (ng (nth-value 1 (gethash "summary" draft)))
         (ng (nth-value 1 (gethash "rank" draft)))
         (ok (string= (jget draft "title") "One, again"))))
     (testing "and the history"
-      (dolist (revision (list-revisions id))
+      (dolist (revision (list-revisions "trimmed" id))
         (ng (nth-value 1 (gethash "summary" (revision-data revision))))
         (ng (nth-value 1 (gethash "rank" (revision-data revision))))))
     (testing "so a write of one field and a publish of the draft are checked against the model alone"
@@ -301,7 +311,7 @@
                                                           (list (make-field :title :text)
                                                                 (make-field :rank :number)
                                                                 (make-field :summary :text))))))
-      (ng (nth-value 1 (gethash "summary" (content-published (get-content id)))))))
+      (ng (nth-value 1 (gethash "summary" (content-published (get-content "trimmed" id)))))))
   (delete-space "trimmed"))
 
 (deftest a-reference-pointed-at-another-model-takes-its-values-with-it
@@ -319,15 +329,16 @@
                                      (jobject "title" "One" "tag" tag) :publish t))))
       (ok (equal (mapcar (lambda (c) (getf c :op)) (deploy "cat")) '(:change-field-type)))
       (testing "the post no longer names the tag"
-        (let ((published (content-published (get-content post))))
+        (let ((published (content-published (get-content "pointed" post))))
           (ng (nth-value 1 (gethash "tag" published)))
           (ok (string= (jget published "title") "One") "the rest is untouched")))
       (testing "so the tag is deleted with nothing left pointing at it"
         (ok (destroy "pointed" (find-model "pointed" "tag") tag))
-        (ng (get-content tag)))))
+        (ng (get-content "pointed" tag)))))
   (delete-space "pointed"))
 
 (deftest stored-values-of-fields-that-are-gone-are-dropped
+  (migrated-to 11)
   (create-space "leftover")
   (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
         "leftover" "post" "list"
@@ -339,19 +350,18 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('kept', 'publish', '{\"title\":\"Old\",\"gone\":{\"a\":1}}', '2026-01-01T00:00:00.000Z')")
-  (exec "DELETE FROM schema_version WHERE version >= 12")
-  (ok (equal (migrate) '(12)))
-  (let ((content (get-content "kept")))
+  (ok (equal (migrate) '(12 13)))
+  (let ((content (get-content "leftover" "kept")))
     (ng (nth-value 1 (gethash "gone" (content-published content))))
     (ng (nth-value 1 (gethash "gone" (content-draft content))))
     (ok (string= (jget (content-published content) "title") "Live") "a declared field is kept")
     (ok (eq (jget (content-published content) "flag") nil) "as the value it was")
     (ok (nth-value 1 (gethash "flag" (content-published content))))
     (ok (string= (jget (content-draft content) "title") "Next")))
-  (let ((data (revision-data (first (list-revisions "kept")))))
+  (let ((data (revision-data (first (list-revisions "leftover" "kept")))))
     (ng (nth-value 1 (gethash "gone" data)) "the history loses it too")
     (ok (string= (jget data "title") "Old")))
-  (delete-space "leftover"))
+  (migrated-fully))
 
 (deftest a-deploy-leaves-a-record
   (create-space "logged")
@@ -399,14 +409,43 @@
                 ('draft', 'old', 'post', 'draft', NULL, '{\"title\":\"Only\"}',
                  '2026-01-01T00:00:00.000Z', '2026-01-05T00:00:00.000Z', NULL, NULL)")
   (migrate)
-  (let ((both (list-revisions "both")))
+  (let ((both (list-revisions "old" "both")))
     (ok (equal (mapcar #'revision-event both) '("draft" "publish")) "the draft sits on top of the published data")
     (ok (string= (jget (revision-data (second both)) "title") "Live"))
     (ok (string= (revision-created-at (second both)) "2026-02-01T00:00:00.000Z") "published when it was last revised")
     (ok (string= (revision-created-at (first both)) "2026-03-01T00:00:00.000Z")))
-  (ok (equal (mapcar #'revision-event (list-revisions "draft")) '("draft")))
-  (connect-db ":memory:")
-  (migrate))
+  (ok (equal (mapcar #'revision-event (list-revisions "old" "draft")) '("draft")))
+  (migrated-fully))
+
+(deftest content-ids-belong-to-their-space
+  (migrated-to 12)
+  (exec "INSERT INTO spaces (name, webhook_secret, created_at) VALUES ('one', 's', '2026-01-01T00:00:00.000Z')")
+  (exec "INSERT INTO models (space, name, kind, definition) VALUES ('one', 'post', 'list', '{\"name\":\"post\",\"kind\":\"list\",\"fields\":[{\"name\":\"title\",\"type\":\"text\"}]}')")
+  (exec "INSERT INTO contents (id, space, model, status, published, created_at, updated_at, published_at, revised_at)
+         VALUES ('about', 'one', 'post', 'published', '{\"title\":\"One\"}',
+                 '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
+  (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
+         VALUES ('about', 'publish', '{\"title\":\"One\"}', '2026-01-01T00:00:00.000Z')")
+  (ok (equal (migrate) '(13)))
+  (testing "what was stored moves into its space, history and all"
+    (ok (string= (jget (content-published (get-content "one" "about")) "title") "One"))
+    (ok (equal (mapcar #'revision-event (list-revisions "one" "about")) '("publish"))))
+  (testing "another space may hold a content of the same id"
+    (create-space "two")
+    (replace-schema "two" (make-schema :models (list (make-model "post" :list (list (make-field :title :text))))))
+    (ok (create "two" (find-model "two" "post") (jobject "title" "Two") :id "about" :publish t))
+    (ok (string= (jget (content-published (get-content "two" "about")) "title") "Two"))
+    (ok (string= (jget (content-published (get-content "one" "about")) "title") "One") "and neither touches the other")
+    (ok (= (count-revisions "two" "about") 1))
+    (ok (= (count-revisions "one" "about") 1))
+    (destroy "two" (find-model "two" "post") "about")
+    (ng (get-content "two" "about"))
+    (ok (get-content "one" "about") "deleting one leaves the other")
+    (ok (= (count-revisions "one" "about") 1) "with its history"))
+  (testing "within a space an id is still one content"
+    (ok (signals (create "one" (find-model "one" "post") (jobject "title" "Again") :id "about")
+                 'koya-server/domain/errors:conflict)))
+  (migrated-fully))
 
 (deftest a-rolled-back-deploy-leaves-nothing
   (create-space "rolled")
