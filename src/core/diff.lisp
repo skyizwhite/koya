@@ -179,7 +179,7 @@
               ((:rename-model :rename-field)
                (format nil "renamed from ~a" (getf change :from)))
               (:change-kind
-               (format nil "~(~a~) -> ~(~a~)" (getf change :from) (getf change :to)))
+               (format nil "~(~a~) -> ~(~a~), its contents are deleted" (getf change :from) (getf change :to)))
               (:change-field-type
                (format nil "~(~a~)~@[ to ~a~] -> ~(~a~)~@[ to ~a~]"
                        (getf change :from) (getf change :from-target)

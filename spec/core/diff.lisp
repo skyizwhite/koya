@@ -184,3 +184,13 @@
     (ok (search "- about" (format-change (second changes))))
     (ok (string= (string-trim " " (format-change (first changes))) "~ webhooks changed")
         "the space's own webhooks are named by the path, not by a space")))
+
+(deftest a-change-of-kind-says-the-contents-go
+  (flet ((about (kind) (make-schema :models (list (make-model "about" kind (list (make-field :body :richtext)))))))
+    (let ((changes (diff-schemas (about :list) (about :object))))
+      (ok (equal (ops changes) '(:change-kind)))
+      (ok (destructive-changes-p changes))
+      (ok (search "list -> object, its contents are deleted" (format-change (first changes)))))
+    (ok (search "object -> list, its contents are deleted"
+                (format-change (first (diff-schemas (about :object) (about :list)))))
+        "either way")))

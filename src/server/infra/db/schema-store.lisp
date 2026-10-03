@@ -124,6 +124,9 @@
            WHERE content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
           path space model)))
 
+(defun drop-model-contents (space model)
+  (exec "DELETE FROM contents WHERE space = ? AND model = ?" space model))
+
 (defun apply-changes (space-name changes)
   (dolist (change changes)
     (case (getf change :op)
@@ -131,7 +134,8 @@
       (:rename-field (rename-content-field space-name (getf change :model)
                                            (getf change :from) (getf change :field)))
       ((:remove-field :change-field-type)
-       (drop-content-field space-name (getf change :model) (getf change :field))))))
+       (drop-content-field space-name (getf change :model) (getf change :field)))
+      (:change-kind (drop-model-contents space-name (getf change :model))))))
 
 (defmethod save-schema (space-name schema changes &key (by ""))
   (with-db-transaction
