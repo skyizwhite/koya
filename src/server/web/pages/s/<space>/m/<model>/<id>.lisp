@@ -3,9 +3,8 @@
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-core/schema #:model-kind #:model-name)
   (:import-from #:koya-server/usecases/contents #:find-content)
-  (:import-from #:koya-server/web/lib/http #:path-param #:redirect-to)
+  (:import-from #:koya-server/web/lib/http #:path-param)
   (:import-from #:koya-server/domain/errors #:not-found)
-  (:import-from #:koya-server/web/lib/urls #:model-url)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/content/editor #:new-p #:show-editor)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
@@ -21,7 +20,8 @@
 (defmacro with-editor ((space model content) params &body body)
   `(handler-case
        (multiple-value-bind (,space ,model ,content) (load-editor ,params)
-         (if (and (null ,content) (not (new-p (path-param ,params :id))))
+         (if (or (eq (model-kind ,model) :object)
+                 (and (null ,content) (not (new-p (path-param ,params :id)))))
              (progn (set-response-status 404)
                     (hsx (~layout :space (path-param ,params :space) (h1 :class "text-xl font-bold" "Content not found"))))
              (progn ,@body)))
@@ -31,6 +31,4 @@
 
 (defun @get (params)
   (with-editor (space model content) params
-    (if (eq (model-kind model) :object)
-        (redirect-to (model-url space (model-name model)) 302)
-        (show-editor params space model content))))
+    (show-editor params space model content)))

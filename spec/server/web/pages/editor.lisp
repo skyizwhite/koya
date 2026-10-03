@@ -189,12 +189,9 @@
                                          ("updated-at" . ,(content-updated-at (get-content "website" id)))))
       (ok (= 1 (count-contents "website" "about")))
       (ok (string= (jget (content-draft (get-content "website" id)) "body") "second")))
-    (testing "its id and new lead to the model"
+    (testing "its id and new do not reach it"
       (dolist (path (list (format nil "/s/website/m/about/~a" id) "/s/website/m/about/new"))
-        (multiple-value-bind (status body headers) (request :get path)
-          (declare (ignore body))
-          (ok (= status 302) path)
-          (ok (string= (location headers) "/s/website/m/about")))))
+        (ok (= (request :get path) 404) path)))
     (testing "it has no delete"
       (edit "/s/website/m/about" :form '(("action" . "publish") ("f-body" . "live")))
       (multiple-value-bind (status body) (request :get "/s/website/m/about")
