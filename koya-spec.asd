@@ -48,6 +48,7 @@
                "koya-spec/server/web/pages/editor"
                "koya-spec/server/web/pages/space-import"
                "koya-spec/server/usecases/ports/main"
+               "koya-spec/server/main"
                "koya-spec/server/layers"
                "koya-spec/sdk/client")
   :perform (test-op (o c) (symbol-call :rove :run c :style :dot)))

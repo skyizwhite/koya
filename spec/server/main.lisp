@@ -1,0 +1,30 @@
+(defpackage #:koya-spec/server/main
+  (:use #:cl #:rove)
+  (:import-from #:koya-server #:start #:stop)
+  (:import-from #:koya-server/infra/env #:setting-error))
+(in-package #:koya-spec/server/main)
+
+(defmacro with-env ((&rest bindings) &body body)
+  (let ((saved (gensym)))
+    `(let ((,saved (list ,@(loop :for (name) :in bindings :collect `(cons ,name (uiop:getenv ,name))))))
+       ,@(loop :for (name value) :in bindings :collect `(setf (uiop:getenv ,name) ,value))
+       (unwind-protect (progn ,@body)
+         (loop :for (name . value) :in ,saved :do (setf (uiop:getenv name) (or value "")))))))
+
+(defun refusal ()
+  (handler-case (progn (start :db ":memory:") (stop) nil)
+    (setting-error (e) (princ-to-string e))))
+
+(deftest a-bad-setting-stops-the-server-before-it-starts
+  (with-env (("KOYA_BASE_URL" "") ("KOYA_PORT" "3100"))
+    (ok (search "KOYA_BASE_URL is not set" (or (refusal) ""))
+        "a missing base URL is named, as nothing could tell the media URLs and the cookie what they are"))
+  (with-env (("KOYA_BASE_URL" "cms.example.com") ("KOYA_PORT" "3100"))
+    (ok (search "KOYA_BASE_URL must be an http or https URL, not \"cms.example.com\"" (or (refusal) ""))))
+  (dolist (port '("abc" "0" "70000"))
+    (with-env (("KOYA_BASE_URL" "https://cms.example.com") ("KOYA_PORT" port))
+      (ok (search (format nil "KOYA_PORT must be a port number from 1 to 65535, not ~s" port) (or (refusal) ""))
+          (format nil "~s is no port" port))))
+  (with-env (("KOYA_BASE_URL" "") ("KOYA_PORT" "abc"))
+    (let ((message (or (refusal) "")))
+      (ok (and (search "KOYA_BASE_URL" message) (search "KOYA_PORT" message)) "and every bad one is named at once"))))

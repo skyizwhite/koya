@@ -192,8 +192,8 @@ port 3100 and keeps everything under `/data`; mount a persistent volume there.
 | Variable | Required | Meaning |
 |---|---|---|
 | `KOYA_SECRET` | yes | the admin UI's login password, at least 32 characters, e.g. from `openssl rand -hex 32`. With a shorter one, or none, the server runs but logging in is off |
-| `KOYA_BASE_URL` | yes | the server's public URL, e.g. `https://cms.example.com`: media URLs, the same-origin check and the Secure cookie flag use it |
-| `KOYA_PORT` | no | listen port, default `3100` |
+| `KOYA_BASE_URL` | yes | the server's public URL, e.g. `https://cms.example.com`: media URLs, the same-origin check and the Secure cookie flag use it. Without it, or with something that is not an http or https URL, the server does not start |
+| `KOYA_PORT` | no | listen port, default `3100`. One that is not a port number stops the server from starting |
 | `KOYA_DB_PATH`, `KOYA_MEDIA_DIR` | no | default `/data/koya.db` and `/data/media` |
 | `KOYA_ENV` | no | `production` (default) hides error details; `dev` shows them |
 
