@@ -3,10 +3,13 @@
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-spec/server/web/api-support
                 #:*webhooks* #:admin #:delivery #:webhook-events #:setup-api #:reset-api
-                #:test-schema)
+                #:test-schema #:*management-key*)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-core/json #:jobject #:jget #:json-null #:jkeys))
+  (:import-from #:koya-core/json #:jobject #:jget #:json-null #:jkeys #:parse-json)
+  (:import-from #:alexandria #:alist-hash-table)
+  (:import-from #:flexi-streams #:make-in-memory-input-stream)
+  (:import-from #:koya-server/web/app #:app))
 (in-package #:koya-spec/server/web/admin-api/contents)
 
 (setup (setup-api))
@@ -265,3 +268,36 @@
           (ok (string= (jget json "error" "code") "not_published")))
         (ok (same-afterwards made) "the content is not touched, and its draft key still works")
         (ok (null *webhooks*) "and nothing is sent")))))
+
+(defun admin-octets (method path octets)
+  (let ((env (list :request-method method :script-name "" :path-info path :query-string ""
+                   :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                   :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
+                   :headers (alist-hash-table `(("authorization" . ,(format nil "Bearer ~a" *management-key*)))
+                                              :test 'equal)
+                   :content-type "application/json" :content-length (length octets)
+                   :raw-body (make-in-memory-input-stream octets))))
+    (destructuring-bind (status headers body) (funcall (app) env)
+      (declare (ignore headers))
+      (values status (ignore-errors (parse-json (apply #'concatenate 'string (if (listp body) body (list body)))))))))
+
+(deftest wrongly-typed-input-is-refused
+  (multiple-value-bind (status json)
+      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Yes?") "publish" "yes"))
+    (ok (= status 400) "publish is true or false, not a word")
+    (ok (string= (jget json "error" "code") "bad_request")))
+  (ok (zerop (jget (nth-value 1 (admin :get "/admin/api/contents/website/blog")) "totalCount"))
+      "and nothing is made")
+  (let ((id (jget (nth-value 1 (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Draft"))))
+                  "id")))
+    (multiple-value-bind (status json)
+        (admin :post (format nil "/admin/api/contents/website/blog/~a/publish" id) :body (jobject "data" 5))
+      (ok (= status 400) "a data that is not an object publishes nothing")
+      (ok (string= (jget json "error" "code") "bad_request")))
+    (ok (string= (jget (nth-value 1 (admin :get (format nil "/admin/api/contents/website/blog/~a" id))) "status") "draft"))
+    (ok (= 200 (admin :post (format nil "/admin/api/contents/website/blog/~a/publish" id) :body (jobject "data" json-null)))
+        "while a null one is none, and publishes the draft"))
+  (multiple-value-bind (status json)
+      (admin-octets :post "/admin/api/contents/website/blog" (coerce #(123 34 100 34 58 34 255 34 125) '(vector (unsigned-byte 8))))
+    (ok (= status 400) "a body that is not UTF-8 is no JSON")
+    (ok (string= (jget json "error" "code") "bad_json"))))
