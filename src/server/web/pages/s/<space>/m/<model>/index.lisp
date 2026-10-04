@@ -133,7 +133,7 @@
 
 (defcomp ~filters-clear (&key space model state)
   (hsx
-   (span :id "filters-clear"
+   (span :id "filters-clear" :class "inline-flex min-h-[2.125rem] items-center"
      (when (filtered-p state)
        (hsx (a :href (list-url space model :sort-key (getf state :sort-key))
                :nm-bind (on-follow (browse-url space model state :search-text "" :status "" :page 1 :clear t))
