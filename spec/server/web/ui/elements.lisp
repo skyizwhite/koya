@@ -6,6 +6,8 @@
 
 (deftest a-component-with-nothing-to-draw-draws-nothing
   (ok (string= (render-to-string (hsx (~errors :errors nil))) ""))
+  (ok (search "<div id=\"editor-errors\" hidden" (render-to-string (hsx (~errors :id "editor-errors" :errors nil))))
+      "unless it has an id, where errors are drawn later")
   (ok (string= (render-to-string (hsx (~pager :page 1 :pages 1 :href #'princ-to-string
                                               :browse #'princ-to-string)))
                "")

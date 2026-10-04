@@ -30,10 +30,14 @@
 
 (deftest editor-flow
   (exec "DELETE FROM contents")
-  (testing "validation errors re-render the form"
+  (testing "validation errors are drawn where they are shown, and the form is left as it is"
     (multiple-value-bind (status body) (edit "/s/website/m/blog/new" :form '(("action" . "save") ("f-body" . "x")))
       (ok (= status 422))
-      (ok (search "is required" body))
+      (ok (search "<div id=\"editor-errors\"" body) "the summary")
+      (ok (cl-ppcre:scan "<p id=\"f-title-error\"[^>]*>is required</p>" body) "the field's own line")
+      (ok (cl-ppcre:scan "<p id=\"f-body-error\"[^>]*hidden[^>]*></p>" body) "and a field without an error has its line emptied")
+      (ng (search "id=\"editor\"" body))
+      (ng (search "editor-form" body) "so what was typed, the focus and the rich text stay")
       (ng (search "NIL" body))))
   (testing "an emptied editor, which koya.js sends as nothing, is no value"
     (multiple-value-bind (status body)

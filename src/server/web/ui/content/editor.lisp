@@ -30,7 +30,7 @@
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
   (:import-from #:koya-server/usecases/media #:find-media)
-  (:import-from #:koya-server/web/ui/content/field-input #:~field-input)
+  (:import-from #:koya-server/web/ui/content/field-input #:~field-input #:~field-error)
   (:import-from #:koya-server/usecases/revisions #:restore-data #:find-revision)
   (:import-from #:koya-server/web/ui/media/picker #:~media-picker-dialog)
   (:import-from #:koya-server/domain/revision #:revision-data #:revision-created-at)
@@ -127,7 +127,7 @@
                              :class "btn btn-primary" :title "Publish content"
                              :confirm "Publish this content? The site shows it as the form has it now."
                              "Publish"))))
-       (~errors :errors errors)
+       (~errors :id "editor-errors" :errors errors)
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
        (form :id "editor-form" :class "space-y-6" :nm-ref "form"
@@ -260,8 +260,10 @@
                                             (t "Draft saved."))))))
            (validation-error (e)
              (set-response-status 422)
-             (hsx (~editor :space space :model model :content content :data data
-                           :errors (validation-error-errors e))))
+             (let ((errors (validation-error-errors e)))
+               (hsx (<> (~errors :id "editor-errors" :errors errors)
+                        (loop :for field :in (model-fields model) :collect
+                          (hsx (~field-error :field field :error (field-error errors (field-name field)))))))))
            (koya-error (e)
              (if (equal (koya-error-code e) "changed_elsewhere")
                  (changed-elsewhere (editor-url space model (content-id content)))

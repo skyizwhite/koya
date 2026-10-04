@@ -11,6 +11,7 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/media/grid #:~media-grid #:~pick-cards #:~upload-limit)
   (:export #:media-picker
+           #:media-picker-search
            #:media-picker-more
            #:media-picker-upload
            #:~media-picker-dialog))
@@ -24,20 +25,23 @@
             (and (< page (last-page (count-media space :search search) +picker-size+))
                  (media-picker-more :space space :q (or search "") :page (1+ page))))))
 
-(defcomp ~picker-body (&key space search error)
+(defcomp ~picker-grid (&key space search)
   (multiple-value-bind (items more) (picker-items space search 1)
-    (hsx
-     (div :id "media-picker-body" :class "space-y-4"
-       (form :nm-data "...koya.search()" :nm-bind (on-search (media-picker :space space)) :class "flex gap-2"
-         (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
-       (form :nm-bind (on-pick (media-picker-upload :space space))
-             :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
-         (label :class "btn" (~icon :name :upload) "Upload…"
-           (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
-         (span :class "text-muted" "PNG, JPEG, GIF or WebP. Uploaded files are added to the library.")
-         (~upload-limit)
-         (when error (hsx (span :class "text-danger" error))))
-       (~media-grid :items items :more more)))))
+    (hsx (div :id "media-picker-grid" (~media-grid :items items :more more)))))
+
+(defcomp ~picker-body (&key space search error)
+  (hsx
+   (div :id "media-picker-body" :class "space-y-4"
+     (form :nm-data "...koya.search()" :nm-bind (on-search (media-picker-search :space space)) :class "flex gap-2"
+       (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
+     (form :nm-bind (on-pick (media-picker-upload :space space))
+           :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
+       (label :class "btn" (~icon :name :upload) "Upload…"
+         (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
+       (span :class "text-muted" "PNG, JPEG, GIF or WebP. Uploaded files are added to the library.")
+       (~upload-limit)
+       (when error (hsx (span :class "text-danger" error))))
+     (~picker-grid :space space :search search))))
 
 (defun forbidden (message)
   (set-response-status 403)
@@ -50,6 +54,10 @@
 (defaction media-picker :get (params)
   (cond ((null (picker-space params)) (forbidden "Unknown space."))
         (t (hsx (~picker-body :space (picker-space params) :search (param params "q"))))))
+
+(defaction media-picker-search :get (params)
+  (cond ((null (picker-space params)) (forbidden "Unknown space."))
+        (t (hsx (~picker-grid :space (picker-space params) :search (param params "q"))))))
 
 (defaction media-picker-more :get (params)
   (let ((space (picker-space params)))

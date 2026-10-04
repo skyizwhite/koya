@@ -11,10 +11,11 @@
            #:~replace-url))
 (in-package #:koya-server/web/ui/elements)
 
-(defcomp ~errors (&key errors)
+(defcomp ~errors (&key id errors)
   (hsx
-   (<> (when errors
-         (hsx (div :class "mb-6 rounded-md border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger"
+   (<> (when (or id errors)
+         (hsx (div :id id :hidden (null errors)
+                   :class "mb-6 rounded-md border border-danger/40 bg-danger/5 px-4 py-3 text-sm text-danger"
                 (ul :class "list-disc pl-5"
                   (loop :for e :in errors :collect
                     (hsx (li (strong (getf e :field)) " " (getf e :message)))))))))))

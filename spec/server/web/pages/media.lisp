@@ -10,7 +10,7 @@
   (:import-from #:koya-server/usecases/ports/media #:list-media #:count-media)
   (:import-from #:koya-server/domain/media #:media-id #:media-filename)
   (:import-from #:koya-server/web/ui/media/picker
-                #:media-picker #:media-picker-more #:media-picker-upload)
+                #:media-picker #:media-picker-search #:media-picker-more #:media-picker-upload)
   (:import-from #:koya-server/web/pages/s/<space>/media
                 #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt)
   (:import-from #:koya-spec/server/usecases/media #:png-bytes)
@@ -92,8 +92,13 @@
         (ok (search "data-pick-url=\"/media/website/" body))
         (ok (not (search "<html" body)) "a fragment, not a page")
         (ok (search "nm-bind=\"{ onclick: () => _pick(this.dataset) }\"" body) "a card hands its file over")
-        (ok (search (bound (on-search (media-picker :space "website"))) body) "the box searches as the typing stops")
+        (ok (search (bound (on-search (media-picker-search :space "website"))) body) "the box searches as the typing stops")
         (ok (search (bound (on-pick (media-picker-upload :space "website"))) body)))
+      (multiple-value-bind (status body) (call-action :get (media-picker-search :space "website" :q "zzz-nothing"))
+        (ok (= status 200))
+        (ok (search "<div id=\"media-picker-grid\"" body) "a search answers the grid")
+        (ng (search "Search file names" body) "and not the box being typed in")
+        (ng (search "data-pick-id=" body) "narrowed by what was typed"))
       (let ((*cookie* nil))
         (multiple-value-bind (status) (call-action :get (media-picker :space "website"))
           (ok (= status 401) "the picker needs the owner session")))
