@@ -97,14 +97,17 @@ category[equals]tech[or]category[equals]life
 | `less_than` `greater_than` | for numbers and dates |
 | `exists` `not_exists` | the field has a value / is blank (takes no value); a boolean always has one, `false` when missing |
 
-On a `many` field, `equals` and `contains` mean "has this value". On a
+On a `many` field, `equals` and `contains` mean "has this value", and
+`not_equals` and `not_contains` "does not have this value". On a
 `richtext` field, `contains`, `not_contains` and `begins_with` read the text
 without its tags, with `&amp;` and the like as the characters they stand for, as
 `q` does. On a `custom` field only `contains` and `not_contains` work:
 `contains` matches when one of its `text`, `textarea`, `slug` or `richtext`
 fields contains the value, `not_contains` when none does; any other operator,
-or `orders` on it, is `400 bad_query`. A `repeater` field is the same, over
-the fields of every row. A value for a
+or `orders` on it, is `400 bad_query`. One of those fields is named through
+its custom field, as `meta.title[contains]x`, and takes only `contains` and
+`not_contains`. A `repeater` field is the same as a custom field, over the
+fields of every row. A value for a
 `number` field is a decimal of at most 64 characters, such as `42`, `-2.5` or
 `1e3`. An unknown field in `filters`, `orders` or `include`, or a number field
 given anything else, is `400 bad_query`.
@@ -147,8 +150,9 @@ A content is its fields plus the system fields:
   inside it is `400 bad_query`. A reference in a repeater's rows is named
   through the repeater, as `blocks.by`, and embedded in each row whose custom
   field has a reference named `by`; the other rows are left as they are, and a
-  path that reaches no reference is `400 bad_query`. What is embedded is the published data, with a
-  `draftKey` too. A referenced content that is missing or unpublished drops out
+  path that reaches no reference is `400 bad_query`. What is embedded is the published data, even
+  when the request carries a `draftKey`; an embedded content carries no draft
+  key. A referenced content that is missing or unpublished drops out
   of a `many` field and becomes `null` in a single one.
 - **Media** fields are always expanded to the media object, with an absolute
   `url`; one whose file is gone is `null`, and drops out of a `many` field, whose
@@ -264,8 +268,8 @@ field a deploy removed does not count.
 
 ## Errors
 
-Anything but a 2xx is the object below, except for a request body over 21 MB:
-that is answered with `413` and a plain-text body before koya reads it.
+Anything but a 2xx is the object below. A request body over 21 MB, on any
+route, is answered with `413 too_large` before koya reads it.
 
 ```json
 { "error": { "code": "validation_failed", "message": "Content is invalid", "details": [ … ] } }
@@ -275,10 +279,10 @@ that is answered with `413` and a plain-text body before koya reads it.
 |---|---|---|
 | 400 | `bad_request` `bad_json` `bad_query` `invalid_schema` | the request is malformed |
 | 401 | `unauthorized` | no key, or a wrong one |
-| 403 | `forbidden` | a key of another space |
-| 404 | `not_found` | no such space, model, content or media |
+| 403 | `forbidden` | a key of another space; a space that does not exist is another space too |
+| 404 | `not_found` | no such model, content or media |
 | 409 | `conflict` `destructive_changes` `contents_do_not_fit` `in_use` `not_published` `no_draft` `object_exists` | refused as things stand |
-| 413 | `too_large` | images over 20 MB, alone or together |
+| 413 | `too_large` | images over 20 MB, alone or together, or a request body over 21 MB |
 | 422 | `validation_failed` `empty_file` `unsupported_type` | the content or file is not acceptable |
 | 500 | `internal_error` | the message is only detailed with `KOYA_ENV=dev` |
 | 503 | `unavailable` | `/health` only: the database cannot be read |

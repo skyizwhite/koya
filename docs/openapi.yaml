@@ -23,8 +23,8 @@ info:
     Bodies use camelCase keys. Timestamps are ISO 8601 in UTC with milliseconds
     (`2026-09-20T05:04:03.123Z`). Every error is
     `{"error": {"code", "message", "details"?}}`; any route can also answer
-    `500 internal_error`. A request body over 21 MB is answered with 413 and a
-    plain-text body before it is read, not with an error object. The
+    `500 internal_error`. Any route given a request body over 21 MB answers
+    `413 too_large` before reading it. The
     schema document is specified in SCHEMA.md, and API.md walks through both
     APIs. koya-ts-sdk (https://github.com/skyizwhite/koya-ts-sdk) wraps them.
   license:
@@ -186,6 +186,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Schema" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     put:
       operationId: deploySchema
@@ -197,7 +198,8 @@ paths:
         Existing content changes only as the schema does: a rename carries it
         through, and a removed or retyped field's values are taken out of every
         published object, draft and revision. The space must already exist — it is
-        made in the admin UI — and a deploy to an unknown name is a 404.
+        made in the admin UI — and a deploy to another name, one that does not
+        exist included, is a 403.
       security: [{ managementKey: [] }]
       parameters:
         - name: force
@@ -230,6 +232,7 @@ paths:
                   message: Schema deploy contains destructive changes; retry with force=true
                   details:
                     - { op: remove_field, path: blog.summary, destructive: true, description: "! - blog.summary (text)" }
+        "413": { $ref: "#/components/responses/TooLarge" }
 
   /admin/api/{space}/schema/plan:
     parameters:
@@ -254,6 +257,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
 
   /admin/api/{space}/lists/{model}:
     parameters:
@@ -282,6 +286,7 @@ paths:
               schema: { $ref: "#/components/schemas/AdminContentList" }
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createAdminListContent
@@ -316,6 +321,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
+        "413": { $ref: "#/components/responses/TooLarge" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
   /admin/api/{space}/lists/{model}/{id}:
@@ -336,6 +342,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       operationId: updateAdminListContent
@@ -365,6 +372,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
     delete:
       operationId: deleteAdminListContent
@@ -416,6 +424,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
   /admin/api/{space}/lists/{model}/{id}/unpublish:
@@ -519,6 +528,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       operationId: updateAdminObject
@@ -549,6 +559,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
+        "413": { $ref: "#/components/responses/TooLarge" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
   /admin/api/{space}/objects/{model}/publish:
@@ -558,7 +569,9 @@ paths:
       summary: Publish an object
       description: |
         As publishing a list content. Before its first write, `data` makes the
-        object, published; without `data` that is a 404. 404 for a `list` model.
+        object, published; without `data` that is a 404; two first writes at
+        once make one, and the other is refused with 409 `object_exists`. 404 for
+        a `list` model.
       security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -578,6 +591,12 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`object_exists`: another first write made the object at the same time"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "413": { $ref: "#/components/responses/TooLarge" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
   /admin/api/{space}/objects/{model}/unpublish:
@@ -675,6 +694,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/DeliveryKeys" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createDeliveryKey
@@ -701,6 +721,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
 
   /admin/api/{space}/keys/{id}:
     delete:
@@ -745,6 +766,7 @@ paths:
               schema: { $ref: "#/components/schemas/MediaList" }
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: uploadMedia
@@ -786,7 +808,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "413":
-          description: "`too_large`: images over 20 MB, alone or together. A body over 21 MB gets 413 in plain text, with no error object."
+          description: "`too_large`: images over 20 MB, alone or together, or a request body over 21 MB"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
@@ -812,6 +834,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MediaWithReferences" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       operationId: updateMedia
@@ -837,6 +860,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
     delete:
       operationId: deleteMedia
       tags: [media]
@@ -909,13 +933,16 @@ components:
         groups of `[and]` terms. Operators: `equals`, `not_equals`, `contains`,
         `not_contains`, `begins_with`, `exists`, `not_exists`, `less_than`,
         `greater_than`. On a `many` field, `equals` and `contains` mean "has
-        this value". On a `richtext` field, `contains`, `not_contains` and
+        this value", and `not_equals` and `not_contains` "does not have this
+        value". On a `richtext` field, `contains`, `not_contains` and
         `begins_with` read its text without tags. On a `custom` field only
         `contains` and `not_contains` work: `contains` matches when one of its
         text, textarea, slug or richtext fields contains the value,
         `not_contains` when none does; any other operator, or `orders` on it,
-        is `bad_query`. A `repeater` field is the same, over the fields of
-        every row. Example:
+        is `bad_query`. One of those fields is named through its custom field,
+        as `meta.title[contains]x`, and takes only `contains` and
+        `not_contains`. A `repeater` field is the same as a custom field, over
+        the fields of every row. Example:
         `title[contains]lisp[and]publishedAt[exists]`.
     q:
       name: q
@@ -949,7 +976,8 @@ components:
         through the repeater, as `blocks.by`, and embedded in each row whose
         custom field has a reference named `by`, the other rows left as they
         are; a path that reaches no reference is `bad_query`. What is embedded is the referenced
-        contents' published data, with a `draftKey` too. Referenced contents that
+        contents' published data, even when the request carries a `draftKey`;
+        an embedded content carries no draft key. Referenced contents that
         are missing or unpublished are dropped from a `many` field and `null` in a
         single one.
     draftKey:
@@ -965,7 +993,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
     BadQuery:
-      description: "`bad_query`: a malformed `filters`, an unknown field in `filters`/`orders`/`include`, an operator or an order a custom field or a repeater does not take, or a bad integer"
+      description: "`bad_query`: a malformed `filters`, an unknown field in `filters`/`orders`/`include`, an unknown operator, an operator or an order a custom field, a field inside one or a repeater does not take, a value that is not a number for a `number` field or not `true`/`false` for a `boolean` one, an `include` path with a segment that is not a reference (or, on the way to one, a custom field or a repeater), or a bad integer"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
@@ -980,12 +1008,17 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
     Forbidden:
-      description: "`forbidden`: the delivery or management key belongs to another space"
+      description: "`forbidden`: the delivery or management key belongs to another space; a space that does not exist is another space too"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
     NotFound:
-      description: "`not_found`: unknown space, model, content, media or endpoint"
+      description: "`not_found`: unknown model, content, media or endpoint"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    TooLarge:
+      description: "`too_large`: the request body is over 21 MB"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
@@ -1062,9 +1095,11 @@ components:
         koyaSchema: { type: integer, const: 1 }
         webhooks:
           type: array
+          description: Responses always carry it.
           items: { $ref: "#/components/schemas/Webhook" }
         models:
           type: array
+          description: Responses always carry it.
           items: { $ref: "#/components/schemas/Model" }
         customFields:
           type: array
@@ -1076,8 +1111,8 @@ components:
       description: |
         A set of fields a model uses as one field of type `custom`, or as the
         rows of a `repeater`. Its fields are any type but `slug`, `custom` and
-        `repeater`, none is `unique`, and none is named `fieldId`, which names a
-        repeater row's custom field.
+        `repeater`, none is `unique` or carries `was`, and none is named
+        `fieldId`, which names a repeater row's custom field.
       required: [name, fields]
       properties:
         name: { $ref: "#/components/schemas/FieldName" }
@@ -1108,12 +1143,14 @@ components:
             shows for a content. Absent, a content is shown by its id.
         was:
           type: string
+          pattern: "^[a-z][a-z0-9-]*$"
           description: |
             The name this model had. A deploy renames it and moves its
             contents instead of dropping them; the stored schema keeps the
             new name alone, so a GET never returns it. See SCHEMA.md.
         fields:
           type: array
+          description: Responses always carry it.
           items: { $ref: "#/components/schemas/Field" }
 
     Field:
@@ -1346,15 +1383,18 @@ components:
         older schemas is ignored.
       required: [url]
       properties:
-        label: { type: string, description: "Defaults to `url`; always present on output" }
+        label: { type: string, minLength: 1, description: "Unique within the schema. Defaults to `url`; responses always carry it" }
         url:
           type: string
           pattern: "^[Hh][Tt][Tt][Pp][Ss]?://."
           description: Starts with `http://` or `https://`. See SCHEMA.md for which addresses are sent to.
         only:
-          type: array
-          description: Model names this webhook is narrowed to; absent means every model.
-          items: { type: string }
+          description: The model name, or model names without repeats, this webhook is narrowed to; absent means every model.
+          oneOf:
+            - { type: string, pattern: "^[a-z][a-z0-9-]*$" }
+            - type: array
+              uniqueItems: true
+              items: { type: string, pattern: "^[a-z][a-z0-9-]*$" }
 
     Change:
       type: object
@@ -1405,7 +1445,7 @@ components:
       required: [data]
       properties:
         data: { $ref: "#/components/schemas/ContentData" }
-        publish: { type: boolean, default: false }
+        publish: { type: [boolean, "null"], default: false, description: "`null` is as absent" }
         id:
           type: string
           pattern: "^[A-Za-z0-9_-]{1,64}$"
@@ -1424,7 +1464,9 @@ components:
     PublishContent:
       type: object
       properties:
-        data: { $ref: "#/components/schemas/ContentData" }
+        data:
+          description: "`null` is as absent"
+          oneOf: [{ $ref: "#/components/schemas/ContentData" }, { type: "null" }]
         publishedAt: { $ref: "#/components/schemas/Timestamp" }
 
     ContentData:
