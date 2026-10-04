@@ -581,7 +581,8 @@
        (progn
          (multiple-value-bind (status body) (request :get "/s/website/m/page/new")
            (ok (= status 200))
-           (ok (cl-ppcre:scan "<fieldset[^>]*>\\s*<legend[^>]*>card" body) "a fieldset named by the field")
+           (ok (cl-ppcre:scan "<div id=\"f-card-label\" class=\"label\">card<span[^>]*>custom</span><span[^>]*>The card</span></div><fieldset id=\"f-card\" aria-labelledby=\"f-card-label\"" body)
+               "a fieldset under a heading like any field's, with its help beside it")
            (ok (search "The card" body) "with its help")
            (ok (search "id=\"f-card.heading\" name=\"f-card.heading\"" body) "and an input for each field inside")
            (ok (search "name=\"f-card.shown\"" body))

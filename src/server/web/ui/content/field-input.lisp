@@ -98,14 +98,17 @@
 (defcomp ~custom-input (&key field error children)
   (let ((name (field-param-name field)))
     (hsx
-     (fieldset :id name :class "space-y-4 rounded-md border border-line p-4"
-       (legend :class "label px-1"
+     (div :class "space-y-1.5"
+       (div :id (format nil "~a-label" name) :class "label"
          (field-name field)
          (span :class "ml-2 text-xs font-normal text-muted" "custom")
-         (when (field-required-p field) (hsx (span :class "ml-1 text-danger" "*"))))
-       (when (field-option field :help)
-         (hsx (p :id (format nil "~a-help" name) :class "text-xs text-muted" (field-option field :help))))
-       children
+         (when (field-required-p field) (hsx (span :class "ml-1 text-danger" "*")))
+         (when (field-option field :help)
+           (hsx (span :id (format nil "~a-help" name) :class "ml-3 text-xs font-normal text-muted"
+                  (field-option field :help)))))
+       (fieldset :id name :aria-labelledby (format nil "~a-label" name)
+                 :class "space-y-4 rounded-md border border-line p-4"
+         children)
        (~field-error :field field :error error)))))
 
 (defcomp ~field-input (&key field parent value error references media)
