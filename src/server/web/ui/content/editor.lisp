@@ -9,7 +9,7 @@
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy
-                #:save-object #:publish-object)
+                #:update-object #:publish-object)
   (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-status #:content-published #:content-draft
@@ -243,7 +243,7 @@
                ((and object-p (string= op "publish"))
                 (done space model (publish-object space model data :since (param params "updated-at")) "Published."))
                ((and object-p (null content))
-                (done space model (save-object space model data) "Draft saved."))
+                (done space model (update-object space model data) "Draft saved."))
                ((null content)
                 (let ((made (create space model data :publish (string= op "publish"))))
                   (move-on (content-url space model-name (content-id made))

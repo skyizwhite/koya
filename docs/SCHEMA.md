@@ -1,7 +1,7 @@
 # The schema format
 
 A koya schema is the JSON document that `koya deploy` sends to
-`PUT /admin/api/schema/{space}` and that `GET /admin/api/schema/{space}` returns.
+`PUT /admin/api/{space}/schema` and that `GET /admin/api/{space}/schema` returns.
 It describes **one space**: the space itself is made in the admin UI and named by
 the URL, so the document carries neither its name nor anything else about it. The
 server stores it as is and generates the admin UI's forms, the delivery API's
@@ -193,7 +193,7 @@ and tightening the options is checked against the stored content (see
 `was` is an instruction to the deploy, not part of the shape:
 
 - The server stores the model and the field without it, so `GET
-  /admin/api/schema/{space}` never returns one and `pull` never brings one back.
+  /admin/api/{space}/schema` never returns one and `pull` never brings one back.
   Leaving it in the source is harmless, and so is dropping it once **every space
   the schema is deployed to** has had the rename — a space still at the old shape
   reads the document without `was` as a removal and an addition.
@@ -232,7 +232,7 @@ Validation failures come back as `422 validation_failed` with
 
 ## Changes
 
-`POST /admin/api/schema/{space}/plan` and `PUT /admin/api/schema/{space}` describe
+`POST /admin/api/{space}/schema/plan` and `PUT /admin/api/{space}/schema` describe
 the difference between the space's stored schema and the one sent as a list of
 **changes**:
 

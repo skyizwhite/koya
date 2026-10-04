@@ -17,11 +17,12 @@
            #:configure
            #:koya-error #:koya-error-status #:koya-error-code #:koya-error-message #:koya-error-details
            #:plan #:deploy #:pull
-           #:get-list #:get-item #:get-object
-           #:list-contents #:get-content #:create-content #:update-content
-           #:publish-content #:unpublish-content #:discard-draft #:delete-content #:draft-key
-           #:get-object-content #:update-object #:publish-object #:unpublish-object
-           #:discard-object-draft #:object-draft-key
+           #:get-list #:get-list-content #:get-object
+           #:admin-get-list #:admin-get-list-content #:admin-create-list-content
+           #:admin-update-list-content #:admin-publish-list-content #:admin-unpublish-list-content
+           #:admin-discard-list-content-draft #:admin-delete-list-content #:admin-list-content-draft-key
+           #:admin-get-object #:admin-update-object #:admin-publish-object #:admin-unpublish-object
+           #:admin-discard-object-draft #:admin-object-draft-key
            #:create-delivery-key #:list-delivery-keys #:delete-delivery-key #:webhook-secret
            #:list-media #:get-media #:upload-media #:update-media #:delete-media))
 (in-package #:koya-sdk/client)
@@ -107,7 +108,7 @@ deploy would make.")
                   (getf misfit :version) (getf misfit :message))))))
 
 (defun schema-path (space &optional action)
-  (format nil "/admin/api/schema/~a~@[/~a~]" (space-name space) action))
+  (format nil "/admin/api/~a/schema~@[/~a~]" (space-name space) action))
 
 (defun plan (&key space (schema (current-schema)) (stream *standard-output*))
   "Show what DEPLOY would change in SPACE. Returns the list of changes."
@@ -145,122 +146,128 @@ confirmation when CONFIRM is true. Returns the applied changes."
   "Fetch the schema SPACE currently has on the server as a schema object."
   (jobject->schema (request :get (schema-path space) :auth :management)))
 
-(defun delivery-path (space model &optional id)
-  (format nil "/api/v1/~a/~(~a~)~@[/~a~]" (space-name space) model id))
+(defun delivery-path (space kind model &optional id)
+  (format nil "/api/v1/~a/~a/~(~a~)~@[/~a~]" (space-name space) kind model id))
 
 (defun get-list (model &key space query)
-  "List published contents of MODEL. QUERY is a kebab plist (:limit :offset :orders
-:fields :filters :q :include). References are ids unless :include names them, e.g.
-:include \"tags\" or :include '(\"tags\" \"author.avatar\")."
-  (jvalue->lisp (request :get (delivery-path space model) :query query :auth :delivery)))
+  "List published contents of list model MODEL. QUERY is a kebab plist (:limit
+:offset :orders :fields :filters :q :include). References are ids unless :include
+names them, e.g. :include \"tags\" or :include '(\"tags\" \"author.avatar\")."
+  (jvalue->lisp (request :get (delivery-path space "lists" model) :query query :auth :delivery)))
 
-(defun get-item (model id &key space query)
-  "Fetch one published content. Pass :draft-key in QUERY to preview a draft."
-  (jvalue->lisp (request :get (delivery-path space model id) :query query :auth :delivery)))
+(defun get-list-content (model id &key space query)
+  "Fetch one published content of list model MODEL. Pass :draft-key in QUERY to preview a draft."
+  (jvalue->lisp (request :get (delivery-path space "lists" model id) :query query :auth :delivery)))
 
 (defun get-object (model &key space query)
-  "Fetch the content of an object-kind model."
-  (jvalue->lisp (request :get (delivery-path space model) :query query :auth :delivery)))
+  "Fetch the published object of object model MODEL. Pass :draft-key in QUERY to preview its draft."
+  (jvalue->lisp (request :get (delivery-path space "objects" model) :query query :auth :delivery)))
 
-(defun admin-path (space model &optional id action)
-  (format nil "/admin/api/contents/~a/~(~a~)~@[/~a~]~@[/~a~]" (space-name space) model id action))
+(defun admin-path (space kind model &optional id action)
+  (format nil "/admin/api/~a/~a/~(~a~)~@[/~a~]~@[/~a~]" (space-name space) kind model id action))
 
-(defun list-contents (model &key space query)
-  "List all contents of MODEL including drafts (management)."
-  (jvalue->lisp (request :get (admin-path space model) :query query :auth :management)))
+(defun list-path (space model &optional id action)
+  (admin-path space "lists" model id action))
 
-(defun get-content (model id &key space)
-  "Content ID of MODEL as the admin API has it, draft included."
-  (jvalue->lisp (request :get (admin-path space model id) :auth :management)))
+(defun object-path (space model &optional action)
+  (admin-path space "objects" model nil action))
 
-(defun create-content (model data &key space publish id created-at updated-at published-at revised-at)
-  "Create a content. DATA is a kebab plist of field values. ID and the system
-timestamps CREATED-AT, UPDATED-AT, PUBLISHED-AT and REVISED-AT (ISO 8601 strings)
-can be given explicitly, e.g. when importing from another CMS."
+(defun admin-get-list (model &key space query)
+  "List all contents of list model MODEL including drafts (management)."
+  (jvalue->lisp (request :get (list-path space model) :query query :auth :management)))
+
+(defun admin-get-list-content (model id &key space)
+  "Content ID of list model MODEL as the admin API has it, draft included."
+  (jvalue->lisp (request :get (list-path space model id) :auth :management)))
+
+(defun admin-create-list-content (model data &key space publish id created-at updated-at published-at revised-at)
+  "Create a content of list model MODEL. DATA is a kebab plist of field values. ID
+and the system timestamps CREATED-AT, UPDATED-AT, PUBLISHED-AT and REVISED-AT (ISO
+8601 strings) can be given explicitly, e.g. when importing from another CMS."
   (let ((body (jobject "data" (lisp->jvalue data) "publish" (and publish t))))
     (when id (setf (gethash "id" body) id))
     (loop :for (key value) :on (list "createdAt" created-at "updatedAt" updated-at
                                      "publishedAt" published-at "revisedAt" revised-at)
           :by #'cddr
           :when value :do (setf (gethash key body) value))
-    (jvalue->lisp (request :post (admin-path space model) :body body :auth :management))))
+    (jvalue->lisp (request :post (list-path space model) :body body :auth :management))))
 
-(defun update-content (model id data &key space)
-  "Save DATA (kebab plist) as a draft, merged onto the current data."
-  (jvalue->lisp (request :patch (admin-path space model id) :body (jobject "data" (lisp->jvalue data)) :auth :management)))
+(defun admin-update-list-content (model id data &key space)
+  "Save DATA (kebab plist) as a draft of content ID, merged onto the current data."
+  (jvalue->lisp (request :patch (list-path space model id) :body (jobject "data" (lisp->jvalue data)) :auth :management)))
 
-(defun publish-content (model id &key space data published-at)
+(defun admin-publish-list-content (model id &key space data published-at)
   "Publish the draft of content ID, or DATA when given. PUBLISHED-AT overrides the publish date."
   (let ((body (jobject)))
     (when data (setf (gethash "data" body) (lisp->jvalue data)))
     (when published-at (setf (gethash "publishedAt" body) published-at))
-    (jvalue->lisp (request :post (admin-path space model id "publish") :body body :auth :management))))
+    (jvalue->lisp (request :post (list-path space model id "publish") :body body :auth :management))))
 
-(defun unpublish-content (model id &key space)
+(defun admin-unpublish-list-content (model id &key space)
   "Take content ID off the delivery API, keeping it as a draft."
-  (jvalue->lisp (request :post (admin-path space model id "unpublish") :body (jobject) :auth :management)))
+  (jvalue->lisp (request :post (list-path space model id "unpublish") :body (jobject) :auth :management)))
 
-(defun discard-draft (model id &key space)
-  "Drop the draft of a published content, leaving the published version."
-  (jvalue->lisp (request :post (admin-path space model id "discard-draft") :body (jobject) :auth :management)))
+(defun admin-discard-list-content-draft (model id &key space)
+  "Drop the draft of published content ID, leaving the published version."
+  (jvalue->lisp (request :post (list-path space model id "discard-draft") :body (jobject) :auth :management)))
 
-(defun delete-content (model id &key space)
+(defun admin-delete-list-content (model id &key space)
   "Delete content ID with its history. Refused while other contents refer to it."
-  (jvalue->lisp (request :delete (admin-path space model id) :auth :management)))
+  (jvalue->lisp (request :delete (list-path space model id) :auth :management)))
 
-(defun draft-key (model id &key space)
+(defun admin-list-content-draft-key (model id &key space)
   "The draft key of content ID for previews."
-  (jget (request :post (admin-path space model id "draft-key") :body (jobject) :auth :management) "draftKey"))
+  (jget (request :post (list-path space model id "draft-key") :body (jobject) :auth :management) "draftKey"))
 
-(defun get-object-content (model &key space)
-  "The content of object model MODEL as the admin API has it, draft included."
-  (jvalue->lisp (request :get (admin-path space model) :auth :management)))
+(defun admin-get-object (model &key space)
+  "The object of object model MODEL as the admin API has it, draft included."
+  (jvalue->lisp (request :get (object-path space model) :auth :management)))
 
-(defun update-object (model data &key space)
+(defun admin-update-object (model data &key space)
   "Save DATA (kebab plist) as the draft of object model MODEL, merged onto the
-current data. The first save makes its content."
-  (jvalue->lisp (request :patch (admin-path space model) :body (jobject "data" (lisp->jvalue data)) :auth :management)))
+current data. The first save makes its object."
+  (jvalue->lisp (request :patch (object-path space model) :body (jobject "data" (lisp->jvalue data)) :auth :management)))
 
-(defun publish-object (model &key space data published-at)
+(defun admin-publish-object (model &key space data published-at)
   "Publish the draft of object model MODEL, or DATA when given; DATA makes its
-content when it has none yet. PUBLISHED-AT overrides the publish date."
+object when it has none yet. PUBLISHED-AT overrides the publish date."
   (let ((body (jobject)))
     (when data (setf (gethash "data" body) (lisp->jvalue data)))
     (when published-at (setf (gethash "publishedAt" body) published-at))
-    (jvalue->lisp (request :post (admin-path space model nil "publish") :body body :auth :management))))
+    (jvalue->lisp (request :post (object-path space model "publish") :body body :auth :management))))
 
-(defun unpublish-object (model &key space)
-  "Take object model MODEL off the delivery API, keeping its content as a draft."
-  (jvalue->lisp (request :post (admin-path space model nil "unpublish") :body (jobject) :auth :management)))
+(defun admin-unpublish-object (model &key space)
+  "Take the object of object model MODEL off the delivery API, keeping it as a draft."
+  (jvalue->lisp (request :post (object-path space model "unpublish") :body (jobject) :auth :management)))
 
-(defun discard-object-draft (model &key space)
+(defun admin-discard-object-draft (model &key space)
   "Drop the draft of object model MODEL, leaving the published version."
-  (jvalue->lisp (request :post (admin-path space model nil "discard-draft") :body (jobject) :auth :management)))
+  (jvalue->lisp (request :post (object-path space model "discard-draft") :body (jobject) :auth :management)))
 
-(defun object-draft-key (model &key space)
+(defun admin-object-draft-key (model &key space)
   "The draft key of object model MODEL for previews."
-  (jget (request :post (admin-path space model nil "draft-key") :body (jobject) :auth :management) "draftKey"))
+  (jget (request :post (object-path space model "draft-key") :body (jobject) :auth :management) "draftKey"))
 
 (defun create-delivery-key (&key space (label ""))
   "Create a delivery key for SPACE. Returns (values key id); it is shown only once."
-  (let ((response (request :post (format nil "/admin/api/keys/~a" (space-name space))
+  (let ((response (request :post (format nil "/admin/api/~a/keys" (space-name space))
                            :body (jobject "label" label) :auth :management)))
     (values (jget response "key") (jget response "id"))))
 
 (defun list-delivery-keys (&key space)
   "The delivery keys of SPACE, without their plaintext."
-  (jvalue->lisp (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :management) "keys")))
+  (jvalue->lisp (jget (request :get (format nil "/admin/api/~a/keys" (space-name space)) :auth :management) "keys")))
 
 (defun webhook-secret (&key space)
   "The secret the server sends as X-KOYA-WEBHOOK-KEY for SPACE's webhooks."
-  (jget (request :get (format nil "/admin/api/keys/~a" (space-name space)) :auth :management) "webhookSecret"))
+  (jget (request :get (format nil "/admin/api/~a/keys" (space-name space)) :auth :management) "webhookSecret"))
 
 (defun delete-delivery-key (id &key space)
   "Revoke the delivery key ID of SPACE."
-  (jvalue->lisp (request :delete (format nil "/admin/api/keys/~a/~a" (space-name space) id) :auth :management)))
+  (jvalue->lisp (request :delete (format nil "/admin/api/~a/keys/~a" (space-name space) id) :auth :management)))
 
 (defun media-path (space &optional id)
-  (format nil "/admin/api/media/~a~@[/~a~]" (space-name space) id))
+  (format nil "/admin/api/~a/media~@[/~a~]" (space-name space) id))
 
 (defun list-media (&key space search (limit 60) (offset 0))
   "Media of SPACE, newest first: (:media (...) :total-count n :offset :limit). SEARCH matches file names."

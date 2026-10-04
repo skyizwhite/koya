@@ -135,10 +135,10 @@
     (ok (= status 301) "a page is sent to its URL")
     (ok (string= (location headers) "/s/website")))
   (multiple-value-bind (status body headers)
-      (request :get "/api/v1/website/blog/" :headers `(("x-koya-delivery-key" . ,(create-delivery-key "website"))))
+      (request :get "/api/v1/website/lists/blog/" :headers `(("x-koya-delivery-key" . ,(create-delivery-key "website"))))
     (declare (ignore body))
     (ok (= status 301) "so is the delivery API")
-    (ok (string= (location headers) "/api/v1/website/blog"))
+    (ok (string= (location headers) "/api/v1/website/lists/blog"))
     (ok (string= (getf headers :access-control-allow-origin) "*")
         "with CORS headers, so a page on another origin can follow it")))
 

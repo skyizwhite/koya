@@ -15,28 +15,28 @@
 
 (deftest boolean-default
   (multiple-value-bind (status json)
-      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Defaulted") "publish" t))
+      (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Defaulted") "publish" t))
     (ok (= status 201))
     (ok (eq (jget json "published" "featured") t) "a :boolean with :default t starts true when not given"))
   (multiple-value-bind (status json)
-      (admin :post "/admin/api/contents/website/blog" :body (jobject "data" (jobject "title" "Explicit" "featured" nil) "publish" t))
+      (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Explicit" "featured" nil) "publish" t))
     (ok (= status 201))
     (ok (eq (jget json "published" "featured") nil) "an explicit false is kept")))
 
 (deftest schema-endpoints
-  (multiple-value-bind (status json) (admin :get "/admin/api/schema/website")
+  (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
     (ok (= status 200))
     (ok (= (length (jget json "models")) 3)))
   (let ((new (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)))))))
-    (multiple-value-bind (status json) (admin :post "/admin/api/schema/website/plan" :body (schema->jobject new))
+    (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan" :body (schema->jobject new))
       (ok (= status 200))
       (ok (eq (jget json "destructive") t))
       (ok (plusp (length (jget json "changes")))))
-    (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (schema->jobject new))
+    (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject new))
       (ok (= status 409))
       (ok (string= (jget json "error" "code") "destructive_changes"))
       (ok (plusp (length (jget json "error" "details")))))
-    (multiple-value-bind (status json) (admin :get "/admin/api/schema/website")
+    (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
       (ok (= status 200))
       (ok (= (length (jget json "models")) 3) "not applied")))
   (testing "non-destructive push applies without force"
@@ -49,23 +49,23 @@
                                                                          (make-field :extra :text)))
                                           (make-model "tag" :list (list (make-field :name :text :required t)))
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
-      (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (schema->jobject new))
+      (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject new))
         (ok (= status 200))
         (ok (= (length (jget json "applied")) 1))
         (ok (string= (jget (aref (jget json "applied") 0) "op") "add_field")))
-      (admin :put "/admin/api/schema/website" :body (schema->jobject (test-schema)) :query "force=true")))
+      (admin :put "/admin/api/website/schema" :body (schema->jobject (test-schema)) :query "force=true")))
   (testing "a management key reaches its own space and no other"
-    (multiple-value-bind (status json) (admin :get "/admin/api/schema/other")
+    (multiple-value-bind (status json) (admin :get "/admin/api/other/schema")
       (ok (= status 403))
       (ok (string= (jget json "error" "code") "forbidden")))
-    (multiple-value-bind (status) (admin :put "/admin/api/schema/other" :body (schema->jobject (test-schema)))
+    (multiple-value-bind (status) (admin :put "/admin/api/other/schema" :body (schema->jobject (test-schema)))
       (ok (= status 403))))
   (testing "invalid schema is a 400"
-    (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (jobject "koyaSchema" 1 "models" (vector (jobject "name" "Bad Name" "kind" "list"))))
+    (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (jobject "koyaSchema" 1 "models" (vector (jobject "name" "Bad Name" "kind" "list"))))
       (ok (= status 400))
       (ok (string= (jget json "error" "code") "invalid_schema"))))
   (testing "malformed JSON is a 400"
-    (multiple-value-bind (status json) (request :put "/admin/api/schema/website" :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*))) :body "not json")
+    (multiple-value-bind (status json) (request :put "/admin/api/website/schema" :headers `(("authorization" . ,(format nil "Bearer ~a" *management-key*))) :body "not json")
       (ok (= status 400))
       (ok (string= (jget json "error" "code") "bad_json")))))
 
@@ -73,26 +73,26 @@
   (let ((comma (make-schema :models (list (make-model "blog" :list
                                                       (list (make-field :title :text :required t :unique t)
                                                             (make-field :tone :select :options '("Red, dark" "Blue"))))))))
-    (multiple-value-bind (status json) (admin :post "/admin/api/schema/website/plan" :body (schema->jobject comma))
+    (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan" :body (schema->jobject comma))
       (ok (= status 400))
       (ok (string= (jget json "error" "code") "invalid_schema"))
       (ok (search "comma" (jget json "error" "message")) "the plan says why"))
-    (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (schema->jobject comma) :query "force=true")
+    (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject comma) :query "force=true")
       (ok (= status 400) "nor is it deployed, forced or not")
       (ok (string= (jget json "error" "code") "invalid_schema")))
     (testing "a space already stored with one, or imported with one, is read as it is"
       (replace-schema "website" comma)
-      (multiple-value-bind (status json) (admin :get "/admin/api/schema/website")
+      (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
         (ok (= status 200))
         (ok (= (length (jget json "models")) 1)))
-      (ok (= 200 (nth-value 0 (admin :get "/admin/api/contents/website/blog")))))))
+      (ok (= 200 (nth-value 0 (admin :get "/admin/api/website/lists/blog")))))))
 
 (deftest a-tightened-option-waits-for-the-contents-to-fit
   (flet ((notes (&rest code-options)
            (make-schema :models (list (make-model "note" :list (list (make-field :title :text)
                                                                      (apply #'make-field :code :text code-options))))))
          (add-note (data &key publish)
-           (jget (nth-value 1 (admin :post "/admin/api/contents/website/note"
+           (jget (nth-value 1 (admin :post "/admin/api/website/lists/note"
                                      :body (jobject "data" data "publish" publish)))
                  "id"))
          (misfits (json path)
@@ -102,7 +102,7 @@
          (let ((long (add-note (jobject "title" "Long" "code" "abcdefgh") :publish t))
                (none (add-note (jobject "title" "None")))
                (twin (add-note (jobject "title" "Twin" "code" "abcdefgh"))))
-           (multiple-value-bind (status json) (admin :post "/admin/api/schema/website/plan"
+           (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
                                                      :body (schema->jobject (notes :max-length 5)))
              (ok (= status 200))
              (ng (jget json "destructive") "tightening asks for no force")
@@ -111,37 +111,37 @@
                  "the plan names every content whose value no longer fits")
              (ok (search "2 contents do not fit" (jget (aref (jget json "changes") 0) "description"))))
            (dolist (query '(nil "force=true"))
-             (multiple-value-bind (status json) (admin :put "/admin/api/schema/website"
+             (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
                                                        :body (schema->jobject (notes :max-length 5)) :query query)
                (ok (= status 409) (format nil "the deploy is refused~@[ with ~a~]" query))
                (ok (string= (jget json "error" "code") "contents_do_not_fit"))
                (ok (= (length (misfits json '("error" "details"))) 2))))
-           (ok (plusp (length (jget (nth-value 1 (admin :post "/admin/api/schema/website/plan"
+           (ok (plusp (length (jget (nth-value 1 (admin :post "/admin/api/website/schema/plan"
                                                          :body (schema->jobject (notes :max-length 5))))
                                     "changes")))
                "and nothing is applied")
            (testing "unique and required are checked the same way"
-             (ok (= 2 (length (misfits (nth-value 1 (admin :post "/admin/api/schema/website/plan"
+             (ok (= 2 (length (misfits (nth-value 1 (admin :post "/admin/api/website/schema/plan"
                                                           :body (schema->jobject (notes :unique t))))
                                        '("changes"))))
                  "the two contents that share a value")
              (ok (equal (mapcar (lambda (m) (jget m "id"))
-                                (misfits (nth-value 1 (admin :post "/admin/api/schema/website/plan"
+                                (misfits (nth-value 1 (admin :post "/admin/api/website/schema/plan"
                                                              :body (schema->jobject (notes :required t))))
                                          '("changes")))
                         (list none))
                  "the content without one"))
            (testing "once they fit, the deploy goes through"
-             (admin :patch (format nil "/admin/api/contents/website/note/~a" long) :body (jobject "data" (jobject "code" "abc")))
-             (admin :post (format nil "/admin/api/contents/website/note/~a/publish" long))
-             (admin :patch (format nil "/admin/api/contents/website/note/~a" twin) :body (jobject "data" (jobject "code" "xyz")))
-             (ok (= 200 (admin :put "/admin/api/schema/website" :body (schema->jobject (notes :max-length 5))))))
+             (admin :patch (format nil "/admin/api/website/lists/note/~a" long) :body (jobject "data" (jobject "code" "abc")))
+             (admin :post (format nil "/admin/api/website/lists/note/~a/publish" long))
+             (admin :patch (format nil "/admin/api/website/lists/note/~a" twin) :body (jobject "data" (jobject "code" "xyz")))
+             (ok (= 200 (admin :put "/admin/api/website/schema" :body (schema->jobject (notes :max-length 5))))))
            (testing "a required field added to a model with contents waits for them too"
              (let ((with-lede (make-schema :models (list (make-model "note" :list
                                                                      (list (make-field :title :text)
                                                                            (make-field :code :text :max-length 5)
                                                                            (make-field :lede :text :required t)))))))
-               (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (schema->jobject with-lede))
+               (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject with-lede))
                  (ok (= status 409))
                  (ok (= (length (misfits json '("error" "details"))) 3)
                      "every stored version of every content lacks it")))))
@@ -154,14 +154,14 @@
     (replace-schema "website" (notes :list))
     (unwind-protect
          (progn
-           (admin :post "/admin/api/contents/website/note" :body (jobject "data" (jobject "title" "Long" "code" "abcdefgh")))
+           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "title" "Long" "code" "abcdefgh")))
            (testing "a deploy that could never go through says why before it asks for force"
              (let ((without-title (make-schema :models (list (make-model "note" :list
                                                                          (list (make-field :code :text :max-length 5)))))))
-               (multiple-value-bind (status json) (admin :put "/admin/api/schema/website" :body (schema->jobject without-title))
+               (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject without-title))
                  (ok (= status 409))
                  (ok (string= (jget json "error" "code") "contents_do_not_fit")))))
            (testing "a model made anew is not checked, as its contents go"
-             (ok (= 200 (admin :put "/admin/api/schema/website" :body (schema->jobject (notes :object :max-length 5))
+             (ok (= 200 (admin :put "/admin/api/website/schema" :body (schema->jobject (notes :object :max-length 5))
                                                                 :query "force=true")))))
       (replace-schema "website" (test-schema)))))

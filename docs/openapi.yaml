@@ -45,8 +45,10 @@ tags:
     description: Published content, read with a delivery key
   - name: schema
     description: The stored schema and the diff against a new one
-  - name: contents
-    description: Contents including drafts
+  - name: lists
+    description: List contents including drafts
+  - name: objects
+    description: Objects including drafts
   - name: keys
     description: Delivery keys and the webhook secret
   - name: media
@@ -55,15 +57,12 @@ tags:
 security: []
 
 paths:
-  /api/v1/{space}/{model}:
+  /api/v1/{space}/lists/{model}:
     get:
-      operationId: getContents
+      operationId: getList
       tags: [delivery]
-      summary: List published contents, or read an object model's content
-      description: |
-        For a `list` model, a page of published contents. For an `object` model,
-        its single content (published, or its draft with the right `draftKey`);
-        `limit`, `offset`, `orders`, `filters` and `q` are ignored then.
+      summary: List published list contents
+      description: A page of a `list` model's published contents. 404 for an `object` model.
       security: [{ deliveryKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -75,26 +74,23 @@ paths:
         - $ref: "#/components/parameters/filters"
         - $ref: "#/components/parameters/q"
         - $ref: "#/components/parameters/include"
-        - $ref: "#/components/parameters/draftKey"
       responses:
         "200":
-          description: A page of contents, or the object model's content
+          description: A page of list contents
           content:
             application/json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/ContentList"
-                  - $ref: "#/components/schemas/Content"
+              schema: { $ref: "#/components/schemas/ContentList" }
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /api/v1/{space}/{model}/{id}:
+  /api/v1/{space}/lists/{model}/{id}:
     get:
-      operationId: getContent
+      operationId: getListContent
       tags: [delivery]
-      summary: Read one published content
+      summary: Read one published list content
+      description: Its draft with the right `draftKey`. 404 for an `object` model.
       security: [{ deliveryKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -105,7 +101,33 @@ paths:
         - $ref: "#/components/parameters/draftKey"
       responses:
         "200":
-          description: The content
+          description: The list content
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Content" }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/{space}/objects/{model}:
+    get:
+      operationId: getObject
+      tags: [delivery]
+      summary: Read a published object
+      description: |
+        The one content of an `object` model, or its draft with the right
+        `draftKey`. 404 for a `list` model, or while the object is not published.
+      security: [{ deliveryKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/space"
+        - $ref: "#/components/parameters/model"
+        - $ref: "#/components/parameters/fields"
+        - $ref: "#/components/parameters/include"
+        - $ref: "#/components/parameters/draftKey"
+      responses:
+        "200":
+          description: The object
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Content" }
@@ -149,7 +171,7 @@ paths:
               schema: { $ref: "#/components/schemas/Me" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
-  /admin/api/schema/{space}:
+  /admin/api/{space}/schema:
     parameters:
       - $ref: "#/components/parameters/space"
     get:
@@ -209,7 +231,7 @@ paths:
                   details:
                     - { op: remove_field, path: blog.summary, destructive: true, description: "! - blog.summary (text)" }
 
-  /admin/api/schema/{space}/plan:
+  /admin/api/{space}/schema/plan:
     parameters:
       - $ref: "#/components/parameters/space"
     post:
@@ -233,20 +255,18 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/api/contents/{space}/{model}:
+  /admin/api/{space}/lists/{model}:
     parameters:
       - $ref: "#/components/parameters/space"
       - $ref: "#/components/parameters/model"
     get:
-      operationId: listAdminContents
-      tags: [contents]
-      summary: List every content of a model, drafts included, or read an object model's content
+      operationId: getAdminList
+      tags: [lists]
+      summary: List every list content, drafts included
       description: |
-        For a `list` model, a page of contents; takes the delivery API's `limit`,
-        `offset`, `orders`, `filters` and `q`, and they apply to the
-        draft data when a content has one. For an `object` model, its content,
-        both versions, and those parameters are ignored; 404 until its first
-        write.
+        A page of a `list` model's contents; takes the delivery API's `limit`,
+        `offset`, `orders`, `filters` and `q`, and they apply to the draft data
+        when a content has one. 404 for an `object` model.
       security: [{ managementKey: [] }]
       parameters:
         - $ref: "#/components/parameters/limit"
@@ -256,29 +276,25 @@ paths:
         - $ref: "#/components/parameters/q"
       responses:
         "200":
-          description: A page of contents, or the object model's content
+          description: A page of list contents
           content:
             application/json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/AdminContentList"
-                  - $ref: "#/components/schemas/AdminContent"
+              schema: { $ref: "#/components/schemas/AdminContentList" }
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     post:
-      operationId: createAdminContent
-      tags: [contents]
-      summary: Create a content
+      operationId: createAdminListContent
+      tags: [lists]
+      summary: Create a list content
       description: |
         Saved as a draft unless `publish` is true. `id` and the system timestamps
         may be supplied, for imports that keep another system's ids and dates; an
         id need only be unique within the space;
         a timestamp needs a date, a time and an offset or `Z`, and is stored in
         UTC with milliseconds.
-        `publishedAt` and `revisedAt` are only stored when publishing. An
-        `object` model that already has its content refuses a second one; change
-        that one through the model.
+        `publishedAt` and `revisedAt` are only stored when publishing. 404 for an
+        `object` model: its object is made by its first write.
       security: [{ managementKey: [] }]
       requestBody:
         required: true
@@ -296,157 +312,22 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: "`conflict`: a content with this `id` already exists in the space; `object_exists`: the `object` model already has its content"
+          description: "`conflict`: a content with this `id` already exists in the space"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-    patch:
-      operationId: updateAdminObjectDraft
-      tags: [contents]
-      summary: Save a draft of an object model's content
-      description: |
-        As saving a draft through an id, for the content of an `object` model.
-        The first save makes that content, filling the defaults. 404 for a
-        `list` model.
-      security: [{ managementKey: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateDraft" }
-      responses:
-        "200":
-          description: The content with its new draft
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/AdminContent" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
 
-  /admin/api/contents/{space}/{model}/publish:
-    post:
-      operationId: publishAdminObject
-      tags: [contents]
-      summary: Publish an object model's content
-      description: |
-        As publishing through an id, for the content of an `object` model.
-        Before its first write, `data` makes the content, published; without
-        `data` that is a 404. 404 for a `list` model.
-      security: [{ managementKey: [] }]
-      parameters:
-        - $ref: "#/components/parameters/space"
-        - $ref: "#/components/parameters/model"
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/PublishContent" }
-      responses:
-        "200":
-          description: The published content
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/AdminContent" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
-
-  /admin/api/contents/{space}/{model}/unpublish:
-    post:
-      operationId: unpublishAdminObject
-      tags: [contents]
-      summary: Unpublish an object model's content
-      description: |
-        As unpublishing through an id, for the content of an `object` model.
-        404 for a `list` model, or before its first write.
-      security: [{ managementKey: [] }]
-      parameters:
-        - $ref: "#/components/parameters/space"
-        - $ref: "#/components/parameters/model"
-      responses:
-        "200":
-          description: The content, now a draft
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/AdminContent" }
-        "409":
-          description: "`not_published`: the content is not published. `in_use`: other contents refer to it through a reference field of the current schema; the message names how many"
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ApiError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /admin/api/contents/{space}/{model}/discard-draft:
-    post:
-      operationId: discardAdminObjectDraft
-      tags: [contents]
-      summary: Discard the draft of an object model's content
-      description: |
-        As discarding through an id, for the content of an `object` model.
-        404 for a `list` model, or before its first write.
-      security: [{ managementKey: [] }]
-      parameters:
-        - $ref: "#/components/parameters/space"
-        - $ref: "#/components/parameters/model"
-      responses:
-        "200":
-          description: The content, published only
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/AdminContent" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409":
-          description: "`not_published`: the content has no published version to fall back to. `no_draft`: it is published with no draft to discard"
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ApiError" }
-
-  /admin/api/contents/{space}/{model}/draft-key:
-    post:
-      operationId: getAdminObjectDraftKey
-      tags: [contents]
-      summary: The draft key of an object model's content
-      description: |
-        As the draft key through an id, for the content of an `object` model.
-        404 for a `list` model, or before its first write.
-      security: [{ managementKey: [] }]
-      parameters:
-        - $ref: "#/components/parameters/space"
-        - $ref: "#/components/parameters/model"
-      responses:
-        "200":
-          description: The key
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [draftKey]
-                properties:
-                  draftKey: { type: string, examples: ["3f1c…"] }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /admin/api/contents/{space}/{model}/{id}:
-    description: A content of a `list` model; every route under it answers 404 for an `object` model.
+  /admin/api/{space}/lists/{model}/{id}:
+    description: A list content; every route under it answers 404 for an `object` model.
     parameters:
       - $ref: "#/components/parameters/space"
       - $ref: "#/components/parameters/model"
       - $ref: "#/components/parameters/id"
     get:
-      operationId: getAdminContent
-      tags: [contents]
-      summary: Read a content, both versions
+      operationId: getAdminListContent
+      tags: [lists]
+      summary: Read a list content, both versions
       security: [{ managementKey: [] }]
       responses:
         "200":
@@ -457,8 +338,8 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
-      operationId: updateAdminContentDraft
-      tags: [contents]
+      operationId: updateAdminListContent
+      tags: [lists]
       summary: Save a draft
       description: |
         `data` is merged onto the current draft (or, without one, the published
@@ -486,9 +367,9 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
     delete:
-      operationId: deleteAdminContent
-      tags: [contents]
-      summary: Delete a content
+      operationId: deleteAdminListContent
+      tags: [lists]
+      summary: Delete a list content
       description: |
         Removes both versions. Fires `delete` webhooks, or `discard` for a content
         that was only a draft.
@@ -505,10 +386,10 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/api/contents/{space}/{model}/{id}/publish:
+  /admin/api/{space}/lists/{model}/{id}/publish:
     post:
-      operationId: publishAdminContent
-      tags: [contents]
+      operationId: publishAdminListContent
+      tags: [lists]
       summary: Publish
       description: |
         Publishes `data` when given, else the current draft, else re-publishes the
@@ -537,10 +418,10 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
-  /admin/api/contents/{space}/{model}/{id}/unpublish:
+  /admin/api/{space}/lists/{model}/{id}/unpublish:
     post:
-      operationId: unpublishAdminContent
-      tags: [contents]
+      operationId: unpublishAdminListContent
+      tags: [lists]
       summary: Unpublish
       description: |
         Takes the content off the delivery API. Its data (the draft when there is
@@ -568,11 +449,11 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/api/contents/{space}/{model}/{id}/discard-draft:
+  /admin/api/{space}/lists/{model}/{id}/discard-draft:
     post:
-      operationId: discardAdminContentDraft
-      tags: [contents]
-      summary: Discard the draft of a published content
+      operationId: discardAdminListContentDraft
+      tags: [lists]
+      summary: Discard the draft of a published list content
       description: Fires `discard` webhooks. A content with no draft is refused with 409.
       security: [{ managementKey: [] }]
       parameters:
@@ -594,11 +475,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
 
-  /admin/api/contents/{space}/{model}/{id}/draft-key:
+  /admin/api/{space}/lists/{model}/{id}/draft-key:
     post:
-      operationId: getAdminContentDraftKey
-      tags: [contents]
-      summary: The content's draft key
+      operationId: getAdminListContentDraftKey
+      tags: [lists]
+      summary: The list content's draft key
       description: |
         For building preview URLs. Generated on first call; replaced whenever a
         draft is saved.
@@ -621,7 +502,165 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/api/keys/{space}:
+  /admin/api/{space}/objects/{model}:
+    parameters:
+      - $ref: "#/components/parameters/space"
+      - $ref: "#/components/parameters/model"
+    get:
+      operationId: getAdminObject
+      tags: [objects]
+      summary: Read an object, both versions
+      description: 404 for a `list` model, or before the object's first write.
+      security: [{ managementKey: [] }]
+      responses:
+        "200":
+          description: The object
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminContent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateAdminObject
+      tags: [objects]
+      summary: Save a draft of an object
+      description: |
+        As saving a draft of a list content. The first save makes the object,
+        filling the defaults; two first writes at once make one, and the other is
+        refused with 409 `object_exists`. 404 for a `list` model.
+      security: [{ managementKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDraft" }
+      responses:
+        "200":
+          description: The content with its new draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminContent" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`object_exists`: another first write made the object at the same time"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /admin/api/{space}/objects/{model}/publish:
+    post:
+      operationId: publishAdminObject
+      tags: [objects]
+      summary: Publish an object
+      description: |
+        As publishing a list content. Before its first write, `data` makes the
+        object, published; without `data` that is a 404. 404 for a `list` model.
+      security: [{ managementKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/space"
+        - $ref: "#/components/parameters/model"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PublishContent" }
+      responses:
+        "200":
+          description: The published content
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminContent" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /admin/api/{space}/objects/{model}/unpublish:
+    post:
+      operationId: unpublishAdminObject
+      tags: [objects]
+      summary: Unpublish an object
+      description: |
+        As unpublishing a list content. 404 for a `list` model, or before the
+        object's first write.
+      security: [{ managementKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/space"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: The content, now a draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminContent" }
+        "409":
+          description: "`not_published`: the content is not published. `in_use`: other contents refer to it through a reference field of the current schema; the message names how many"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/api/{space}/objects/{model}/discard-draft:
+    post:
+      operationId: discardAdminObjectDraft
+      tags: [objects]
+      summary: Discard the draft of an object
+      description: |
+        As discarding the draft of a list content. 404 for a `list` model, or
+        before the object's first write.
+      security: [{ managementKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/space"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: The content, published only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminContent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`not_published`: the content has no published version to fall back to. `no_draft`: it is published with no draft to discard"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /admin/api/{space}/objects/{model}/draft-key:
+    post:
+      operationId: getAdminObjectDraftKey
+      tags: [objects]
+      summary: The draft key of an object
+      description: |
+        As the draft key of a list content. 404 for a `list` model, or before the
+        object's first write.
+      security: [{ managementKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/space"
+        - $ref: "#/components/parameters/model"
+      responses:
+        "200":
+          description: The key
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draftKey]
+                properties:
+                  draftKey: { type: string, examples: ["3f1c…"] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/api/{space}/keys:
     parameters:
       - $ref: "#/components/parameters/space"
     get:
@@ -663,7 +702,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/api/keys/{space}/{id}:
+  /admin/api/{space}/keys/{id}:
     delete:
       operationId: deleteDeliveryKey
       tags: [keys]
@@ -678,7 +717,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /admin/api/media/{space}:
+  /admin/api/{space}/media:
     parameters:
       - $ref: "#/components/parameters/space"
     get:
@@ -757,7 +796,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
 
-  /admin/api/media/{space}/{id}:
+  /admin/api/{space}/media/{id}:
     parameters:
       - $ref: "#/components/parameters/space"
       - $ref: "#/components/parameters/id"

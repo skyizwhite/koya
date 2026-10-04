@@ -65,7 +65,7 @@ call time:
 |---|---|---|
 | `koya-sdk:*base-url*` | `KOYA_URL` | everything |
 | `koya-sdk:*management-key*` | `KOYA_MANAGEMENT_KEY` | `plan`, `deploy`, `pull`, content/keys/media management |
-| `koya-sdk:*delivery-key*` | `KOYA_DELIVERY_KEY` | `get-list`, `get-item`, `get-object` |
+| `koya-sdk:*delivery-key*` | `KOYA_DELIVERY_KEY` | `get-list`, `get-list-content`, `get-object` |
 | `koya-sdk:*space*` | `KOYA_SPACE` | the default for every `:space` argument |
 
 **The space is made in the admin UI first**, and both keys are then made on its
@@ -259,14 +259,15 @@ of the management key that sent it — and is read afterwards in the admin UI at
 
 ## Reading content
 
-These need a delivery key and return published data only.
+These need a delivery key and return published data only. A `:list` model is a
+list of list contents; an `:object` model's one content is its object.
 
 ```lisp
 (koya-sdk:get-list 'blog)
 (koya-sdk:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :fields "title"))
-(koya-sdk:get-list 'blog :query '(:include "tags"))          ; embed referenced contents
-(koya-sdk:get-item 'blog "01J…")
-(koya-sdk:get-item 'blog "01J…" :query '(:draft-key "…"))    ; preview a draft
+(koya-sdk:get-list 'blog :query '(:include "tags"))                  ; embed referenced contents
+(koya-sdk:get-list-content 'blog "01J…")
+(koya-sdk:get-list-content 'blog "01J…" :query '(:draft-key "…"))    ; preview a draft
 (koya-sdk:get-object 'about)
 ```
 
@@ -277,7 +278,7 @@ Each takes `:space` to override the default. `get-list` returns a plist:
  :total-count 42 :offset 0 :limit 10)
 ```
 
-`get-item` and `get-object` return the content plist itself.
+`get-list-content` and `get-object` return the content plist itself.
 
 ### Query options
 
@@ -297,7 +298,7 @@ are the same.
 | `:filters` | see below |
 | `:q` | search the text fields, as the delivery API's `q` |
 | `:include` | reference fields to embed |
-| `:draft-key` | with `get-item` / `get-object`, serves that content's draft |
+| `:draft-key` | with `get-list-content` / `get-object`, serves that content's draft |
 
 `:filters` takes the delivery API's filter syntax as a string:
 
@@ -314,52 +315,53 @@ are `nil` while a content is not published.
 
 ## Managing content
 
-These use the management key and see drafts as well.
+These use the management key and see drafts as well. Their names start with
+`admin-`.
 
 ```lisp
-(koya-sdk:list-contents 'blog :query '(:limit 100))   ; everything, drafts included
-(koya-sdk:get-content 'blog "01J…")
-(koya-sdk:create-content 'blog '(:title "Hello" :content "<p>…</p>"))            ; as a draft
-(koya-sdk:create-content 'blog '(:title "Hello") :publish t)
-(koya-sdk:update-content 'blog "01J…" '(:title "New title"))                     ; save a draft
-(koya-sdk:publish-content 'blog "01J…")                                          ; publish the draft
-(koya-sdk:publish-content 'blog "01J…" :data '(:title "…") :published-at "2026-09-20T10:00:00.000Z")
-(koya-sdk:unpublish-content 'blog "01J…")
-(koya-sdk:discard-draft 'blog "01J…")
-(koya-sdk:delete-content 'blog "01J…")
-(koya-sdk:draft-key 'blog "01J…")                     ; for a preview URL
+(koya-sdk:admin-get-list 'blog :query '(:limit 100))   ; every list content, drafts included
+(koya-sdk:admin-get-list-content 'blog "01J…")
+(koya-sdk:admin-create-list-content 'blog '(:title "Hello" :content "<p>…</p>"))   ; as a draft
+(koya-sdk:admin-create-list-content 'blog '(:title "Hello") :publish t)
+(koya-sdk:admin-update-list-content 'blog "01J…" '(:title "New title"))            ; save a draft
+(koya-sdk:admin-publish-list-content 'blog "01J…")                                 ; publish the draft
+(koya-sdk:admin-publish-list-content 'blog "01J…" :data '(:title "…") :published-at "2026-09-20T10:00:00.000Z")
+(koya-sdk:admin-unpublish-list-content 'blog "01J…")
+(koya-sdk:admin-discard-list-content-draft 'blog "01J…")
+(koya-sdk:admin-delete-list-content 'blog "01J…")
+(koya-sdk:admin-list-content-draft-key 'blog "01J…")   ; for a preview URL
 ```
 
-An `:object` model's content is reached through the model, with no id:
+An object is reached through its model, with no id:
 
 ```lisp
-(koya-sdk:get-object-content 'about)
-(koya-sdk:update-object 'about '(:body "<p>…</p>"))     ; save a draft; the first one makes the content
-(koya-sdk:publish-object 'about)
-(koya-sdk:publish-object 'about :data '(:body "…"))
-(koya-sdk:unpublish-object 'about)
-(koya-sdk:discard-object-draft 'about)
-(koya-sdk:object-draft-key 'about)
+(koya-sdk:admin-get-object 'about)
+(koya-sdk:admin-update-object 'about '(:body "<p>…</p>"))   ; save a draft; the first one makes the object
+(koya-sdk:admin-publish-object 'about)
+(koya-sdk:admin-publish-object 'about :data '(:body "…"))
+(koya-sdk:admin-unpublish-object 'about)
+(koya-sdk:admin-discard-object-draft 'about)
+(koya-sdk:admin-object-draft-key 'about)
 ```
 
-- `list-contents` returns `(:contents (…) :total-count n :offset n :limit n)` where
+- `admin-get-list` returns `(:contents (…) :total-count n :offset n :limit n)` where
   each content is `(:id … :status … :published {…} :draft {…} :draft-key … :created-at …)`.
   `status` is `"draft"`, `"published"` or `"published+draft"`.
-- `update-content` **merges** the plist onto the current draft (or the published
-  data when there is none); a key whose value is `nil` is removed. `publish-content`
-  with `:data` replaces the data outright.
-- `create-content` also takes `:id`, `:created-at`, `:updated-at`, `:published-at`
+- `admin-update-list-content` and `admin-update-object` **merge** the plist onto
+  the current draft (or the published data when there is none); a key whose
+  value is `nil` is removed. Publishing with `:data` replaces the data outright.
+- `admin-create-list-content` also takes `:id`, `:created-at`, `:updated-at`, `:published-at`
   and `:revised-at` — everything an import from another CMS needs to keep its ids
   and dates. Ids are 1–64 characters from `A-Za-z0-9_-`; without one a ULID is
   generated. A duplicate id is a 409.
-- An `:object` model holds one content: once it has it, `create-content` is
-  refused (`object_exists`), and that one is changed through the model. The
-  functions that take an id answer 404 for it, and it has no delete: it goes
+- An `:object` model's object is made by its first `admin-update-object`, or an
+  `admin-publish-object` with `:data`; `admin-create-list-content` answers 404
+  for it, as do the other functions that take an id. It has no delete: it goes
   with its model.
 - Saving a draft issues a new draft key, so older preview links stop working.
 - What a content's `status` cannot do is refused with a 409 and changes nothing:
-  `unpublish-content` needs a published content (`not_published`), and
-  `discard-draft` a published content with a draft (`not_published`, `no_draft`).
+  unpublishing needs a published content (`not_published`), and discarding a
+  draft a published content with a draft (`not_published`, `no_draft`).
   The table is in [API.md](API.md#managing-content).
 
 ## Delivery keys and the webhook secret
@@ -406,7 +408,7 @@ with its `:misfits`. A `500` only carries the underlying
 message when the server runs with `KOYA_ENV=dev`.
 
 ```lisp
-(handler-case (koya-sdk:create-content 'blog '(:title ""))
+(handler-case (koya-sdk:admin-create-list-content 'blog '(:title ""))
   (koya-sdk:koya-error (e)
     (when (= (koya-sdk:koya-error-status e) 422)
       (dolist (problem (koya-sdk:koya-error-details e))
@@ -431,9 +433,10 @@ and coming back, an object becomes a kebab-case keyword plist, an array a list a
 `:tags '("01J…" "01J…")` is an array of ids.
 
 There is no Lisp spelling for JSON `false`: the server treats `null` and `false`
-alike for booleans, so `nil` means "off". On `update-content`, which merges,
-`nil` removes the key instead — send the whole data with `publish-content
-:data …` when a value must be written rather than dropped.
+alike for booleans, so `nil` means "off". On `admin-update-list-content` and
+`admin-update-object`, which merge, `nil` removes the key instead — send the
+whole data when publishing with `:data …` when a value must be written rather
+than dropped.
 
 Timestamps are ISO 8601 in UTC with milliseconds, e.g.
 `"2026-09-20T05:04:03.123Z"`. `koya-sdk:now-iso`, `koya-sdk:format-iso` and

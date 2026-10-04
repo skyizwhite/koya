@@ -35,7 +35,7 @@
            #:destroy
            #:draft-key
            #:object-content
-           #:save-object
+           #:update-object
            #:publish-object
            #:resolve-content
            #:find-content
@@ -220,7 +220,7 @@
   (or (find-object-content space (model-name model))
       (fail 'not-found (format nil "~a has no content yet" (model-name model)))))
 
-(defun save-object (space model data &key replace since)
+(defun update-object (space model data &key replace since)
   (let ((content (find-object-content space (model-name model))))
     (if content
         (update-draft space model (content-id content) data :replace replace :since since)

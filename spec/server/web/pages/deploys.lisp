@@ -83,7 +83,7 @@
                                (make-schema :models (list (make-model "post" :list
                                                                      (list (make-field :title :text)))))))))
            (multiple-value-bind (status)
-               (request :put "/admin/api/schema/witnessed" :json body
+               (request :put "/admin/api/witnessed/schema" :json body
                         :headers `(("origin" . "http://localhost:3000")
                                    ("authorization" . ,(format nil "Bearer ~a" key))))
              (ok (= status 200)))
@@ -99,7 +99,7 @@
                                                                        (list (make-field :title :text)))))))))
              (setf *cookie* nil)
              (multiple-value-bind (status)
-                 (request :put "/admin/api/schema/by-key" :json body
+                 (request :put "/admin/api/by-key/schema" :json body
                           :headers `(("origin" . "http://localhost:3000")
                                      ("authorization" . ,(format nil "Bearer ~a" key))))
                (ok (= status 200)))

@@ -63,8 +63,8 @@
 (defun space-path-p (space path)
   (let ((segments (path-segments path)))
     (cond ((equal segments '("me")) t)
-          ((< (length segments) 2) nil)
-          (t (string= (second segments) space)))))
+          ((null segments) nil)
+          (t (string= (first segments) space)))))
 
 (defun calling-space ()
   (space-for-management-key (bearer-token (request-env *request*))))

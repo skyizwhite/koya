@@ -1,0 +1,18 @@
+(defpackage #:koya-server/web/admin-api/<space>/lists/<model>/<id>/publish
+  (:use #:cl)
+  (:import-from #:koya-server/web/lib/http #:path-param #:read-json-body #:body-field #:fail-api)
+  (:import-from #:koya-core/json #:json-null)
+  (:import-from #:koya-server/usecases/contents #:publish)
+  (:import-from #:koya-server/web/lib/presenters #:admin-content->jobject)
+  (:import-from #:koya-server/usecases/schema #:resolve-list-model)
+  (:export #:@post))
+(in-package #:koya-server/web/admin-api/<space>/lists/<model>/<id>/publish)
+
+(defun @post (params)
+  (multiple-value-bind (space model) (resolve-list-model (path-param params :space) (path-param params :model))
+    (let* ((body (read-json-body))
+           (data (body-field body "data")))
+      (unless (or (null data) (eq data json-null) (hash-table-p data))
+        (fail-api 400 "bad_request" "\"data\" must be an object or null"))
+      (admin-content->jobject (publish space model (path-param params :id) (and (hash-table-p data) data)
+                                       :published-at (body-field body "publishedAt"))))))

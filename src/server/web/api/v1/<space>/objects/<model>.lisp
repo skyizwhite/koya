@@ -1,0 +1,15 @@
+(defpackage #:koya-server/web/api/v1/<space>/objects/<model>
+  (:use #:cl)
+  (:import-from #:koya-server/domain/query #:parse-query #:query-fields)
+  (:import-from #:koya-server/web/lib/http #:path-param #:param)
+  (:import-from #:koya-server/usecases/delivery #:delivered-object)
+  (:import-from #:koya-server/web/lib/presenters #:delivered->jobject)
+  (:import-from #:koya-server/usecases/schema #:resolve-object-model)
+  (:export #:@get))
+(in-package #:koya-server/web/api/v1/<space>/objects/<model>)
+
+(defun @get (params)
+  (multiple-value-bind (space model) (resolve-object-model (path-param params :space) (path-param params :model))
+    (let ((query (parse-query params)))
+      (delivered->jobject (delivered-object space model query :draft-key (param params "draftKey"))
+                          :fields (query-fields query)))))
