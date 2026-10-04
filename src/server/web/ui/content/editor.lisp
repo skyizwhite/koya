@@ -66,16 +66,16 @@
     (hsx
      (div :class "rounded-md border border-line bg-panel" :data-row key
           :nm-bind (and fresh "{ oninit: () => koya.rowAdded(this) }")
-       (div :class "flex items-center justify-between gap-2 border-b border-line px-3 py-2"
+       (div :class "flex items-center justify-between gap-2 border-b border-line px-3 py-1"
          (div :class "flex items-center gap-2 text-sm"
            (span :class "cursor-move select-none text-muted" :aria-hidden "true" :data-drag-handle t "⠿")
            (span :class "font-medium" (custom-field-name kind)))
          (div :class "flex items-center gap-1"
-           (button :type "button" :class "btn btn-icon" :aria-label "Move row up"
-                   :nm-bind "{ onclick: () => koya.moveRow(this, -1) }" "↑")
-           (button :type "button" :class "btn btn-icon" :aria-label "Move row down"
-                   :nm-bind "{ onclick: () => koya.moveRow(this, 1) }" "↓")
-           (button :type "button" :class "btn btn-icon" :aria-label "Remove row"
+           (button :type "button" :class "btn btn-icon py-1" :aria-label "Move row up"
+                   :nm-bind "{ onclick: () => koya.moveRow(this, -1) }" (~icon :name :up))
+           (button :type "button" :class "btn btn-icon py-1" :aria-label "Move row down"
+                   :nm-bind "{ onclick: () => koya.moveRow(this, 1) }" (~icon :name :down))
+           (button :type "button" :class "btn btn-icon py-1" :aria-label "Remove row"
                    :nm-bind "{ onclick: () => koya.removeRow(this) }" (~icon :name :close))))
        (input :type "hidden" :name name :value key)
        (input :type "hidden" :name (format nil "~a.~a.fieldId" name key) :value (custom-field-name kind))

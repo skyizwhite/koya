@@ -140,15 +140,16 @@
          (when (field-option field :help)
            (hsx (span :id (format nil "~a-help" name) :class "ml-3 text-xs font-normal text-muted"
                   (field-option field :help)))))
-       (div :id (format nil "~a-rows" name) :class "space-y-3" :role "list" :aria-labelledby (format nil "~a-label" name)
-            :nm-bind "{ oninit: () => koya.sortable(this) }"
-         children)
-       (div :class "flex items-center gap-2"
-         (select :aria-label (format nil "Custom field of a new ~a row" (field-name field)) :nm-ref "kind" :class "w-auto"
-           (loop :for kind :in (field-row-kinds field) :collect
-             (hsx (option :value (custom-field-name kind) (custom-field-name kind)))))
-         (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add($refs.kind) }"
-           (~icon :name :plus) "Add row"))
+       (div :class "space-y-3 rounded-md border border-line p-4"
+         (div :id (format nil "~a-rows" name) :class "space-y-3 empty:hidden" :role "list" :aria-labelledby (format nil "~a-label" name)
+              :nm-bind "{ oninit: () => koya.sortable(this) }"
+           children)
+         (div :class "flex items-center gap-2"
+           (select :aria-label (format nil "Custom field of a new ~a row" (field-name field)) :nm-ref "kind" :class "w-auto"
+             (loop :for kind :in (field-row-kinds field) :collect
+               (hsx (option :value (custom-field-name kind) (custom-field-name kind)))))
+           (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add($refs.kind) }"
+             (~icon :name :plus) "Add row")))
        (~field-error :field field :error error)))))
 
 (defcomp ~field-input (&key field parent value error references media)
@@ -171,7 +172,7 @@
           (hsx (textarea :id id :name name :rows 5 :class "input" string)))
          (:richtext
           (hsx
-           (<>
+           (div
              (input :type "hidden" :id id :name name :value string)
              (div :class "quill-editor" :data-quill-for id
                   :nm-bind "{ oninit: () => koya.quill(this) }"))))
