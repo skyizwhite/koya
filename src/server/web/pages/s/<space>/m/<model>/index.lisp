@@ -98,6 +98,8 @@
 (defun field-preview (field data ref-labels)
   (let ((value (and data (gethash (field-name field) data))))
     (cond ((eq value json-null) nil)
+          ((eq (field-type field) :repeater)
+           (and (vectorp value) (plusp (length value)) (format nil "~a row~:p" (length value))))
           ((eq (field-type field) :boolean)
            (and data (nth-value 1 (gethash (field-name field) data))
                 (scalar-preview field value ref-labels)))
@@ -170,7 +172,7 @@
                  (:asc (format nil "-~a" name))
                  (:desc nil)
                  (t name))))
-    (if (eq (field-type field) :custom)
+    (if (member (field-type field) '(:custom :repeater))
         (hsx (th :class "py-2 pr-4 font-medium" (span :class (clsx "block truncate" (column-width field)) name)))
     (hsx
      (th :class "py-2 pr-4 font-medium"

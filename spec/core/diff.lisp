@@ -279,3 +279,26 @@
       (ng (destructive-changes-p changes))))
   (testing "nothing changed is no change"
     (ng (diff-schemas (with-custom (seo-fields)) (with-custom (seo-fields))))))
+
+(defun with-blocks (kinds &rest more-heading-fields)
+  (make-schema :custom-fields (list (make-custom-field "heading" (append (list (make-field :text :text)) more-heading-fields))
+                                    (make-custom-field "body" (list (make-field :text :richtext))))
+               :models (list (make-model "page" :list (list (make-field :blocks :repeater :custom-fields kinds))))))
+
+(deftest repeaters
+  (testing "a custom field added to the list is no tightening"
+    (let ((change (find :change-field-options (diff-schemas (with-blocks '("heading")) (with-blocks '("heading" "body")))
+                        :key (lambda (c) (getf c :op)))))
+      (ok change)
+      (ng (tightened-change-p change))))
+  (testing "one taken from it is, since rows of it no longer fit"
+    (ok (tightened-change-p (find :change-field-options (diff-schemas (with-blocks '("heading" "body")) (with-blocks '("heading")))
+                                  :key (lambda (c) (getf c :op))))))
+  (testing "a change inside a custom field reaches the repeaters that list it, named by the kind of row"
+    (let ((changes (diff-schemas (with-blocks '("heading" "body")) (with-blocks '("heading" "body") (make-field :level :number)))))
+      (ok (equal (mapcar (lambda (c) (list (getf c :op) (getf c :field)))
+                         (remove :change-custom-fields changes :key (lambda (c) (getf c :op))))
+                 '((:add-field "blocks[heading].level"))))
+      (ok (search "page.blocks[heading].level (number)" (format-change (second changes))))))
+  (testing "nothing changed is no change"
+    (ng (diff-schemas (with-blocks '("heading")) (with-blocks '("heading"))))))

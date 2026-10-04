@@ -2,6 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:schema-webhooks #:schema-models #:schema-custom-fields #:custom-field->jobject #:field-fields
+                #:custom-field-name #:custom-field-fields
                 #:model-name #:model-kind #:model-fields #:model-options #:model-was
                 #:field-name #:field-type #:field-options #:field-was
                 #:forget-rename)
@@ -29,7 +30,8 @@
         (and (n :pattern) (not (equal (n :pattern) (f :pattern))))
         (and (n :min) (or (null (f :min)) (> (n :min) (f :min))))
         (and (n :max) (or (null (f :max)) (< (n :max) (f :max))))
-        (and (f :options) (set-difference (f :options) (n :options) :test #'equal) t))))
+        (and (f :options) (set-difference (f :options) (n :options) :test #'equal) t)
+        (and (f :custom-fields) (set-difference (f :custom-fields) (n :custom-fields) :test #'equal) t))))
 
 (defun destructive-change-p (change)
   (and (member (getf change :op) *destructive-ops*) t))
@@ -106,8 +108,16 @@
            (append (unless (plist-equal from to)
                      (list (list :op :change-field-options :model model :field (field-name new)
                                  :from from :to to)))
-                   (when (eq (field-type new) :custom)
-                     (inner-changes model (field-name new) (field-fields old) (field-fields new) renames)))))))
+                   (case (field-type new)
+                     (:custom
+                      (inner-changes model (field-name new) (field-fields old) (field-fields new) renames))
+                     (:repeater
+                      (loop :for kind :in (field-fields new)
+                            :for before := (find (custom-field-name kind) (field-fields old)
+                                                 :key #'custom-field-name :test #'string=)
+                            :when before
+                              :append (inner-changes model (format nil "~a[~a]" (field-name new) (custom-field-name kind))
+                                                     (custom-field-fields before) (custom-field-fields kind) renames)))))))))
 
 (defun diff-fields (model old new renames)
   (let ((pairs (rename-pairs old new #'field-name #'field-was)))

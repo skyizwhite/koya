@@ -378,7 +378,7 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Deleted" }
         "409":
-          description: "`in_use`: other contents refer to it through a reference field of the current schema, one inside a custom field included; the message names how many"
+          description: "`in_use`: other contents refer to it through a reference field of the current schema, one inside a custom field or a repeater's rows included; the message names how many"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
@@ -441,7 +441,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "409":
-          description: "`not_published`: the content is not published. `in_use`: other contents refer to it through a reference field of the current schema, one inside a custom field included; the message names how many"
+          description: "`not_published`: the content is not published. `in_use`: other contents refer to it through a reference field of the current schema, one inside a custom field or a repeater's rows included; the message names how many"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
@@ -599,7 +599,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AdminContent" }
         "409":
-          description: "`not_published`: the content is not published. `in_use`: other contents refer to it through a reference field of the current schema, one inside a custom field included; the message names how many"
+          description: "`not_published`: the content is not published. `in_use`: other contents refer to it through a reference field of the current schema, one inside a custom field or a repeater's rows included; the message names how many"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
@@ -807,7 +807,7 @@ paths:
       security: [{ managementKey: [] }]
       responses:
         "200":
-          description: The media plus `references`, the number of contents that use it in a `media` or `richtext` field of the current schema, one inside a custom field included
+          description: The media plus `references`, the number of contents that use it in a `media` or `richtext` field of the current schema, one inside a custom field or a repeater's rows included
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MediaWithReferences" }
@@ -914,7 +914,8 @@ components:
         `contains` and `not_contains` work: `contains` matches when one of its
         text, textarea, slug or richtext fields contains the value,
         `not_contains` when none does; any other operator, or `orders` on it,
-        is `bad_query`. Example:
+        is `bad_query`. A `repeater` field is the same, over the fields of
+        every row. Example:
         `title[contains]lisp[and]publishedAt[exists]`.
     q:
       name: q
@@ -922,7 +923,8 @@ components:
       schema: { type: string }
       description: |
         Search: the text of the model's `text`, `textarea`, `slug` and `richtext`
-        fields, those inside a custom field included, contains it (rich text
+        fields, those inside a custom field or a repeater's rows included,
+        contains it (rich text
         without its tags), or it is a content's whole id. Applies together with
         `filters`.
     fields:
@@ -931,7 +933,8 @@ components:
       schema: { type: string }
       description: |
         Comma-separated top-level fields to keep in each content; applied after
-        `include` and media expansion. A custom field is kept whole. The system
+        `include` and media expansion. A custom field or a repeater is kept
+        whole. The system
         fields are always kept.
     include:
       name: include
@@ -942,7 +945,10 @@ components:
         `tags,author.team` embeds `tags`, `author`, and `team` inside each `author`.
         Only `reference` fields may be named; one inside a custom field is named
         through it, as `meta.author`, and a path ending at a custom field or at
-        anything else inside it is `bad_query`. What is embedded is the referenced
+        anything else inside it is `bad_query`. One in a repeater's rows is named
+        through the repeater, as `blocks.by`, and embedded in each row whose
+        custom field has a reference named `by`, the other rows left as they
+        are; a path that reaches no reference is `bad_query`. What is embedded is the referenced
         contents' published data, with a `draftKey` too. Referenced contents that
         are missing or unpublished are dropped from a `many` field and `null` in a
         single one.
@@ -959,7 +965,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
     BadQuery:
-      description: "`bad_query`: a malformed `filters`, an unknown field in `filters`/`orders`/`include`, an operator or an order a custom field does not take, or a bad integer"
+      description: "`bad_query`: a malformed `filters`, an unknown field in `filters`/`orders`/`include`, an operator or an order a custom field or a repeater does not take, or a bad integer"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
@@ -1034,11 +1040,11 @@ components:
       type: object
       required: [field, code, message]
       properties:
-        field: { type: string }
+        field: { type: string, examples: [title, meta.title, "blocks[1].text"] }
         code:
           type: string
           description: See SCHEMA.md "Content values"
-          examples: [required, unique, max_length, pattern, slug, integer, min, max, option, type, unknown_field]
+          examples: [required, unique, max_length, pattern, slug, integer, min, max, option, type, unknown_field, custom_field]
         message: { type: string }
 
     Me:
@@ -1068,8 +1074,10 @@ components:
     CustomField:
       type: object
       description: |
-        A set of fields a model uses as one field of type `custom`. Its fields
-        are any type but `slug` and `custom`, and none is `unique`.
+        A set of fields a model uses as one field of type `custom`, or as the
+        rows of a `repeater`. Its fields are any type but `slug`, `custom` and
+        `repeater`, none is `unique`, and none is named `fieldId`, which names a
+        repeater row's custom field.
       required: [name, fields]
       properties:
         name: { $ref: "#/components/schemas/FieldName" }
@@ -1127,6 +1135,7 @@ components:
         - $ref: "#/components/schemas/ReferenceField"
         - $ref: "#/components/schemas/SlugField"
         - $ref: "#/components/schemas/CustomFieldField"
+        - $ref: "#/components/schemas/RepeaterField"
       discriminator:
         propertyName: type
         mapping:
@@ -1142,6 +1151,7 @@ components:
           reference: "#/components/schemas/ReferenceField"
           slug: "#/components/schemas/SlugField"
           custom: "#/components/schemas/CustomFieldField"
+          repeater: "#/components/schemas/RepeaterField"
 
     FieldName:
       type: string
@@ -1306,6 +1316,27 @@ components:
         required: { type: boolean }
         customField: { $ref: "#/components/schemas/FieldName", description: "A custom field of the same schema" }
 
+    RepeaterField:
+      type: object
+      required: [name, type, customFields]
+      additionalProperties: false
+      description: |
+        Its value is an array of rows, each an object naming its custom field
+        in `fieldId` beside that custom field's fields' values. Only in a
+        model, not inside a custom field.
+      properties:
+        name: { $ref: "#/components/schemas/FieldName" }
+        type: { type: string, const: repeater }
+        was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
+        required: { type: boolean, description: "At least one row" }
+        customFields:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: Custom fields of the same schema a row may be.
+          items: { $ref: "#/components/schemas/FieldName" }
+
     Webhook:
       type: object
       description: |
@@ -1333,7 +1364,7 @@ components:
           enum: [change_webhooks, change_custom_fields, add_model, remove_model, rename_model, change_kind,
                  change_model_options, add_field, remove_field, rename_field,
                  change_field_type, change_field_options]
-        path: { type: string, description: "`webhooks`, `customFields`, `model`, `model.field`, or `model.field.subfield` inside a custom field", examples: ["blog.title"] }
+        path: { type: string, description: "`webhooks`, `customFields`, `model`, `model.field`, or `model.field.subfield` inside a custom field (`model.field[customField].subfield` in a repeater)", examples: ["blog.title", "page.blocks[heading].level"] }
         destructive: { type: boolean }
         description: { type: string, examples: ["+ blog.title (text)"] }
         misfits:
@@ -1346,7 +1377,7 @@ components:
       required: [id, field, version, message]
       properties:
         id: { type: string }
-        field: { type: string, description: "The field, or `field.subfield` inside a custom field" }
+        field: { type: string, description: "The field, `field.subfield` inside a custom field, or `field[index]` / `field[index].subfield` in a repeater's row", examples: ["title", "blocks[1].text"] }
         version: { type: string, enum: [published, draft] }
         message: { type: string, examples: ["must be at most 50 characters"] }
 
@@ -1400,7 +1431,9 @@ components:
       description: |
         Field name to value, as SCHEMA.md "Content values" defines them. Ids for
         `media` and `reference` fields; arrays on `many` fields; an object of
-        its fields' values on a `custom` field.
+        its fields' values on a `custom` field; an array of rows on a
+        `repeater`, each an object naming its custom field in `fieldId` beside
+        that custom field's fields' values.
       additionalProperties: true
 
     Content:
@@ -1410,7 +1443,7 @@ components:
         are expanded to Media objects (or `null` when the file is gone); `richtext`
         HTML has its `/media/` URLs made absolute; `reference` fields are ids
         unless embedded through `include`; the same goes for the fields inside
-        a `custom` field. With `fields`, only the named data
+        a `custom` field and a `repeater`'s rows, which keep their `fieldId`. With `fields`, only the named data
         fields are present; the system fields always are.
       required: [id, createdAt, updatedAt, publishedAt, revisedAt]
       properties:
@@ -1514,7 +1547,7 @@ components:
         - type: object
           required: [references]
           properties:
-            references: { type: integer, description: The number of contents that use it in a `media` or `richtext` field of the current schema, one inside a custom field included }
+            references: { type: integer, description: The number of contents that use it in a `media` or `richtext` field of the current schema, one inside a custom field or a repeater's rows included }
 
     DeliveryKeys:
       type: object

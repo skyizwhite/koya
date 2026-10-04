@@ -142,3 +142,29 @@
     (ok (equal (seo-codes "{}" post) '(("meta" . "required"))))
     (ok (equal (seo-codes "{\"meta\": null}" post) '(("meta" . "required"))))
     (ok (null (seo-codes "{\"meta\": {\"title\": \" \"}}" post)) "an object whose fields are blank is still one")))
+
+(defparameter *with-blocks*
+  (make-schema :custom-fields (list (make-custom-field "heading" (list (make-field :text :text :required t :max-length 5)))
+                                    (make-custom-field "image" (list (make-field :photo :media)
+                                                                     (make-field :wide :boolean))))
+               :models (list (make-model "page" :list (list (make-field :blocks :repeater :custom-fields '(heading image))))
+                             (make-model "post" :list (list (make-field :blocks :repeater :custom-fields '(heading) :required t))))))
+
+(defun block-codes (model json)
+  (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
+          (validate-content (schema-model *with-blocks* model) (parse-json json))))
+
+(deftest a-repeater-is-a-list-of-rows
+  (ok (null (block-codes "page" "{\"blocks\": [{\"fieldId\": \"heading\", \"text\": \"Hi\"},
+                                               {\"fieldId\": \"image\", \"photo\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\", \"wide\": true}]}")))
+  (ok (null (block-codes "page" "{\"blocks\": []}")) "no rows is no value")
+  (ok (equal (block-codes "post" "{\"blocks\": []}") '(("blocks" . "required"))) "and a required one wants a row")
+  (ok (equal (block-codes "page" "{\"blocks\": {}}") '(("blocks" . "type"))) "it must be an array")
+  (ok (equal (block-codes "page" "{\"blocks\": [\"Hi\"]}") '(("blocks[0]" . "type"))) "of objects")
+  (ok (equal (block-codes "page" "{\"blocks\": [{\"text\": \"Hi\"}, {\"fieldId\": \"quote\"}]}")
+             '(("blocks[0]" . "custom_field") ("blocks[1]" . "custom_field")))
+      "each naming one of the repeater's custom fields")
+  (ok (equal (block-codes "page" "{\"blocks\": [{\"fieldId\": \"image\"}, {\"fieldId\": \"heading\", \"text\": \"Too long\", \"photo\": \"x\"}]}")
+             '(("blocks[1].photo" . "unknown_field") ("blocks[1].text" . "max_length")))
+      "and checked as that custom field, by its path")
+  (ok (equal (block-codes "page" "{\"blocks\": [{\"fieldId\": \"heading\"}]}") '(("blocks[0].text" . "required")))))

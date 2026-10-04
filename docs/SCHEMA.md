@@ -153,6 +153,7 @@ take their names.
 | `reference` | `required` `model` `many` |
 | `slug` | `required` `from` `unique` `pattern` |
 | `custom` | `required` `customField` |
+| `repeater` | `required` `customFields` |
 
 | Option | Type | Rules |
 |---|---|---|
@@ -164,6 +165,7 @@ take their names.
 | `model` | string | a model name; **required** on `reference`, and the model must exist in the same space |
 | `from` | string | a field name; **required** on `slug`, and must name a `text` or `textarea` field of the same model other than the slug itself |
 | `customField` | string | a custom field name; **required** on `custom`, and must name a [custom field](#custom-field) of the same schema |
+| `customFields` | array of string | custom field names; **required** on `repeater`, non-empty, no duplicates, and each must name a [custom field](#custom-field) of the same schema |
 | `was` | string | a field name other than this one and not a system field, see [Renames](#renames) |
 | `help` | string | non-empty; shown under the field's name in the editor, to say what the field expects |
 
@@ -194,8 +196,9 @@ A custom field is a group of fields defined once in the document's
 | `fields` | array of [field](#field) | at least one; names unique within the custom field |
 
 Its fields are written as a model's, with every type and its options except
-`slug` and `custom`, and without `unique` or `was`: renaming a custom field, or a
-field inside one, is a removal and an addition.
+`slug`, `custom` and `repeater`, and without `unique` or `was`: renaming a custom
+field, or a field inside one, is a removal and an addition. No field inside it may
+be named `fieldId`, which names a repeater row's custom field.
 
 A model uses it by name, and its field JSON holds only that name; the fields come
 from the definition:
@@ -203,6 +206,16 @@ from the definition:
 ```json
 {"name": "meta", "type": "custom", "customField": "seo"}
 ```
+
+A field of type `repeater` holds any number of rows, each one of the custom fields
+it lists, in any order:
+
+```json
+{"name": "blocks", "type": "repeater", "customFields": ["heading", "body"]}
+```
+
+A repeater sits only in a model, never in a custom field. A list of values of one
+plain kind is a `many` field, not a repeater.
 
 ## Renames
 
@@ -260,6 +273,7 @@ boolean is `false`. Otherwise:
 | `select` | one of `options` (`option`) | |
 | `media` `reference` | an id: `^[A-Za-z0-9_-]{1,64}$` | |
 | `custom` | an object of its fields' values, each checked as above; an error names the path, such as `meta.title`, and a key that is not one of its fields is `unknown_field` | |
+| `repeater` | an array of rows, each an object naming its custom field in `fieldId` plus that custom field's fields' values, checked as in a `custom` value; an error names the path, such as `blocks[1].text` | a row that is not an object (`type`), a `fieldId` missing or not in `customFields` (`custom_field`) |
 
 A `many` field takes an array of such values (`type` when not an array). A wrong
 type is `type`. `unique` is checked by the server against both the draft and the
@@ -281,6 +295,17 @@ once given is a custom field without `required`, with `required` fields inside.
 A `boolean` field's `default` inside applies, as one at the top does, to a new
 content created with the object; the editor starts the box checked whenever the
 object is added.
+
+A `repeater` value is an array of rows:
+
+```json
+[{"fieldId": "heading", "text": "Hi"}, {"fieldId": "body", "text": "<p>…</p>"}]
+```
+
+`[]` is no value, and `required` asks for at least one row. An error in a row
+names it, as `blocks[0]` for the row itself and `blocks[1].text` for a field in
+it. Booleans and datetimes in a row are normalised as at the top, and a
+`boolean` field's `default` inside applies to the rows of a new content.
 
 Validation failures come back as `422 validation_failed` with
 `details: [{"field", "code", "message"}, …]`.
@@ -314,14 +339,20 @@ the difference between the space's stored schema and the one sent as a list of
 
 Options are **tightened** when they can reject content the old ones accepted:
 `required`, `unique` or `integer` turned on, `many` switched either way,
-`maxLength` or `max` lowered, `min` raised, `pattern` changed, or a value dropped
-from `options`.
+`maxLength` or `max` lowered, `min` raised, `pattern` changed, a value dropped
+from `options`, or a custom field dropped from a repeater's `customFields`, where
+a row of it is a misfit that names the row, such as `blocks[0]`. Adding one is an
+ordinary options change.
 
 A custom field's definition is kept as deployed, used by a model or not. For
 every field that uses a changed custom field, the changes to the fields inside
 are listed too, as `add_field`, `remove_field`, `change_field_type` or
 `change_field_options` with the path `model.field.subfield`, and judged as at the
-top.
+top. A repeater that lists the custom field gets them with the path
+`model.field[customField].subfield`, such as `page.blocks[heading].level`: a
+removed or retyped field goes from the rows of that custom field only, and a
+tightened one is checked against those rows, a misfit's `field` naming the row,
+such as `blocks[1].text`.
 
 A tightened option, or a `required` field added to a model that has contents, is
 checked against every stored published object and draft of the model (not the
@@ -335,12 +366,13 @@ deploy again. Stored content always fits the schema it is stored under. A
 tightened option that every stored value fits is applied without `force`.
 
 `path` is `webhooks` (the space's own), `customFields`, `model`, `model.field`
-or, inside a custom field, `model.field.subfield`, where a misfit's `field` is
-`field.subfield`, such as `card.title`. A `PUT` whose changes
+or, inside a custom field, `model.field.subfield` (`model.field[customField].subfield`
+in a repeater), where a misfit's `field` is `field.subfield`, such as
+`card.title`, or `field[index].subfield` in a repeater. A `PUT` whose changes
 include a destructive one is refused with `409 destructive_changes` (the changes
 in `details`) unless `?force=true` is given. Applying a schema carries a rename
 through the stored content, and takes the values of a removed field, or of one
-whose type or target model changed (inside a custom field too), out of every published object, draft and
+whose type or target model changed (inside a custom field or a repeater's rows too), out of every published object, draft and
 revision, in the same transaction. Changing a model's `kind` makes it anew: its
 contents and their history are deleted, as if the model were removed and added
 again under the same name. A field added later under that name starts

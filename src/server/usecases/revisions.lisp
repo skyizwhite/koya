@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option
-                #:field-required-p #:field-fields)
+                #:field-required-p #:field-fields #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-server/usecases/ports/contents
@@ -38,10 +38,24 @@
                    ~:*~[are~;is~:;are~] not published" count)))
 
 (defun drop-unusable-inside (space field value)
+  (if (eq (field-type field) :repeater)
+      (let ((notes '()))
+        (values (map 'vector (lambda (row)
+                               (let ((kind (row-kind field row)))
+                                 (if kind
+                                     (multiple-value-bind (kept note) (drop-unusable-in space (custom-field-fields kind) row)
+                                       (when note (push note notes))
+                                       kept)
+                                     row)))
+                     value)
+                (and notes (format nil "~{~a~^; ~}" (nreverse notes)))))
+      (drop-unusable-in space (field-fields field) value)))
+
+(defun drop-unusable-in (space fields value)
   (let ((kept (make-hash-table :test 'equal))
         (notes '()))
     (maphash (lambda (k v) (setf (gethash k kept) v)) value)
-    (dolist (inner (field-fields field))
+    (dolist (inner fields)
       (let ((v (gethash (field-name inner) kept)))
         (when (and (member (field-type inner) '(:reference :media)) (not (blank-value-p v)))
           (multiple-value-bind (left dropped) (drop-unusable-ids space inner v)
@@ -68,7 +82,8 @@
                   (note name (dropped-note field dropped))
                   (setf value kept
                         found (not (blank-value-p kept))))))
-            (when (and found (eq (field-type field) :custom) (hash-table-p value))
+            (when (and found (or (and (eq (field-type field) :custom) (hash-table-p value))
+                                 (and (eq (field-type field) :repeater) (json-array-p value))))
               (multiple-value-bind (kept note) (drop-unusable-inside space field value)
                 (when note (note name note))
                 (setf value kept)))

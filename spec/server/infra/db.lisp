@@ -582,3 +582,28 @@
 
 (defun fetch-text (space id)
   (col (first (fetch "SELECT published_text FROM contents WHERE space = ? AND id = ?" space id)) "published_text"))
+
+(defun blocks-schema (&rest heading-fields)
+  (make-schema :custom-fields (list (make-custom-field "heading" heading-fields)
+                                    (make-custom-field "quote" (list (make-field :text :text) (make-field :note :text))))
+               :models (list (make-model "post" :list (list (make-field :title :text)
+                                                          (make-field :blocks :repeater :custom-fields '(heading quote)))))))
+
+(deftest a-field-removed-from-a-row-kind-leaves-the-other-rows
+  (create-space "rows")
+  (replace-schema "rows" (blocks-schema (make-field :text :text) (make-field :note :text)))
+  (let* ((content (create "rows" (find-model "rows" "post")
+                          (jobject "title" "P" "blocks" (vector (jobject "fieldId" "heading" "text" "Head" "note" "Gone")
+                                                                (jobject "fieldId" "quote" "text" "Quoted" "note" "Kept")))
+                          :publish t))
+         (id (content-id content)))
+    (replace-schema "rows" (blocks-schema (make-field :text :text)))
+    (let ((rows (jget (content-published (get-content "rows" id)) "blocks")))
+      (ng (nth-value 1 (gethash "note" (aref rows 0))) "the field goes from the rows of its custom field")
+      (ok (string= (jget (aref rows 1) "note") "Kept") "and stays in rows of another")
+      (ok (string= (jget (aref rows 0) "text") "Head")))
+    (ng (search "Gone" (fetch-text "rows" id)) "its text goes too")
+    (ok (search "Quoted" (fetch-text "rows" id)) "the text of every row is kept")
+    (dolist (revision (list-revisions "rows" id))
+      (ng (nth-value 1 (gethash "note" (aref (jget (revision-data revision) "blocks") 0))) "and the history's")))
+  (delete-space "rows"))

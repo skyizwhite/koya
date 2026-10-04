@@ -23,6 +23,9 @@
            #:field-options
            #:field-option
            #:field-fields
+           #:field-row-kinds
+           #:field-path-parts
+           #:row-kind
            #:custom-field
            #:make-custom-field
            #:custom-field-name
@@ -90,7 +93,8 @@
     (:media     :required)
     (:reference :required :model :many)
     (:slug      :required :from :unique :pattern)
-    (:custom    :required :custom-field)))
+    (:custom    :required :custom-field)
+    (:repeater  :required :custom-fields)))
 
 (defparameter *universal-options* '(:was :help))
 
@@ -127,6 +131,9 @@
       (:options (if (or (listp value) (json-array-p value))
                     (map 'list #'name-string value)
                     value))
+      (:custom-fields (if (or (listp value) (json-array-p value))
+                          (map 'list (lambda (v) (if (and v (symbolp v)) (camel-key v) v)) value)
+                          value))
       (t value))))
 
 (defun check-option-value (field-name key value)
@@ -150,6 +157,10 @@
        (unless (slug-name-p value) (bad "a model name")))
       ((:from :custom-field)
        (unless (field-name-p value) (bad "a field name")))
+      (:custom-fields
+       (unless (and (consp value) (every #'field-name-p value)) (bad "a non-empty list of custom field names"))
+       (when (/= (length value) (length (remove-duplicates value :test #'string=)))
+         (bad "a list without duplicates")))
       (:help
        (unless (and (stringp value) (plusp (length value))) (bad "a non-empty string")))
       (:was
@@ -180,6 +191,8 @@
       (fail "slug field ~s needs :from" name))
     (when (and (eq type :custom) (null (getf options :custom-field)))
       (fail "custom field ~s needs :custom-field" name))
+    (when (and (eq type :repeater) (null (getf options :custom-fields)))
+      (fail "repeater ~s needs :custom-fields" name))
     (when (equal (getf options :was) name)
       (fail "field ~s: :was must name the field it was renamed from, not itself" name))
     (%make-field :name name :type type :options options)))
@@ -215,13 +228,31 @@
       (when (/= (length names) (length (remove-duplicates names :test #'string=)))
         (fail "custom field ~s has duplicate field names" name)))
     (dolist (field fields)
-      (when (member (field-type field) '(:slug :custom))
+      (when (string= (field-name field) "fieldId")
+        (fail "custom field ~s: fieldId names a row's custom field and cannot be a field" name))
+      (when (member (field-type field) '(:slug :custom :repeater))
         (fail "custom field ~s: a ~(~a~) field cannot be inside a custom field" name (field-type field)))
       (when (field-option field :unique)
         (fail "custom field ~s: field ~s cannot be unique inside a custom field" name (field-name field)))
       (when (field-was field)
         (fail "custom field ~s: field ~s cannot be renamed with :was inside a custom field" name (field-name field))))
     (%make-custom-field :name name :fields fields)))
+
+(defun field-row-kinds (field) (field-fields field))
+
+(defun row-kind (field row)
+  (and (hash-table-p row)
+       (find (gethash "fieldId" row) (field-fields field) :key #'custom-field-name :test #'equal)))
+
+(defun field-path-parts (path)
+  (let* ((bracket (position #\[ path))
+         (dot (position #\. path))
+         (end (or bracket dot)))
+    (if (null end)
+        (values path nil nil)
+        (values (subseq path 0 end)
+                (and bracket (subseq path (1+ bracket) (position #\] path)))
+                (and dot (subseq path (1+ dot)))))))
 
 (defun field-required-p (field) (and (field-option field :required) t))
 (defun field-many-p (field) (and (field-option field :many) t))
@@ -351,16 +382,20 @@
   models)
 
 (defun resolve-custom-fields (model custom-fields)
-  (flet ((resolve (field)
-           (if (eq (field-type field) :custom)
-               (let ((custom (find (field-option field :custom-field) custom-fields
-                                   :key #'custom-field-name :test #'string=)))
-                 (%make-field :name (field-name field) :type :custom :options (field-options field)
-                              :fields (and custom (custom-field-fields custom))))
-               field)))
-    (%make-model :name (model-name model) :kind (model-kind model)
-                 :fields (mapcar #'resolve (model-fields model))
-                 :options (model-options model))))
+  (flet ((named (name) (find name custom-fields :key #'custom-field-name :test #'string=)))
+    (flet ((resolve (field)
+             (case (field-type field)
+               (:custom
+                (let ((custom (named (field-option field :custom-field))))
+                  (%make-field :name (field-name field) :type :custom :options (field-options field)
+                               :fields (and custom (custom-field-fields custom)))))
+               (:repeater
+                (%make-field :name (field-name field) :type :repeater :options (field-options field)
+                             :fields (remove nil (mapcar #'named (field-option field :custom-fields)))))
+               (t field))))
+      (%make-model :name (model-name model) :kind (model-kind model)
+                   :fields (mapcar #'resolve (model-fields model))
+                   :options (model-options model)))))
 
 (defun make-schema (&key webhooks custom-fields models)
   (let ((names (mapcar #'model-name models)))
@@ -410,6 +445,12 @@
            (let ((name (field-option field :custom-field)))
              (unless (schema-custom-field schema name)
                (push (format nil "~a.~a: :customField names unknown custom field ~s"
+                             (model-name model) (field-name field) name)
+                     errors))))
+          (:repeater
+           (dolist (name (field-option field :custom-fields))
+             (unless (schema-custom-field schema name)
+               (push (format nil "~a.~a: :customFields names unknown custom field ~s"
                              (model-name model) (field-name field) name)
                      errors))))
           (:slug
@@ -468,7 +509,7 @@
 
 (defun option->jvalue (key value)
   (case key
-    (:options (coerce value 'vector))
+    ((:options :custom-fields) (coerce value 'vector))
     (t value)))
 
 (defun field->jobject (field)
@@ -515,7 +556,7 @@
 
 (defun jvalue->option (key value)
   (case key
-    (:options (if (json-array-p value) (coerce value 'list) value))
+    ((:options :custom-fields) (if (json-array-p value) (coerce value 'list) value))
     (t value)))
 
 (defun find-keyword (string candidates)

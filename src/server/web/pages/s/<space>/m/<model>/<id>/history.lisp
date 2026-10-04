@@ -6,7 +6,7 @@
   (:import-from #:koya-server/web/lib/binds #:on-follow)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-field #:field-type #:field-option
-                #:field-name #:field-fields)
+                #:field-name #:field-fields #:row-kind #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/validate #:blank-value-p)
   (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions)
@@ -67,16 +67,29 @@
     (:number (if (realp value) (number->string value) (princ-to-string value)))
     (t (if (eq value t) "Yes" (princ-to-string value)))))
 
-(defun custom-text (space field value)
-  (format nil "~{~a~^~%~}"
-          (loop :for inner :in (field-fields field)
+(defun fields-text (space fields value separator)
+  (format nil (format nil "~~{~~a~~^~a~~}" separator)
+          (loop :for inner :in fields
                 :for (inner-value found) := (multiple-value-list (gethash (field-name inner) value))
                 :for text := (value-text space inner inner-value found)
                 :when text :collect (format nil "~a: ~a" (field-name inner) text))))
 
+(defun custom-text (space field value)
+  (fields-text space (field-fields field) value (string #\Newline)))
+
+(defun rows-text (space field value)
+  (format nil "~{~a~^~%~}"
+          (loop :for row :across value
+                :for kind := (row-kind field row)
+                :when kind
+                  :collect (format nil "~a: ~a" (custom-field-name kind)
+                                   (fields-text space (custom-field-fields kind) row "; ")))))
+
 (defun value-text (space field value found)
   (cond ((and (eq (field-type field) :custom) (hash-table-p value))
          (custom-text space field value))
+        ((and (eq (field-type field) :repeater) (json-array-p value))
+         (and (plusp (length value)) (rows-text space field value)))
         ((eq (field-type field) :boolean)
          (and found (scalar-text space field value)))
         ((or (not found) (blank-value-p value)) nil)

@@ -7,7 +7,8 @@
                 #:model-label #:make-webhook #:webhook-only #:webhook-covers-p #:schema-error
                 #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
                 #:model-options #:check-deployable
-                #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields)
+                #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields
+                #:field-row-kinds)
   (:import-from #:koya-core/json
                 #:to-json #:parse-json #:jget))
 (in-package #:koya-spec/core/schema)
@@ -341,3 +342,39 @@
                  '("title" "image" "kind")))
       (ok (string= json (to-json (schema->jobject back))) "and the round trip is stable"))
     (ng (search "customFields" (to-json (schema->jobject (make-schema)))) "absent when there are none")))
+
+(defun blocks-schema (&rest repeater-options)
+  (make-schema :custom-fields (list (make-custom-field "heading" (list (make-field :text :text)))
+                                    (make-custom-field "body" (list (make-field :text :richtext))))
+               :models (list (make-model "page" :list
+                                         (list (apply #'make-field :blocks :repeater :custom-fields '(heading body)
+                                                      repeater-options))))))
+
+(deftest repeaters
+  (testing "a repeater names the custom fields its rows can be"
+    (let ((field (model-field (schema-model (blocks-schema :required t :help "The page") "page") :blocks)))
+      (ok (equal (field-option field :custom-fields) '("heading" "body")) "taken as names, as a field's")
+      (ok (equal (mapcar #'custom-field-name (field-row-kinds field)) '("heading" "body"))
+          "and the schema gives it those custom fields")))
+  (testing "the list"
+    (ok (signals (make-field :blocks :repeater) 'schema-error) "is given")
+    (ok (signals (make-field :blocks :repeater :custom-fields '()) 'schema-error) "is not empty")
+    (ok (signals (make-field :blocks :repeater :custom-fields '("a" "a")) 'schema-error) "names each once")
+    (ok (signals (make-field :blocks :repeater :custom-fields '("a") :unique t) 'schema-error)))
+  (testing "a repeater sits in a model, not in a custom field"
+    (ok (signals (make-custom-field "outer" (list (make-field :rows :repeater :custom-fields '("a")))) 'schema-error)))
+  (testing "a row names its custom field with fieldId, so no field inside one takes that name"
+    (ok (signals (make-custom-field "card" (list (make-field :field-id :text))) 'schema-error)))
+  (testing "the schema checks the names"
+    (ok (null (schema-errors (blocks-schema))))
+    (ok (= (length (schema-errors (make-schema :custom-fields (list (make-custom-field "heading" (list (make-field :text :text))))
+                                               :models (list (make-model "page" :list
+                                                                         (list (make-field :blocks :repeater :custom-fields '(heading ghost))))))))
+           1)
+        "a custom field that is not declared"))
+  (testing "it goes over the wire and back"
+    (let* ((json (to-json (schema->jobject (blocks-schema))))
+           (back (jobject->schema (parse-json json))))
+      (ok (search "{\"name\":\"blocks\",\"type\":\"repeater\",\"customFields\":[\"heading\",\"body\"]}" json))
+      (ok (equal (mapcar #'custom-field-name (field-row-kinds (model-field (schema-model back "page") :blocks)))
+                 '("heading" "body"))))))

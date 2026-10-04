@@ -1,7 +1,8 @@
 (defpackage #:koya-server/domain/content
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:model-label #:field-name #:field-type #:field-option #:field-fields)
+                #:model-fields #:model-label #:field-name #:field-type #:field-option #:field-fields
+                #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
@@ -175,7 +176,13 @@
         (cond ((and (eq (field-type field) :boolean) (member value (list nil json-null)))
                (setf (gethash (field-name field) out) nil))
               ((and (eq (field-type field) :custom) (hash-table-p value))
-               (setf (gethash (field-name field) out) (fields-booleans-filled (field-fields field) value))))))))
+               (setf (gethash (field-name field) out) (fields-booleans-filled (field-fields field) value)))
+              ((and (eq (field-type field) :repeater) (vectorp value) (not (stringp value)))
+               (setf (gethash (field-name field) out)
+                     (map 'vector (lambda (row)
+                                    (let ((kind (row-kind field row)))
+                                      (if kind (fields-booleans-filled (custom-field-fields kind) row) row)))
+                          value))))))))
 
 (defun same-data-p (model a b)
   (json-equal (booleans-filled model a) (booleans-filled model b)))
@@ -195,7 +202,11 @@
       (cond ((and (eq (field-type field) :boolean) (field-option field :default) (not found))
              (setf (gethash (field-name field) data) t))
             ((and (eq (field-type field) :custom) (hash-table-p value))
-             (fill-field-defaults (field-fields field) value))))))
+             (fill-field-defaults (field-fields field) value))
+            ((and (eq (field-type field) :repeater) (vectorp value) (not (stringp value)))
+             (loop :for row :across value
+                   :for kind := (row-kind field row)
+                   :when kind :do (fill-field-defaults (custom-field-fields kind) row)))))))
 
 (defun to-the-minute (model data)
   (fields-to-the-minute (model-fields model) data))
@@ -210,7 +221,12 @@
              (setf (gethash (field-name field) data)
                    (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+))))))
         (:custom
-         (when (hash-table-p value) (fields-to-the-minute (field-fields field) value)))))))
+         (when (hash-table-p value) (fields-to-the-minute (field-fields field) value)))
+        (:repeater
+         (when (and (vectorp value) (not (stringp value)))
+           (loop :for row :across value
+                 :for kind := (row-kind field row)
+                 :when kind :do (fields-to-the-minute (custom-field-fields kind) row))))))))
 
 (defun slugify (string)
   (let* ((lower (string-downcase string))

@@ -107,3 +107,17 @@
       (ng (nth-value 1 (gethash "photo" card)) "and a media")
       (ok (string= (jget card "caption") "Kept") "the rest of the custom field comes back"))
     (ok (equal (notes-of notes) '("card")) "and the note names the custom field")))
+
+(deftest what-a-row-no-longer-has
+  (replace-schema "site" (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
+                                                                                          (make-field :caption :text))))
+                                      :models (list (make-model "post" :list (list (make-field :title :text)
+                                                                                   (make-field :cards :repeater :custom-fields '(card))))
+                                                    (make-model "tag" :list (list (make-field :name :text))))))
+  (multiple-value-bind (data notes)
+      (restore-data "site" (post) "x" (object "title" "Old" "cards" (vector (object "fieldId" "card" "link" "gone" "caption" "Kept")))
+                    (object))
+    (let ((row (aref (jget data "cards") 0)))
+      (ng (nth-value 1 (gethash "link" row)) "a reference in a row to what is gone is dropped")
+      (ok (string= (jget row "caption") "Kept") "the rest of the row comes back"))
+    (ok (equal (notes-of notes) '("cards")) "and the note names the repeater")))

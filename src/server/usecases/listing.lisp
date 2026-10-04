@@ -25,7 +25,7 @@
   (and (not (empty-p name))
        (let ((field (model-field model name)))
          (if field
-             (not (eq (field-type field) :custom))
+             (not (member (field-type field) '(:custom :repeater)))
              (member name +system-fields+ :test #'string=)))))
 
 (defun parse-sort (raw model)

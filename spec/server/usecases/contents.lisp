@@ -461,3 +461,37 @@
                                                (make-model "page" :list (list (make-field :title :text)
                                                                               (make-field :slug :slug :from :title)))
                                                (make-model "about" :object (list (make-field :body :richtext))))))))
+
+(deftest inside-a-repeater
+  (replace-schema "website"
+                  (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
+                                                                                    (make-field :shown :boolean)
+                                                                                    (make-field :at :datetime))))
+                               :models (list (blog-model)
+                                             (make-model "tag" :list (list (make-field :name :text)))
+                                             (make-model "event" :list (list (make-field :at :datetime)))
+                                             (make-model "page" :list (list (make-field :title :text)
+                                                                            (make-field :cards :repeater :custom-fields '(card))))
+                                             (make-model "about" :object (list (make-field :body :richtext))))))
+  (unwind-protect
+       (let* ((page (find-model "website" "page"))
+              (tag (content-id (create "website" (find-model "website" "tag") (data "{\"name\": \"x\"}") :publish t)))
+              (content (create "website" page
+                               (data (format nil "{\"title\": \"P\", \"cards\": [{\"fieldId\": \"card\", \"link\": \"~a\", \"at\": \"2026-09-20T10:00:59+09:00\"}]}" tag))
+                               :publish t)))
+         (testing "a datetime in a row is kept to the minute in UTC"
+           (ok (string= (jget (aref (jget (content-published content) "cards") 0) "at") "2026-09-20T01:00:00.000Z")))
+         (testing "a reference in a row is a use"
+           (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
+           (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
+         (testing "a boolean missing in a row and one that is false are the same"
+           (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
+                                                         (data (format nil "{\"title\": \"P\", \"cards\": [{\"fieldId\": \"card\", \"link\": \"~a\", \"at\": \"2026-09-20T01:00:00.000Z\", \"shown\": false}]}" tag))
+                                                         :replace t))))))
+    (replace-schema "website"
+                    (make-schema :models (list (blog-model)
+                                               (make-model "tag" :list (list (make-field :name :text)))
+                                               (make-model "event" :list (list (make-field :at :datetime)))
+                                               (make-model "page" :list (list (make-field :title :text)
+                                                                              (make-field :slug :slug :from :title)))
+                                               (make-model "about" :object (list (make-field :body :richtext))))))))

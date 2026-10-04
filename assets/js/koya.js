@@ -223,6 +223,66 @@
     },
   });
 
+  koya.repeater = (url) => ({
+    _add(select) {
+      if (select.value) this.$get(url, { kind: select.value });
+    },
+  });
+
+  koya.rowAdded = (row) => changed(row);
+
+  const rowOf = (el) => el.closest("[data-row]");
+
+  koya.moveRow = (button, step) => {
+    const row = rowOf(button);
+    const other = step < 0 ? row.previousElementSibling : row.nextElementSibling;
+    if (!other) return;
+    if (step < 0) other.before(row);
+    else other.after(row);
+    button.focus();
+    changed(row);
+  };
+
+  koya.removeRow = (button) => {
+    const row = rowOf(button);
+    const list = row.parentElement;
+    row.remove();
+    changed(list);
+  };
+
+  koya.sortable = (list) => {
+    let dragged = null;
+    list.addEventListener("pointerdown", (event) => {
+      const handle = event.target.closest?.("[data-drag-handle]");
+      if (handle) rowOf(handle).draggable = true;
+    });
+    list.addEventListener("pointerup", (event) => {
+      const row = event.target.closest?.("[data-row]");
+      if (row && !dragged) row.draggable = false;
+    });
+    list.addEventListener("dragstart", (event) => {
+      dragged = event.target.closest?.("[data-row]");
+      if (!dragged || dragged.parentElement !== list) return;
+      event.dataTransfer.effectAllowed = "move";
+      dragged.classList.add("opacity-50");
+    });
+    list.addEventListener("dragover", (event) => {
+      const over = event.target.closest?.("[data-row]");
+      if (!dragged || !over || over === dragged || over.parentElement !== list) return;
+      event.preventDefault();
+      const box = over.getBoundingClientRect();
+      if (event.clientY < box.top + box.height / 2) over.before(dragged);
+      else over.after(dragged);
+    });
+    list.addEventListener("dragend", () => {
+      if (!dragged) return;
+      dragged.classList.remove("opacity-50");
+      dragged.draggable = false;
+      changed(dragged);
+      dragged = null;
+    });
+  };
+
   koya.mediaPicker = (dialog, url) => ({
     _onpick: null,
     _open(onpick) {
