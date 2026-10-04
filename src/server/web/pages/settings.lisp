@@ -33,21 +33,37 @@
          (input :type "text" :id "code" :name "code" :inputmode "numeric" :autocomplete "one-time-code"
                 :pattern "[0-9 ]*" :required t :autofocus t :class "input mt-1.5 max-w-xs"))))
 
-(defcomp ~two-factor (&key pending error)
+(defcomp ~card-error (&key id message)
+  (hsx (p :id id :class "mb-4 text-sm text-danger" :hidden (null message) message)))
+
+(defcomp ~disable-form (&key error)
+  (hsx (form :id "two-factor-disable" :class "space-y-3"
+             :nm-bind (on-submit (disable-two-factor-action))
+         (~card-error :message error)
+         (~code-input :label "Enter a current code to turn it off")
+         (button :type "submit" :class "btn btn-danger" (~icon :name :close) "Disable two-factor login"))))
+
+(defcomp ~enable-form (&key error)
+  (hsx (form :id "two-factor-enable" :class "space-y-3"
+             :nm-bind (on-submit (enable-two-factor-action))
+         (~card-error :message error)
+         (~code-input :label "Code shown by the app")
+         (div :class "flex gap-2"
+           (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Enable two-factor login")
+           (button :type "button" :class "btn" :nm-bind (on-click (cancel-two-factor-action))
+             (~icon :name :close) "Cancel")))))
+
+(defcomp ~two-factor (&key pending)
   (hsx
    (section :id "two-factor" :class "rounded-md border border-line bg-panel p-6"
      (h2 :class "mb-1 text-lg font-bold" "Two-factor login")
      (p :class "mb-4 text-sm text-muted"
        "Ask for a one-time code from an authenticator app in addition to the owner secret when logging in.")
-     (when error (hsx (p :class "mb-4 text-sm text-danger" error)))
      (cond
        ((totp-enabled-p)
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-ok/10 text-ok" "Enabled"))
-               (form :class "space-y-3"
-                     :nm-bind (on-submit (disable-two-factor-action))
-                 (~code-input :label "Enter a current code to turn it off")
-                 (button :type "submit" :class "btn btn-danger" (~icon :name :close) "Disable two-factor login")))))
+               (~disable-form))))
        (pending
         (hsx (<>
                (p :class "mb-4 text-sm" "Scan the QR code with your authenticator app, or enter the secret by hand, then type the code it shows to finish.")
@@ -59,27 +75,21 @@
                    (dd (code :class "select-all break-all" pending))
                    (dt :class "text-muted" "otpauth URI")
                    (dd (code :class "select-all break-all text-xs" (otpauth-uri pending)))))
-               (form :class "space-y-3"
-                     :nm-bind (on-submit (enable-two-factor-action))
-                 (~code-input :label "Code shown by the app")
-                 (div :class "flex gap-2"
-                   (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Enable two-factor login")
-                   (button :type "button" :class "btn" :nm-bind (on-click (cancel-two-factor-action))
-                     (~icon :name :close) "Cancel"))))))
+               (~enable-form))))
        (t
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-line text-muted" "Disabled"))
                (form :nm-bind (on-submit (begin-two-factor-action))
                  (button :type "submit" :class "btn btn-primary" (~icon :name :shield) "Set up two-factor login")))))))))
 
-(defcomp ~time-zone (&key error)
+(defcomp ~time-zone ()
   (hsx
    (section :id "time-zone" :class "rounded-md border border-line bg-panel p-6"
      (h2 :class "mb-1 text-lg font-bold" "Time zone")
      (p :class "mb-4 text-sm text-muted"
        "Times in the admin UI — created and updated at, datetime fields — are shown and entered in this zone. "
        "Stored values and the delivery API stay UTC.")
-     (when error (hsx (p :class "mb-4 text-sm text-danger" error)))
+     (~card-error :id "time-zone-error")
      (form :class "flex flex-wrap items-end gap-3"
            :nm-bind (on-submit (save-timezone-action))
        (div
@@ -131,15 +141,20 @@
          (values "Two-factor login is off." nil))
         (t (values nil "That code did not match; two-factor login is still on."))))
 
-(defun answer (card message error)
-  (when error (set-response-status 422))
+(defun answer (card message)
   (if message
       (hsx (<> card (~toast :message message)))
       card))
 
+(defun refuse (part)
+  (set-response-status 422)
+  part)
+
 (defaction save-timezone-action :post (params)
   (multiple-value-bind (message error) (save-timezone params)
-    (answer (hsx (~time-zone :error error)) message error)))
+    (if error
+        (refuse (hsx (~card-error :id "time-zone-error" :message error)))
+        (answer (hsx (~time-zone)) message))))
 
 (defaction begin-two-factor-action :post (params)
   (declare (ignore params))
@@ -153,7 +168,9 @@
 
 (defaction enable-two-factor-action :post (params)
   (multiple-value-bind (message error) (enable-two-factor params)
-    (answer (hsx (~two-factor :pending (pending-secret) :error error)) message error)))
+    (if error
+        (refuse (hsx (~enable-form :error error)))
+        (answer (hsx (~two-factor :pending (pending-secret))) message))))
 
 (defaction end-other-sessions-action :post (params)
   (declare (ignore params))
@@ -162,7 +179,9 @@
 
 (defaction disable-two-factor-action :post (params)
   (multiple-value-bind (message error) (disable-two-factor params)
-    (answer (hsx (~two-factor :error error)) message error)))
+    (if error
+        (refuse (hsx (~disable-form :error error)))
+        (answer (hsx (~two-factor)) message))))
 
 (defun @get (params)
   (declare (ignore params))

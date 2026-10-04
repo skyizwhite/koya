@@ -92,6 +92,9 @@
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
              (~icon :name :close) "Clear")))))))
 
+(defcomp ~field-error (&key field error)
+  (hsx (p :id (format nil "~a-error" (field-param-name field)) :class "text-xs text-danger" :hidden (null error) error)))
+
 (defcomp ~field-input (&key field value error references media)
   (let* ((name (field-param-name field))
          (id name)
@@ -142,5 +145,4 @@
          (:media
           (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media)))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))
-       (when error
-         (hsx (p :class "text-xs text-danger" error)))))))
+       (~field-error :field field :error error)))))
