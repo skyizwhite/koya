@@ -43,8 +43,9 @@ naming the problem.
 | `models` | array of [model](#model) | optional; names unique |
 | `customFields` | array of [custom field](#custom-field) | optional; names unique; omitted from the output when empty |
 
-The `models` order is the order the admin UI shows. A deploy to a space that does
-not exist is refused with `404 not_found`; it never makes one.
+The `models` order is the order the admin UI shows. A deploy to a space the
+management key does not belong to, one that does not exist included, is refused
+with `403 forbidden`; it never makes one.
 
 ## Webhook
 
