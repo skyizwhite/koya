@@ -84,7 +84,7 @@
         (or (cdr (assoc target renames :test #'equal)) target)
         target)))
 
-(defun inner-changes (model outer old new)
+(defun inner-changes (model outer old new renames)
   (flet ((path (field) (format nil "~a.~a" outer (field-name field))))
     (diff-named
      old new #'field-name
@@ -92,7 +92,7 @@
      (lambda (f) (list (list :op :remove-field :model model :field (path f) :from (field-type f))))
      (lambda (o n)
        (mapcar (lambda (change) (list* :op (getf change :op) :model model :field (path n) (nthcdr 6 change)))
-               (field-changes model o n nil))))))
+               (field-changes model o n renames))))))
 
 (defun field-changes (model old new renames)
   (let ((from (forget-rename (field-options old)))
@@ -107,7 +107,7 @@
                      (list (list :op :change-field-options :model model :field (field-name new)
                                  :from from :to to)))
                    (when (eq (field-type new) :custom)
-                     (inner-changes model (field-name new) (field-fields old) (field-fields new))))))))
+                     (inner-changes model (field-name new) (field-fields old) (field-fields new) renames)))))))
 
 (defun diff-fields (model old new renames)
   (let ((pairs (rename-pairs old new #'field-name #'field-was)))

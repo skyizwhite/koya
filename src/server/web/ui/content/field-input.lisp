@@ -55,8 +55,8 @@
                         :nm-bind "{ hidden: () => _has(this.value), disabled: () => _has(this.value) }"
                   label))))))))
 
-(defcomp ~reference-select (&key field value references)
-  (let* ((name (field-param-name field))
+(defcomp ~reference-select (&key field parent value references)
+  (let* ((name (field-param-name field parent))
          (choices (reference-choices value references)))
     (hsx
      (<>
@@ -159,7 +159,7 @@
                      (loop :for option :in (field-option field :options) :collect
                        (hsx (option :value option :selected (equal option value) option)))))))
          (:reference
-          (hsx (~reference-select :field field :value value :references references)))
+          (hsx (~reference-select :field field :parent parent :value value :references references)))
          (:media
           (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media)))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))

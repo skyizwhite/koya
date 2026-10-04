@@ -267,5 +267,15 @@
            (changes (diff-schemas (funcall two "seo") (funcall two "card"))))
       (ok (equal (ops changes) '(:change-field-type)))
       (ok (destructive-changes-p changes))))
+  (testing "a reference inside follows a renamed model, as one at the top does"
+    (let* ((before (make-schema :custom-fields (list (make-custom-field "byline" (list (make-field :by :reference :model "author"))))
+                                :models (list (make-model "author" :list (list (make-field :name :text)))
+                                              (make-model "post" :list (list (make-field :byline :custom :custom-field "byline"))))))
+           (after (make-schema :custom-fields (list (make-custom-field "byline" (list (make-field :by :reference :model "writer"))))
+                               :models (list (make-model "writer" :list (list (make-field :name :text)) :was 'author)
+                                             (make-model "post" :list (list (make-field :byline :custom :custom-field "byline"))))))
+           (changes (diff-schemas before after)))
+      (ng (member :change-field-type (ops changes)) "its values are kept")
+      (ng (destructive-changes-p changes))))
   (testing "nothing changed is no change"
     (ng (diff-schemas (with-custom (seo-fields)) (with-custom (seo-fields))))))

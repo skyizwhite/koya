@@ -421,6 +421,14 @@
                     (push (format nil "~a.~a: :from must name a text or textarea field other than itself"
                                   (model-name model) (field-name field))
                           errors))))))))
+    (dolist (custom (schema-custom-fields schema))
+      (dolist (field (custom-field-fields custom))
+        (when (eq (field-type field) :reference)
+          (let ((target (field-option field :model)))
+            (unless (schema-model schema target)
+              (push (format nil "custom field ~a.~a references unknown model ~s"
+                            (custom-field-name custom) (field-name field) target)
+                    errors))))))
     (dolist (model (schema-models schema))
       (let ((label (model-label model)))
         (when label

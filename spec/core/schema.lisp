@@ -319,6 +319,8 @@
                                                                          (list (make-field :meta :custom :custom-field "seo"))))))) 1)
         "a custom field that is not declared")
     (ok (signals (make-schema :custom-fields (list (seo) (seo))) 'schema-error) "two with one name")
+    (ok (= (length (schema-errors (make-schema :custom-fields (list (make-custom-field "byline" (list (make-field :by :reference :model "ghost"))))))) 1)
+        "a reference inside to a model the schema does not have")
     (ok (= (length (schema-errors (make-schema :custom-fields (list (seo))
                                                :models (list (make-model "blog" :list (list (make-field :meta :custom :custom-field "seo"))
                                                                          :label :meta)))))
