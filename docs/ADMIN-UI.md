@@ -146,9 +146,10 @@ is no button.
   draft, when there is one.
 - The status filter offers the three badges: `draft`, `published` and
   `published+draft`.
-- Clicking a header sorts by it, clicking the sorted one turns it around, and an
-  arrow marks it. The system fields (created, updated, published, revised, id)
-  can be sorted by as well.
+- Every header that sorts carries a faint ↕. Clicking one sorts by it (↑),
+  clicking it again turns it around (↓), and a third click goes back to the
+  default order, newest created first. The system fields (created, updated,
+  published, revised, id) can be sorted by as well.
 
 The count beside the heading reads *3 of 120* while anything is filtered.
 **Clear**, beside the status filter, drops both and keeps the sort.

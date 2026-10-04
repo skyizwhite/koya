@@ -159,16 +159,21 @@
 
 (defcomp ~column-header (&key space model field state)
   (let* ((name (field-name field))
-         (active (equal name (getf state :sort-name)))
-         (next (if (and active (eq (getf state :sort-direction) :asc)) (format nil "-~a" name) name)))
+         (direction (and (equal name (getf state :sort-name)) (getf state :sort-direction)))
+         (next (case direction
+                 (:asc (format nil "-~a" name))
+                 (:desc nil)
+                 (t name))))
     (hsx
      (th :class "py-2 pr-4 font-medium"
+         :aria-sort (case direction (:asc "ascending") (:desc "descending"))
        (a :href (list-url space model :search-text (getf state :search-text) :status (getf state :status) :sort-key next)
           :nm-bind (on-follow (browse-url space model state :sort-key next :page 1))
           :class "flex items-center gap-1 hover:text-fg"
          (span :class (clsx "truncate" (column-width field)) name)
-         (when active
-           (hsx (span :class "shrink-0 text-accent" (if (eq (getf state :sort-direction) :asc) "↑" "↓")))))))))
+         (if direction
+             (hsx (span :class "shrink-0 text-accent" (if (eq direction :asc) "↑" "↓")))
+             (hsx (span :class "shrink-0 opacity-50" :aria-hidden "true" "↕"))))))))
 
 (defcomp ~bulk-bar (&key space model state)
   (labels ((url (op)
