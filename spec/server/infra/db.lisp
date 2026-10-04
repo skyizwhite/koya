@@ -20,7 +20,9 @@
                 #:schema->jobject)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions #:count-revisions)
-  (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish #:destroy)
+  (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish #:destroy #:unpublish #:discard)
+  (:import-from #:koya-server/domain/html #:data-text)
+  (:import-from #:koya-core/json #:parse-json)
   (:import-from #:koya-core/diff
                 #:destructive-changes-p)
   (:import-from #:koya-server/usecases/ports/sessions #:make-session-store #:delete-sessions)
@@ -63,7 +65,7 @@
   (migrate))
 
 (deftest migrations
-  (ok (= (current-version) 13))
+  (ok (= (current-version) 14))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -74,7 +76,7 @@
         "legacy" "about" "object"
         "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
         0)
-  (ok (equal (migrate) '(10 11 12 13)))
+  (ok (equal (migrate) '(10 11 12 13 14)))
   (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
     (ng (search "previewUrl" definition))
     (ok (search "https://x/about" definition) "a web address is kept"))
@@ -85,7 +87,7 @@
   (create-space "legacy")
   (exec "UPDATE spaces SET webhooks = ? WHERE name = 'legacy'"
         "[{\"label\":\"bare\",\"url\":\"example.com/hook\"},{\"label\":\"site\",\"url\":\"https://x/hook\"},{\"label\":\"ftp\",\"url\":\"ftp://x/hook\"}]")
-  (ok (equal (migrate) '(11 12 13)))
+  (ok (equal (migrate) '(11 12 13 14)))
   (ok (equal (mapcar (lambda (hook) (getf hook :label)) (space-webhooks "legacy")) '("site"))
       "the space still reads, with the one hook that can be sent")
   (migrated-fully))
@@ -350,7 +352,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('kept', 'publish', '{\"title\":\"Old\",\"gone\":{\"a\":1}}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(12 13)))
+  (ok (equal (migrate) '(12 13 14)))
   (let ((content (get-content "leftover" "kept")))
     (ng (nth-value 1 (gethash "gone" (content-published content))))
     (ng (nth-value 1 (gethash "gone" (content-draft content))))
@@ -361,6 +363,73 @@
   (let ((data (revision-data (first (list-revisions "leftover" "kept")))))
     (ng (nth-value 1 (gethash "gone" data)) "the history loses it too")
     (ok (string= (jget data "title") "Old")))
+  (migrated-fully))
+
+(defun text-fits-p (data text)
+  (if (null data)
+      (null text)
+      (and text (equalp (parse-json text) (data-text (parse-json data))))))
+
+(defun texts-fit-p (space)
+  (every (lambda (row)
+           (and (text-fits-p (col row "published") (col row "published_text"))
+                (text-fits-p (col row "draft") (col row "draft_text"))))
+         (fetch "SELECT published, draft, published_text, draft_text FROM contents WHERE space = ?" space)))
+
+(deftest the-text-of-each-content-is-kept-beside-it
+  (create-space "texts")
+  (flet ((deploy (&rest fields)
+           (replace-schema "texts" (make-schema :models (list (make-model "post" :list fields)))))
+         (post () (find-model "texts" "post")))
+    (deploy (make-field :title :text) (make-field :body :richtext) (make-field :count :number))
+    (let ((draft (content-id (create "texts" (post) (jobject "title" "Draft" "body" "<p>a <b>draft</b></p>"))))
+          (live (content-id (create "texts" (post) (jobject "title" "Live" "body" "<p>live</p>") :publish t)))
+          (numbers (content-id (create "texts" (post) (jobject "count" 3)))))
+      (ok (texts-fit-p "texts") "a content made, as a draft or published")
+      (ok (string= (col (fetch-one "SELECT draft_text FROM contents WHERE id = ?" numbers) "draft_text") "{}")
+          "data without strings has an empty text, so a draft is never read through to the published one")
+      (ok (null (col (fetch-one "SELECT published_text FROM contents WHERE id = ?" draft) "published_text"))
+          "and no data has no text")
+      (update-draft "texts" (post) live (jobject "title" "Live, edited"))
+      (ok (texts-fit-p "texts") "a draft saved")
+      (publish "texts" (post) live (jobject "title" "Live, edited" "body" "<p>again</p>"))
+      (ok (texts-fit-p "texts") "published")
+      (update-draft "texts" (post) live (jobject "title" "Next"))
+      (discard "texts" (post) live)
+      (ok (texts-fit-p "texts") "a draft discarded")
+      (unpublish "texts" (post) live)
+      (ok (texts-fit-p "texts") "unpublished")
+      (deploy (make-field :headline :text :was :title) (make-field :body :richtext) (make-field :count :number))
+      (ok (texts-fit-p "texts") "a field renamed by a deploy")
+      (deploy (make-field :headline :text) (make-field :count :number))
+      (ok (texts-fit-p "texts") "a field dropped")
+      (deploy (make-field :headline :richtext) (make-field :count :number))
+      (ok (texts-fit-p "texts") "a field whose type changed")
+      (ok (null (gethash "headline" (parse-json (col (fetch-one "SELECT draft_text FROM contents WHERE id = ?" live)
+                                                    "draft_text"))))
+          "takes its old text with it")))
+  (delete-space "texts"))
+
+(deftest a-content-stored-before-its-text-gets-one
+  (migrated-to 13)
+  (create-space "older")
+  (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
+        "older" "post" "list"
+        "{\"name\":\"post\",\"kind\":\"list\",\"fields\":[{\"name\":\"body\",\"type\":\"richtext\"},{\"name\":\"n\",\"type\":\"number\"}]}"
+        0)
+  (flet ((row (id status published draft)
+           (exec "INSERT INTO contents (id, space, model, status, published, draft, created_at, updated_at)
+                  VALUES (?, 'older', 'post', ?, ?, ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')"
+                 id status published draft)))
+    (row "drafted" "draft" nil "{\"body\":\"<p>new &amp; <b>bold</b></p>\"}")
+    (row "live" "published" "{\"body\":\"<p>live</p>\"}" nil)
+    (row "both" "published+draft" "{\"body\":\"<p>old</p>\"}" "{\"body\":\"<p>new</p>\"}")
+    (row "bare" "draft" nil "{\"n\":1}"))
+  (ok (equal (migrate) '(14)))
+  (ok (texts-fit-p "older") "every content gets the text of its data")
+  (ok (string= (col (fetch-one "SELECT draft_text FROM contents WHERE id = 'drafted'") "draft_text")
+               "{\"body\":\"new & bold\"}"))
+  (ok (string= (col (fetch-one "SELECT draft_text FROM contents WHERE id = 'bare'") "draft_text") "{}"))
   (migrated-fully))
 
 (deftest a-deploy-leaves-a-record
@@ -426,7 +495,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('about', 'publish', '{\"title\":\"One\"}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(13)))
+  (ok (equal (migrate) '(13 14)))
   (testing "what was stored moves into its space, history and all"
     (ok (string= (jget (content-published (get-content "one" "about")) "title") "One"))
     (ok (equal (mapcar #'revision-event (list-revisions "one" "about")) '("publish"))))

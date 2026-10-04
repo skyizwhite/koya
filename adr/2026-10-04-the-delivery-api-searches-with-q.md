@@ -15,7 +15,8 @@ already searches every text field through the same query.
   content's whole id: the content list's search, and the same code.
 - `q` is one phrase, matched as typed: it is not split into words.
 - With `filters`, both apply. The admin API's list takes `q` too.
-- It is SQL `LIKE` over the stored JSON, without an index.
+- It is SQL `LIKE` over the stored data, and over the stored text of rich
+  text, without an index.
 
 ## Consequences
 

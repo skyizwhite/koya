@@ -9,6 +9,7 @@
   (:import-from #:koya-core/json
                 #:parse-json #:to-json)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
+  (:import-from #:koya-server/infra/db/contents #:text-column)
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/spaces
@@ -106,8 +107,9 @@
            (in-published (and published (rename-key published from to)))
            (in-draft (and draft (rename-key draft from to))))
       (when (or in-published in-draft)
-        (exec "UPDATE contents SET published = ?, draft = ? WHERE space = ? AND id = ?"
-              (and published (to-json published)) (and draft (to-json draft)) space (col row "id")))))
+        (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
+              (and published (to-json published)) (and draft (to-json draft))
+              (text-column published) (text-column draft) space (col row "id")))))
   (dolist (row (fetch "SELECT r.id, r.data FROM content_revisions r
                         JOIN contents c ON c.space = r.space AND c.id = r.content_id
                         WHERE c.space = ? AND c.model = ?"
@@ -118,9 +120,10 @@
 
 (defun drop-content-field (space model field)
   (let ((path (format nil "$.~a" field)))
-    (exec "UPDATE contents SET published = json_remove(published, ?), draft = json_remove(draft, ?)
+    (exec "UPDATE contents SET published = json_remove(published, ?), draft = json_remove(draft, ?),
+                                published_text = json_remove(published_text, ?), draft_text = json_remove(draft_text, ?)
            WHERE space = ? AND model = ?"
-          path path space model)
+          path path path path space model)
     (exec "UPDATE content_revisions SET data = json_remove(data, ?)
            WHERE space = ? AND content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
           path space space model)))
