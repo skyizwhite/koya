@@ -5,7 +5,8 @@
   (:import-from #:koya-core/schema
                 #:make-schema #:schema-webhooks #:schema-models #:webhook->jobject
                 #:jobject->webhook #:model-name #:model-kind #:model->jobject #:jobject->model
-                #:model-forget-renames #:schema-model)
+                #:model-forget-renames #:schema-model #:schema-custom-fields
+                #:custom-field->jobject #:jobject->custom-field)
   (:import-from #:koya-core/json
                 #:parse-json #:to-json)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
@@ -38,9 +39,10 @@
           (fetch "SELECT definition FROM models WHERE space = ? ORDER BY position, name" space-name)))
 
 (defun read-schema (space-name)
-  (let ((row (first (fetch "SELECT webhooks FROM spaces WHERE name = ?" space-name))))
+  (let ((row (first (fetch "SELECT webhooks, custom_fields FROM spaces WHERE name = ?" space-name))))
     (and row
          (make-schema :webhooks (coerce (parse-json (col row "webhooks")) 'list)
+                      :custom-fields (map 'list #'jobject->custom-field (parse-json (col row "custom_fields")))
                       :models (load-space-models space-name)))))
 
 (defmethod load-schema (space-name)
@@ -118,7 +120,31 @@
       (when (rename-key data from to)
         (exec "UPDATE content_revisions SET data = ? WHERE id = ?" (to-json data) (col row "id"))))))
 
+(defun drop-inner-key (data outer inner)
+  (let ((object (and data (gethash outer data))))
+    (and (hash-table-p object) (remhash inner object))))
+
+(defun drop-inner-field (space model outer inner)
+  (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?" space model))
+    (let* ((published (let ((v (col row "published"))) (and v (parse-json v))))
+           (draft (let ((v (col row "draft"))) (and v (parse-json v))))
+           (in-published (drop-inner-key published outer inner))
+           (in-draft (drop-inner-key draft outer inner)))
+      (when (or in-published in-draft)
+        (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
+              (and published (to-json published)) (and draft (to-json draft))
+              (text-column published) (text-column draft) space (col row "id")))))
+  (exec "UPDATE content_revisions SET data = json_remove(data, ?)
+         WHERE space = ? AND content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
+        (format nil "$.~a.~a" outer inner) space space model))
+
 (defun drop-content-field (space model field)
+  (let ((dot (position #\. field)))
+    (if dot
+        (drop-inner-field space model (subseq field 0 dot) (subseq field (1+ dot)))
+        (drop-top-field space model field))))
+
+(defun drop-top-field (space model field)
   (let ((path (format nil "$.~a" field)))
     (exec "UPDATE contents SET published = json_remove(published, ?), draft = json_remove(draft, ?),
                                 published_text = json_remove(published_text, ?), draft_text = json_remove(draft_text, ?)
@@ -147,8 +173,10 @@
       (forget-schema space-name)
       (apply-changes space-name changes)
       (record-deploy space-name changes :by by)
-      (exec "UPDATE spaces SET webhooks = ? WHERE name = ?"
-            (to-json (map 'vector #'webhook->jobject (schema-webhooks schema))) space-name)
+      (exec "UPDATE spaces SET webhooks = ?, custom_fields = ? WHERE name = ?"
+            (to-json (map 'vector #'webhook->jobject (schema-webhooks schema)))
+            (to-json (map 'vector #'custom-field->jobject (schema-custom-fields schema)))
+            space-name)
       (let ((keep (mapcar #'model-name (schema-models schema))))
         (dolist (row (fetch "SELECT name FROM models WHERE space = ?" space-name))
           (unless (member (col row "name") keep :test #'string=)

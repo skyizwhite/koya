@@ -29,7 +29,7 @@
                 #:parse-query #:make-query #:query-limit #:query-offset #:query-orders
                 #:query-filters #:query-fields #:query-include #:query-error)
   (:import-from #:koya-core/validate #:validation-error)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name #:make-custom-field)
   (:import-from #:koya-core/json #:parse-json #:jget))
 (in-package #:koya-spec/server/usecases/contents)
 
@@ -427,3 +427,37 @@
     (delete-delivery-key "website" id)
     (ok (null (list-delivery-keys "website")))
     (ng (space-for-delivery-key key))))
+
+(deftest inside-a-custom-field
+  (replace-schema "website"
+                  (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
+                                                                                    (make-field :shown :boolean)
+                                                                                    (make-field :at :datetime))))
+                               :models (list (blog-model)
+                                             (make-model "tag" :list (list (make-field :name :text)))
+                                             (make-model "event" :list (list (make-field :at :datetime)))
+                                             (make-model "page" :list (list (make-field :title :text)
+                                                                            (make-field :card :custom :custom-field "card")))
+                                             (make-model "about" :object (list (make-field :body :richtext))))))
+  (unwind-protect
+       (let* ((page (find-model "website" "page"))
+              (tag (content-id (create "website" (find-model "website" "tag") (data "{\"name\": \"x\"}") :publish t)))
+              (content (create "website" page
+                               (data (format nil "{\"title\": \"P\", \"card\": {\"link\": \"~a\", \"at\": \"2026-09-20T10:00:59+09:00\"}}" tag))
+                               :publish t)))
+         (testing "a datetime inside is kept to the minute in UTC"
+           (ok (string= (jget (content-published content) "card" "at") "2026-09-20T01:00:00.000Z")))
+         (testing "a reference inside is a use"
+           (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
+           (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
+         (testing "a boolean missing inside and one that is false are the same"
+           (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
+                                                         (data (format nil "{\"title\": \"P\", \"card\": {\"link\": \"~a\", \"at\": \"2026-09-20T01:00:00.000Z\", \"shown\": false}}" tag))
+                                                         :replace t))))))
+    (replace-schema "website"
+                    (make-schema :models (list (blog-model)
+                                               (make-model "tag" :list (list (make-field :name :text)))
+                                               (make-model "event" :list (list (make-field :at :datetime)))
+                                               (make-model "page" :list (list (make-field :title :text)
+                                                                              (make-field :slug :slug :from :title)))
+                                               (make-model "about" :object (list (make-field :body :richtext))))))))

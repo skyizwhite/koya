@@ -1,7 +1,7 @@
 (defpackage #:koya-spec/core/validate
   (:use #:cl #:rove)
   (:import-from #:koya-core/schema
-                #:make-field #:make-model)
+                #:make-field #:make-model #:make-schema #:make-custom-field #:schema-model)
   (:import-from #:koya-core/validate
                 #:validate-content)
   (:import-from #:koya-core/json
@@ -104,3 +104,41 @@
              '(("tags" . "type"))))
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"extra\": 1}")
              '(("extra" . "unknown_field")))))
+
+(defparameter *with-seo*
+  (schema-model
+   (make-schema :custom-fields (list (make-custom-field "seo" (list (make-field :title :text :required t :max-length 5)
+                                                                    (make-field :image :media)
+                                                                    (make-field :indexed :boolean :required t))))
+                :models (list (make-model "page" :list (list (make-field :meta :custom :custom-field "seo")))
+                              (make-model "post" :list (list (make-field :meta :custom :custom-field "seo" :required t)))))
+   "page"))
+
+(defun seo-codes (json &optional (model *with-seo*))
+  (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
+          (validate-content model (parse-json json))))
+
+(deftest a-custom-field-is-an-object-of-its-fields
+  (ok (null (seo-codes "{\"meta\": {\"title\": \"Hi\", \"image\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"}}")))
+  (ok (null (seo-codes "{}")) "an optional one may be absent")
+  (ok (equal (seo-codes "{\"meta\": \"Hi\"}") '(("meta" . "type"))) "it must be an object")
+  (ok (equal (seo-codes "{\"meta\": {\"title\": \"Too long\", \"image\": 3}}")
+             '(("meta.title" . "max_length") ("meta.image" . "type")))
+      "each field inside is checked, and named by its path")
+  (ok (equal (seo-codes "{\"meta\": {\"image\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"}}") '(("meta.title" . "required")))
+      "a required field inside is required once the object is there; a boolean never is")
+  (ok (equal (seo-codes "{\"meta\": {\"title\": \"Hi\", \"extra\": 1}}") '(("meta.extra" . "unknown_field"))))
+  (ok (equal (seo-codes "{\"meta\": {\"title\": false}}") '(("meta.title" . "type")))
+      "false is no value only for a boolean")
+  (ok (equal (seo-codes "{\"meta\": {\"bogus\": null}}") '(("meta.bogus" . "unknown_field") ("meta.title" . "required")))
+      "and a key the custom field does not have is never blank")
+  (ok (equal (seo-codes "{\"meta\": {\"indexed\": true}}") '(("meta.title" . "required")))
+      "an object given is a value, whatever it holds")
+  (ok (equal (seo-codes "{\"meta\": {}}") '(("meta.title" . "required"))) "even an empty one")
+  (ok (null (seo-codes "{\"meta\": null}")) "and null is none")
+  (let ((post (schema-model (make-schema :custom-fields (list (make-custom-field "seo" (list (make-field :title :text))))
+                                         :models (list (make-model "post" :list (list (make-field :meta :custom :custom-field "seo" :required t)))))
+                            "post")))
+    (ok (equal (seo-codes "{}" post) '(("meta" . "required"))))
+    (ok (equal (seo-codes "{\"meta\": null}" post) '(("meta" . "required"))))
+    (ok (null (seo-codes "{\"meta\": {\"title\": \" \"}}" post)) "an object whose fields are blank is still one")))

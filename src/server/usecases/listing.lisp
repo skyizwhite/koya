@@ -23,8 +23,10 @@
 
 (defun sortable-p (model name)
   (and (not (empty-p name))
-       (or (model-field model name)
-           (member name +system-fields+ :test #'string=))))
+       (let ((field (model-field model name)))
+         (if field
+             (not (eq (field-type field) :custom))
+             (member name +system-fields+ :test #'string=)))))
 
 (defun parse-sort (raw model)
   (let* ((desc (and (not (empty-p raw)) (char= (char raw 0) #\-)))

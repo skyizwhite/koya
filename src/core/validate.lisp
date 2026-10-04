@@ -6,7 +6,8 @@
                 #:field-type
                 #:field-option
                 #:field-required-p
-                #:field-many-p)
+                #:field-many-p
+                #:field-fields)
   (:import-from #:koya-core/json
                 #:json-null-p
                 #:json-array-p)
@@ -18,6 +19,7 @@
            #:validation-error
            #:validation-error-errors
            #:blank-value-p
+           #:blank-for-field-p
            #:datetime-string-p
            #:content-id-p))
 (in-package #:koya-core/validate)
@@ -108,7 +110,18 @@
      (unless (content-id-p value)
        (list (err field "type" "must be an id"))))))
 
+(defun inside (field errors)
+  (mapcar (lambda (e) (list* :field (format nil "~a.~a" (field-name field) (getf e :field)) (rest (rest e))))
+          errors))
+
 (defun check-value (field value)
+  (cond ((eq (field-type field) :custom)
+         (if (hash-table-p value)
+             (inside field (validate-fields (field-fields field) value nil))
+             (list (err field "type" "must be an object"))))
+        (t (check-many field value))))
+
+(defun check-many (field value)
   (if (field-many-p field)
       (if (json-array-p value)
           (loop :for v :across value :append (check-one field v))
@@ -116,14 +129,17 @@
       (check-one field value)))
 
 (defun validate-content (model data &key partial)
+  (validate-fields (model-fields model) data partial))
+
+(defun validate-fields (fields data partial)
   (let ((errors '())
-        (known (mapcar #'field-name (model-fields model))))
+        (known (mapcar #'field-name fields)))
     (maphash (lambda (key value)
                (declare (ignore value))
                (unless (member key known :test #'string=)
                  (push (list :field key :code "unknown_field" :message "is not a field of this model") errors)))
              data)
-    (dolist (field (model-fields model))
+    (dolist (field fields)
       (multiple-value-bind (value found) (gethash (field-name field) data)
         (cond ((and (not found) partial) nil)
               ((not found)

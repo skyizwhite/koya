@@ -9,7 +9,7 @@
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/usecases/settings #:display-timezone-name)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:export #:~field-input))
+  (:export #:~field-input #:~custom-input))
 (in-package #:koya-server/web/ui/content/field-input)
 
 (defun present-p (value) (and value (not (eq value json-null))))
@@ -55,8 +55,8 @@
                         :nm-bind "{ hidden: () => _has(this.value), disabled: () => _has(this.value) }"
                   label))))))))
 
-(defcomp ~reference-select (&key field value references)
-  (let* ((name (field-param-name field))
+(defcomp ~reference-select (&key field parent value references)
+  (let* ((name (field-param-name field parent))
          (choices (reference-choices value references)))
     (hsx
      (<>
@@ -92,11 +92,43 @@
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
              (~icon :name :close) "Clear")))))))
 
-(defcomp ~field-error (&key field error)
-  (hsx (p :id (format nil "~a-error" (field-param-name field)) :class "text-xs text-danger" :hidden (null error) error)))
+(defcomp ~field-error (&key field parent error)
+  (hsx (p :id (format nil "~a-error" (field-param-name field parent)) :class "text-xs text-danger" :hidden (null error) error)))
 
-(defcomp ~field-input (&key field value error references media)
+(defcomp ~custom-input (&key field present error children)
   (let* ((name (field-param-name field))
+         (required (field-required-p field))
+         (on (or required present)))
+    (hsx
+     (div :class "space-y-1.5" :nm-data (format nil "...koya.customField(~:[false~;true~])" on)
+       (div :class "flex items-center justify-between gap-3"
+         (div :id (format nil "~a-label" name) :class "label"
+           (field-name field)
+           (span :class "ml-2 text-xs font-normal text-muted" "custom")
+           (when required (hsx (span :class "ml-1 text-danger" "*")))
+           (when (field-option field :help)
+             (hsx (span :id (format nil "~a-help" name) :class "ml-3 text-xs font-normal text-muted"
+                    (field-option field :help)))))
+         (unless required
+           (hsx (button :type "button" :class "btn" :hidden (not on)
+                        :nm-bind "{ hidden: () => !_on, onclick: () => _remove() }"
+                  (~icon :name :close) (format nil "Remove ~a" (field-name field))))))
+       (input :type "hidden" :name name :value "on" :disabled (not on) :nm-ref "marker"
+              :nm-bind "{ disabled: () => !_on }")
+       (unless required
+         (hsx (div :class "rounded-md border border-dashed border-line p-4" :hidden on
+                   :nm-bind "{ hidden: () => _on }"
+                (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add() }"
+                  (~icon :name :plus) (format nil "Add ~a" (field-name field))))))
+       (fieldset :id name :aria-labelledby (format nil "~a-label" name)
+                 :class "space-y-4 rounded-md border border-line p-4"
+                 :hidden (not on) :disabled (not on)
+                 :nm-bind "{ hidden: () => !_on, disabled: () => !_on }"
+         children)
+       (~field-error :field field :error error)))))
+
+(defcomp ~field-input (&key field parent value error references media)
+  (let* ((name (field-param-name field parent))
          (id name)
          (type (field-type field))
          (string (value->string field value)))
@@ -143,8 +175,8 @@
                      (loop :for option :in (field-option field :options) :collect
                        (hsx (option :value option :selected (equal option value) option)))))))
          (:reference
-          (hsx (~reference-select :field field :value value :references references)))
+          (hsx (~reference-select :field field :parent parent :value value :references references)))
          (:media
           (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media)))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))
-       (~field-error :field field :error error)))))
+       (~field-error :field field :parent parent :error error)))))

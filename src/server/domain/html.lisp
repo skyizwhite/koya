@@ -58,6 +58,7 @@
   (when data
     (let ((text (make-hash-table :test 'equal)))
       (maphash (lambda (name value)
-                 (when (stringp value) (setf (gethash name text) (html-text value))))
+                 (cond ((stringp value) (setf (gethash name text) (html-text value)))
+                       ((hash-table-p value) (setf (gethash name text) (data-text value)))))
                data)
       text)))

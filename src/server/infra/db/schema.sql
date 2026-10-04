@@ -75,7 +75,7 @@ CREATE TABLE spaces (
   webhooks TEXT NOT NULL DEFAULT '[]',
   webhook_secret TEXT NOT NULL,
   position INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL);
+  created_at TEXT NOT NULL, custom_fields TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE webhook_deliveries (
   id TEXT PRIMARY KEY,
   space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,

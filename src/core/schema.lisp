@@ -22,6 +22,15 @@
            #:field-type
            #:field-options
            #:field-option
+           #:field-fields
+           #:custom-field
+           #:make-custom-field
+           #:custom-field-name
+           #:custom-field-fields
+           #:custom-field->jobject
+           #:jobject->custom-field
+           #:schema-custom-fields
+           #:schema-custom-field
            #:field-required-p
            #:field-many-p
            #:field-was
@@ -80,7 +89,8 @@
     (:select    :required :options :many)
     (:media     :required)
     (:reference :required :model :many)
-    (:slug      :required :from :unique :pattern)))
+    (:slug      :required :from :unique :pattern)
+    (:custom    :required :custom-field)))
 
 (defparameter *universal-options* '(:was :help))
 
@@ -106,13 +116,14 @@
 (defstruct (field (:constructor %make-field))
   name
   type
-  options)
+  options
+  fields)
 
 (defun normalize-option (key value)
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
     (case key
       (:model (name-string value))
-      ((:from :was) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
+      ((:from :was :custom-field) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
       (:options (if (or (listp value) (json-array-p value))
                     (map 'list #'name-string value)
                     value))
@@ -137,7 +148,7 @@
          (bad "a list without duplicates")))
       (:model
        (unless (slug-name-p value) (bad "a model name")))
-      (:from
+      ((:from :custom-field)
        (unless (field-name-p value) (bad "a field name")))
       (:help
        (unless (and (stringp value) (plusp (length value))) (bad "a non-empty string")))
@@ -167,6 +178,8 @@
       (fail "reference field ~s needs :model" name))
     (when (and (eq type :slug) (null (getf options :from)))
       (fail "slug field ~s needs :from" name))
+    (when (and (eq type :custom) (null (getf options :custom-field)))
+      (fail "custom field ~s needs :custom-field" name))
     (when (equal (getf options :was) name)
       (fail "field ~s: :was must name the field it was renamed from, not itself" name))
     (%make-field :name name :type type :options options)))
@@ -184,8 +197,31 @@
 (defun field-forget-rename (field)
   (if (field-was field)
       (%make-field :name (field-name field) :type (field-type field)
-                   :options (forget-rename (field-options field)))
+                   :options (forget-rename (field-options field))
+                   :fields (field-fields field))
       field))
+
+(defstruct (custom-field (:constructor %make-custom-field))
+  name
+  fields)
+
+(defun make-custom-field (name fields)
+  (let ((name (if (stringp name) name (camel-key name))))
+    (unless (field-name-p name)
+      (fail "custom field name ~s must be a camelCase identifier" name))
+    (when (null fields)
+      (fail "custom field ~s has no fields" name))
+    (let ((names (mapcar #'field-name fields)))
+      (when (/= (length names) (length (remove-duplicates names :test #'string=)))
+        (fail "custom field ~s has duplicate field names" name)))
+    (dolist (field fields)
+      (when (member (field-type field) '(:slug :custom))
+        (fail "custom field ~s: a ~(~a~) field cannot be inside a custom field" name (field-type field)))
+      (when (field-option field :unique)
+        (fail "custom field ~s: field ~s cannot be unique inside a custom field" name (field-name field)))
+      (when (field-was field)
+        (fail "custom field ~s: field ~s cannot be renamed with :was inside a custom field" name (field-name field))))
+    (%make-custom-field :name name :fields fields)))
 
 (defun field-required-p (field) (and (field-option field :required) t))
 (defun field-many-p (field) (and (field-option field :many) t))
@@ -311,13 +347,34 @@
 
 (defstruct (schema (:constructor %make-schema))
   webhooks
+  custom-fields
   models)
 
-(defun make-schema (&key webhooks models)
+(defun resolve-custom-fields (model custom-fields)
+  (flet ((resolve (field)
+           (if (eq (field-type field) :custom)
+               (let ((custom (find (field-option field :custom-field) custom-fields
+                                   :key #'custom-field-name :test #'string=)))
+                 (%make-field :name (field-name field) :type :custom :options (field-options field)
+                              :fields (and custom (custom-field-fields custom))))
+               field)))
+    (%make-model :name (model-name model) :kind (model-kind model)
+                 :fields (mapcar #'resolve (model-fields model))
+                 :options (model-options model))))
+
+(defun make-schema (&key webhooks custom-fields models)
   (let ((names (mapcar #'model-name models)))
     (when (/= (length names) (length (remove-duplicates names :test #'string=)))
       (fail "duplicate model names")))
-  (%make-schema :webhooks (normalize-webhooks webhooks "schema") :models models))
+  (let ((names (mapcar #'custom-field-name custom-fields)))
+    (when (/= (length names) (length (remove-duplicates names :test #'string=)))
+      (fail "duplicate custom field names")))
+  (%make-schema :webhooks (normalize-webhooks webhooks "schema")
+                :custom-fields custom-fields
+                :models (mapcar (lambda (model) (resolve-custom-fields model custom-fields)) models)))
+
+(defun schema-custom-field (schema name)
+  (find name (schema-custom-fields schema) :key #'custom-field-name :test #'string=))
 
 (defun schema-model (schema name)
   (find (string-downcase (string name)) (schema-models schema) :key #'model-name :test #'string=))
@@ -349,6 +406,12 @@
                (push (format nil "~a.~a references unknown model ~s"
                              (model-name model) (field-name field) target)
                      errors))))
+          (:custom
+           (let ((name (field-option field :custom-field)))
+             (unless (schema-custom-field schema name)
+               (push (format nil "~a.~a: :customField names unknown custom field ~s"
+                             (model-name model) (field-name field) name)
+                     errors))))
           (:slug
            (let* ((from (field-option field :from))
                   (source (model-field model from)))
@@ -360,6 +423,14 @@
                     (push (format nil "~a.~a: :from must name a text or textarea field other than itself"
                                   (model-name model) (field-name field))
                           errors))))))))
+    (dolist (custom (schema-custom-fields schema))
+      (dolist (field (custom-field-fields custom))
+        (when (eq (field-type field) :reference)
+          (let ((target (field-option field :model)))
+            (unless (schema-model schema target)
+              (push (format nil "custom field ~a.~a references unknown model ~s"
+                            (custom-field-name custom) (field-name field) target)
+                    errors))))))
     (dolist (model (schema-models schema))
       (let ((label (model-label model)))
         (when label
@@ -379,14 +450,18 @@
       (fail "~{~a~^; ~}" errors)))
   schema)
 
+(defun comma-errors (where fields)
+  (loop :for field :in fields
+        :for comma := (find-if (lambda (option) (find #\, option)) (field-option field :options))
+        :when comma
+          :collect (format nil "~a: field ~s: option ~s holds a comma" where (field-name field) comma)))
+
 (defun check-deployable (schema)
-  (let ((errors (loop :for model :in (schema-models schema)
-                      :append (loop :for field :in (model-fields model)
-                                    :for comma := (find-if (lambda (option) (find #\, option))
-                                                           (field-option field :options))
-                                    :when comma
-                                      :collect (format nil "model ~a: field ~s: option ~s holds a comma"
-                                                       (model-name model) (field-name field) comma)))))
+  (let ((errors (append (loop :for model :in (schema-models schema)
+                              :append (comma-errors (format nil "model ~a" (model-name model)) (model-fields model)))
+                        (loop :for custom :in (schema-custom-fields schema)
+                              :append (comma-errors (format nil "custom field ~a" (custom-field-name custom))
+                                                    (custom-field-fields custom))))))
     (when errors
       (fail "~{~a~^; ~}" errors)))
   schema)
@@ -426,10 +501,17 @@
     (when (model-was model) (setf (gethash "was" obj) (model-was model)))
     obj))
 
+(defun custom-field->jobject (custom)
+  (jobject "name" (custom-field-name custom)
+           "fields" (map 'vector #'field->jobject (custom-field-fields custom))))
+
 (defun schema->jobject (schema)
-  (jobject "koyaSchema" +schema-version+
-           "webhooks" (map 'vector #'webhook->jobject (schema-webhooks schema))
-           "models" (map 'vector #'model->jobject (schema-models schema))))
+  (let ((obj (jobject "koyaSchema" +schema-version+
+                      "webhooks" (map 'vector #'webhook->jobject (schema-webhooks schema))
+                      "models" (map 'vector #'model->jobject (schema-models schema)))))
+    (when (schema-custom-fields schema)
+      (setf (gethash "customFields" obj) (map 'vector #'custom-field->jobject (schema-custom-fields schema))))
+    obj))
 
 (defun jvalue->option (key value)
   (case key
@@ -459,6 +541,14 @@
           (setf options (append options (list k (jvalue->option k (gethash key obj))))))))
     (apply #'make-field name type options)))
 
+(defun jobject->custom-field (obj)
+  (unless (hash-table-p obj) (fail "each custom field must be an object"))
+  (let ((name (jget obj "name"))
+        (fields (jget obj "fields")))
+    (unless (stringp name) (fail "custom field without a name"))
+    (unless (json-array-p fields) (fail "custom field ~s: fields must be an array" name))
+    (make-custom-field name (map 'list #'jobject->field fields))))
+
 (defun jobject->model (obj)
   (unless (hash-table-p obj) (fail "each model must be an object"))
   (let ((name (jget obj "name"))
@@ -480,8 +570,11 @@
     (unless (eql version +schema-version+)
       (fail "unsupported koyaSchema version ~s (expected ~a)" version +schema-version+)))
   (let ((webhooks (jget obj "webhooks"))
+        (custom-fields (jget obj "customFields"))
         (models (jget obj "models")))
     (unless (or (null webhooks) (json-array-p webhooks)) (fail "webhooks must be an array"))
+    (unless (or (null custom-fields) (json-array-p custom-fields)) (fail "customFields must be an array"))
     (unless (or (null models) (json-array-p models)) (fail "models must be an array"))
     (check-schema (make-schema :webhooks (coerce (or webhooks #()) 'list)
+                               :custom-fields (map 'list #'jobject->custom-field (or custom-fields #()))
                                :models (map 'list #'jobject->model (or models #()))))))

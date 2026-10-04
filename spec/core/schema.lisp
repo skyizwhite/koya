@@ -6,7 +6,8 @@
                 #:schema-model #:schema-webhooks #:model-preview-url #:model-public-url
                 #:model-label #:make-webhook #:webhook-only #:webhook-covers-p #:schema-error
                 #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
-                #:model-options #:check-deployable)
+                #:model-options #:check-deployable
+                #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields)
   (:import-from #:koya-core/json
                 #:to-json #:parse-json #:jget))
 (in-package #:koya-spec/core/schema)
@@ -278,3 +279,65 @@
       (ok (string= (jget field "help") "1200x630"))
       (ok (string= (field-option (model-field (schema-model (jobject->schema (parse-json (to-json obj))) "m") :cover) :help)
                    "1200x630")))))
+
+(defun seo ()
+  (make-custom-field "seo" (list (make-field :title :text :max-length 60)
+                                 (make-field :image :media)
+                                 (make-field :kind :select :options '("article" "page")))))
+
+(defun with-seo (&rest field-options)
+  (make-schema :custom-fields (list (seo))
+               :models (list (make-model "blog" :list
+                                         (list (make-field :title :text)
+                                               (apply #'make-field :meta :custom :custom-field "seo" field-options))))))
+
+(deftest custom-fields
+  (testing "a custom field is a named set of built-in fields"
+    (let ((seo (seo)))
+      (ok (string= (custom-field-name seo) "seo"))
+      (ok (equal (mapcar #'field-name (custom-field-fields seo)) '("title" "image" "kind")))))
+  (testing "its name is a field name, and its fields are unique"
+    (ok (string= (custom-field-name (make-custom-field :link-card (list (make-field :url :text)))) "linkCard"))
+    (ok (signals (make-custom-field "Seo" (list (make-field :title :text))) 'schema-error))
+    (ok (signals (make-custom-field "seo" nil) 'schema-error) "it has fields")
+    (ok (signals (make-custom-field "seo" (list (make-field :title :text) (make-field :title :textarea))) 'schema-error)))
+  (testing "what cannot be inside one"
+    (ok (signals (make-custom-field "seo" (list (make-field :slug :slug :from :title))) 'schema-error) "a slug")
+    (ok (signals (make-custom-field "seo" (list (make-field :title :text :unique t))) 'schema-error) "a unique field")
+    (ok (signals (make-custom-field "seo" (list (make-field :inner :custom :custom-field "other"))) 'schema-error)
+        "another custom field")
+    (ok (signals (make-custom-field "seo" (list (make-field :title :text :was :headline))) 'schema-error)
+        "a rename, which does not reach inside"))
+  (testing "a model uses one by name"
+    (ok (signals (make-field :meta :custom) 'schema-error) "and must name it")
+    (ok (signals (make-field :meta :custom :custom-field "seo" :unique t) 'schema-error))
+    (let ((field (model-field (schema-model (with-seo :required t :help "For search engines") "blog") :meta)))
+      (ok (string= (field-option field :custom-field) "seo"))
+      (ok (equal (mapcar #'field-name (field-fields field)) '("title" "image" "kind"))
+          "and the schema gives the field the custom field's fields")))
+  (testing "the schema checks the names"
+    (ok (null (schema-errors (with-seo))))
+    (ok (= (length (schema-errors (make-schema :models (list (make-model "blog" :list
+                                                                         (list (make-field :meta :custom :custom-field "seo"))))))) 1)
+        "a custom field that is not declared")
+    (ok (signals (make-schema :custom-fields (list (seo) (seo))) 'schema-error) "two with one name")
+    (ok (= (length (schema-errors (make-schema :custom-fields (list (make-custom-field "byline" (list (make-field :by :reference :model "ghost"))))))) 1)
+        "a reference inside to a model the schema does not have")
+    (ok (= (length (schema-errors (make-schema :custom-fields (list (seo))
+                                               :models (list (make-model "blog" :list (list (make-field :meta :custom :custom-field "seo"))
+                                                                         :label :meta)))))
+           1)
+        "a custom field labels nothing")
+    (ok (signals (check-deployable (make-schema :custom-fields (list (make-custom-field "seo" (list (make-field :kind :select :options '("a,b"))))))) 'schema-error)
+        "a comma in an option inside is caught at deploy"))
+  (testing "it goes over the wire and back"
+    (let* ((obj (schema->jobject (with-seo)))
+           (json (to-json obj))
+           (back (jobject->schema (parse-json json))))
+      (ok (search "\"customFields\":[{\"name\":\"seo\",\"fields\":[" json))
+      (ok (search "{\"name\":\"meta\",\"type\":\"custom\",\"customField\":\"seo\"}" json)
+          "a model names it and does not repeat its fields")
+      (ok (equal (mapcar #'field-name (field-fields (model-field (schema-model back "blog") :meta)))
+                 '("title" "image" "kind")))
+      (ok (string= json (to-json (schema->jobject back))) "and the round trip is stable"))
+    (ng (search "customFields" (to-json (schema->jobject (make-schema)))) "absent when there are none")))

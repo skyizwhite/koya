@@ -3,6 +3,8 @@
   (:import-from #:koya-core/schema
                 #:make-field
                 #:make-model
+                #:make-custom-field
+                #:custom-field-name
                 #:make-webhook
                 #:make-schema
                 #:check-schema
@@ -10,6 +12,7 @@
                 #:model-was)
   (:export #:defwebhooks
            #:defmodel
+           #:defcustomfield
            #:webhook
            #:current-schema
            #:clear-schema
@@ -20,10 +23,13 @@
 
 (defvar *models* '())
 
+(defvar *custom-fields* '())
+
 (defun clear-schema ()
-  "Forget every model and webhook defined so far."
+  "Forget every model, custom field and webhook defined so far."
   (setf *webhooks* '()
-        *models* '()))
+        *models* '()
+        *custom-fields* '()))
 
 (defun model-key (name) (string-downcase (string name)))
 
@@ -45,6 +51,29 @@
         (setf (cdr entry) model)
         (setf *models* (append *models* (list (cons key model)))))
     model))
+
+(defun register-custom-field (custom)
+  (let* ((key (custom-field-name custom))
+         (entry (assoc key *custom-fields* :test #'string=)))
+    (if entry
+        (setf (cdr entry) custom)
+        (setf *custom-fields* (append *custom-fields* (list (cons key custom)))))
+    custom))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun field-forms (fields)
+    `(list ,@(loop :for (fname ftype . options) :in fields
+                   :collect `(make-field ',fname ,ftype
+                                         ,@(loop :for (k v) :on options :by #'cddr
+                                                 :append (list k `',v)))))))
+
+(defmacro defcustomfield (name &body fields)
+  "Define (or redefine) custom field NAME: a set of fields a model uses as one
+field, e.g. (defcustomfield seo (title :text) (image :media)). Each field is
+(NAME TYPE . OPTIONS) as in DEFMODEL, but cannot be a :slug or a :custom field,
+nor :unique. A model uses it as (meta :custom :custom-field seo), and its value
+is an object of these fields."
+  `(register-custom-field (make-custom-field ',name ,(field-forms fields))))
 
 (defun webhook (label url &key only)
   "A webhook for DEFWEBHOOKS. It is sent every event (publish, unpublish, delete,
@@ -68,6 +97,8 @@ with them. Both are taken literally and are dropped once the deploy has applied
 them, so PULL never brings them back.
 :HELP on a field is a string the editor shows under the field's name, to say
 what it expects, e.g. (cover :media :help \"1200x630\").
+:CUSTOM-FIELD names a custom field made with DEFCUSTOMFIELD, for a :custom
+field, e.g. (meta :custom :custom-field seo).
 PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI,
 starting with http:// or https://, where {CONTENT_ID} and {DRAFT_KEY} are
 substituted, e.g.
@@ -79,10 +110,7 @@ is shown by its id."
     (error "defmodel ~(~a~): :kind must be given as :list or :object, got ~s" name kind))
   `(register-model
     (make-model ',name ,kind
-                (list ,@(loop :for (fname ftype . options) :in fields
-                              :collect `(make-field ',fname ,ftype
-                                                    ,@(loop :for (k v) :on options :by #'cddr
-                                                            :append (list k `',v)))))
+                ,(field-forms fields)
                 :preview-url ,preview-url
                 :public-url ,public-url
                 :label ',label
@@ -90,4 +118,6 @@ is shown by its id."
 
 (defun current-schema ()
   "Return the validated schema built from all definitions so far."
-  (check-schema (make-schema :webhooks *webhooks* :models (mapcar #'cdr *models*))))
+  (check-schema (make-schema :webhooks *webhooks*
+                             :custom-fields (mapcar #'cdr *custom-fields*)
+                             :models (mapcar #'cdr *models*))))

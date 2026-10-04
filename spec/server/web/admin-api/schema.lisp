@@ -2,7 +2,8 @@
   (:use #:cl #:rove)
   (:import-from #:koya-spec/server/web/api-support #:*management-key* #:test-schema #:request #:admin #:setup-api #:reset-api)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema->jobject)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema->jobject
+                #:make-custom-field)
   (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:koya-server/usecases/schema #:replace-schema))
 (in-package #:koya-spec/server/web/admin-api/schema)
@@ -164,4 +165,48 @@
            (testing "a model made anew is not checked, as its contents go"
              (ok (= 200 (admin :put "/admin/api/website/schema" :body (schema->jobject (notes :object :max-length 5))
                                                                 :query "force=true")))))
+      (replace-schema "website" (test-schema)))))
+
+(deftest a-custom-field-goes-over-the-api
+  (flet ((cards (&rest title-options)
+           (make-schema :custom-fields (list (make-custom-field "card" (list (apply #'make-field :title :text title-options))))
+                        :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card")))))))
+    (replace-schema "website" (cards))
+    (unwind-protect
+         (progn
+           (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
+             (ok (= status 200))
+             (ok (string= (jget (aref (jget json "customFields") 0) "name") "card") "it is read back"))
+           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "abcdefgh"))))
+           (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
+                                                     :body (schema->jobject (cards :max-length 5)))
+             (ok (= status 200))
+             (let ((misfit (loop :for change :across (jget json "changes")
+                                 :thereis (and (jget change "misfits") (aref (jget change "misfits") 0)))))
+               (ok misfit "tightening a field inside is checked against stored contents")
+               (ok (string= (jget misfit "field") "card.title") "and the misfit says where"))))
+      (replace-schema "website" (test-schema)))))
+
+(deftest a-field-tightened-inside-is-checked-alone
+  (flet ((cards (&rest fields)
+           (make-schema :custom-fields (list (make-custom-field "card" fields))
+                        :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card"))))))
+         (required-cards (&rest fields)
+           (make-schema :custom-fields (list (make-custom-field "card" fields))
+                        :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card" :required t)))))))
+    (replace-schema "website" (cards (make-field :title :text) (make-field :image :text)))
+    (unwind-protect
+         (progn
+           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "T" "image" "I"))))
+           (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
+                                                     :body (schema->jobject (required-cards (make-field :title :text))))
+             (ok (= status 200))
+             (ok (every (lambda (c) (null (jget c "misfits"))) (jget json "changes"))
+                 "a custom field made required is checked with what the same deploy removes from it gone"))
+           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject)))
+           (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
+                                                     :body (schema->jobject (cards (make-field :title :text :required t)))
+                                                     :query "force=true")
+             (ok (= status 200) "a field made required inside is checked alone, not with one the same deploy removes")
+             (ng (jget json "error"))))
       (replace-schema "website" (test-schema)))))

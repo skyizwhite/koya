@@ -1,7 +1,8 @@
 (defpackage #:koya-server/usecases/delivery
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p)
+                #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p
+                #:field-fields)
   (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
@@ -35,42 +36,57 @@
     (and content (content-published content)
          (deliver content target space :include include))))
 
+(defun next-fields (space field)
+  (case (field-type field)
+    (:custom (field-fields field))
+    (:reference (let ((target (find-model space (field-option field :model))))
+                  (and target (model-fields target))))))
+
 (defun check-include (space model include)
   (dolist (path include)
-    (loop :for name :in path
-          :for at := model :then (and field (find-model space (field-option field :model)))
-          :for field := (and at (find name (model-fields at) :key #'field-name :test #'string=))
+    (loop :for (name . more) :on path
+          :for fields := (model-fields model) :then (next-fields space field)
+          :for field := (find name fields :key #'field-name :test #'string=)
           :for reached :from 1
-          :unless (and field (eq (field-type field) :reference))
+          :unless (and field (or (eq (field-type field) :reference)
+                                 (and more (eq (field-type field) :custom))))
             :do (bad-query "include: ~s is not a reference field" (format nil "~{~a~^.~}" (subseq path 0 reached))))))
 
-(defun embed-references (object model space include)
-  (dolist (field (model-fields model))
+(defun embed-references (object fields space include)
+  (dolist (field fields)
     (let* ((name (field-name field))
            (nested (loop :for path :in include
                          :when (string= (first path) name) :collect (rest path)))
            (value (gethash name object)))
       (when (and nested value (not (eq value json-null)))
-        (let ((target (field-option field :model))
-              (nested (remove nil nested)))
-          (setf (gethash name object)
-                (if (field-many-p field)
-                    (coerce (remove nil (map 'list (lambda (v) (expand-reference space target v nested)) value)) 'vector)
-                    (or (expand-reference space target value nested) json-null)))))))
+        (let ((nested (remove nil nested)))
+          (if (eq (field-type field) :custom)
+              (when (hash-table-p value)
+                (setf (gethash name object) (embed-references (copy-object value) (field-fields field) space nested)))
+              (let ((target (field-option field :model)))
+                (setf (gethash name object)
+                      (if (field-many-p field)
+                          (coerce (remove nil (map 'list (lambda (v) (expand-reference space target v nested)) value)) 'vector)
+                          (or (expand-reference space target value nested) json-null)))))))))
   object)
 
-(defun expand-media (object model space)
-  (dolist (field (model-fields model) object)
-    (when (eq (field-type field) :media)
-      (let ((value (gethash (field-name field) object)))
-        (when (and value (not (eq value json-null)))
-          (let ((media (and (stringp value) (find-media space value))))
-            (setf (gethash (field-name field) object) (or media json-null))))))))
+(defun expand-media (object fields space)
+  (dolist (field fields object)
+    (let ((value (gethash (field-name field) object)))
+      (case (field-type field)
+        (:media
+         (when (and value (not (eq value json-null)))
+           (let ((media (and (stringp value) (find-media space value))))
+             (setf (gethash (field-name field) object) (or media json-null)))))
+        (:custom
+         (when (hash-table-p value)
+           (setf (gethash (field-name field) object)
+                 (expand-media (copy-object value) (field-fields field) space))))))))
 
 (defun deliver (content model space &key draft include)
   (let ((data (copy-object (content-data content :draft draft))))
-    (when include (embed-references data model space include))
-    (expand-media data model space)
+    (when include (embed-references data (model-fields model) space include))
+    (expand-media data (model-fields model) space)
     (make-delivered content model data)))
 
 (defun draft-key-p (content draft-key)

@@ -211,6 +211,18 @@
     },
   });
 
+  koya.customField = (on) => ({
+    _on: on,
+    _add() {
+      this._on = true;
+      changed(this.$refs.marker);
+    },
+    _remove() {
+      this._on = false;
+      changed(this.$refs.marker);
+    },
+  });
+
   koya.mediaPicker = (dialog, url) => ({
     _onpick: null,
     _open(onpick) {

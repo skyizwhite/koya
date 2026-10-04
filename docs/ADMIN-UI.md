@@ -120,7 +120,8 @@ opens the delivery log filtered to this model.
 
 - Every field gets a short preview: rich text as plain text, a reference as the
   referenced content's label, a media as a small thumbnail, a `many` field as its
-  values comma-separated, an empty field as `—`.
+  values comma-separated, a custom field as the previews of the values inside
+  joined by ` · `, an empty field as `—`.
 - A row shows its **draft** when it has one, so the table reflects what is being
   worked on rather than what is live.
 - Contents are listed newest first, 20 to a page, with **Previous** / **Next**
@@ -142,11 +143,12 @@ sort. The search goes as the typing stops and the status as it is picked; there
 is no button.
 
 - The search matches the model's text fields — `text`, `textarea`, `slug` and
-  `richtext`, whose text is searched without its tags — and a whole content id. It looks at what the table shows: the
+  `richtext`, whose text is searched without its tags, those inside a custom
+  field included — and a whole content id. It looks at what the table shows: the
   draft, when there is one.
 - The status filter offers the three badges: `draft`, `published` and
   `published+draft`.
-- Every header that sorts carries a faint ↕. Clicking one sorts by it (↑),
+- Every header that sorts carries a faint ↕; a custom field's does not sort. Clicking one sorts by it (↑),
   clicking it again turns it around (↓), and a third click goes back to the
   default order, newest created first. The system fields (created, updated,
   published, revised, id) can be sorted by as well.
@@ -191,12 +193,14 @@ by its model's `label` field, or by its id.
 | `select` | dropdown, or checkboxes when `many` |
 | `reference` | dropdown, or chips plus a dropdown when `many` |
 | `media` | thumbnail with **Choose…** (opens the media picker) and **Clear** |
+| `custom` | a box of the controls of the custom field's fields, under a heading like any field's: its name, `custom`, a red `*` when required, and its help beside them. One that is not required starts absent with an **Add** button and, once there, has a **Remove** button; a required one is always there and has neither. Only one that is there is saved, its required fields asked for, and a box left unchecked inside it is `false` |
 
 - A reference dropdown lists every content of the target model, drafts included,
   by its label. A reference to a content that no longer exists is kept and shown
   as *(missing)*, so a save never drops it silently.
 - When validation fails the page comes back with a summary at the top and the
-  message under each offending field; nothing is saved.
+  message under each offending field, inside a custom field too; nothing is
+  saved.
 
 The sticky bar at the top of the editor carries the model's name and the
 content's id, the status badge and the created/updated times, then — where the
@@ -221,7 +225,8 @@ with a link that opens the content again to see the change.
 At the bottom, the **Danger zone** holds **Unpublish** (takes the content off the
 delivery API, keeping its data as a draft) and **Delete** (removes it for good;
 an object model's content has none). Both ask first. A
-content that another content refers to through a `reference` field — in its
+content that another content refers to through a `reference` field, one inside a
+custom field included — in its
 published data or its draft — can be neither: the page comes back saying how
 many refer to it. Below the danger zone, set apart by a line, **Referenced by** lists them,
 closed until it is opened, each by its label and model, linked to its editor. Take it out of those contents first.
@@ -268,7 +273,8 @@ show. Nothing is ever pruned; deleting the content deletes its history with it.
 Each revision is badged by what it was — *Draft saved*, *Published*,
 *Unpublished* or *Draft discarded* — with when and by whom, and drawn as the
 fields it changed, the old value on the left and the new one on the right. The
-oldest one in the view shows every field it had. Rich text is shown formatted;
+oldest one in the view shows every field it had. A custom field shows each field
+inside as a `name: value` line. Rich text is shown formatted;
 references and media carry their label or file name while they still exist.
 
 **Restore** opens the editor with that version in the form, under a banner
@@ -279,7 +285,9 @@ goes back to the current data.
 The schema and the space may have changed since the version was written, so not
 everything always comes back. The banner lists each field that did not: a value
 that no longer fits the field leaves the current value in place, and a reference
-or media that has since been deleted is dropped. A field removed from the model,
+or media that has since been deleted is dropped. A custom field comes back as
+one value: a reference inside it to a content now missing or unpublished, or a
+media that is gone, is dropped, and the banner names the custom field. A field removed from the model,
 or given another type, took its old values out of the history with it. A deleted
 content cannot be restored at all: its history went with it.
 
@@ -350,7 +358,8 @@ newest 100 of a space are kept.
   matches file names as the typing stops.
 - Clicking a thumbnail opens a preview with the file's name, dimensions, size
   and upload time, an **alt text** box to save, and **Delete**.
-- A file that any content still uses — as a `media` value or inside rich text —
+- A file that any content still uses — as a `media` value or inside rich text,
+  inside a custom field too —
   cannot be deleted: the button says how many contents use it, and the preview
   lists them under the alt text box, as **Used by**, closed until it is opened,
   each by its label and model, linked to its editor. Take it out of those contents first.
@@ -420,8 +429,9 @@ left logged in somewhere else.
 
 ## What the UI leaves out
 
-- Editing the schema: the models of a space belong to the site's repository (see
-  [SCHEMA.md](SCHEMA.md)). Making and deleting the space itself does belong here.
+- Editing the schema: the models and custom fields of a space belong to the
+  site's repository (see [SCHEMA.md](SCHEMA.md)); custom fields have no page of
+  their own, and show only inside the editor. Making and deleting the space itself does belong here.
 - User accounts and roles: there is one owner.
 - History over the APIs: revisions are read and restored in the admin UI only.
 

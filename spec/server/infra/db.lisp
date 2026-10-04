@@ -17,7 +17,8 @@
   (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:make-webhook
                 #:schema-webhooks #:schema-models #:model-name #:model-field
-                #:schema->jobject)
+                #:schema->jobject #:make-custom-field #:schema-custom-fields #:custom-field-name
+                #:field-fields #:field-name)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions #:count-revisions)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish #:destroy #:unpublish #:discard)
@@ -65,7 +66,7 @@
   (migrate))
 
 (deftest migrations
-  (ok (= (current-version) 14))
+  (ok (= (current-version) 15))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -76,7 +77,7 @@
         "legacy" "about" "object"
         "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
         0)
-  (ok (equal (migrate) '(10 11 12 13 14)))
+  (ok (equal (migrate) '(10 11 12 13 14 15)))
   (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
     (ng (search "previewUrl" definition))
     (ok (search "https://x/about" definition) "a web address is kept"))
@@ -87,7 +88,7 @@
   (create-space "legacy")
   (exec "UPDATE spaces SET webhooks = ? WHERE name = 'legacy'"
         "[{\"label\":\"bare\",\"url\":\"example.com/hook\"},{\"label\":\"site\",\"url\":\"https://x/hook\"},{\"label\":\"ftp\",\"url\":\"ftp://x/hook\"}]")
-  (ok (equal (migrate) '(11 12 13 14)))
+  (ok (equal (migrate) '(11 12 13 14 15)))
   (ok (equal (mapcar (lambda (hook) (getf hook :label)) (space-webhooks "legacy")) '("site"))
       "the space still reads, with the one hook that can be sent")
   (migrated-fully))
@@ -352,7 +353,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('kept', 'publish', '{\"title\":\"Old\",\"gone\":{\"a\":1}}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(12 13 14)))
+  (ok (equal (migrate) '(12 13 14 15)))
   (let ((content (get-content "leftover" "kept")))
     (ng (nth-value 1 (gethash "gone" (content-published content))))
     (ng (nth-value 1 (gethash "gone" (content-draft content))))
@@ -425,7 +426,7 @@
     (row "live" "published" "{\"body\":\"<p>live</p>\"}" nil)
     (row "both" "published+draft" "{\"body\":\"<p>old</p>\"}" "{\"body\":\"<p>new</p>\"}")
     (row "bare" "draft" nil "{\"n\":1}"))
-  (ok (equal (migrate) '(14)))
+  (ok (equal (migrate) '(14 15)))
   (ok (texts-fit-p "older") "every content gets the text of its data")
   (ok (string= (col (fetch-one "SELECT draft_text FROM contents WHERE id = 'drafted'") "draft_text")
                "{\"body\":\"new & bold\"}"))
@@ -495,7 +496,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('about', 'publish', '{\"title\":\"One\"}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(13 14)))
+  (ok (equal (migrate) '(13 14 15)))
   (testing "what was stored moves into its space, history and all"
     (ok (string= (jget (content-published (get-content "one" "about")) "title") "One"))
     (ok (equal (mapcar #'revision-event (list-revisions "one" "about")) '("publish"))))
@@ -544,3 +545,40 @@
       (testing "a row that cannot be read is no session"
         (exec "UPDATE sessions SET data = ?" "{not json")
         (ng (fetch-session (make-session-store) "sid-3"))))))
+
+(defun seo-schema (&rest seo-fields)
+  (make-schema :custom-fields (list (make-custom-field "seo" seo-fields))
+               :models (list (make-model "post" :list (list (make-field :title :text)
+                                                          (make-field :meta :custom :custom-field "seo"))))))
+
+(deftest custom-fields-are-kept-with-the-space
+  (create-space "kept")
+  (replace-schema "kept" (seo-schema (make-field :title :text) (make-field :image :media)))
+  (let ((schema (load-schema "kept")))
+    (ok (equal (mapcar #'custom-field-name (schema-custom-fields schema)) '("seo")))
+    (ok (equal (mapcar #'field-name (field-fields (model-field (find-model "kept" "post") "meta"))) '("title" "image"))
+        "and a model read back has them in its custom field"))
+  (replace-schema "kept" (make-schema :models (list (make-model "post" :list (list (make-field :title :text))))))
+  (ok (null (schema-custom-fields (load-schema "kept"))) "and a deploy without them drops them")
+  (delete-space "kept"))
+
+(deftest a-field-removed-from-a-custom-field-takes-its-values-with-it
+  (create-space "inner")
+  (replace-schema "inner" (seo-schema (make-field :title :text) (make-field :note :text)))
+  (let* ((content (create "inner" (find-model "inner" "post")
+                          (jobject "title" "Post" "meta" (jobject "title" "Searchable" "note" "Gone soon")) :publish t))
+         (id (content-id content)))
+    (ok (string= (jget (data-text (content-published content)) "meta" "title") "Searchable")
+        "the text of a custom field is kept with the rest, field by field")
+    (let ((changes (replace-schema "inner" (seo-schema (make-field :title :text)))))
+      (ok (member :remove-field (mapcar (lambda (c) (getf c :op)) changes))))
+    (let ((meta (jget (content-published (get-content "inner" id)) "meta")))
+      (ng (nth-value 1 (gethash "note" meta)) "the value inside is gone")
+      (ok (string= (jget meta "title") "Searchable") "and the rest stays"))
+    (ok (null (search "Gone soon" (fetch-text "inner" id))) "and so is its text")
+    (dolist (revision (list-revisions "inner" id))
+      (ng (nth-value 1 (gethash "note" (jget (revision-data revision) "meta"))) "and the history's")))
+  (delete-space "inner"))
+
+(defun fetch-text (space id)
+  (col (first (fetch "SELECT published_text FROM contents WHERE space = ? AND id = ?" space id)) "published_text"))

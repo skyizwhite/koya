@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option
-                #:field-required-p)
+                #:field-required-p #:field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-server/usecases/ports/contents
@@ -37,6 +37,21 @@
       (format nil "lost ~a reference~:p to content~:p that ~:*~[were~;was~:;were~] deleted or ~
                    ~:*~[are~;is~:;are~] not published" count)))
 
+(defun drop-unusable-inside (space field value)
+  (let ((kept (make-hash-table :test 'equal))
+        (notes '()))
+    (maphash (lambda (k v) (setf (gethash k kept) v)) value)
+    (dolist (inner (field-fields field))
+      (let ((v (gethash (field-name inner) kept)))
+        (when (and (member (field-type inner) '(:reference :media)) (not (blank-value-p v)))
+          (multiple-value-bind (left dropped) (drop-unusable-ids space inner v)
+            (when (plusp dropped)
+              (push (format nil "~a ~a" (field-name inner) (dropped-note inner dropped)) notes)
+              (if (blank-value-p left)
+                  (remhash (field-name inner) kept)
+                  (setf (gethash (field-name inner) kept) left)))))))
+    (values kept (and notes (format nil "~{~a~^; ~}" (nreverse notes))))))
+
 (defun restore-data (space model id revision current)
   (let ((data (make-hash-table :test 'equal))
         (notes '()))
@@ -53,6 +68,10 @@
                   (note name (dropped-note field dropped))
                   (setf value kept
                         found (not (blank-value-p kept))))))
+            (when (and found (eq (field-type field) :custom) (hash-table-p value))
+              (multiple-value-bind (kept note) (drop-unusable-inside space field value)
+                (when note (note name note))
+                (setf value kept)))
             (let ((errors (and found
                                (validate-content model (let ((one (make-hash-table :test 'equal)))
                                                          (setf (gethash name one) value)

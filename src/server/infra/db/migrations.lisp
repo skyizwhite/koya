@@ -206,7 +206,9 @@
     (14
      "ALTER TABLE contents ADD COLUMN published_text TEXT"
      "ALTER TABLE contents ADD COLUMN draft_text TEXT"
-     fill-content-texts)))
+     fill-content-texts)
+    (15
+     "ALTER TABLE spaces ADD COLUMN custom_fields TEXT NOT NULL DEFAULT '[]'")))
 
 (defun fill-content-texts ()
   (flet ((text (json) (and json (text-column (parse-json json)))))
