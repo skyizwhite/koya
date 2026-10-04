@@ -275,7 +275,10 @@
       if (!over || over.parentElement !== list) {
         if (event.target !== list) return;
         event.preventDefault();
-        if (list.lastElementChild !== dragged) list.append(dragged);
+        const last = list.lastElementChild;
+        const box = last?.getBoundingClientRect();
+        const beyond = box && (across ? event.clientX > box.right && event.clientY > box.top : event.clientY > box.bottom);
+        if (beyond && last !== dragged) list.append(dragged);
         return;
       }
       event.preventDefault();
@@ -337,6 +340,7 @@
     const list = el.querySelector("[data-media-list]");
     const template = el.querySelector("template");
     const add = (item) => {
+      if ([...list.querySelectorAll("input")].some((input) => input.value === item.id)) return;
       const entry = template.content.firstElementChild.cloneNode(true);
       const img = entry.querySelector("img");
       img.src = item.url;
