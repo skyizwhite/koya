@@ -1,10 +1,11 @@
 (defpackage #:koya-server/domain/references
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:schema-models #:model-name #:model-fields #:field-name #:field-type #:field-option)
+                #:schema-models #:schema-model #:model-name #:model-fields #:field-name #:field-type #:field-option)
   (:import-from #:koya-server/domain/content
-                #:content-model #:content-published #:content-draft)
+                #:content-model #:content-published #:content-draft #:content-id #:content-label)
   (:export #:reference-fields
+           #:referrers
            #:refers-p
            #:media-fields
            #:mentioned-ids))
@@ -56,3 +57,13 @@
          (union (data-mentioned-ids fields (content-published content) ids)
                 (data-mentioned-ids fields (content-draft content) ids)
                 :test #'string=))))
+
+(defun referrers (schema contents)
+  (sort (mapcar (lambda (content)
+                  (let ((model (schema-model schema (content-model content))))
+                    (list :model model :id (content-id content) :label (content-label content model))))
+                contents)
+        (lambda (a b)
+          (let ((ma (model-name (getf a :model))) (mb (model-name (getf b :model))))
+            (or (string< ma mb)
+                (and (string= ma mb) (string-lessp (getf a :label) (getf b :label))))))))

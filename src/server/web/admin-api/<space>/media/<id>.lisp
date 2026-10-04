@@ -17,8 +17,8 @@
 
 (defun with-references (media)
   (let ((obj (media->jobject media)))
-    (setf (gethash "references" obj) (media-references (media-space media)
-                                                       (media-id media)))
+    (setf (gethash "references" obj) (length (media-references (media-space media)
+                                                               (media-id media))))
     obj))
 
 (defun @get (params)

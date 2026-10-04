@@ -9,7 +9,7 @@
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy
-                #:update-object #:publish-object)
+                #:update-object #:publish-object #:content-references)
   (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-status #:content-published #:content-draft
@@ -25,7 +25,7 @@
                 #:expand-url-template #:content-url #:model-url #:history-url #:webhook-log-url #:editor-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors #:~confirm-dialog #:~go-to #:~replace-url)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors #:~confirm-dialog #:~go-to #:~replace-url #:~referrers)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
@@ -148,7 +148,11 @@
                   (p :class "text-muted"
                     (if object-p
                         "Unpublishing takes the content off the site."
-                        "Unpublishing takes the content off the site; deleting removes it for good.")))
+                        "Unpublishing takes the content off the site; deleting removes it for good."))
+                  (let ((references (content-references space-name model-name id)))
+                    (when references
+                      (hsx (div :class "mt-3"
+                             (~referrers :space space-name :heading "Referenced by" :references references))))))
                 (div :class "flex flex-wrap items-center gap-2"
                   (when published
                     (hsx (~action-button :space space-name :model model-name :id id :op "unpublish"

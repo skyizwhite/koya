@@ -550,3 +550,15 @@
           (control (search "id=\"f-cover\"" body)))
       (ok (and label help control (< label help control)) "under its label, above its control"))
     (ok (= (length (cl-ppcre:all-matches-as-strings "id=\"f-[a-zA-Z]+-help\"" body)) 1) "and a field without one draws nothing for it")))
+
+(deftest the-editor-lists-what-refers-to-a-content
+  (exec "DELETE FROM contents")
+  (multiple-value-bind (space model) (resolve-model "website" "blog")
+    (let* ((target (content-id (create space model (jobject "title" "Target") :publish t)))
+           (refers (content-id (create space model (jobject "title" "Refers" "related" (vector target))))))
+      (let ((body (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" target)))))
+        (ok (search "Referenced by 1 content" body))
+        (ok (search (format nil "href=\"/s/website/m/blog/~a\"" refers) body) "each one is a link to its editor")
+        (ok (search ">Refers<" body) "named by its label"))
+      (ng (search "Referenced by" (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" refers))))
+          "and a content nothing refers to says nothing about it"))))
