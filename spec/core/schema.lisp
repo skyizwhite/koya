@@ -305,7 +305,9 @@
     (ok (signals (make-custom-field "seo" (list (make-field :slug :slug :from :title))) 'schema-error) "a slug")
     (ok (signals (make-custom-field "seo" (list (make-field :title :text :unique t))) 'schema-error) "a unique field")
     (ok (signals (make-custom-field "seo" (list (make-field :inner :custom :custom-field "other"))) 'schema-error)
-        "another custom field"))
+        "another custom field")
+    (ok (signals (make-custom-field "seo" (list (make-field :title :text :was :headline))) 'schema-error)
+        "a rename, which does not reach inside"))
   (testing "a model uses one by name"
     (ok (signals (make-field :meta :custom) 'schema-error) "and must name it")
     (ok (signals (make-field :meta :custom :custom-field "seo" :unique t) 'schema-error))

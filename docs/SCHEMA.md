@@ -194,8 +194,8 @@ A custom field is a group of fields defined once in the document's
 | `fields` | array of [field](#field) | at least one; names unique within the custom field |
 
 Its fields are written as a model's, with every type and its options except
-`slug` and `custom`, and without `unique`. `was` is not carried through a custom
-field: renaming one, or a field inside one, is a removal and an addition.
+`slug` and `custom`, and without `unique` or `was`: renaming a custom field, or a
+field inside one, is a removal and an addition.
 
 A model uses it by name, and its field JSON holds only that name; the fields come
 from the definition:

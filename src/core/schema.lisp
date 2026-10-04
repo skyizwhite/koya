@@ -218,7 +218,9 @@
       (when (member (field-type field) '(:slug :custom))
         (fail "custom field ~s: a ~(~a~) field cannot be inside a custom field" name (field-type field)))
       (when (field-option field :unique)
-        (fail "custom field ~s: field ~s cannot be unique inside a custom field" name (field-name field))))
+        (fail "custom field ~s: field ~s cannot be unique inside a custom field" name (field-name field)))
+      (when (field-was field)
+        (fail "custom field ~s: field ~s cannot be renamed with :was inside a custom field" name (field-name field))))
     (%make-custom-field :name name :fields fields)))
 
 (defun field-required-p (field) (and (field-option field :required) t))

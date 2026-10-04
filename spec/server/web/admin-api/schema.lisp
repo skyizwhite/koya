@@ -186,3 +186,18 @@
                (ok misfit "tightening a field inside is checked against stored contents")
                (ok (string= (jget misfit "field") "card.title") "and the misfit says where"))))
       (replace-schema "website" (test-schema)))))
+
+(deftest a-field-tightened-inside-is-checked-alone
+  (flet ((cards (&rest fields)
+           (make-schema :custom-fields (list (make-custom-field "card" fields))
+                        :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card")))))))
+    (replace-schema "website" (cards (make-field :title :text) (make-field :image :text)))
+    (unwind-protect
+         (progn
+           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "T" "image" "I"))))
+           (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
+                                                     :body (schema->jobject (cards (make-field :title :text :required t)))
+                                                     :query "force=true")
+             (ok (= status 200) "a field made required inside is checked alone, not with one the same deploy removes")
+             (ng (jget json "error"))))
+      (replace-schema "website" (test-schema)))))

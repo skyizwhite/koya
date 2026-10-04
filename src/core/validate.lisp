@@ -41,8 +41,12 @@
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
       (and (field-many-p field) (json-array-p value) (zerop (length value)))
       (and (eq (field-type field) :custom) (hash-table-p value)
-           (loop :for value :being :the :hash-values :of value
-                 :always (or (blank-value-p value) (eq value nil))))))
+           (loop :for key :being :the :hash-keys :of value :using (:hash-value inner-value)
+                 :for inner := (find key (field-fields field) :key #'field-name :test #'string=)
+                 :always (and inner
+                              (if (null inner-value)
+                                  (eq (field-type inner) :boolean)
+                                  (blank-value-p inner-value)))))))
 
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
