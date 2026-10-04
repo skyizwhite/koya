@@ -261,6 +261,9 @@
             (ok (search (format nil "name=\"id\" value=\"~a\" data-bulk-item nm-bind=\"{ checked: () => _picked(this.value), onchange: () => _pick(this.value, this.checked) }\"" one) body)
                 "each row carries its id")
             (ok (search "hidden nm-bind=\"{ hidden: () => !_count() }\"" body) "the bar waits for a selection")
+            (ok (< (search "</table>" body) (search "nm-bind=\"{ hidden: () => !_count() }\"" body))
+                "below the table, so showing it moves no row")
+            (ok (search "sticky bottom-" body) "and kept in reach while the table runs past the screen")
             (dolist (op '("publish" "unpublish" "delete"))
               (ok (asked-first body (format nil "confirm-bulk-~a" op)
                                (bulk-contents :space "website" :model "blog" :op op
