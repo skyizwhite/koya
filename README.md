@@ -153,8 +153,8 @@ const { contents, totalCount } = await koya.getList("blog", {
   include: ["tags"], // tags come back as tag contents, not ids
 });
 
-const post = await koya.getItem("blog", id);                     // one content
-const preview = await koya.getItem("blog", id, { draftKey });    // its draft, for a preview page
+const post = await koya.getListContent("blog", id);                  // one content
+const preview = await koya.getListContent("blog", id, { draftKey }); // its draft, for a preview page
 const about = await koya.getObject("about");
 ```
 
