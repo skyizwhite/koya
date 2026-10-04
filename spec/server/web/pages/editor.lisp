@@ -574,7 +574,8 @@
                :models (list (blog-model)
                              (make-model "about" :object (list (make-field :body :richtext)))
                              (make-model "page" :list (list (make-field :title :text)
-                                                            (make-field :card :custom :custom-field "card" :help "The card"))))))
+                                                            (make-field :card :custom :custom-field "card" :help "The card")))
+                             (make-model "badge" :list (list (make-field :card :custom :custom-field "card" :required t))))))
 
 (deftest a-custom-field-is-edited-as-its-fields
   (exec "DELETE FROM contents")
@@ -597,6 +598,12 @@
                "so the form does not say it is there")
            (ok (cl-ppcre:scan "<fieldset id=\"f-card\"[^>]* hidden disabled" body) "and its fields are not sent")
            (ok (search "Shown under the heading" body)))
+         (let ((body (nth-value 1 (request :get "/s/website/m/badge/new"))))
+           (ok (cl-ppcre:scan "<fieldset id=\"f-card\" aria-labelledby=\"f-card-label\" class=\"[^\"]*\" nm-bind" body)
+               "a required custom field starts there")
+           (ng (search "Add card" body) "and cannot be added")
+           (ng (search "Remove card" body) "or removed")
+           (ok (search "<input type=\"hidden\" name=\"f-card\" value=\"on\" nm-ref" body) "so the form always says it is there"))
          (multiple-value-bind (status body)
              (edit "/s/website/m/page/new" :form '(("action" . "save") ("f-title" . "Absent") ("f-card.heading" . "Ignored")))
            (ok (= status 200) "without the form saying the custom field is there, what is inside is none")
