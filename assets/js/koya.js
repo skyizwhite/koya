@@ -256,13 +256,14 @@
       const handle = event.target.closest?.("[data-drag-handle]");
       if (handle) rowOf(handle).draggable = true;
     });
-    list.addEventListener("pointerup", (event) => {
-      const row = event.target.closest?.("[data-row]");
-      if (row && !dragged) row.draggable = false;
+    document.addEventListener("pointerup", () => {
+      if (dragged) return;
+      for (const row of list.querySelectorAll(":scope > [draggable='true']")) row.draggable = false;
     });
     list.addEventListener("dragstart", (event) => {
-      dragged = event.target.closest?.("[data-row]");
-      if (!dragged || dragged.parentElement !== list) return;
+      const row = event.target.closest?.("[data-row]");
+      if (!row || !row.draggable || row.parentElement !== list) return;
+      dragged = row;
       event.dataTransfer.effectAllowed = "move";
       dragged.classList.add("opacity-50");
     });

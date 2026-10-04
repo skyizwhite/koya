@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-field #:field-type #:field-many-p #:field-name #:field-fields
-                #:field-row-kinds #:custom-field-fields)
+                #:field-row-kinds #:custom-field-fields #:custom-field-name)
   (:import-from #:koya-server/domain/query
                 #:bad-query)
   (:import-from #:koya-server/domain/number
@@ -64,26 +64,30 @@
                    (mapcar (constantly like) exprs)))
           (t (bad-query "~a is inside a custom field: only contains and not_contains read it" name)))))
 
+(defun rows-matching-sql (field source like pick)
+  (let ((clauses '())
+        (params '()))
+    (dolist (kind (field-row-kinds field))
+      (let ((names (mapcar #'field-name (remove-if-not pick (custom-field-fields kind)))))
+        (when names
+          (push (format nil "(json_extract(each_row.value, '$.fieldId') = ? AND (~{~a~^ OR ~}))"
+                        (mapcar (lambda (n) (format nil "json_extract(each_row.value, '$.~a') LIKE ? ESCAPE '\\'" n))
+                                names))
+                clauses)
+          (setf params (append params (list (custom-field-name kind)) (mapcar (constantly like) names))))))
+    (and clauses
+         (list (format nil "EXISTS (SELECT 1 FROM json_each(~a, '$.~a') AS each_row WHERE ~{~a~^ OR ~})"
+                       source (field-name field) (reverse clauses))
+               params))))
+
 (defun row-text-sql (field column text-column like)
-  (let* ((fields (remove-duplicates
-                  (loop :for kind :in (field-row-kinds field)
-                        :append (remove-if-not (lambda (f) (member (field-type f) +text-types+))
-                                               (custom-field-fields kind)))
-                  :key #'field-name :test #'string= :from-end t))
-         (plain (remove :richtext fields :key #'field-type))
-         (rich (remove-if-not (lambda (f) (eq (field-type f) :richtext)) fields))
-         (clauses '())
-         (params '()))
-    (flet ((exists (source names)
-             (when names
-               (push (format nil "EXISTS (SELECT 1 FROM json_each(~a, '$.~a') AS each_row WHERE ~{~a~^ OR ~})"
-                             source (field-name field)
-                             (mapcar (lambda (n) (format nil "json_extract(each_row.value, '$.~a') LIKE ? ESCAPE '\\'" n)) names))
-                     clauses)
-               (setf params (append params (mapcar (constantly like) names))))))
-      (exists column (mapcar #'field-name plain))
-      (exists (or text-column column) (mapcar #'field-name rich)))
-    (values (if clauses (format nil "(~{~a~^ OR ~})" (reverse clauses)) "0") params)))
+  (let ((parts (remove nil (list (rows-matching-sql field column like
+                                                    (lambda (f) (member (field-type f) '(:text :textarea :slug))))
+                                 (rows-matching-sql field (or text-column column) like
+                                                    (lambda (f) (eq (field-type f) :richtext)))))))
+    (if parts
+        (values (format nil "(~{~a~^ OR ~})" (mapcar #'first parts)) (loop :for part :in parts :append (second part)))
+        (values "0" '()))))
 
 (defun repeater-term-sql (name field op value column text-column)
   (multiple-value-bind (sql params) (row-text-sql field column text-column (format nil "%~a%" (escape-like value)))

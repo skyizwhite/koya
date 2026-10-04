@@ -50,10 +50,13 @@
   (dolist (path include)
     (loop :for (name . more) :on path
           :for fields := (model-fields model) :then (next-fields space field)
-          :for field := (find name fields :key #'field-name :test #'string=)
+          :for field := (find-if (lambda (f)
+                                   (and (string= (field-name f) name)
+                                        (or (eq (field-type f) :reference)
+                                            (and more (member (field-type f) '(:custom :repeater))))))
+                                 fields)
           :for reached :from 1
-          :unless (and field (or (eq (field-type field) :reference)
-                                 (and more (member (field-type field) '(:custom :repeater)))))
+          :unless field
             :do (bad-query "include: ~s is not a reference field" (format nil "~{~a~^.~}" (subseq path 0 reached))))))
 
 (defun embed-references (object fields space include)
@@ -77,7 +80,7 @@
                                            (embed-references (copy-object row) (custom-field-fields kind) space nested)
                                            row)))
                            value))))
-            (t
+            (:reference
               (let ((target (field-option field :model)))
                 (setf (gethash name object)
                       (if (field-many-p field)
