@@ -265,6 +265,7 @@
       if (!row || !row.draggable || row.parentElement !== list) return;
       dragged = row;
       event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", "");
       dragged.classList.add("opacity-50");
     });
     list.addEventListener("dragover", (event) => {
