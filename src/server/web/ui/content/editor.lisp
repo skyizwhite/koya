@@ -142,7 +142,7 @@
                               :media (media-for space field (and data (gethash (field-name field) data)))
                               :error (field-error errors (field-name field))))))
        (when (and content (or published (not object-p)))
-         (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
+         (hsx (div :class "mt-12 flex flex-wrap items-start justify-between gap-4 border-t border-line pt-6 text-sm"
                 (div
                   (p :class "font-medium text-danger" "Danger zone")
                   (p :class "text-muted"

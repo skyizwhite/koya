@@ -228,6 +228,7 @@
       (let ((user (content-id (create space model (jobject "title" "Has a cover" "cover" id)))))
         (let ((body (nth-value 1 (call-action :get (preview-media :space "website" :id id)))))
           (ok (search "Used by 1 content" body))
+          (ok (< (search "name=\"alt\"" body) (search "Used by" body)) "under the alt text")
           (ok (search (format nil "href=\"/s/website/m/blog/~a\"" user) body) "each one is a link to its editor")
           (ok (search ">Has a cover<" body) "named by its label"))
         (call-action :post (delete-media-action :space "website") :form `(("id" . ,id)))

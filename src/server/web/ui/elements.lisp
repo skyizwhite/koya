@@ -26,9 +26,11 @@
 (defcomp ~referrers (&key space heading references)
   (hsx
    (<> (when references
-         (hsx (div :class "text-sm"
-                (p :class "text-muted" (format nil "~a ~a content~:p:" heading (length references)))
-                (ul :class "mt-1 space-y-0.5"
+         (hsx (details :class "group text-sm"
+                (summary :class "row-toggle inline-flex cursor-pointer items-center gap-1 text-muted hover:text-fg"
+                  (span :class "transition-transform group-open:rotate-90" (~icon :name :next))
+                  (format nil "~a ~a content~:p" heading (length references)))
+                (ul :class "mt-1 space-y-0.5 pl-5"
                   (loop :for reference :in references :collect
                     (hsx (li (a :href (editor-url space (getf reference :model) (getf reference :id))
                                 :class "text-fg hover:underline"

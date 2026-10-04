@@ -223,8 +223,8 @@ delivery API, keeping its data as a draft) and **Delete** (removes it for good;
 an object model's content has none). Both ask first. A
 content that another content refers to through a `reference` field — in its
 published data or its draft — can be neither: the page comes back saying how
-many refer to it. The danger zone lists them under **Referenced by**, each by its
-label and model, linked to its editor. Take it out of those contents first.
+many refer to it. The danger zone lists them under **Referenced by**, closed until it is
+opened, each by its label and model, linked to its editor. Take it out of those contents first.
 
 ## Drafts, publishing and previews
 
@@ -352,8 +352,8 @@ newest 100 of a space are kept.
   and upload time, an **alt text** box to save, and **Delete**.
 - A file that any content still uses — as a `media` value or inside rich text —
   cannot be deleted: the button says how many contents use it, and the preview
-  lists them under **Used by**, each by its label and model, linked to its
-  editor. Take it out of those contents first.
+  lists them under the alt text box, as **Used by**, closed until it is opened,
+  each by its label and model, linked to its editor. Take it out of those contents first.
 - Each card has a checkbox, and **Select all** sits above the grid. With a
   selection, **Delete** appears and asks first. A file still in use is skipped,
   the rest go, and the message says how many could not and why.

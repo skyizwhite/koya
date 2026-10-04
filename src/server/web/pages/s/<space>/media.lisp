@@ -152,15 +152,15 @@
             (div :class "flex max-h-[65vh] items-center justify-center bg-fg/5 p-4"
               (img :src (media-url media :absolute nil) :alt (media-alt media)
                    :class "max-h-[60vh] max-w-full object-contain"))
-            (when references
-              (hsx (div :class "border-t border-line px-4 py-3"
-                     (~referrers :space space :heading "Used by" :references references))))
             (form :nm-bind (on-submit (save-alt :space space :id (media-id media)))
                   :class "flex items-center gap-2 border-t border-line px-4 py-3"
               (input :type "text" :name "alt" :value (media-alt media) :placeholder "alt text"
                      :class "input" :aria-label "alt text")
               (button :type "submit" :class "btn btn-icon" :aria-label "Save alt text" (~icon :name :check))
-              (~alt-saved)))))))))
+              (~alt-saved))
+            (when references
+              (hsx (div :class "border-t border-line px-4 py-3"
+                     (~referrers :space space :heading "Used by" :references references)))))))))))
 
 (defun upload (space files)
   (handler-case
