@@ -25,7 +25,7 @@
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
-  (:import-from #:koya-server/domain/references #:reference-fields #:refers-p)
+  (:import-from #:koya-server/domain/references #:reference-fields #:refers-p #:referrers)
   (:export #:check-content
            #:create
            #:update-draft
@@ -163,7 +163,7 @@
             (published-view space model content))))
 
 (defun check-unreferenced (space-name model-name id verb)
-  (let ((references (content-references space-name model-name id)))
+  (let ((references (length (content-references space-name model-name id))))
     (when (plusp references)
       (fail 'conflict (format nil "This content is referenced by ~a other content~:p; remove ~:*~[~;that reference~:;those references~] before you ~a it"
                               references verb)
@@ -287,8 +287,8 @@
         (error (e) (incf failed) (unless message (setf message (failure-message e))))))))
 
 (defun content-references (space model id)
-  (let ((fields (reference-fields (load-schema space) model)))
-    (if (zerop (hash-table-count fields))
-        0
-        (count-if (lambda (content) (refers-p content fields id))
-                  (contents-mentioning space id :exclude-id id)))))
+  (let* ((schema (load-schema space))
+         (fields (reference-fields schema model)))
+    (unless (zerop (hash-table-count fields))
+      (referrers schema (remove-if-not (lambda (content) (refers-p content fields id))
+                                       (contents-mentioning space id :exclude-id id))))))

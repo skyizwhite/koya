@@ -14,7 +14,7 @@
                 #:count-revisions #:find-revision)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key
-                #:object-content #:update-object #:publish-object)
+                #:object-content #:update-object #:publish-object #:content-references)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -29,7 +29,7 @@
                 #:parse-query #:make-query #:query-limit #:query-offset #:query-orders
                 #:query-filters #:query-fields #:query-include #:query-error)
   (:import-from #:koya-core/validate #:validation-error)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name)
   (:import-from #:koya-core/json #:parse-json #:jget))
 (in-package #:koya-spec/server/usecases/contents)
 
@@ -182,6 +182,19 @@
          (e (handler-case (destroy "website" about (content-id content)) (conflict (e) e))))
     (ok (string= (koya-error-code e) "object_stays") "it goes only with its model")
     (ok (object-content "website" about))))
+
+(deftest a-content-knows-what-refers-to-it
+  (let* ((tag (content-id (create "website" (find-model "website" "tag") (data "{\"name\": \"lisp\"}"))))
+         (a (content-id (make (format nil "{\"title\": \"A\", \"tags\": [\"~a\"]}" tag))))
+         (b (content-id (make (format nil "{\"title\": \"B\", \"tags\": [\"~a\"]}" tag) :publish t))))
+    (make "{\"title\": \"C\"}")
+    (let ((references (content-references "website" "tag" tag)))
+      (ok (equal (sort (mapcar (lambda (r) (getf r :id)) references) #'string<) (sort (list a b) #'string<))
+          "the contents that refer to it, draft or published, and no other")
+      (ok (every (lambda (r) (string= (model-name (getf r :model)) "blog")) references) "each with its model")
+      (ok (every (lambda (r) (string= (getf r :label) (getf r :id))) references)
+          "and its label, which is its id when its model names none"))
+    (ok (null (content-references "website" "blog" a)) "nothing refers to a content no field can point at")))
 
 (deftest uniqueness
   (let ((c (make "{\"title\": \"Taken\"}" :publish t)))

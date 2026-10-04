@@ -10,7 +10,7 @@
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/usecases/media
                 #:remove-media #:store-uploads #:remove-each #:list-media #:count-media
-                #:find-media #:update-media #:media-reference-counts)
+                #:find-media #:update-media #:media-reference-counts #:media-references)
   (:import-from #:koya-server/web/lib/http
                 #:path-param #:uploaded-files #:param #:form-list)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
@@ -19,7 +19,7 @@
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url #:~referrers)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:koya-server/web/ui/media/grid #:~thumb #:dimensions #:human-size #:~upload-limit)
@@ -125,7 +125,8 @@
   (hsx (span :id "alt-saved" :class "shrink-0 text-sm text-ok" message)))
 
 (defcomp ~media-preview-dialog (&key space media references search page)
-  (let ((in-use (and media (plusp (or references 0)))))
+  (let ((in-use (and media references t))
+        (count (length references)))
     (hsx
      (dialog :id "media-preview" :closedby "any"
              :nm-bind (and media "{ oninit: () => this.showModal() }")
@@ -141,10 +142,10 @@
                           (short-time (media-created-at media)))))
               (div :class "flex shrink-0 items-center gap-2"
                 (form :nm-bind (on-submit (delete-media-action :space space :q (or search "") :page page)
-                                          :confirm (delete-confirmation media references))
+                                          :confirm (delete-confirmation media count))
                   (input :type "hidden" :name "id" :value (media-id media))
                   (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete"
-                          :disabled in-use :title (and in-use (delete-confirmation media references))
+                          :disabled in-use :title (and in-use (delete-confirmation media count))
                     (~icon :name :delete)))
                 (button :type "button" :commandfor "media-preview" :command "close"
                         :class "btn btn-icon" :aria-label "Close" (~icon :name :close))))
@@ -156,7 +157,10 @@
               (input :type "text" :name "alt" :value (media-alt media) :placeholder "alt text"
                      :class "input" :aria-label "alt text")
               (button :type "submit" :class "btn btn-icon" :aria-label "Save alt text" (~icon :name :check))
-              (~alt-saved)))))))))
+              (~alt-saved))
+            (when references
+              (hsx (div :class "border-t border-line px-4 py-3"
+                     (~referrers :space space :heading "Used by" :references references)))))))))))
 
 (defun upload (space files)
   (handler-case
@@ -226,8 +230,7 @@
          (media (and space (find-media space (or (param params "id") "")))))
     (if media
         (hsx (~media-preview-dialog :space space :media media :search (param params "q") :page (page-number params)
-                                    :references (gethash (media-id media)
-                                                         (media-reference-counts space (list (media-id media))) 0)))
+                                    :references (media-references space (media-id media))))
         (action-refusal "Media not found." 404))))
 
 (defaction save-alt :post (params)

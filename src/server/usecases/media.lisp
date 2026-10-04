@@ -10,7 +10,7 @@
                 #:insert-media #:delete-media #:find-media #:list-media #:count-media #:update-media
                 #:space-media #:write-media-file #:delete-media-file #:delete-space-media-files
                 #:media-file-path #:media-file-exists-p)
-  (:import-from #:koya-server/domain/references #:media-fields #:mentioned-ids)
+  (:import-from #:koya-server/domain/references #:media-fields #:mentioned-ids #:referrers)
   (:import-from #:koya-server/usecases/ports/spaces #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents #:contents-mentioning #:space-contents)
   (:import-from #:koya-core/ulid #:make-ulid)
@@ -41,9 +41,10 @@
     counts))
 
 (defun media-references (space id)
-  (let ((fields (media-fields (load-schema space))))
-    (count-if (lambda (content) (mentioned-ids content fields (list id)))
-              (contents-mentioning space id))))
+  (let* ((schema (load-schema space))
+         (fields (media-fields schema)))
+    (referrers schema (remove-if-not (lambda (content) (mentioned-ids content fields (list id)))
+                                     (contents-mentioning space id)))))
 
 (defun upload-limit-message ()
   (let ((mb (floor +max-upload-bytes+ (* 1024 1024))))
@@ -71,7 +72,7 @@
   (mapcar (lambda (file) (store-upload space (first file) :filename (second file) :alt alt)) files))
 
 (defun remove-media (media)
-  (let ((references (media-references (media-space media) (media-id media))))
+  (let ((references (length (media-references (media-space media) (media-id media)))))
     (when (plusp references)
       (fail 'conflict (format nil "~a is used by ~a content~:p; remove it from them first"
                               (media-filename media) references)

@@ -2,7 +2,10 @@
   (:use #:cl #:hsx)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/lib/binds #:on-follow)
+  (:import-from #:koya-server/web/lib/urls #:editor-url)
+  (:import-from #:koya-core/schema #:model-name)
   (:export #:~errors
+           #:~referrers
            #:~empty-state
            #:~status-badge
            #:~pager
@@ -19,6 +22,20 @@
                 (ul :class "list-disc pl-5"
                   (loop :for e :in errors :collect
                     (hsx (li (strong (getf e :field)) " " (getf e :message)))))))))))
+
+(defcomp ~referrers (&key space heading references)
+  (hsx
+   (<> (when references
+         (hsx (details :class "group text-sm"
+                (summary :class "row-toggle inline-flex cursor-pointer items-center gap-1 text-muted hover:text-fg"
+                  (span :class "transition-transform group-open:rotate-90" (~icon :name :next))
+                  (format nil "~a ~a content~:p" heading (length references)))
+                (ul :class "mt-1 space-y-0.5 pl-5"
+                  (loop :for reference :in references :collect
+                    (hsx (li (span :class "mr-2 text-xs text-muted" (model-name (getf reference :model)))
+                             (a :href (editor-url space (getf reference :model) (getf reference :id))
+                                :class "text-fg hover:underline"
+                               (getf reference :label))))))))))))
 
 (defcomp ~empty-state (&key children)
   (hsx (div :class "rounded-md border border-dashed border-line px-6 py-10 text-center text-sm text-muted" children)))

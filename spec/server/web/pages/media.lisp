@@ -16,6 +16,9 @@
   (:import-from #:koya-spec/server/usecases/media #:png-bytes)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:koya-server/usecases/media #:store-upload)
+  (:import-from #:koya-server/usecases/contents #:create)
+  (:import-from #:koya-server/usecases/schema #:resolve-model)
+  (:import-from #:koya-core/json #:jobject)
   (:import-from #:babel #:string-to-octets))
 (in-package #:koya-spec/server/web/pages/media)
 
@@ -216,3 +219,18 @@
         (ok (= (cards body) 12) "a search is fetched the same way")
         (ok (search (bound (on-reveal (media-picker-more :space "website" :q "paged-" :page 2))) body)))
       (ok (= (cards (answer (media-picker-more :space "website" :q "paged-" :page 2))) 5)))))
+
+(deftest the-preview-lists-what-uses-a-file
+  (let ((id (media-id (store-upload "website" (png-bytes 1 1) :filename "used.png"))))
+    (ok (null (search "Used by" (nth-value 1 (call-action :get (preview-media :space "website" :id id)))))
+        "a file nothing uses says nothing about it")
+    (multiple-value-bind (space model) (resolve-model "website" "blog")
+      (let ((user (content-id (create space model (jobject "title" "Has a cover" "cover" id)))))
+        (let ((body (nth-value 1 (call-action :get (preview-media :space "website" :id id)))))
+          (ok (search "Used by 1 content" body))
+          (ok (< (search "name=\"alt\"" body) (search "Used by" body)) "under the alt text")
+          (ok (search (format nil "href=\"/s/website/m/blog/~a\"" user) body) "each one is a link to its editor")
+          (ok (search ">Has a cover<" body) "named by its label"))
+        (call-action :post (delete-media-action :space "website") :form `(("id" . ,id)))
+        (ok (search "Used by" (nth-value 1 (call-action :get (preview-media :space "website" :id id))))
+            "and a refused delete leaves it in use")))))
