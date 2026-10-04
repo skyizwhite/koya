@@ -12,7 +12,8 @@ A small, self-hosted headless CMS for one owner and any number of sites.
   deployed from an npm script — with a plan first, and a question before anything
   destructive.
 - **An admin UI built from it.** List pages and an editor for every model: rich
-  text, media, references, drafts, previews and the history of every version.
+  text, media, references, custom fields and repeating blocks, drafts, previews
+  and the history of every version.
 - **A typed client.** [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk)
   reads content with types generated from your schema, references embedded on
   request.
@@ -68,7 +69,7 @@ KOYA_MANAGEMENT_KEY=koya_mgmt_…
 ### 3. Define your models
 
 ```sh
-npm install github:skyizwhite/koya-ts-sdk#v0.1.0
+npm install github:skyizwhite/koya-ts-sdk#v0.5.0
 ```
 
 ```ts
@@ -78,6 +79,11 @@ import { defineConfig, defineSchema } from "koya-ts-sdk";
 export default defineConfig({
   schema: defineSchema({
     webhooks: [{ label: "revalidate", url: "https://example.com/api/revalidate" }],
+    customFields: [
+      { name: "heading", fields: [{ name: "text", type: "text", required: true }] },
+      { name: "paragraph", fields: [{ name: "text", type: "richtext", required: true }] },
+      { name: "seo", fields: [{ name: "description", type: "textarea" }, { name: "image", type: "media" }] },
+    ],
     models: [
       {
         name: "blog",
@@ -88,9 +94,11 @@ export default defineConfig({
         fields: [
           { name: "title", type: "text", required: true },
           { name: "slug", type: "slug", from: "title", unique: true },
-          { name: "cover", type: "media" },
-          { name: "body", type: "richtext" },
+          { name: "cover", type: "media", help: "1200x630, also shown when the post is shared" },
+          { name: "body", type: "repeater", customFields: ["heading", "paragraph"] },
+          { name: "gallery", type: "media", many: true },
           { name: "tags", type: "reference", model: "tag", many: true },
+          { name: "seo", type: "custom", customField: "seo" },
         ],
       },
       { name: "tag", kind: "list", fields: [{ name: "name", type: "text", required: true }] },
@@ -118,8 +126,12 @@ npm run koya:types    # src/koya.gen.ts: a type per model
 ```
 
 Field types are `text`, `textarea`, `richtext`, `number`, `boolean`, `date`,
-`datetime`, `select`, `media`, `reference` and `slug`; their options and rules
-are in [docs/SCHEMA.md](docs/SCHEMA.md). A `list` model has any number of
+`datetime`, `select`, `media`, `reference` and `slug`, and two built from the
+schema's `customFields`: `custom`, one set of fields used as a field, and
+`repeater`, a list of rows each of one of the custom fields it names, such as a
+page's blocks. `many` makes a `select`, `media` or `reference` field a list of
+values, and `help` says in the editor what a field expects. The options and
+rules are in [docs/SCHEMA.md](docs/SCHEMA.md). A `list` model has any number of
 contents, an `object` model exactly one.
 
 ### 4. Fetch content
@@ -146,9 +158,10 @@ const preview = await koya.getItem("blog", id, { draftKey });    // its draft, f
 const about = await koya.getObject("about");
 ```
 
-Each content is typed by its model — `post.cover?.url`, and
-`post.tags?.[0]?.name` with `include` — and carries the system fields `id`,
-`createdAt`, `updatedAt`, `publishedAt` and `revisedAt`.
+Each content is typed by its model — `post.cover?.url`,
+`post.tags?.[0]?.name` with `include`, and the rows of `post.body` told apart by
+their `fieldId` (`"heading"` or `"paragraph"`) — and carries the system fields
+`id`, `createdAt`, `updatedAt`, `publishedAt` and `revisedAt`.
 
 This works on a server (server rendering, build time, an API route) and in a
 browser: the delivery API answers cross-origin requests from any site. A
