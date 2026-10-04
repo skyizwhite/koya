@@ -163,7 +163,8 @@
              (length out)))))
   (testing "a simple WebP has nothing to strip"
     (let ((simple (octets "RIFF" (le32 22) "WEBP" (riff-chunk "VP8 " (octets 0 0 0 #x9D 1 #x2A (le16 320) (le16 240))))))
-      (ok (equalp (strip-metadata simple "image/webp") simple)))))
+      (ok (equalp (strip-metadata simple "image/webp") simple))
+      (ok (equalp (strip-metadata (octets simple "TRAILING") "image/webp") simple) "but what follows its RIFF"))))
 
 (deftest what-is-not-stripped
   (let ((gif (octets "GIF89a" (le16 16) (le16 8) 0 0 0 "rest")))

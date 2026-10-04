@@ -168,9 +168,13 @@
   (octets type (le32 (length data)) data (when (oddp (length data)) 0)))
 
 (defun strip-webp (bytes)
-  (unless (at-p bytes 12 "VP8X")
-    (return-from strip-webp bytes))
-  (let ((n (min (length bytes) (+ 8 (u32le bytes 4)))) (i 12) (parts '()) (orientation nil))
+  (let ((n (min (length bytes) (+ 8 (u32le bytes 4)))))
+    (if (at-p bytes 12 "VP8X")
+        (strip-vp8x bytes n)
+        (subseq bytes 0 n))))
+
+(defun strip-vp8x (bytes n)
+  (let ((i 12) (parts '()) (orientation nil))
     (flet ((keep (from to) (push (subseq bytes from (min to n)) parts)))
       (loop
         (when (>= i n) (return))
