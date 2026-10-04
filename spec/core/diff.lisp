@@ -209,3 +209,12 @@
     (ok (search "object -> list, its contents are deleted"
                 (format-change (first (diff-schemas (about :object) (about :list)))))
         "either way")))
+
+(deftest field-help
+  (flet ((blog (&rest cover-options)
+           (make-schema :models (list (make-model "blog" :list
+                                                  (list (apply #'make-field :cover :media cover-options)))))))
+    (let ((changes (diff-schemas (blog) (blog :help "1200x630"))))
+      (ok (equal (ops changes) '(:change-field-options)) "a help text is an option of its field")
+      (ng (destructive-changes-p changes))
+      (ng (tightened-change-p (first changes)) "and no content stops fitting for it"))))

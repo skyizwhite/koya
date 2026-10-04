@@ -541,3 +541,12 @@
     (multiple-value-bind (status)
         (edit path :form `(("action" . "discard") ("updated-at" . ,(content-updated-at (get-content "website" id)))))
       (ok (= status 200) "while one it has seen is"))))
+
+(deftest a-field-tells-the-editor-what-it-expects
+  (multiple-value-bind (status body) (request :get "/s/website/m/blog/new")
+    (ok (= status 200))
+    (let ((label (search "<label for=\"f-cover\"" body))
+          (help (search "1200x630, shown when the post is shared" body))
+          (control (search "id=\"f-cover\"" body)))
+      (ok (and label help control (< label help control)) "under its label, above its control"))
+    (ok (= (length (cl-ppcre:all-matches-as-strings "id=\"f-[a-zA-Z]+-help\"" body)) 1) "and a field without one draws nothing for it")))

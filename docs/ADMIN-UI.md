@@ -173,7 +173,8 @@ published.*
 ## The editor
 
 The editor is a form generated from the model. Each field is labelled with its
-name, its type and, when required, a red `*`. The breadcrumb names the content
+name, its type and, when required, a red `*`; a field with a `help` text shows
+it under that line. The breadcrumb names the content
 by its model's `label` field, or by its id.
 
 ![Editing a content](img/editor.png)

@@ -66,6 +66,8 @@ WAS names the model this one was called before, and :WAS on a field names the
 field it was called before; a deploy renames them and moves the stored content
 with them. Both are taken literally and are dropped once the deploy has applied
 them, so PULL never brings them back.
+:HELP on a field is a string the editor shows under the field's name, to say
+what it expects, e.g. (cover :media :help \"1200x630\").
 PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI,
 starting with http:// or https://, where {CONTENT_ID} and {DRAFT_KEY} are
 substituted, e.g.

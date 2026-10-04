@@ -261,3 +261,20 @@
     (ok (string= (json (make-field :title :text :required t :max-length 10 :unique t))
                  (json (make-field :title :text :unique t :max-length 10 :required t)))
         "however the field was given its options")))
+
+(deftest help
+  (testing "every type takes a help text for the editor"
+    (dolist (field (list (make-field :title :text :help "Shown on the page")
+                         (make-field :cover :media :help "1200x630")
+                         (make-field :tags :reference :model "tag" :help "Up to five")))
+      (ok (stringp (field-option field :help)))))
+  (testing "a help text is a line of text"
+    (ok (signals (make-field :title :text :help 3) 'schema-error))
+    (ok (signals (make-field :title :text :help "") 'schema-error) "an empty one says nothing"))
+  (testing "it goes over the wire and back"
+    (let* ((schema (make-schema :models (list (make-model "m" :list (list (make-field :cover :media :help "1200x630"))))))
+           (obj (schema->jobject schema))
+           (field (aref (jget (aref (jget obj "models") 0) "fields") 0)))
+      (ok (string= (jget field "help") "1200x630"))
+      (ok (string= (field-option (model-field (schema-model (jobject->schema (parse-json (to-json obj))) "m") :cover) :help)
+                   "1200x630")))))

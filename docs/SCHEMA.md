@@ -130,7 +130,7 @@ the space had, is ignored on input.
 |---|---|---|
 | `name` | string | `^[a-z][a-zA-Z0-9]*$`; not one of the system fields |
 | `type` | string | one of the types below |
-| *options* | | any other key must be an option allowed for `type`, or `was`, which every type takes |
+| *options* | | any other key must be an option allowed for `type`, or `was` or `help`, which every type takes |
 
 `id`, `createdAt`, `updatedAt`, `publishedAt` and `revisedAt` are **system
 fields**: every content has them, the server manages them, and a field may not
@@ -160,6 +160,7 @@ take their names.
 | `model` | string | a model name; **required** on `reference`, and the model must exist in the same space |
 | `from` | string | a field name; **required** on `slug`, and must name a `text` or `textarea` field of the same model other than the slug itself |
 | `was` | string | a field name other than this one and not a system field, see [Renames](#renames) |
+| `help` | string | non-empty; shown under the field's name in the editor, to say what the field expects |
 
 `default: true` on a `boolean` field sets it to `true` on a new content whose
 `data` does not mention it; an explicit `false` is kept. On output the

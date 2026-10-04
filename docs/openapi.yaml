@@ -1120,6 +1120,11 @@ components:
       pattern: "^[a-z][a-zA-Z0-9]*$"
       description: Not one of the system fields `id`, `createdAt`, `updatedAt`, `publishedAt`, `revisedAt`.
 
+    FieldHelp:
+      type: string
+      minLength: 1
+      description: Shown under the field's name in the editor, to say what the field expects.
+
     TextField:
       type: object
       required: [name, type]
@@ -1128,6 +1133,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: text }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
         maxLength: { type: integer, minimum: 1 }
         pattern: { type: string, description: A cl-ppcre (Perl-style) regular expression }
@@ -1141,6 +1147,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: textarea }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
         maxLength: { type: integer, minimum: 1 }
 
@@ -1152,6 +1159,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: richtext }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
 
     NumberField:
@@ -1162,6 +1170,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: number }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
         min: { type: number }
         max: { type: number }
@@ -1175,6 +1184,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: boolean }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
         default: { type: boolean, description: "`true` sets the field on a new content whose data does not mention it" }
 
@@ -1186,6 +1196,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: date }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
 
     DatetimeField:
@@ -1196,6 +1207,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: datetime }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
 
     SelectField:
@@ -1206,6 +1218,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: select }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
         options:
           type: array
@@ -1222,6 +1235,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: media }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
 
     ReferenceField:
@@ -1232,6 +1246,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: reference }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
         model: { type: string, description: A model of the same schema }
         many: { type: boolean }
@@ -1244,6 +1259,7 @@ components:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: slug }
         was: { $ref: "#/components/schemas/FieldName" }
+        help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
         from: { type: string, description: "A text or textarea field of the same model, filled into a blank slug" }
         unique: { type: boolean }
