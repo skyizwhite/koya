@@ -32,10 +32,10 @@
                   (format nil "~a ~a content~:p" heading (length references)))
                 (ul :class "mt-1 space-y-0.5 pl-5"
                   (loop :for reference :in references :collect
-                    (hsx (li (a :href (editor-url space (getf reference :model) (getf reference :id))
+                    (hsx (li (span :class "mr-2 text-xs text-muted" (model-name (getf reference :model)))
+                             (a :href (editor-url space (getf reference :model) (getf reference :id))
                                 :class "text-fg hover:underline"
-                               (getf reference :label))
-                             (span :class "ml-2 text-xs text-muted" (model-name (getf reference :model)))))))))))))
+                               (getf reference :label))))))))))))
 
 (defcomp ~empty-state (&key children)
   (hsx (div :class "rounded-md border border-dashed border-line px-6 py-10 text-center text-sm text-muted" children)))

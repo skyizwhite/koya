@@ -223,8 +223,8 @@ delivery API, keeping its data as a draft) and **Delete** (removes it for good;
 an object model's content has none). Both ask first. A
 content that another content refers to through a `reference` field — in its
 published data or its draft — can be neither: the page comes back saying how
-many refer to it. The danger zone lists them under **Referenced by**, closed until it is
-opened, each by its label and model, linked to its editor. Take it out of those contents first.
+many refer to it. Below the danger zone, set apart by a line, **Referenced by** lists them,
+closed until it is opened, each by its label and model, linked to its editor. Take it out of those contents first.
 
 ## Drafts, publishing and previews
 

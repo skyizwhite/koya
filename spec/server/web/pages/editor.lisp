@@ -559,6 +559,7 @@
       (let ((body (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" target)))))
         (ok (search "Referenced by 1 content" body))
         (ok (cl-ppcre:scan "<details class=\"[^\"]*\"><summary" body) "closed until it is opened")
+        (ok (< (search "Danger zone" body) (search "Referenced by" body)) "under the danger zone, apart from it")
         (ok (search (format nil "href=\"/s/website/m/blog/~a\"" refers) body) "each one is a link to its editor")
         (ok (search ">Refers<" body) "named by its label"))
       (ng (search "Referenced by" (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" refers))))

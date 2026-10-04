@@ -142,17 +142,13 @@
                               :media (media-for space field (and data (gethash (field-name field) data)))
                               :error (field-error errors (field-name field))))))
        (when (and content (or published (not object-p)))
-         (hsx (div :class "mt-12 flex flex-wrap items-start justify-between gap-4 border-t border-line pt-6 text-sm"
+         (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
                 (div
                   (p :class "font-medium text-danger" "Danger zone")
                   (p :class "text-muted"
                     (if object-p
                         "Unpublishing takes the content off the site."
-                        "Unpublishing takes the content off the site; deleting removes it for good."))
-                  (let ((references (content-references space-name model-name id)))
-                    (when references
-                      (hsx (div :class "mt-3"
-                             (~referrers :space space-name :heading "Referenced by" :references references))))))
+                        "Unpublishing takes the content off the site; deleting removes it for good.")))
                 (div :class "flex flex-wrap items-center gap-2"
                   (when published
                     (hsx (~action-button :space space-name :model model-name :id id :op "unpublish"
@@ -163,7 +159,11 @@
                     (hsx (~action-button :space space-name :model model-name :id id :op "delete"
                                          :icon :delete :class "btn btn-danger" :title "Delete content"
                                          :confirm "Delete this content? This cannot be undone."
-                                         "Delete")))))))))))
+                                         "Delete")))))))
+       (let ((references (and content (content-references space-name model-name id))))
+         (when references
+           (hsx (div :class "mt-6 border-t border-line pt-6"
+                  (~referrers :space space-name :heading "Referenced by" :references references)))))))))
 
 (defcomp ~editor-page (&key space model content data errors restoring)
   (let ((model-name (model-name model)))
