@@ -119,7 +119,8 @@ opens the delivery log filtered to this model.
 ![Contents of a list model](img/list-contents.png)
 
 - Every field gets a short preview: rich text as plain text, a reference as the
-  referenced content's label, a media as a small thumbnail, a `many` field as its
+  referenced content's label, a media as a small thumbnail (the first of a `many`
+  one, with how many more), a `many` field as its
   values comma-separated, a custom field as the previews of the values inside
   joined by ` · `, a repeater as its number of rows (*2 rows*), an empty field
   as `—`.
@@ -193,7 +194,7 @@ by its model's `label` field, or by its id.
 | `datetime` | date and time picker to the minute, in the time zone chosen under **Settings** |
 | `select` | dropdown, or checkboxes when `many` |
 | `reference` | dropdown, or chips plus a dropdown when `many` |
-| `media` | thumbnail with **Choose…** (opens the media picker) and **Clear** |
+| `media` | thumbnail with **Choose…** (opens the media picker) and **Clear**; a `many` one is a row of thumbnails, each moved by dragging it or by ← and →, and removed by ×, with **Add images**, which opens the picker to choose several at once |
 | `custom` | a box of the controls of the custom field's fields, under a heading like any field's: its name, `custom`, a red `*` when required, and its help beside them. One that is not required starts absent with an **Add** button and, once there, has a **Remove** button; a required one is always there and has neither. Only one that is there is saved, its required fields asked for, and a box left unchecked inside it is `false` |
 | `repeater` | its rows under a heading like any field's: its name, `repeater`, a red `*` when required, and its help beside them. Each row is a box headed by its custom field's name, with a drag handle (⠿), **↑** / **↓** to move it and **×** to remove it, holding the controls of that custom field's fields. Under the rows, a dropdown of the repeater's custom fields and **Add row** add a row of the one chosen at the end; rich text in it starts its own editor. Rows are reordered with the buttons or by dragging the handle |
 
@@ -373,8 +374,10 @@ newest 100 of a space are kept.
   the rest go, and the message says how many could not and why.
 
 The same library opens as a picker inside the editor — from a `media` field's
-**Choose…** button and from the rich text editor's image button. The picker
-searches, scrolls through the library and uploads too, so an image can go
+**Choose…** button and from the rich text editor's image button, where a click
+picks the file, and from a `many` media field's **Add images**, where clicks mark
+several files and **Add images** adds them in the order they were marked. The
+picker searches, scrolls through the library and uploads too, so an image can go
 straight from the desktop into a content.
 
 ## Keys

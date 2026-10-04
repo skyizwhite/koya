@@ -54,7 +54,10 @@
          :nconc (loop :for field :in (model-fields model)
                       :for value := (and data (gethash (field-name field) data))
                       :when (and (eq (field-type field) :media) (stringp value) (plusp (length value)))
-                        :collect value))))
+                        :collect value
+                      :when (and (eq (field-type field) :media) (vectorp value) (not (stringp value)) (plusp (length value))
+                                 (stringp (aref value 0)))
+                        :collect (aref value 0)))))
 
 (defun all-contents (space model query)
   (list-contents space (model-name model) model query :status :all))

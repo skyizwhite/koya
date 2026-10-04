@@ -111,25 +111,31 @@
           ((and (stringp value) (zerop (length value))) nil)
           (t (truncate-text (scalar-preview field value ref-labels))))))
 
-(defcomp ~media-cell (&key field id media)
+(defcomp ~media-cell (&key field id media more)
   (let ((found (gethash id media)))
     (hsx
      (td :class (clsx "py-2 pr-4" (if found "" "text-muted"))
-       (div :class (column-width field)
+       (div :class (clsx "flex items-center gap-2" (column-width field))
          (if found
              (hsx (img :src (media-url found :absolute nil) :alt (media-alt found)
                        :loading "lazy" :decoding "async"
                        :class "h-10 w-10 rounded object-cover"))
-             (hsx (div :class "line-clamp-2 break-all" (format nil "~a (missing)" id)))))))))
+             (hsx (div :class "line-clamp-2 break-all" (format nil "~a (missing)" id))))
+         (when (and more (plusp more))
+           (hsx (span :class "text-xs text-muted" (format nil "+~a" more)))))))))
 
 (defcomp ~preview-cell (&key field content ref-labels media)
   (let* ((data (content-data content :draft t))
          (value (and data (gethash (field-name field) data))))
-    (if (and (eq (field-type field) :media) (stringp value) (plusp (length value)))
-        (hsx (~media-cell :field field :id value :media media))
+    (cond
+      ((and (eq (field-type field) :media) (stringp value) (plusp (length value)))
+        (hsx (~media-cell :field field :id value :media media)))
+      ((and (eq (field-type field) :media) (vectorp value) (plusp (length value)) (stringp (aref value 0)))
+        (hsx (~media-cell :field field :id (aref value 0) :media media :more (1- (length value)))))
+      (t
         (let ((preview (field-preview field data ref-labels)))
           (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
-                 (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—"))))))))
+                 (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—")))))))))
 
 (defun browse-url (space model state &key (search-text (getf state :search-text)) (status (getf state :status))
                                              (sort-key (getf state :sort-key)) (page (getf state :page)) clear)

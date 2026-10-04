@@ -90,7 +90,7 @@
     (:date      :required)
     (:datetime  :required)
     (:select    :required :options :many)
-    (:media     :required)
+    (:media     :required :many)
     (:reference :required :model :many)
     (:slug      :required :from :unique :pattern)
     (:custom    :required :custom-field)

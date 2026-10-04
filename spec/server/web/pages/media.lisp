@@ -94,7 +94,7 @@
         (ok (search "data-pick-id=" body))
         (ok (search "data-pick-url=\"/media/website/" body))
         (ok (not (search "<html" body)) "a fragment, not a page")
-        (ok (search "nm-bind=\"{ onclick: () => _pick(this.dataset) }\"" body) "a card hands its file over")
+        (ok (search "nm-bind=\"{ onclick: () => _pick(this.dataset), " body) "a card hands its file over")
         (ok (search (bound (on-search (media-picker-search :space "website"))) body) "the box searches as the typing stops")
         (ok (search (bound (on-pick (media-picker-upload :space "website"))) body)))
       (multiple-value-bind (status body) (call-action :get (media-picker-search :space "website" :q "zzz-nothing"))

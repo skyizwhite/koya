@@ -168,3 +168,11 @@
              '(("blocks[1].photo" . "unknown_field") ("blocks[1].text" . "max_length")))
       "and checked as that custom field, by its path")
   (ok (equal (block-codes "page" "{\"blocks\": [{\"fieldId\": \"heading\"}]}") '(("blocks[0].text" . "required")))))
+
+(deftest a-media-field-can-hold-several
+  (let ((model (make-model "album" :list (list (make-field :photos :media :many t :required t)))))
+    (flet ((codes (json) (mapcar (lambda (e) (cons (getf e :field) (getf e :code))) (validate-content model (parse-json json)))))
+      (ok (null (codes "{\"photos\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\", \"01ARZ3NDEKTSV4RRFFQ69G5FAW\"]}")))
+      (ok (equal (codes "{\"photos\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"}") '(("photos" . "type"))) "an array of ids")
+      (ok (equal (codes "{\"photos\": [\"no id\"]}") '(("photos" . "type"))))
+      (ok (equal (codes "{\"photos\": []}") '(("photos" . "required"))) "and none is no value"))))

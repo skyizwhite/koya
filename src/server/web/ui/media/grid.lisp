@@ -36,12 +36,12 @@
 (defcomp ~pick-card (&key media)
   (hsx
    (li
-     (button :type "button" :class "w-full space-y-1 rounded-md p-1 text-left text-xs hover:bg-accent/5"
+     (button :type "button" :class "w-full space-y-1 rounded-md p-1 text-left text-xs ring-accent hover:bg-accent/5"
              :data-pick-id (media-id media)
              :data-pick-url (media-url media :absolute nil)
              :data-pick-alt (media-alt media)
              :data-pick-name (media-filename media)
-             :nm-bind "{ onclick: () => _pick(this.dataset) }"
+             :nm-bind "{ onclick: () => _pick(this.dataset), 'class.ring-2': () => _has(this.dataset.pickId), ariaPressed: () => _many ? String(_has(this.dataset.pickId)) : null }"
        (~thumb :media media)
        (div :class "truncate" :title (media-filename media) (media-filename media))
        (div :class "text-muted" (dimensions media))))))

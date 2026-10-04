@@ -93,9 +93,12 @@
     (let ((value (gethash (field-name field) object)))
       (case (field-type field)
         (:media
-         (when (and value (not (eq value json-null)))
-           (let ((media (and (stringp value) (find-media space value))))
-             (setf (gethash (field-name field) object) (or media json-null)))))
+         (cond ((rows-of value)
+                (setf (gethash (field-name field) object)
+                      (coerce (remove nil (map 'list (lambda (id) (and (stringp id) (find-media space id))) value)) 'vector)))
+               ((and value (not (eq value json-null)))
+                (let ((media (and (stringp value) (find-media space value))))
+                  (setf (gethash (field-name field) object) (or media json-null))))))
         (:custom
          (when (hash-table-p value)
            (setf (gethash (field-name field) object)
