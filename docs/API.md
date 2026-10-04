@@ -99,7 +99,9 @@ given anything else, is `400 bad_query`.
 draft key. The editor's *Preview draft* link opens the model's `previewUrl` with
 `{CONTENT_ID}` and `{DRAFT_KEY}` filled in; the preview page passes the key on as
 `draftKey`. Saving the draft again issues a new key, so an old link stops
-working.
+working. The key opens only its own content's draft: the references it embeds
+are published data, as publishing that one content would show them, so a new
+content it links is published first to appear in the preview.
 
 ## What comes back
 
@@ -126,8 +128,9 @@ A content is its fields plus the system fields:
 
 - **References** are ids unless named in `include`. `include=tags,author.team`
   embeds `tags`, `author`, and `team` inside each `author`. Only reference
-  fields can be included. A referenced content that is missing or unpublished
-  drops out of a `many` field and becomes `null` in a single one.
+  fields can be included. What is embedded is the published data, with a
+  `draftKey` too. A referenced content that is missing or unpublished drops out
+  of a `many` field and becomes `null` in a single one.
 - **Media** fields are always expanded to the media object, with an absolute
   `url`; one whose file is gone is `null`.
 - **Rich text** is HTML whose `/media/` sources are rewritten to absolute URLs,
