@@ -4,8 +4,12 @@ A koya server has two JSON APIs:
 
 - the **delivery API** (`/api/v1/{space}/…`), which reads published content with
   a **delivery key**;
-- the **admin API** (`/admin/api/…`), which deploys the schema and manages
-  contents, keys and media with a **management key**.
+- the **admin API** (`/admin/api/{space}/…`), which deploys the schema and
+  manages contents, keys and media with a **management key**.
+
+Both name the two kinds of model apart. A `list` model is a **list**, and its
+contents are **list contents**, reached under `lists/{model}`. An `object`
+model's one content is its **object**, reached under `objects/{model}` with no id.
 
 [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) wraps both, with types
 generated from your schema; this page is what it does underneath, for reading
@@ -49,13 +53,14 @@ load on koya lower. The admin API answers no cross-origin request.
 ## Reading content
 
 ```
-GET /api/v1/{space}/{model}          a page of a list model, or an object model's content
-GET /api/v1/{space}/{model}/{id}     one content of a list model
+GET /api/v1/{space}/lists/{model}         a page of a list
+GET /api/v1/{space}/lists/{model}/{id}    one list content
+GET /api/v1/{space}/objects/{model}       an object
 ```
 
 ```ts
 const res = await fetch(
-  "https://cms.example.com/api/v1/website/blog?limit=10&orders=-publishedAt&include=tags",
+  "https://cms.example.com/api/v1/website/lists/blog?limit=10&orders=-publishedAt&include=tags",
   { headers: { "X-KOYA-DELIVERY-KEY": process.env.KOYA_DELIVERY_KEY! } },
 );
 const { contents, totalCount, offset, limit } = await res.json();
@@ -70,10 +75,11 @@ const { contents, totalCount, offset, limit } = await res.json();
 | `q` | search: the text of the model's `text`, `textarea`, `slug` and `richtext` fields contains it, or it is a content's whole id. Combined with `filters`, both apply |
 | `include` | reference fields to embed, dotted for nesting: `tags,author.team` |
 | `fields` | keys to keep in each content: `id,title` |
-| `draftKey` | on one content, serves its draft instead — for previews |
+| `draftKey` | on one list content or an object, serves its draft instead — for previews |
 
-`limit`, `offset`, `orders`, `filters` and `q` apply to list models; an object model
-has one content and ignores them.
+`limit`, `offset`, `orders`, `filters` and `q` apply to a list; an object ignores
+them. A list model is not found under `objects/` nor an object model under
+`lists/` (`404`).
 
 **Filters** are `field[operator]value` terms joined with `[and]` and `[or]`;
 `[or]` separates groups of `[and]` terms:
@@ -153,38 +159,36 @@ A content is its fields plus the system fields:
 The admin API sees drafts as well, and returns contents in their stored shape:
 both versions, with references and media as ids.
 
-A list model's contents are reached through their ids:
+List contents are reached through their ids:
 
 ```
-GET    /admin/api/contents/{space}/{model}                   every content, drafts included
-POST   /admin/api/contents/{space}/{model}                   create (a draft, unless "publish": true)
-GET    /admin/api/contents/{space}/{model}/{id}
-PATCH  /admin/api/contents/{space}/{model}/{id}              save a draft
-DELETE /admin/api/contents/{space}/{model}/{id}
-POST   /admin/api/contents/{space}/{model}/{id}/publish
-POST   /admin/api/contents/{space}/{model}/{id}/unpublish
-POST   /admin/api/contents/{space}/{model}/{id}/discard-draft
-POST   /admin/api/contents/{space}/{model}/{id}/draft-key    the key for a preview URL
+GET    /admin/api/{space}/lists/{model}                   every list content, drafts included
+POST   /admin/api/{space}/lists/{model}                   create (a draft, unless "publish": true)
+GET    /admin/api/{space}/lists/{model}/{id}
+PATCH  /admin/api/{space}/lists/{model}/{id}              save a draft
+DELETE /admin/api/{space}/lists/{model}/{id}
+POST   /admin/api/{space}/lists/{model}/{id}/publish
+POST   /admin/api/{space}/lists/{model}/{id}/unpublish
+POST   /admin/api/{space}/lists/{model}/{id}/discard-draft
+POST   /admin/api/{space}/lists/{model}/{id}/draft-key    the key for a preview URL
 ```
 
-An object model's one content is part of the model, and is reached through the
-model:
+An object is part of its model, and is reached through the model:
 
 ```
-GET    /admin/api/contents/{space}/{model}                   its content
-POST   /admin/api/contents/{space}/{model}                   create it (a draft, unless "publish": true)
-PATCH  /admin/api/contents/{space}/{model}                   save a draft
-POST   /admin/api/contents/{space}/{model}/publish
-POST   /admin/api/contents/{space}/{model}/unpublish
-POST   /admin/api/contents/{space}/{model}/discard-draft
-POST   /admin/api/contents/{space}/{model}/draft-key         the key for a preview URL
+GET    /admin/api/{space}/objects/{model}                 the object
+PATCH  /admin/api/{space}/objects/{model}                 save a draft
+POST   /admin/api/{space}/objects/{model}/publish
+POST   /admin/api/{space}/objects/{model}/unpublish
+POST   /admin/api/{space}/objects/{model}/discard-draft
+POST   /admin/api/{space}/objects/{model}/draft-key       the key for a preview URL
 ```
 
-Until its first write it has no content, and `GET` is a `404`. The first `PATCH`,
-or a `publish` with `data`, makes it. It is never deleted: it goes when its model
-does. Its id does not reach it — the routes with `{id}` answer `404` for an object
-model — and a list model has none of the routes above that an object model has
-alone (`404`).
+Until its first write an object model has no object, and `GET` is a `404`. The
+first `PATCH`, or a `publish` with `data`, makes it; it is not created with
+`POST`. It is never deleted: it goes when its model does. Its id does not reach
+it — an object model is not found under `lists/` — and a list model is not found
+under `objects/` (`404`).
 
 ```json
 {
@@ -207,7 +211,7 @@ alone (`404`).
   | `published` | `published+draft` | `published` | `draft` | `no_draft` | gone |
   | `published+draft` | `published+draft` | `published` | `draft` | `published` | gone |
 
-  An object model's content has no delete.
+  An object has no delete.
 
 - Saving a draft (`PATCH`, `{"data": {…}}`) **merges** onto the current draft, or
   the published data when there is none: keys given replace, `null` removes a key.
@@ -215,25 +219,25 @@ alone (`404`).
   revision, no webhook); when it is the published data again, the draft is
   dropped, as `discard-draft` would.
 - Publishing takes `data` when given, else the draft, else re-publishes.
-- Creating may give `id` and the four timestamps, for imports that keep another
-  system's ids and dates. An id is the space's own: another space may hold a
-  content of the same id. A timestamp needs a date, a time and an offset or
-  `Z`, and is stored in UTC with milliseconds. An object model holds one content: once it has it,
-  creating another is refused (`409 object_exists`), and that one is changed
-  through the model.
+- Creating a list content may give `id` and the four timestamps, for imports
+  that keep another system's ids and dates. An id is the space's own: another
+  space may hold a content of the same id. A timestamp needs a date, a time and
+  an offset or `Z`, and is stored in UTC with milliseconds.
+- An object model holds one object. Two first writes at once make only one: the
+  other is refused (`409 object_exists`).
 - A content another content refers to, in its published data or its draft,
   through a `reference` field of the current schema, cannot be deleted, nor
   unpublished while it is published (`409 in_use`, naming how many). Take the
   reference out of those contents — and publish them, when it is in their
   published data — first. An id left in a field a deploy removed does not count.
 
-The schema itself is deployed with `PUT /admin/api/schema/{space}` and previewed
-with `POST /admin/api/schema/{space}/plan`: see [SCHEMA.md](SCHEMA.md), and
+The schema itself is deployed with `PUT /admin/api/{space}/schema` and previewed
+with `POST /admin/api/{space}/schema/plan`: see [SCHEMA.md](SCHEMA.md), and
 `koya plan` / `koya deploy` in koya-ts-sdk.
 
 ## Media
 
-`POST /admin/api/media/{space}` takes `multipart/form-data` with one or more
+`POST /admin/api/{space}/media` takes `multipart/form-data` with one or more
 `file` parts and an optional `alt`: PNG, JPEG, GIF or WebP, up to 20 MB each and
 20 MB together, the type decided by the file's leading bytes. A JPEG, PNG or
 WebP is stored without its metadata (EXIF, XMP, text): the camera, the time and

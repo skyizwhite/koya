@@ -1,0 +1,11 @@
+(defpackage #:koya-server/web/admin-api/<space>/keys/<id>
+  (:use #:cl)
+  (:import-from #:koya-core/json #:jobject)
+  (:import-from #:koya-server/web/lib/http #:path-param)
+  (:import-from #:koya-server/usecases/keys #:remove-delivery-key)
+  (:export #:@delete))
+(in-package #:koya-server/web/admin-api/<space>/keys/<id>)
+
+(defun @delete (params)
+  (remove-delivery-key (path-param params :space) (path-param params :id))
+  (jobject "deleted" t))

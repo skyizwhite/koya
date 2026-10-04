@@ -17,7 +17,7 @@
            #:delivered-data
            #:deliver
            #:delivered-list
-           #:delivered-one
+           #:delivered-list-content
            #:delivered-object))
 (in-package #:koya-server/usecases/delivery)
 
@@ -88,7 +88,7 @@
     (values (mapcar (lambda (c) (deliver c model space :include (query-include query))) contents)
             total)))
 
-(defun delivered-one (space model id query &key draft-key)
+(defun delivered-list-content (space model id query &key draft-key)
   (check-include space model (query-include query))
   (let ((content (or (find-content space (model-name model) id)
                      (fail 'not-found "Content does not exist"))))

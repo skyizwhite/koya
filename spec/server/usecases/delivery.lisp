@@ -7,7 +7,7 @@
   (:import-from #:koya-server/usecases/contents #:create #:update-draft #:draft-key)
   (:import-from #:koya-server/usecases/delivery
                 #:deliver #:delivered-data #:delivered-p #:delivered-content
-                #:delivered-one #:delivered-list #:delivered-object)
+                #:delivered-list-content #:delivered-list #:delivered-object)
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/domain/media #:media-p #:media-id)
   (:import-from #:koya-server/domain/content #:content-id)
@@ -106,7 +106,7 @@
       (ok (null (refused (lambda () (delivered-list "site" (model "post") (query "include" "author.favorite,tags")))))
           "a path that only names references is fine"))
     (testing "before one content is looked for"
-      (ok (refused (lambda () (delivered-one "site" (model "post") "nothing-here" (query "include" "title"))))
+      (ok (refused (lambda () (delivered-list-content "site" (model "post") "nothing-here" (query "include" "title"))))
           "a bad query, not a missing content")
       (ok (refused (lambda () (delivered-object "site" (model "about") (query "include" "body"))))))))
 
@@ -140,19 +140,19 @@
   (let* ((live (make "post" (list "title" "Live") :publish t))
          (draft (make "post" (list "title" "Draft")))
          (id (content-id draft)))
-    (ok (string= (jget (delivered-data (delivered-one "site" (model "post") (content-id live) (query))) "title") "Live"))
-    (ok (signals (delivered-one "site" (model "post") id (query)) 'not-found) "a draft is not there")
-    (ok (signals (delivered-one "site" (model "post") "nope" (query)) 'not-found))
+    (ok (string= (jget (delivered-data (delivered-list-content "site" (model "post") (content-id live) (query))) "title") "Live"))
+    (ok (signals (delivered-list-content "site" (model "post") id (query)) 'not-found) "a draft is not there")
+    (ok (signals (delivered-list-content "site" (model "post") "nope" (query)) 'not-found))
     (testing "but its draft key opens it, as a preview"
       (let ((key (draft-key "site" "post" id)))
-        (ok (string= (jget (delivered-data (delivered-one "site" (model "post") id (query) :draft-key key)) "title") "Draft"))
-        (ok (signals (delivered-one "site" (model "post") id (query) :draft-key "wrong") 'not-found))
+        (ok (string= (jget (delivered-data (delivered-list-content "site" (model "post") id (query) :draft-key key)) "title") "Draft"))
+        (ok (signals (delivered-list-content "site" (model "post") id (query) :draft-key "wrong") 'not-found))
         (testing "and shows the draft of a published content, where the key is the new draft's"
           (update-draft "site" (model "post") (content-id live) (jobject-from (list "title" "Live, edited")))
           (let ((key (draft-key "site" "post" (content-id live))))
-            (ok (string= (jget (delivered-data (delivered-one "site" (model "post") (content-id live) (query) :draft-key key)) "title")
+            (ok (string= (jget (delivered-data (delivered-list-content "site" (model "post") (content-id live) (query) :draft-key key)) "title")
                          "Live, edited"))
-            (ok (string= (jget (delivered-data (delivered-one "site" (model "post") (content-id live) (query))) "title")
+            (ok (string= (jget (delivered-data (delivered-list-content "site" (model "post") (content-id live) (query))) "title")
                          "Live") "without it, what is live")))
         (testing "and embeds only what is published, as publishing this one alone would show it"
           (let* ((tag (make "tag" (list "name" "lisp") :publish t))
@@ -163,7 +163,7 @@
             (update-draft "site" (model "tag") (content-id tag) (jobject-from (list "name" "lisp, edited")))
             (update-draft "site" (model "author") (content-id author) (jobject-from (list "name" "Ann, edited")))
             (let* ((key (draft-key "site" "post" (content-id preview)))
-                   (data (delivered-data (delivered-one "site" (model "post") (content-id preview)
+                   (data (delivered-data (delivered-list-content "site" (model "post") (content-id preview)
                                                         (query "include" "author,tags") :draft-key key)))
                    (tags (jget data "tags")))
               (ok (= (length tags) 1) "a tag never published drops out")

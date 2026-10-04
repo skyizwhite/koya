@@ -14,7 +14,7 @@
                 #:count-revisions #:find-revision)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key
-                #:object-content #:save-object #:publish-object)
+                #:object-content #:update-object #:publish-object)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -158,12 +158,12 @@
     (testing "before its first write it has no content to read"
       (ok (signals (object-content "website" about) 'not-found)))
     (testing "the first save makes its content, as a draft"
-      (let ((saved (save-object "website" about (data "{\"body\": \"draft\"}"))))
+      (let ((saved (update-object "website" about (data "{\"body\": \"draft\"}"))))
         (ok (string= (content-status saved) "draft"))
         (ok (string= (content-id saved) (content-id (object-content "website" about))))))
     (testing "a later save merges onto that content"
       (let ((id (content-id (object-content "website" about))))
-        (save-object "website" about (data "{}"))
+        (update-object "website" about (data "{}"))
         (ok (string= (jget (content-draft (object-content "website" about)) "body") "draft"))
         (ok (string= (content-id (object-content "website" about)) id) "and makes no second")))
     (testing "publishing publishes the draft, or the data given"
@@ -178,7 +178,7 @@
 
 (deftest an-object-content-is-not-deleted
   (let* ((about (find-model "website" "about"))
-         (content (save-object "website" about (data "{\"body\": \"stays\"}")))
+         (content (update-object "website" about (data "{\"body\": \"stays\"}")))
          (e (handler-case (destroy "website" about (content-id content)) (conflict (e) e))))
     (ok (string= (koya-error-code e) "object_stays") "it goes only with its model")
     (ok (object-content "website" about))))

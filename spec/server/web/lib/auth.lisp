@@ -68,7 +68,7 @@
 
 (deftest the-admin-api-is-called-with-a-key-not-the-session
   (ok (= 401 (request :get "/admin/api/me")) "the owner's session does not reach it")
-  (ok (= 401 (request :post "/admin/api/schema/website/plan" :json "{\"koyaSchema\":1}"
+  (ok (= 401 (request :post "/admin/api/website/schema/plan" :json "{\"koyaSchema\":1}"
                       :headers '(("origin" . "http://localhost:3000")))))
   (create-space "elsewhere")
   (let ((key (create-management-key "elsewhere" :label "k")))
