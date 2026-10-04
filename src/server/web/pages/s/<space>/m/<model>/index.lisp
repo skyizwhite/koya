@@ -169,11 +169,11 @@
          :aria-sort (case direction (:asc "ascending") (:desc "descending"))
        (a :href (list-url space model :search-text (getf state :search-text) :status (getf state :status) :sort-key next)
           :nm-bind (on-follow (browse-url space model state :sort-key next :page 1))
-          :class "flex items-center gap-1 hover:text-fg"
-         (span :class (clsx "truncate" (column-width field)) name)
+          :class (clsx "flex items-center gap-1 hover:text-fg" (column-width field))
          (if direction
              (hsx (span :class "shrink-0 text-accent" (if (eq direction :asc) "↑" "↓")))
-             (hsx (span :class "shrink-0 opacity-50" :aria-hidden "true" "↕"))))))))
+             (hsx (span :class "shrink-0 opacity-50" :aria-hidden "true" "↕")))
+         (span :class "truncate" name))))))
 
 (defcomp ~bulk-bar (&key space model state)
   (labels ((url (op)
