@@ -126,7 +126,7 @@
                          ((= marker #xE1)
                           (when (at-p bytes (+ i 4) "Exif" 0 0)
                             (setf orientation (or orientation (tiff-orientation bytes (+ i 10) end)))))
-                         ((or (and (= marker #xE0) (or (at-p bytes (+ i 4) "JFIF" 0) (at-p bytes (+ i 4) "JFXX" 0)))
+                         ((or (and (= marker #xE0) (at-p bytes (+ i 4) "JFIF" 0))
                               (and (= marker #xE2) (at-p bytes (+ i 4) "ICC_PROFILE" 0))
                               (and (= marker #xEE) (at-p bytes (+ i 4) "Adobe")))
                           (keep i end))
@@ -170,7 +170,7 @@
 (defun strip-webp (bytes)
   (unless (at-p bytes 12 "VP8X")
     (return-from strip-webp bytes))
-  (let ((n (length bytes)) (i 12) (parts '()) (orientation nil))
+  (let ((n (min (length bytes) (+ 8 (u32le bytes 4)))) (i 12) (parts '()) (orientation nil))
     (flet ((keep (from to) (push (subseq bytes from (min to n)) parts)))
       (loop
         (when (>= i n) (return))

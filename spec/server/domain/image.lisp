@@ -53,6 +53,7 @@
           (segment #xE2 "MPF" 0 "MM" 0 42 "mpf-index")
           (segment #xE2 "FPXR" 0 "fpxr-thumb")
           (segment #xE0 "AVI1" 0 "avi-note")
+          (segment #xE0 "JFXX" 0 #x10 "jfxx-thumb")
           (segment #xEE "Adobe" 0 100 0 0 0 0 1)
           (segment #xEE "Other" 0 "app14-note")
           (segment #xED "Photoshop 3.0" 0 "iptc-city")
@@ -105,6 +106,7 @@
     (ng (contains out "mpf-index") "the index of pictures no longer there")
     (ng (contains out "fpxr-thumb") "a segment is kept by what it says it is, not by its number")
     (ng (contains out "avi-note"))
+    (ng (contains out "jfxx-thumb") "nor a thumbnail, which may show what was cropped away")
     (ng (contains out "app14-note"))
     (ok (contains out "Adobe") "the colour transform stays")
     (ok (contains out "JFIF"))
@@ -154,6 +156,11 @@
     (let ((out (strip-metadata (webp :exif (tiff-be 1)) "image/webp")))
       (ng (contains out "EXIF"))
       (ok (= (aref out 20) #x20))))
+  (testing "what follows the RIFF it declares is not taken into it"
+    (let ((out (strip-metadata (octets (webp) "TRAILING") "image/webp")))
+      (ng (contains out "TRAILING"))
+      (ok (= (+ 8 (logior (aref out 4) (ash (aref out 5) 8) (ash (aref out 6) 16) (ash (aref out 7) 24)))
+             (length out)))))
   (testing "a simple WebP has nothing to strip"
     (let ((simple (octets "RIFF" (le32 22) "WEBP" (riff-chunk "VP8 " (octets 0 0 0 #x9D 1 #x2A (le16 320) (le16 240))))))
       (ok (equalp (strip-metadata simple "image/webp") simple)))))
