@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-server/domain/errors
                 #:fail #:koya-error #:koya-error-message #:conflict #:rejected #:too-large)
-  (:import-from #:koya-server/domain/image #:sniff-image #:+image-types+)
+  (:import-from #:koya-server/domain/image #:sniff-image #:strip-metadata #:+image-types+)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-space #:media-filename #:media-mime #:safe-filename
                 #:+max-upload-bytes+)
@@ -55,7 +55,8 @@
     (fail 'too-large (upload-limit-message)))
   (multiple-value-bind (mime width height) (sniff-image bytes)
     (unless mime (fail 'rejected "Only PNG, JPEG, GIF and WebP images are accepted" :code "unsupported_type"))
-    (let ((id (make-ulid)))
+    (let ((id (make-ulid))
+          (bytes (strip-metadata bytes mime)))
       (write-media-file space id mime bytes)
       (handler-case
           (insert-media space :id id :filename (safe-filename filename) :mime mime :size (length bytes)
