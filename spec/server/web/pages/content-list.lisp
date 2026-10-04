@@ -156,7 +156,8 @@
               (ok (= (arrows unsorted) (length (model-fields (blog-model)))) "a muted arrow on each")
               (ng (search "aria-sort" unsorted) "while none is sorted")
               (ok (= (arrows sorted) (1- (length (model-fields (blog-model))))) "and the sorted one shows its way instead")
-              (ok (search "aria-sort=\"ascending\"" sorted)))))
+              (ok (search "aria-sort=\"ascending\"" sorted))
+              (ok (search "↑</span><span class=\"truncate\">title</span>" sorted) "the arrow goes before the name"))))
         (testing "the three are one state, and the links carry it"
           (multiple-value-bind (status body)
               (request :get "/s/website/m/blog" :query "q=a&status=draft&sort=title")
