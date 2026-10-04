@@ -231,8 +231,10 @@ with `POST /admin/api/schema/{space}/plan`: see [SCHEMA.md](SCHEMA.md), and
 
 `POST /admin/api/media/{space}` takes `multipart/form-data` with one or more
 `file` parts and an optional `alt`: PNG, JPEG, GIF or WebP, up to 20 MB each and
-20 MB together, the type decided by the file's leading bytes. The answer is
-`{"media": [...]}`; put a media object's `id` in a `media` field. A media still
+20 MB together, the type decided by the file's leading bytes. A JPEG, PNG or
+WebP is stored without its metadata (EXIF, XMP, text): the camera, the time and
+the GPS position are gone, and only the orientation and the colour profile stay.
+The pixels are not touched. The answer is `{"media": [...]}`; put a media object's `id` in a `media` field. A media still
 used by a content, in a `media` or `richtext` field of the current schema, cannot
 be deleted (`409 in_use`); a value left in a field a deploy removed does not
 count.

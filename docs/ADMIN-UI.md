@@ -342,7 +342,8 @@ newest 100 of a space are kept.
 ![The media library](img/media.png)
 
 - **Upload** takes PNG, JPEG, GIF and WebP, several at once, up to 20 MB each
-  and 20 MB in one go.
+  and 20 MB in one go. A photo's metadata, its GPS position included, is not
+  kept; its orientation is.
 - The grid is thumbnails, newest first, with paging underneath. The search box
   matches file names as the typing stops.
 - Clicking a thumbnail opens a preview with the file's name, dimensions, size

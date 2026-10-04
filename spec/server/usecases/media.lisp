@@ -9,12 +9,13 @@
   (:import-from #:koya-server/usecases/ports/media
                 #:find-media #:list-media #:count-media #:update-media #:media-file-path)
   (:import-from #:koya-server/domain/image #:sniff-image)
+  (:import-from #:koya-spec/server/domain/image #:jpeg #:octets)
   (:import-from #:koya-server/web/lib/presenters #:media-url #:media->jobject)
   (:import-from #:koya-server/usecases/media
                 #:store-upload #:store-uploads #:remove-media #:remove-each #:remove-space-media #:media-references
                 #:media-reference-counts)
   (:import-from #:koya-server/domain/media
-                #:media-id #:media-space #:media-filename #:media-mime #:media-width
+                #:media-id #:media-space #:media-filename #:media-mime #:media-size #:media-width
                 #:media-height #:media-alt #:+max-upload-bytes+)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code #:conflict #:rejected #:too-large)
@@ -136,6 +137,14 @@
       (remove-media media)
       (ok (null (find-media "website" (media-id media))))
       (ok (null (probe-file (media-path media))) "file gone"))))
+
+(deftest an-upload-is-stored-without-its-metadata
+  (let* ((media (store-upload "website" (jpeg) :filename "phone.jpg"))
+         (stored (alexandria:read-file-into-byte-vector (media-path media))))
+    (ng (search (octets "GPS") stored) "where it was taken is not kept")
+    (ok (= (media-size media) (length stored)) "its size is what is kept")
+    (ok (< (length stored) (length (jpeg))))
+    (remove-media media)))
 
 (deftest rejected-uploads
   (flet ((refusal (thunk) (handler-case (progn (funcall thunk) nil) (koya-error (e) (type-of e)))))

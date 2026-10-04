@@ -713,7 +713,8 @@ paths:
         `multipart/form-data` with one or more `file` parts and an optional `alt`
         applied to all of them. PNG, JPEG, GIF and WebP, up to 20 MB each and 20 MB
         together, decided by the file's leading bytes; the part's Content-Type is
-        ignored. The whole request body is limited to 21 MB.
+        ignored. The whole request body is limited to 21 MB. A JPEG, PNG or WebP
+        is stored without its metadata but its orientation and colour profile.
       security: [{ managementKey: [] }]
       requestBody:
         required: true
@@ -1389,7 +1390,7 @@ components:
         url: { type: string, description: "Absolute: KOYA_BASE_URL + /media/{space}/{id}.{ext}" }
         filename: { type: string, description: The uploaded file's base name }
         mime: { type: string, enum: [image/png, image/jpeg, image/gif, image/webp] }
-        size: { type: integer, description: Bytes }
+        size: { type: integer, description: Bytes, as stored }
         width:
           oneOf: [{ type: integer }, { type: "null" }]
         height:

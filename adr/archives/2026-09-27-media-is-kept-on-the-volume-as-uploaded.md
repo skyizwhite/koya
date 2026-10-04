@@ -1,5 +1,8 @@
 # Media is kept on koya's own volume, as it was uploaded
 
+Superseded by adr/2026-10-04-media-is-kept-on-koyas-own-volume.md
+Superseded by adr/2026-10-04-an-upload-is-served-without-its-metadata.md
+
 *2026-09-27, restating a decision of 2026-09-20*
 
 ## Context
