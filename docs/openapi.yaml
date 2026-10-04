@@ -882,14 +882,15 @@ components:
       description: |
         Comma-separated reference fields to embed, dotted for nesting:
         `tags,author.team` embeds `tags`, `author`, and `team` inside each `author`.
-        Only `reference` fields may be named. Referenced contents that are
-        missing or unpublished are dropped from a `many` field and `null` in a
+        Only `reference` fields may be named. What is embedded is the referenced
+        contents' published data, with a `draftKey` too. Referenced contents that
+        are missing or unpublished are dropped from a `many` field and `null` in a
         single one.
     draftKey:
       name: draftKey
       in: query
       schema: { type: string }
-      description: The content's draft key (from the admin API or the editor's preview link) serves its draft instead of the published data.
+      description: The content's draft key (from the admin API or the editor's preview link) serves its draft instead of the published data. The contents it embeds through `include` stay published.
 
   responses:
     BadRequest:
