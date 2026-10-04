@@ -64,7 +64,7 @@
 
 (defcomp ~filters-clear (&key space label model)
   (hsx
-   (span :id "filters-clear"
+   (span :id "filters-clear" :class "inline-flex min-h-[2.125rem] items-center"
      (when (filtered-p label model)
        (hsx (a :href (webhook-log-url space)
                :nm-bind (on-follow (browse-deliveries :space space :clear "1"))
