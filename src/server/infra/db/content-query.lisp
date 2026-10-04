@@ -1,7 +1,8 @@
 (defpackage #:koya-server/infra/db/content-query
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-field #:field-type #:field-many-p #:field-name #:field-fields)
+                #:model-field #:field-type #:field-many-p #:field-name #:field-fields
+                #:field-row-kinds #:custom-field-fields #:custom-field-name)
   (:import-from #:koya-server/domain/query
                 #:bad-query)
   (:import-from #:koya-server/domain/number
@@ -21,8 +22,8 @@
 (defun field-expr (name model column)
   (or (system-column name)
       (let ((field (or (model-field model name) (bad-query "unknown field ~s" name))))
-        (when (eq (field-type field) :custom)
-          (bad-query "~a is a custom field: only contains and not_contains read it" name))
+        (when (member (field-type field) '(:custom :repeater))
+          (bad-query "~a holds fields of its own: only contains and not_contains read it" name))
         (format nil (if (eq (field-type field) :boolean) "COALESCE(json_extract(~a, '$.~a'), 0)" "json_extract(~a, '$.~a')")
                 column name))))
 
@@ -63,6 +64,37 @@
                    (mapcar (constantly like) exprs)))
           (t (bad-query "~a is inside a custom field: only contains and not_contains read it" name)))))
 
+(defun rows-matching-sql (field source like pick)
+  (let ((clauses '())
+        (params '()))
+    (dolist (kind (field-row-kinds field))
+      (let ((names (mapcar #'field-name (remove-if-not pick (custom-field-fields kind)))))
+        (when names
+          (push (format nil "(json_extract(each_row.value, '$.fieldId') = ? AND (~{~a~^ OR ~}))"
+                        (mapcar (lambda (n) (format nil "json_extract(each_row.value, '$.~a') LIKE ? ESCAPE '\\'" n))
+                                names))
+                clauses)
+          (setf params (append params (list (custom-field-name kind)) (mapcar (constantly like) names))))))
+    (and clauses
+         (list (format nil "EXISTS (SELECT 1 FROM json_each(~a, '$.~a') AS each_row WHERE ~{~a~^ OR ~})"
+                       source (field-name field) (reverse clauses))
+               params))))
+
+(defun row-text-sql (field column text-column like)
+  (let ((parts (remove nil (list (rows-matching-sql field column like
+                                                    (lambda (f) (member (field-type f) '(:text :textarea :slug))))
+                                 (rows-matching-sql field (or text-column column) like
+                                                    (lambda (f) (eq (field-type f) :richtext)))))))
+    (if parts
+        (values (format nil "(~{~a~^ OR ~})" (mapcar #'first parts)) (loop :for part :in parts :append (second part)))
+        (values "0" '()))))
+
+(defun repeater-term-sql (name field op value column text-column)
+  (multiple-value-bind (sql params) (row-text-sql field column text-column (format nil "%~a%" (escape-like value)))
+    (cond ((string= op "contains") (values sql params))
+          ((string= op "not_contains") (values (format nil "NOT ~a" sql) params))
+          (t (bad-query "~a is a repeater: only contains and not_contains read it" name)))))
+
 (defun inside (model name)
   (let* ((dot (position #\. name))
          (outer (and dot (model-field model (subseq name 0 dot)))))
@@ -73,7 +105,9 @@
   (destructuring-bind (name op value) term
     (let ((field (model-field model name)))
       (multiple-value-bind (outer inner) (inside model name)
-        (cond ((and field (eq (field-type field) :custom))
+        (cond ((and field (eq (field-type field) :repeater))
+               (repeater-term-sql name field op value column text-column))
+              ((and field (eq (field-type field) :custom))
                (text-sql name
                          (loop :for inner :in (field-fields field)
                                :when (member (field-type inner) +text-types+)

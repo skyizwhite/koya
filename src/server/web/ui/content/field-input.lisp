@@ -1,7 +1,8 @@
 (defpackage #:koya-server/web/ui/content/field-input
   (:use #:cl #:hsx)
   (:import-from #:koya-core/schema
-                #:field-name #:field-type #:field-option #:field-required-p #:field-many-p)
+                #:field-name #:field-type #:field-option #:field-required-p #:field-many-p
+                #:field-row-kinds #:custom-field-name)
   (:import-from #:koya-core/json
                 #:json-null #:to-json #:jobject)
   (:import-from #:koya-server/web/lib/forms #:field-param-name #:value->string)
@@ -9,7 +10,8 @@
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/usecases/settings #:display-timezone-name)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:export #:~field-input #:~custom-input))
+  (:import-from #:koya-server/web/lib/binds #:js-string)
+  (:export #:~field-input #:~custom-input #:~repeater-input))
 (in-package #:koya-server/web/ui/content/field-input)
 
 (defun present-p (value) (and value (not (eq value json-null))))
@@ -127,6 +129,29 @@
          children)
        (~field-error :field field :error error)))))
 
+(defcomp ~repeater-input (&key field add-url error children)
+  (let ((name (field-param-name field)))
+    (hsx
+     (div :class "space-y-1.5" :nm-data (format nil "...koya.repeater(~a)" (js-string add-url))
+       (div :id (format nil "~a-label" name) :class "label"
+         (field-name field)
+         (span :class "ml-2 text-xs font-normal text-muted" "repeater")
+         (when (field-required-p field) (hsx (span :class "ml-1 text-danger" "*")))
+         (when (field-option field :help)
+           (hsx (span :id (format nil "~a-help" name) :class "ml-3 text-xs font-normal text-muted"
+                  (field-option field :help)))))
+       (div :class "space-y-3 rounded-md border border-line p-4"
+         (div :id (format nil "~a-rows" name) :class "space-y-3 empty:hidden" :role "list" :aria-labelledby (format nil "~a-label" name)
+              :nm-bind "{ oninit: () => koya.sortable(this) }"
+           children)
+         (div :class "flex items-center gap-2"
+           (select :aria-label (format nil "Custom field of a new ~a row" (field-name field)) :nm-ref "kind" :class "w-auto"
+             (loop :for kind :in (field-row-kinds field) :collect
+               (hsx (option :value (custom-field-name kind) (custom-field-name kind)))))
+           (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add($refs.kind) }"
+             (~icon :name :plus) "Add row")))
+       (~field-error :field field :error error)))))
+
 (defcomp ~field-input (&key field parent value error references media)
   (let* ((name (field-param-name field parent))
          (id name)
@@ -147,7 +172,7 @@
           (hsx (textarea :id id :name name :rows 5 :class "input" string)))
          (:richtext
           (hsx
-           (<>
+           (div
              (input :type "hidden" :id id :name name :value string)
              (div :class "quill-editor" :data-quill-for id
                   :nm-bind "{ oninit: () => koya.quill(this) }"))))

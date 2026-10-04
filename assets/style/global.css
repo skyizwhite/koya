@@ -123,5 +123,5 @@ dialog.koya-dialog::backdrop {
   @apply rounded-t-md border-line bg-panel;
 }
 .ql-container.ql-snow {
-  border: 0;
+  @apply border border-t-0 border-line;
 }

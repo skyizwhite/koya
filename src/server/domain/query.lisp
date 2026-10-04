@@ -97,7 +97,7 @@
 
 (defun search-filters (model search-text)
   (let ((text-fields (loop :for field :in (model-fields model)
-                           :when (member (field-type field) +searchable-types+)
+                           :when (member (field-type field) (cons :repeater +searchable-types+))
                              :collect (field-name field)
                            :when (eq (field-type field) :custom)
                              :append (loop :for inner :in (field-fields field)

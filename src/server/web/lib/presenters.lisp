@@ -1,7 +1,8 @@
 (defpackage #:koya-server/web/lib/presenters
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject #:json-null #:to-json)
-  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-fields)
+  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-fields
+                #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/diff #:change->jobject)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -64,7 +65,12 @@
            (setf (gethash (field-name field) object)
                  (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))
         (:custom
-         (when (hash-table-p value) (absolutize-fields value (field-fields field) base)))))))
+         (when (hash-table-p value) (absolutize-fields value (field-fields field) base)))
+        (:repeater
+         (when (and (vectorp value) (not (stringp value)))
+           (loop :for row :across value
+                 :for kind := (row-kind field row)
+                 :when kind :do (absolutize-fields row (custom-field-fields kind) base))))))))
 
 (defparameter +system-fields+ '("id" "createdAt" "updatedAt" "publishedAt" "revisedAt"))
 

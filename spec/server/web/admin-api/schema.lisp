@@ -210,3 +210,25 @@
              (ok (= status 200) "a field made required inside is checked alone, not with one the same deploy removes")
              (ng (jget json "error"))))
       (replace-schema "website" (test-schema)))))
+
+(deftest a-repeater-is-checked-row-by-row
+  (flet ((pages (kinds &rest heading-options)
+           (make-schema :custom-fields (list (make-custom-field "heading" (list (apply #'make-field :text :text heading-options)
+                                                                                (make-field :note :text)))
+                                             (make-custom-field "quote" (list (make-field :text :text))))
+                        :models (list (make-model "note" :list (list (make-field :blocks :repeater :custom-fields kinds)))))))
+    (replace-schema "website" (pages '(heading quote)))
+    (unwind-protect
+         (progn
+           (admin :post "/admin/api/website/lists/note"
+                  :body (jobject "data" (jobject "blocks" (vector (jobject "fieldId" "quote" "text" "Q")
+                                                                  (jobject "fieldId" "heading" "text" "abcdefgh" "note" "n")))))
+           (flet ((misfit-fields (schema)
+                    (let ((json (nth-value 1 (admin :post "/admin/api/website/schema/plan" :body (schema->jobject schema)))))
+                      (loop :for change :across (jget json "changes")
+                            :append (map 'list (lambda (m) (jget m "field")) (or (jget change "misfits") #()))))))
+             (ok (equal (misfit-fields (pages '(heading quote) :max-length 5)) '("blocks[1].text"))
+                 "a field tightened inside is checked in the rows of its custom field, named by the row")
+             (ok (equal (misfit-fields (pages '(heading))) '("blocks[0]"))
+                 "a custom field taken from the list is checked against the rows of it")))
+      (replace-schema "website" (test-schema)))))

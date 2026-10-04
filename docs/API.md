@@ -72,8 +72,8 @@ const { contents, totalCount, offset, limit } = await res.json();
 | `offset` | default 0; above 2^63−1 answers `400 bad_query` |
 | `orders` | comma-separated field names, `-` for descending: `-publishedAt,title`. Default: newest published first |
 | `filters` | see below |
-| `q` | search: the text of the model's `text`, `textarea`, `slug` and `richtext` fields, those inside a custom field included, contains it, or it is a content's whole id. Combined with `filters`, both apply |
-| `include` | reference fields to embed, dotted for nesting and to reach into a custom field: `tags,author.team,meta.author` |
+| `q` | search: the text of the model's `text`, `textarea`, `slug` and `richtext` fields, those inside a custom field or a repeater's rows included, contains it, or it is a content's whole id. Combined with `filters`, both apply |
+| `include` | reference fields to embed, dotted for nesting and to reach into a custom field or a repeater's rows: `tags,author.team,meta.author,blocks.by` |
 | `fields` | top-level keys to keep in each content: `id,title` |
 | `draftKey` | on one list content or an object, serves its draft instead — for previews |
 
@@ -103,7 +103,8 @@ without its tags, with `&amp;` and the like as the characters they stand for, as
 `q` does. On a `custom` field only `contains` and `not_contains` work:
 `contains` matches when one of its `text`, `textarea`, `slug` or `richtext`
 fields contains the value, `not_contains` when none does; any other operator,
-or `orders` on it, is `400 bad_query`. A value for a
+or `orders` on it, is `400 bad_query`. A `repeater` field is the same, over
+the fields of every row. A value for a
 `number` field is a decimal of at most 64 characters, such as `42`, `-2.5` or
 `1e3`. An unknown field in `filters`, `orders` or `include`, or a number field
 given anything else, is `400 bad_query`.
@@ -143,7 +144,10 @@ A content is its fields plus the system fields:
   embeds `tags`, `author`, and `team` inside each `author`. Only reference
   fields can be included; a reference inside a custom field is named through it,
   as `meta.author`, and a path that ends at the custom field or at anything else
-  inside it is `400 bad_query`. What is embedded is the published data, with a
+  inside it is `400 bad_query`. A reference in a repeater's rows is named
+  through the repeater, as `blocks.by`, and embedded in each row whose custom
+  field has a reference named `by`; the other rows are left as they are, and a
+  path that reaches no reference is `400 bad_query`. What is embedded is the published data, with a
   `draftKey` too. A referenced content that is missing or unpublished drops out
   of a `many` field and becomes `null` in a single one.
 - **Media** fields are always expanded to the media object, with an absolute
@@ -152,8 +156,10 @@ A content is its fields plus the system fields:
   so it renders on any site.
 - A **custom field** is an object of its fields' values, and the rules above
   apply to the fields inside it.
+- A **repeater** is an array of rows, each an object naming its custom field in
+  `fieldId` beside that custom field's fields, to which the rules above apply.
 - **`fields`** applies last, after embedding and expansion, and narrows the
-  content's own fields, a custom field whole; the system fields (`id`,
+  content's own fields, a custom field or a repeater whole; the system fields (`id`,
   `createdAt`, `updatedAt`, `publishedAt`, `revisedAt`) are always there.
 - `publishedAt` is the first publish, `revisedAt` the latest; both are `null`
   while a content is not published. Timestamps are ISO 8601 in UTC with
@@ -234,7 +240,7 @@ under `objects/` (`404`).
   other is refused (`409 object_exists`).
 - A content another content refers to, in its published data or its draft,
   through a `reference` field of the current schema (one inside a custom field
-  too), cannot be deleted, nor
+  or a repeater's rows too), cannot be deleted, nor
   unpublished while it is published (`409 in_use`, naming how many). Take the
   reference out of those contents — and publish them, when it is in their
   published data — first. An id left in a field a deploy removed does not count.
@@ -252,7 +258,7 @@ WebP is stored without its metadata (EXIF, XMP, text): the camera, the time and
 the GPS position are gone, and only the orientation and the colour profile stay.
 The pixels are not touched. The answer is `{"media": [...]}`; put a media object's `id` in a `media` field. A media still
 used by a content, in a `media` or `richtext` field of the current schema (one
-inside a custom field too), cannot be deleted (`409 in_use`); a value left in a
+inside a custom field or a repeater's rows too), cannot be deleted (`409 in_use`); a value left in a
 field a deploy removed does not count.
 
 ## Errors

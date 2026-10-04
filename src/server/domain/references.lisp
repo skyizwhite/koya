@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:model-name #:model-fields #:field-name #:field-type #:field-option
-                #:field-fields)
+                #:field-fields #:field-row-kinds #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-server/domain/content
                 #:content-model #:content-published #:content-draft #:content-id #:content-label)
   (:export #:reference-fields
@@ -14,9 +14,23 @@
 
 (defun matching (fields predicate)
   (loop :for field :in fields
-        :for inner := (and (eq (field-type field) :custom) (matching (field-fields field) predicate))
+        :for inner := (case (field-type field)
+                        (:custom (matching (field-fields field) predicate))
+                        (:repeater (loop :for kind :in (field-row-kinds field)
+                                         :for entries := (matching (custom-field-fields kind) predicate)
+                                         :when entries :collect (cons (custom-field-name kind) entries))))
         :when (or inner (funcall predicate field))
           :collect (cons field inner)))
+
+(defun some-inside (test field inner value)
+  (if (eq (field-type field) :repeater)
+      (and (vectorp value) (not (stringp value))
+           (some (lambda (row)
+                   (and (hash-table-p row)
+                        (let ((entries (cdr (assoc (gethash "fieldId" row) inner :test #'equal))))
+                          (and entries (funcall test entries row)))))
+                 value))
+      (funcall test inner value)))
 
 (defun fields-by-model (schema predicate)
   (let ((table (make-hash-table :test 'equal)))
@@ -37,7 +51,7 @@
                (destructuring-bind (field . inner) entry
                  (let ((value (gethash (field-name field) data)))
                    (if inner
-                       (data-refers-p inner value id)
+                       (some-inside (lambda (entries v) (data-refers-p entries v id)) field inner value)
                        (typecase value
                          (string (string= value id))
                          (vector (find id value :test #'equal)))))))
@@ -56,7 +70,7 @@
                (destructuring-bind (field . inner) entry
                  (let ((value (gethash (field-name field) data)))
                    (if inner
-                       (mentions-p inner value id)
+                       (some-inside (lambda (entries v) (mentions-p entries v id)) field inner value)
                        (and (stringp value)
                             (if (eq (field-type field) :media) (string= value id) (search id value)))))))
              fields)))

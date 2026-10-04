@@ -2,7 +2,8 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
-                #:field-name #:field-option #:model-kind #:field-fields)
+                #:field-name #:field-option #:model-kind #:field-fields #:field-row-kinds
+                #:field-path-parts #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/usecases/ports/contents #:space-contents)
@@ -61,14 +62,20 @@
   (find-if (lambda (c) (and (eq (getf c :op) :change-kind) (equal (getf c :model) model))) changes))
 
 (defun outer-name (path)
-  (subseq path 0 (position #\. path)))
+  (values (field-path-parts path)))
+
+(defun inner-fields (field kind)
+  (if kind
+      (let ((custom (find kind (field-row-kinds field) :key #'custom-field-name :test #'string=)))
+        (and custom (custom-field-fields custom)))
+      (field-fields field)))
 
 (defun changed-field (schema change)
-  (let ((field (model-field (schema-model schema (getf change :model)) (outer-name (getf change :field))))
-        (dot (position #\. (getf change :field))))
-    (if dot
-        (find (subseq (getf change :field) (1+ dot)) (field-fields field) :key #'field-name :test #'string=)
-        field)))
+  (multiple-value-bind (outer kind inner) (field-path-parts (getf change :field))
+    (let ((field (model-field (schema-model schema (getf change :model)) outer)))
+      (if inner
+          (find inner (inner-fields field kind) :key #'field-name :test #'string=)
+          field))))
 
 (defun checked-change-p (change schema changes)
   (and (not (made-anew-p changes (getf change :model)))
@@ -91,18 +98,27 @@
 
 (defun gone-inside (changes model outer)
   (loop :for change :in changes
-        :for path := (getf change :field)
-        :for dot := (and path (position #\. path))
-        :when (and dot (member (getf change :op) '(:remove-field :change-field-type))
-                   (equal (getf change :model) model) (string= (subseq path 0 dot) outer))
-          :collect (subseq path (1+ dot))))
+        :when (and (getf change :field) (member (getf change :op) '(:remove-field :change-field-type))
+                   (equal (getf change :model) model))
+          :append (multiple-value-bind (name kind inner) (field-path-parts (getf change :field))
+                    (and inner (string= name outer) (list (cons kind inner))))))
+
+(defun without-gone (object kind gone)
+  (let ((kept (jobject)))
+    (maphash (lambda (k v)
+               (unless (find-if (lambda (g) (and (equal (car g) kind) (string= (cdr g) k))) gone)
+                 (setf (gethash k kept) v)))
+             object)
+    kept))
 
 (defun as-deployed (value gone)
-  (if (and gone (hash-table-p value))
-      (let ((kept (jobject)))
-        (maphash (lambda (k v) (unless (member k gone :test #'string=) (setf (gethash k kept) v))) value)
-        kept)
-      value))
+  (cond ((null gone) value)
+        ((hash-table-p value) (without-gone value nil gone))
+        ((and (vectorp value) (not (stringp value)))
+         (map 'vector (lambda (row)
+                        (if (hash-table-p row) (without-gone row (gethash "fieldId" row) gone) row))
+              value))
+        (t value)))
 
 (defun value-misfits (contents field key &optional gone)
   (let ((check (make-model "check" :list (list field)))
@@ -115,23 +131,28 @@
                                   (mapcar (lambda (e) (misfit content version (getf e :field) (getf e :message)))
                                           (validate-content check one)))))))
 
-(defun inner-misfits (contents outer inner key gone)
+(defun object-misfits (content version check name object path)
+  (let ((one (jobject)))
+    (multiple-value-bind (value found) (gethash name object)
+      (when found (setf (gethash name one) value)))
+    (mapcar (lambda (e) (misfit content version (format nil "~a.~a" path (getf e :field)) (getf e :message)))
+            (validate-content check one))))
+
+(defun inner-misfits (contents outer kind inner key gone)
   (let ((check (make-model "check" :list (list inner)))
         (name (field-name inner)))
     (loop :for content :in contents
           :append (loop :for (version data) :in (versions content)
-                        :for object := (as-deployed (gethash key data) gone)
-                        :append (let ((one (jobject)))
-                                  (when (hash-table-p object)
-                                    (multiple-value-bind (value found) (gethash name object)
-                                      (when found (setf (gethash name one) value))))
-                                  (if (hash-table-p object)
-                                      (mapcar (lambda (e)
-                                                (misfit content version
-                                                        (format nil "~a.~a" (field-name outer) (getf e :field))
-                                                        (getf e :message)))
-                                              (validate-content check one))
-                                      '()))))))
+                        :for value := (as-deployed (gethash key data) gone)
+                        :append (cond ((and (null kind) (hash-table-p value))
+                                       (object-misfits content version check name value (field-name outer)))
+                                      ((and kind (vectorp value) (not (stringp value)))
+                                       (loop :for row :across value
+                                             :for index :from 0
+                                             :when (and (hash-table-p row) (equal (gethash "fieldId" row) kind))
+                                               :append (object-misfits content version check name row
+                                                                       (format nil "~a[~a]" (field-name outer) index))))
+                                      (t '()))))))
 
 (defun unique-misfits (contents field key)
   (let ((owners (make-hash-table :test 'equal))
@@ -158,8 +179,9 @@
                          (key (stored-name changes :rename-field model outer))
                          (of-model (remove-if-not (lambda (c) (equal (content-model c) stored-model)) contents))
                          (gone (gone-inside changes model outer))
-                         (misfits (if (find #\. (getf change :field))
-                                      (inner-misfits of-model field (changed-field schema change) key gone)
+                         (misfits (if (nth-value 2 (field-path-parts (getf change :field)))
+                                      (inner-misfits of-model field (nth-value 1 (field-path-parts (getf change :field)))
+                                                     (changed-field schema change) key gone)
                                       (append (value-misfits of-model field key gone)
                                               (and (field-option field :unique) (unique-misfits of-model field key))))))
                     (if misfits (append change (list :misfits misfits)) change))

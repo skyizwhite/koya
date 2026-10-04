@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p
-                #:field-fields)
+                #:field-fields #:field-row-kinds #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
@@ -36,9 +36,13 @@
     (and content (content-published content)
          (deliver content target space :include include))))
 
+(defun rows-of (value)
+  (and (vectorp value) (not (stringp value)) value))
+
 (defun next-fields (space field)
   (case (field-type field)
     (:custom (field-fields field))
+    (:repeater (loop :for kind :in (field-row-kinds field) :append (custom-field-fields kind)))
     (:reference (let ((target (find-model space (field-option field :model))))
                   (and target (model-fields target))))))
 
@@ -46,10 +50,13 @@
   (dolist (path include)
     (loop :for (name . more) :on path
           :for fields := (model-fields model) :then (next-fields space field)
-          :for field := (find name fields :key #'field-name :test #'string=)
+          :for field := (find-if (lambda (f)
+                                   (and (string= (field-name f) name)
+                                        (or (eq (field-type f) :reference)
+                                            (and more (member (field-type f) '(:custom :repeater))))))
+                                 fields)
           :for reached :from 1
-          :unless (and field (or (eq (field-type field) :reference)
-                                 (and more (eq (field-type field) :custom))))
+          :unless field
             :do (bad-query "include: ~s is not a reference field" (format nil "~{~a~^.~}" (subseq path 0 reached))))))
 
 (defun embed-references (object fields space include)
@@ -60,14 +67,25 @@
            (value (gethash name object)))
       (when (and nested value (not (eq value json-null)))
         (let ((nested (remove nil nested)))
-          (if (eq (field-type field) :custom)
+          (case (field-type field)
+            (:custom
               (when (hash-table-p value)
-                (setf (gethash name object) (embed-references (copy-object value) (field-fields field) space nested)))
+                (setf (gethash name object) (embed-references (copy-object value) (field-fields field) space nested))))
+            (:repeater
+              (when (rows-of value)
+                (setf (gethash name object)
+                      (map 'vector (lambda (row)
+                                     (let ((kind (row-kind field row)))
+                                       (if kind
+                                           (embed-references (copy-object row) (custom-field-fields kind) space nested)
+                                           row)))
+                           value))))
+            (:reference
               (let ((target (field-option field :model)))
                 (setf (gethash name object)
                       (if (field-many-p field)
                           (coerce (remove nil (map 'list (lambda (v) (expand-reference space target v nested)) value)) 'vector)
-                          (or (expand-reference space target value nested) json-null)))))))))
+                          (or (expand-reference space target value nested) json-null))))))))))
   object)
 
 (defun expand-media (object fields space)
@@ -81,7 +99,14 @@
         (:custom
          (when (hash-table-p value)
            (setf (gethash (field-name field) object)
-                 (expand-media (copy-object value) (field-fields field) space))))))))
+                 (expand-media (copy-object value) (field-fields field) space))))
+        (:repeater
+         (when (rows-of value)
+           (setf (gethash (field-name field) object)
+                 (map 'vector (lambda (row)
+                                (let ((kind (row-kind field row)))
+                                  (if kind (expand-media (copy-object row) (custom-field-fields kind) space) row)))
+                      value))))))))
 
 (defun deliver (content model space &key draft include)
   (let ((data (copy-object (content-data content :draft draft))))

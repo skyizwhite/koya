@@ -118,9 +118,10 @@ the same name, so the schema can be edited live from the REPL.
   The URL templates are evaluated; each field form `(name type . options)` is
   taken literally. A model carries no webhooks: they all live in `defwebhooks`.
 - **`(defcustomfield name &body fields)`** — a set of fields a model uses as one
-  field of type `:custom`, its value an object of these fields. The fields are
-  written as in `defmodel`, but none is a `:slug` or a `:custom`, nor `:unique`
-  or `:was`. Its name follows the field rule below.
+  field of type `:custom`, its value an object of these fields, or as the rows of
+  a `:repeater`. The fields are written as in `defmodel`, but none is a `:slug`,
+  a `:custom` or a `:repeater`, nor `:unique` or `:was`, and none is named
+  `fieldId`. Its name follows the field rule below.
 - **`:was`**, on the model or on a field, names what it used to be called, so
   that a deploy renames it instead of dropping it — see
   [Renaming a model or a field](#renaming-a-model-or-a-field).
@@ -163,6 +164,7 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
 | `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |
 | `:slug` | `:required` `:from` `:unique` `:pattern` | lowercase-hyphen string |
 | `:custom` | `:required` `:custom-field` | an object of the custom field's fields |
+| `:repeater` | `:required` `:custom-fields` | an array of rows, each naming its custom field in `fieldId` beside that custom field's fields |
 
 - Every type also takes `:was`, which names the field this one was renamed from —
   see [Renaming a model or a field](#renaming-a-model-or-a-field).
@@ -175,6 +177,10 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
   `:textarea` field of the same model other than itself; `:custom-field` names a
   `defcustomfield`. All three are checked against the whole schema, so a typo
   fails before anything is sent.
+- `:custom-fields` is a non-empty list of `defcustomfield` names, without
+  duplicates, taken literally and camelised like field names:
+  `(blocks :repeater :custom-fields (heading body))`. A `:repeater` sits only in
+  a `defmodel`.
 - `:default t` on a `:boolean` sets the field to true on a new content that does
   not mention it (the editor starts with the box checked); an explicit `false` is
   kept.

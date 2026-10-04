@@ -1,6 +1,7 @@
 (defpackage #:koya-server/web/lib/forms
   (:use #:cl)
-  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p #:field-fields)
+  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p #:field-fields
+                #:field-row-kinds #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/json
                 #:json-null)
   (:import-from #:cl-ppcre
@@ -12,13 +13,17 @@
                 #:form-values #:form-list)
   (:export #:form->data
            #:field-param-name
+           #:row-prefix
            #:form-value
            #:value->string
            #:number->string))
 (in-package #:koya-server/web/lib/forms)
 
 (defun field-param-name (field &optional parent)
-  (format nil "f-~@[~a.~]~a" (and parent (field-name parent)) (field-name field)))
+  (format nil "f-~@[~a.~]~a" (and parent (if (stringp parent) parent (field-name parent))) (field-name field)))
+
+(defun row-prefix (field key)
+  (format nil "~a.~a" (field-name field) key))
 
 (defun form-value (params name)
   (let ((v (first (form-values params name))))
@@ -40,6 +45,15 @@
           (:custom
            (when raw
              (setf (gethash (field-name field) data) (form->fields (field-fields field) params field))))
+          (:repeater
+           (let ((rows (loop :for key :in (form-list params name)
+                             :for kind := (find (form-value params (format nil "~a.~a.fieldId" name key))
+                                                (field-row-kinds field) :key #'custom-field-name :test #'equal)
+                             :when kind
+                               :collect (let ((row (form->fields (custom-field-fields kind) params (row-prefix field key))))
+                                          (setf (gethash "fieldId" row) (custom-field-name kind))
+                                          row))))
+             (when rows (setf (gethash (field-name field) data) (coerce rows 'vector)))))
           (:boolean
            (setf (gethash (field-name field) data) (and raw t)))
           (:number

@@ -7,7 +7,9 @@
                 #:field-option
                 #:field-required-p
                 #:field-many-p
-                #:field-fields)
+                #:field-fields
+                #:custom-field-name
+                #:custom-field-fields)
   (:import-from #:koya-core/json
                 #:json-null-p
                 #:json-array-p)
@@ -40,7 +42,7 @@
 (defun blank-for-field-p (field value)
   (or (json-null-p value)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
-      (and (field-many-p field) (json-array-p value) (zerop (length value)))))
+      (and (or (field-many-p field) (eq (field-type field) :repeater)) (json-array-p value) (zerop (length value)))))
 
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
@@ -110,16 +112,34 @@
      (unless (content-id-p value)
        (list (err field "type" "must be an id"))))))
 
-(defun inside (field errors)
-  (mapcar (lambda (e) (list* :field (format nil "~a.~a" (field-name field) (getf e :field)) (rest (rest e))))
+(defun inside (path errors)
+  (mapcar (lambda (e) (list* :field (format nil "~a.~a" path (getf e :field)) (rest (rest e))))
           errors))
 
+(defun check-row (field index row)
+  (let ((path (format nil "~a[~a]" (field-name field) index)))
+    (if (not (hash-table-p row))
+        (list (list :field path :code "type" :message "must be an object"))
+        (let ((kind (find (gethash "fieldId" row) (field-fields field) :key #'custom-field-name :test #'equal)))
+          (if (null kind)
+              (list (list :field path :code "custom_field"
+                          :message (format nil "must name its custom field in fieldId, one of ~{~a~^, ~}"
+                                           (mapcar #'custom-field-name (field-fields field)))))
+              (let ((fields (make-hash-table :test 'equal)))
+                (maphash (lambda (k v) (unless (string= k "fieldId") (setf (gethash k fields) v))) row)
+                (inside path (validate-fields (custom-field-fields kind) fields nil))))))))
+
 (defun check-value (field value)
-  (cond ((eq (field-type field) :custom)
-         (if (hash-table-p value)
-             (inside field (validate-fields (field-fields field) value nil))
-             (list (err field "type" "must be an object"))))
-        (t (check-many field value))))
+  (case (field-type field)
+    (:custom
+     (if (hash-table-p value)
+         (inside (field-name field) (validate-fields (field-fields field) value nil))
+         (list (err field "type" "must be an object"))))
+    (:repeater
+     (if (json-array-p value)
+         (loop :for row :across value :for index :from 0 :append (check-row field index row))
+         (list (err field "type" "must be an array"))))
+    (t (check-many field value))))
 
 (defun check-many (field value)
   (if (field-many-p field)

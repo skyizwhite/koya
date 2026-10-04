@@ -223,6 +223,68 @@
     },
   });
 
+  koya.repeater = (url) => ({
+    _add(select) {
+      if (select.value) this.$get(url, { kind: select.value });
+    },
+  });
+
+  koya.rowAdded = (row) => changed(row);
+
+  const rowOf = (el) => el.closest("[data-row]");
+
+  koya.moveRow = (button, step) => {
+    const row = rowOf(button);
+    const other = step < 0 ? row.previousElementSibling : row.nextElementSibling;
+    if (!other) return;
+    if (step < 0) other.before(row);
+    else other.after(row);
+    button.focus();
+    changed(row);
+  };
+
+  koya.removeRow = (button) => {
+    const row = rowOf(button);
+    const list = row.parentElement;
+    row.remove();
+    changed(list);
+  };
+
+  koya.sortable = (list) => {
+    let dragged = null;
+    list.addEventListener("pointerdown", (event) => {
+      const handle = event.target.closest?.("[data-drag-handle]");
+      if (handle) rowOf(handle).draggable = true;
+    });
+    document.addEventListener("pointerup", () => {
+      if (dragged) return;
+      for (const row of list.querySelectorAll(":scope > [draggable='true']")) row.draggable = false;
+    });
+    list.addEventListener("dragstart", (event) => {
+      const row = event.target.closest?.("[data-row]");
+      if (!row || !row.draggable || row.parentElement !== list) return;
+      dragged = row;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", "");
+      dragged.classList.add("opacity-50");
+    });
+    list.addEventListener("dragover", (event) => {
+      const over = event.target.closest?.("[data-row]");
+      if (!dragged || !over || over === dragged || over.parentElement !== list) return;
+      event.preventDefault();
+      const box = over.getBoundingClientRect();
+      if (event.clientY < box.top + box.height / 2) over.before(dragged);
+      else over.after(dragged);
+    });
+    list.addEventListener("dragend", () => {
+      if (!dragged) return;
+      dragged.classList.remove("opacity-50");
+      dragged.draggable = false;
+      changed(dragged);
+      dragged = null;
+    });
+  };
+
   koya.mediaPicker = (dialog, url) => ({
     _onpick: null,
     _open(onpick) {
