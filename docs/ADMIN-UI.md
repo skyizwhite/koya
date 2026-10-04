@@ -158,7 +158,9 @@ All three are in the URL, so the list as you are reading it is a link.
 ### Doing it to several at once
 
 A checkbox per row, and one in the header for the whole page. Tick any and a
-bar appears with **Publish**, **Unpublish** and **Delete**; each asks first.
+bar appears below the table with **Publish**, **Unpublish** and **Delete**; each
+asks first. No row moves for it, and while the table runs past the bottom of the
+screen the bar stays there, in reach.
 Filter first and select the page: *status = draft*, select all, Publish.
 
 Each content goes through the same path a single one takes, so validation and

@@ -180,24 +180,30 @@
              (bulk-contents :space space :model model :op op
                             :q (or (getf state :search-text) "") :status (or (getf state :status) "")
                             :sort (or (getf state :sort-key) "") :page (getf state :page)))
-           (action (op class icon label title message)
+           (action (op class icon label title message &key icon-only-narrow)
              (let ((dialog (format nil "confirm-bulk-~a" op)))
                (hsx (<> (button :type "button" :class class :commandfor dialog :command "show-modal"
-                          (~icon :name icon) label)
+                                :aria-label (and icon-only-narrow label)
+                          (~icon :name icon)
+                          (if icon-only-narrow
+                              (hsx (span :class "hidden sm:inline" label))
+                              label))
                         (~confirm-dialog :id dialog :title title :message message
                           (button :type "button" :class class :commandfor dialog :command "close"
                                   :nm-bind (on-click (url op) :data "{ id: _chosen }")
                             (~icon :name icon) label)))))))
     (hsx
      (div :hidden t :nm-bind "{ hidden: () => !_count() }"
-          :class "mb-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel px-4 py-2 text-sm"
-       (span :class "mr-2 text-muted" :nm-bind "{ textContent: () => `${_count()} selected` }" "0 selected")
-       (action "publish" "btn" :publish "Publish" "Publish contents"
-               "Publish the selected contents? The site shows each of them as it is now.")
-       (action "unpublish" "btn" :unpublish "Unpublish" "Unpublish contents"
-               "Unpublish the selected contents? They come off the site and stay here as drafts.")
-       (action "delete" "btn btn-danger" :delete "Delete" "Delete contents"
-               "Delete the selected contents? This cannot be undone.")))))
+          :class "sticky bottom-4 z-20 mt-3 flex flex-col gap-2 rounded-md border border-line bg-panel px-4 py-2 text-sm shadow-lg sm:flex-row sm:items-center sm:gap-4"
+       (span :class "text-muted" :nm-bind "{ textContent: () => `${_count()} selected` }" "0 selected")
+       (div :class "flex flex-1 items-center justify-between gap-2"
+         (div :class "flex items-center gap-2"
+           (action "publish" "btn" :publish "Publish" "Publish contents"
+                   "Publish the selected contents? The site shows each of them as it is now.")
+           (action "unpublish" "btn" :unpublish "Unpublish" "Unpublish contents"
+                   "Unpublish the selected contents? They come off the site and stay here as drafts."))
+         (action "delete" "btn btn-danger" :delete "Delete" "Delete contents"
+                 "Delete the selected contents? This cannot be undone." :icon-only-narrow t))))))
 
 (defun read-state (params model)
   (let ((status (let ((s (param params "status"))) (and (member s +statuses+ :test #'equal) s))))
@@ -236,7 +242,6 @@
                                     ((not (blank-p status)) "No contents with this status.")
                                     (t "No contents yet."))))
            (hsx (form :nm-data "...koya.bulk(this)"
-                  (~bulk-bar :space space :model model-name :state state)
                   (div :class "overflow-x-auto rounded-md border border-line bg-panel"
                     (table :class "w-full text-sm"
                       (thead (tr :class "border-b border-line text-left text-muted"
@@ -263,7 +268,8 @@
                                    (a :href (content-url space model-name (content-id content))
                                       :class "after:absolute after:inset-0"
                                       :aria-label (format nil "Open ~a" (content-label content model))
-                                     "›")))))))))))
+                                     "›"))))))))
+                  (~bulk-bar :space space :model model-name :state state))))
        (~pager :page page :pages pages
                :href (lambda (n) (list-url space model-name :search-text search-text :status status
                                                             :sort-key (getf state :sort-key) :page n))
