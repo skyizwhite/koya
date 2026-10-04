@@ -267,9 +267,18 @@ published data of the model's other contents (`unique`). A blank `slug` is fille
 from its `from` field before validation.
 
 A `custom` value is there when an object is given, `{}` included, and absent
-when the key is missing or `null`; what the object holds does not decide it. A
-`required` field inside a custom field is required whenever the object is there, and a `boolean` field's `default` inside applies when the object is
-given.
+when the key is missing or `null`; what the object holds does not decide it.
+`required` says two things, one on each side of the object:
+
+| `required` on | means |
+|---|---|
+| the `custom` field | the object is always there; on its own it asks nothing of what is inside |
+| a field inside the custom field | whenever the object is there, that field has a value |
+
+So a custom field that must be filled in is a `required` custom field with
+`required` fields inside, and one that may be left out but asks for its fields
+once given is a custom field without `required`, with `required` fields inside.
+A `boolean` field's `default` inside applies when the object is given.
 
 Validation failures come back as `422 validation_failed` with
 `details: [{"field", "code", "message"}, …]`.
