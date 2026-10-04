@@ -155,6 +155,9 @@ far, `(koya-sdk:clear-schema)` empties the registry, and
 
 - Every type also takes `:was`, which names the field this one was renamed from —
   see [Renaming a model or a field](#renaming-a-model-or-a-field).
+- Every type also takes `:help`, a non-empty string the editor shows under the
+  field's name to say what it expects, e.g. `(cover :media :help "1200x630")`.
+  Changing it changes nothing stored.
 - `:options` takes strings or symbols, which are downcased; `:model` and `:from`
   take a symbol or a string too.
 - `:model` names another model of the same space; `:from` names a `:text` or

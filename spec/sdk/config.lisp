@@ -18,7 +18,7 @@
     (title        :text :required t :max-length 100)
     (tags         :reference :model tag :many t)
     (category     :select :options ("news" "tech"))
-    (event-at :datetime))
+    (event-at :datetime :help "When the event starts"))
   (defmodel tag (:kind :list :label name)
     (name :text :required t))
   (defmodel about (:kind :object
@@ -41,7 +41,8 @@
     (ok (= (field-option (model-field blog "title") :max-length) 100))
     (ok (string= (field-option (model-field blog "tags") :model) "tag"))
     (ok (equal (field-option (model-field blog "category") :options) '("news" "tech")))
-    (ok (eq (field-type (model-field blog "eventAt")) :datetime))))
+    (ok (eq (field-type (model-field blog "eventAt")) :datetime))
+    (ok (string= (field-option (model-field blog "eventAt") :help) "When the event starts"))))
 
 (deftest redefinition
   (defmodel blog (:kind :list) (title :text))

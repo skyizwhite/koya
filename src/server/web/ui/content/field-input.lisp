@@ -106,6 +106,8 @@
          (field-name field)
          (span :class "ml-2 text-xs font-normal text-muted" (string-downcase (symbol-name type)))
          (when (field-required-p field) (hsx (span :class "ml-1 text-danger" "*"))))
+       (when (field-option field :help)
+         (hsx (p :id (format nil "~a-help" name) :class "text-xs text-muted" (field-option field :help))))
        (case type
          ((:text :slug)
           (hsx (input :type "text" :id id :name name :value string :class "input")))

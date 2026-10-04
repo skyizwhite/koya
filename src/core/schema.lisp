@@ -82,7 +82,7 @@
     (:reference :required :model :many)
     (:slug      :required :from :unique :pattern)))
 
-(defparameter *universal-options* '(:was))
+(defparameter *universal-options* '(:was :help))
 
 (defun field-type-p (type)
   (and (assoc type *field-types*) t))
@@ -139,6 +139,8 @@
        (unless (slug-name-p value) (bad "a model name")))
       (:from
        (unless (field-name-p value) (bad "a field name")))
+      (:help
+       (unless (and (stringp value) (plusp (length value))) (bad "a non-empty string")))
       (:was
        (unless (field-name-p value) (bad "a field name"))
        (when (member value +system-fields+ :test #'string=)

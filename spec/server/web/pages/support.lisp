@@ -34,7 +34,7 @@
                                  (make-field :labels :select :options '("a" "b") :many t)
                                  (make-field :count :number)
                                  (make-field :when :datetime)
-                                 (make-field :cover :media)
+                                 (make-field :cover :media :help "1200x630, shown when the post is shared")
                                  (make-field :related :reference :model "blog" :many t))
               :label :title
               :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
