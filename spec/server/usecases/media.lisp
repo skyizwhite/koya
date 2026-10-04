@@ -221,3 +221,19 @@
     (ok (null (find-space "gone")))
     (ok (null (find-media "gone" (media-id media))))
     (ok (null (probe-file (media-path media))))))
+
+(deftest a-media-among-several-is-in-use
+  (replace-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
+                                                                                     (make-field :photos :media :many t))))))
+  (unwind-protect
+       (let* ((a (store-upload "website" (png-bytes) :filename "a.png"))
+              (b (store-upload "website" (png-bytes) :filename "b.png")))
+         (create "website" (find-model "website" "blog") (parse-json (format nil "{\"title\": \"x\", \"photos\": [\"~a\", \"~a\"]}" (media-id a) (media-id b))))
+         (ok (= (length (media-references "website" (media-id b))) 1) "each one of them is a use")
+         (ok (= (gethash (media-id a) (media-reference-counts "website" (list (media-id a)))) 1) "and the library counts it")
+         (ok (equal "in_use" (handler-case (progn (remove-media b) nil) (conflict (e) (koya-error-code e))))))
+    (exec "DELETE FROM contents")
+    (replace-schema "website"
+                    (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
+                                                                              (make-field :cover :media)
+                                                                              (make-field :body :richtext))))))))

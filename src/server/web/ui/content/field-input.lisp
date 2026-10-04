@@ -94,6 +94,34 @@
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
              (~icon :name :close) "Clear")))))))
 
+(defcomp ~media-entry (&key name id media)
+  (hsx
+   (li :class "w-28 space-y-1" :data-row t
+     (img :src (if media (media-url media :absolute nil) "") :alt (if media (media-alt media) "")
+          :data-drag-handle t :draggable "false"
+          :class "h-28 w-28 cursor-move rounded-md border border-line bg-panel object-contain")
+     (div :class "truncate text-xs text-muted" :data-media-name t
+          :title (cond (media (media-filename media)) (id (format nil "~a (missing)" id)) (t ""))
+       (cond (media (media-filename media)) (id (format nil "~a (missing)" id)) (t "")))
+     (div :class "flex gap-1"
+       (button :type "button" :class "btn btn-icon py-1" :aria-label "Move image left" :data-action "left"
+         (~icon :name :prev))
+       (button :type "button" :class "btn btn-icon py-1" :aria-label "Move image right" :data-action "right"
+         (~icon :name :next))
+       (button :type "button" :class "btn btn-icon py-1" :aria-label "Remove image" :data-action "remove"
+         (~icon :name :close)))
+     (input :type "hidden" :name name :value (or id "")))))
+
+(defcomp ~media-list-control (&key name entries)
+  (hsx
+   (div :class "space-y-2" :nm-data "...koya.mediaList(this)"
+     (ul :id name :class "flex flex-wrap gap-3 empty:hidden" :data-media-list t :data-sort-axis "x"
+         :nm-bind "{ oninit: () => koya.sortable(this) }"
+       (loop :for (id . media) :in entries :collect (hsx (~media-entry :name name :id id :media media))))
+     (template (~media-entry :name name))
+     (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add() }"
+       (~icon :name :media) "Add images"))))
+
 (defcomp ~field-error (&key field parent error)
   (hsx (p :id (format nil "~a-error" (field-param-name field parent)) :class "text-xs text-danger" :hidden (null error) error)))
 
@@ -202,6 +230,10 @@
          (:reference
           (hsx (~reference-select :field field :parent parent :value value :references references)))
          (:media
-          (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media)))
+          (if (field-many-p field)
+              (hsx (~media-list-control :name name
+                                        :entries (and (present-p value) (vectorp value) (not (stringp value))
+                                                      (map 'list (lambda (id) (cons id (cdr (assoc id media :test #'equal)))) value))))
+              (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media))))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))
        (~field-error :field field :parent parent :error error)))))

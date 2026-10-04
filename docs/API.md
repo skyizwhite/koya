@@ -151,7 +151,8 @@ A content is its fields plus the system fields:
   `draftKey` too. A referenced content that is missing or unpublished drops out
   of a `many` field and becomes `null` in a single one.
 - **Media** fields are always expanded to the media object, with an absolute
-  `url`; one whose file is gone is `null`.
+  `url`; one whose file is gone is `null`, and drops out of a `many` field, whose
+  media keep their order.
 - **Rich text** is HTML whose `/media/` sources are rewritten to absolute URLs,
   so it renders on any site.
 - A **custom field** is an object of its fields' values, and the rules above

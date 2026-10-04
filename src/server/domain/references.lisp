@@ -71,8 +71,9 @@
                  (let ((value (gethash (field-name field) data)))
                    (if inner
                        (some-inside (lambda (entries v) (mentions-p entries v id)) field inner value)
-                       (and (stringp value)
-                            (if (eq (field-type field) :media) (string= value id) (search id value)))))))
+                       (typecase value
+                         (string (if (eq (field-type field) :media) (string= value id) (search id value)))
+                         (vector (and (eq (field-type field) :media) (find id value :test #'equal) t)))))))
              fields)))
 
 (defun data-mentioned-ids (fields data ids)

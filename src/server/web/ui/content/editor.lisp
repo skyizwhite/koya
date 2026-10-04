@@ -44,8 +44,10 @@
 (defun new-p (id) (string= id "new"))
 
 (defun media-for (space field value)
-  (and (eq (field-type field) :media) (stringp value) (plusp (length value))
-       (find-media space value)))
+  (when (eq (field-type field) :media)
+    (cond ((and (stringp value) (plusp (length value))) (find-media space value))
+          ((and (vectorp value) (not (stringp value)))
+           (loop :for id :across value :when (stringp id) :collect (cons id (find-media space id)))))))
 
 (defun field-error (errors name)
   (let ((e (find name errors :key (lambda (e) (getf e :field)) :test #'string=)))

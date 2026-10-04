@@ -160,7 +160,7 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
 | `:date` | `:required` | `"YYYY-MM-DD"` |
 | `:datetime` | `:required` | ISO 8601 with a zone, e.g. `"2026-09-20T10:00:00.000Z"`, kept to the minute in UTC |
 | `:select` | `:required` `:options` `:many` | one of `:options`, or an array of them |
-| `:media` | `:required` | media id (expanded to an object by the delivery API) |
+| `:media` | `:required` `:many` | media id, or an array of them with `:many` (expanded to objects by the delivery API) |
 | `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |
 | `:slug` | `:required` `:from` `:unique` `:pattern` | lowercase-hyphen string |
 | `:custom` | `:required` `:custom-field` | an object of the custom field's fields |

@@ -1275,6 +1275,7 @@ components:
         was: { $ref: "#/components/schemas/FieldName" }
         help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
+        many: { type: boolean, description: "An array of media ids, kept in their order; delivered as media objects, a file that is gone dropping out" }
 
     ReferenceField:
       type: object

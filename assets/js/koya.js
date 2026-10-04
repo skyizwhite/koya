@@ -268,12 +268,21 @@
       event.dataTransfer.setData("text/plain", "");
       dragged.classList.add("opacity-50");
     });
+    const across = list.dataset.sortAxis === "x";
     list.addEventListener("dragover", (event) => {
+      if (!dragged) return;
       const over = event.target.closest?.("[data-row]");
-      if (!dragged || !over || over === dragged || over.parentElement !== list) return;
+      if (!over || over.parentElement !== list) {
+        if (event.target !== list) return;
+        event.preventDefault();
+        if (list.lastElementChild !== dragged) list.append(dragged);
+        return;
+      }
       event.preventDefault();
+      if (over === dragged) return;
       const box = over.getBoundingClientRect();
-      if (event.clientY < box.top + box.height / 2) over.before(dragged);
+      const before = across ? event.clientX < box.left + box.width / 2 : event.clientY < box.top + box.height / 2;
+      if (before) over.before(dragged);
       else over.after(dragged);
     });
     list.addEventListener("dragend", () => {
@@ -287,22 +296,73 @@
 
   koya.mediaPicker = (dialog, url) => ({
     _onpick: null,
-    _open(onpick) {
-      this._onpick = onpick;
+    _many: false,
+    _chosen: [],
+    _open(detail) {
+      this._many = typeof detail !== "function";
+      this._onpick = this._many ? detail.onpick : detail;
+      this._chosen = [];
       this.$get(url);
       dialog.showModal();
     },
     _close() {
       this._onpick = null;
+      this._chosen = [];
       dialog.close();
+    },
+    _has(id) {
+      return this._chosen.some((item) => item.id === id);
     },
     _pick(card) {
       const item = { id: card.pickId, url: card.pickUrl, alt: card.pickAlt, name: card.pickName };
+      if (this._many) {
+        this._chosen = this._has(item.id)
+          ? this._chosen.filter((chosen) => chosen.id !== item.id)
+          : [...this._chosen, item];
+        return;
+      }
       const onpick = this._onpick;
       this._close();
       onpick?.(item);
     },
+    _done() {
+      const onpick = this._onpick;
+      const chosen = this._chosen;
+      this._close();
+      onpick?.(chosen);
+    },
   });
+
+  koya.mediaList = (el) => {
+    const list = el.querySelector("[data-media-list]");
+    const template = el.querySelector("template");
+    const add = (item) => {
+      const entry = template.content.firstElementChild.cloneNode(true);
+      const img = entry.querySelector("img");
+      img.src = item.url;
+      img.alt = item.alt;
+      entry.querySelector("[data-media-name]").textContent = item.name;
+      entry.querySelector("[data-media-name]").title = item.name;
+      entry.querySelector("input").value = item.id;
+      list.append(entry);
+    };
+    list.addEventListener("click", (event) => {
+      const button = event.target.closest?.("[data-action]");
+      if (!button) return;
+      if (button.dataset.action === "remove") koya.removeRow(button);
+      else koya.moveRow(button, button.dataset.action === "left" ? -1 : 1);
+    });
+    return {
+      _add() {
+        pickMedia({
+          onpick: (items) => {
+            items.forEach(add);
+            if (items.length) changed(list);
+          },
+        });
+      },
+    };
+  };
 
   koya.mediaField = (file) => ({
     _id: file.id,
