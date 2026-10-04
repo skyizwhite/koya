@@ -67,11 +67,12 @@ const { contents, totalCount, offset, limit } = await res.json();
 | `offset` | default 0; above 2^63−1 answers `400 bad_query` |
 | `orders` | comma-separated field names, `-` for descending: `-publishedAt,title`. Default: newest published first |
 | `filters` | see below |
+| `q` | search: the text of the model's `text`, `textarea`, `slug` and `richtext` fields contains it, or it is a content's whole id. Combined with `filters`, both apply |
 | `include` | reference fields to embed, dotted for nesting: `tags,author.team` |
 | `fields` | keys to keep in each content: `id,title` |
 | `draftKey` | on one content, serves its draft instead — for previews |
 
-`limit`, `offset`, `orders` and `filters` apply to list models; an object model
+`limit`, `offset`, `orders`, `filters` and `q` apply to list models; an object model
 has one content and ignores them.
 
 **Filters** are `field[operator]value` terms joined with `[and]` and `[or]`;
@@ -90,7 +91,10 @@ category[equals]tech[or]category[equals]life
 | `less_than` `greater_than` | for numbers and dates |
 | `exists` `not_exists` | the field has a value / is blank (takes no value); a boolean always has one, `false` when missing |
 
-On a `many` field, `equals` and `contains` mean "has this value". A value for a
+On a `many` field, `equals` and `contains` mean "has this value". On a
+`richtext` field, `contains`, `not_contains` and `begins_with` read the text
+without its tags, with `&amp;` and the like as the characters they stand for, as
+`q` does. A value for a
 `number` field is a decimal of at most 64 characters, such as `42`, `-2.5` or
 `1e3`. An unknown field in `filters`, `orders` or `include`, or a number field
 given anything else, is `400 bad_query`.

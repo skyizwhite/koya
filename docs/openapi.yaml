@@ -63,7 +63,7 @@ paths:
       description: |
         For a `list` model, a page of published contents. For an `object` model,
         its single content (published, or its draft with the right `draftKey`);
-        `limit`, `offset`, `orders` and `filters` are ignored then.
+        `limit`, `offset`, `orders`, `filters` and `q` are ignored then.
       security: [{ deliveryKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -73,6 +73,7 @@ paths:
         - $ref: "#/components/parameters/orders"
         - $ref: "#/components/parameters/fields"
         - $ref: "#/components/parameters/filters"
+        - $ref: "#/components/parameters/q"
         - $ref: "#/components/parameters/include"
         - $ref: "#/components/parameters/draftKey"
       responses:
@@ -242,7 +243,7 @@ paths:
       summary: List every content of a model, drafts included, or read an object model's content
       description: |
         For a `list` model, a page of contents; takes the delivery API's `limit`,
-        `offset`, `orders` and `filters`, and filters and orders apply to the
+        `offset`, `orders`, `filters` and `q`, and they apply to the
         draft data when a content has one. For an `object` model, its content,
         both versions, and those parameters are ignored; 404 until its first
         write.
@@ -252,6 +253,7 @@ paths:
         - $ref: "#/components/parameters/offset"
         - $ref: "#/components/parameters/orders"
         - $ref: "#/components/parameters/filters"
+        - $ref: "#/components/parameters/q"
       responses:
         "200":
           description: A page of contents, or the object model's content
@@ -868,7 +870,17 @@ components:
         groups of `[and]` terms. Operators: `equals`, `not_equals`, `contains`,
         `not_contains`, `begins_with`, `exists`, `not_exists`, `less_than`,
         `greater_than`. On a `many` field, `equals` and `contains` mean "has
-        this value". Example: `title[contains]lisp[and]publishedAt[exists]`.
+        this value". On a `richtext` field, `contains`, `not_contains` and
+        `begins_with` read its text without tags. Example:
+        `title[contains]lisp[and]publishedAt[exists]`.
+    q:
+      name: q
+      in: query
+      schema: { type: string }
+      description: |
+        Search: the text of the model's `text`, `textarea`, `slug` and `richtext`
+        fields contains it (rich text without its tags), or it is a content's
+        whole id. Applies together with `filters`.
     fields:
       name: fields
       in: query

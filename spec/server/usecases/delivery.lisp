@@ -25,7 +25,8 @@
                   (make-schema :models (list (make-model "post" :list (list (make-field :title :text :required t)
                                                                            (make-field :cover :media)
                                                                            (make-field :author :reference :model "author")
-                                                                           (make-field :tags :reference :model "tag" :many t)))
+                                                                           (make-field :tags :reference :model "tag" :many t)
+                                                                           (make-field :body :richtext)))
                                              (make-model "author" :list (list (make-field :name :text)
                                                                              (make-field :avatar :media)
                                                                              (make-field :favorite :reference :model "tag")))
@@ -108,6 +109,32 @@
       (ok (refused (lambda () (delivered-one "site" (model "post") "nothing-here" (query "include" "title"))))
           "a bad query, not a missing content")
       (ok (refused (lambda () (delivered-object "site" (model "about") (query "include" "body"))))))))
+
+(deftest searching
+  (let* ((lisp (make "post" (list "title" "Lisp macros" "body" "<p>Write <strong>macros</strong> in Lisp</p>") :publish t))
+         (other (make "post" (list "title" "Other" "body" "<p>AT&amp;T and 100%</p>") :publish t)))
+    (make "post" (list "title" "Draft lisp"))
+    (flet ((found (&rest kv)
+             (sort (mapcar (lambda (d) (content-id (delivered-content d))) (delivered-list "site" (model "post") (apply #'query kv)))
+                   #'string<))
+           (ids (&rest contents) (sort (mapcar #'content-id contents) #'string<)))
+      (testing "q searches the text fields of what is published"
+        (ok (equal (found "q" "lisp") (ids lisp)) "the title, either case, and not the draft")
+        (ok (equal (found "q" "macros in") (ids lisp)) "rich text is searched as the text it reads")
+        (ok (equal (found "q" "AT&T") (ids other)) "with its character references read")
+        (ok (null (found "q" "strong")) "and not its tags")
+        (ok (equal (found "q" "100%") (ids other)))
+        (ok (null (found "q" "_")) "a LIKE wildcard is only itself")
+        (ok (equal (found "q" (content-id other)) (ids other)) "the id, whole")
+        (ok (equal (found "q" "") (ids lisp other)) "an empty q is no search"))
+      (testing "q and filters both apply"
+        (ok (null (found "q" "lisp" "filters" "title[equals]Other")))
+        (ok (equal (found "q" "and" "filters" "title[equals]Other") (ids other))))
+      (testing "a filter on rich text reads its text as well"
+        (ok (null (found "filters" "body[contains]strong")))
+        (ok (equal (found "filters" "body[contains]macros in") (ids lisp)))
+        (ok (equal (found "filters" "body[begins_with]Write") (ids lisp)))
+        (ok (equal (found "filters" "body[not_contains]strong") (ids lisp other)))))))
 
 (deftest what-is-delivered-and-what-is-not
   (let* ((live (make "post" (list "title" "Live") :publish t))

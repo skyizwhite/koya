@@ -295,6 +295,7 @@ are the same.
 | `:orders` | comma-separated field names, `-` for descending; default newest published first |
 | `:fields` | fields to keep in each content; the system fields are always kept |
 | `:filters` | see below |
+| `:q` | search the text fields, as the delivery API's `q` |
 | `:include` | reference fields to embed |
 | `:draft-key` | with `get-item` / `get-object`, serves that content's draft |
 

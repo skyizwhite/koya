@@ -150,7 +150,7 @@ confirmation when CONFIRM is true. Returns the applied changes."
 
 (defun get-list (model &key space query)
   "List published contents of MODEL. QUERY is a kebab plist (:limit :offset :orders
-:fields :filters :include). References are ids unless :include names them, e.g.
+:fields :filters :q :include). References are ids unless :include names them, e.g.
 :include \"tags\" or :include '(\"tags\" \"author.avatar\")."
   (jvalue->lisp (request :get (delivery-path space model) :query query :auth :delivery)))
 

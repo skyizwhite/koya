@@ -13,6 +13,7 @@
                "koya-spec/sdk/main"
                "koya-spec/server/domain/totp"
                "koya-spec/server/domain/image"
+               "koya-spec/server/domain/html"
                "koya-spec/server/domain/timezone"
                "koya-spec/server/domain/number"
                "koya-spec/server/domain/address"

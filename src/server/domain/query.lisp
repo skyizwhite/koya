@@ -1,7 +1,7 @@
 (defpackage #:koya-server/domain/query
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:+system-fields+)
+                #:+system-fields+ #:model-fields #:field-name #:field-type)
   (:import-from #:koya-server/domain/errors
                 #:invalid-input)
   (:import-from #:cl-ppcre
@@ -11,6 +11,8 @@
            #:parse-query
            #:query #:make-query
            #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
+           #:query-search
+           #:search-filters
            #:+system-fields+))
 (in-package #:koya-server/domain/query)
 
@@ -29,7 +31,8 @@
   orders
   filters
   fields
-  include)
+  include
+  search)
 
 (defun param (params name)
   (let ((v (cdr (assoc name params :test #'string=))))
@@ -87,4 +90,14 @@
               :orders (let ((o (param params "orders"))) (and o (parse-orders o)))
               :filters (let ((f (param params "filters"))) (and f (parse-filters f)))
               :fields (let ((f (param params "fields"))) (and f (split-csv f)))
-              :include (let ((i (param params "include"))) (and i (parse-include i)))))
+              :include (let ((i (param params "include"))) (and i (parse-include i)))
+              :search (param params "q")))
+
+(defparameter +searchable-types+ '(:text :textarea :slug :richtext))
+
+(defun search-filters (model search-text)
+  (let ((text-fields (loop :for field :in (model-fields model)
+                           :when (member (field-type field) +searchable-types+)
+                             :collect (field-name field))))
+    (cons (list (list "id" "equals" search-text))
+          (mapcar (lambda (name) (list (list name "contains" search-text))) text-fields))))

@@ -4,7 +4,7 @@
                 #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
   (:import-from #:koya-server/infra/db/content-query #:build-where #:build-order-by)
   (:import-from #:koya-server/domain/query
-                #:query-limit #:query-offset #:query-orders #:query-filters)
+                #:query-limit #:query-offset #:query-orders #:query-filters #:query-search #:search-filters)
   (:import-from #:koya-server/domain/content
                 #:make-content #:content-id #:content-published #:content-draft #:content-draft-key
                 #:content-space #:content-model
@@ -92,7 +92,9 @@
 
 (defmethod list-contents (space model schema-model query &key (status :published) only-status)
   (let ((column (data-column status)))
-    (multiple-value-bind (where-sql where-params) (build-where (query-filters query) schema-model column)
+    (multiple-value-bind (where-sql where-params)
+        (build-where (query-filters query) schema-model column
+                     :and (and (query-search query) (search-filters schema-model (query-search query))))
       (let* ((base (format nil "FROM contents WHERE space = ? AND model = ? AND ~a~@[~a~]~@[ AND ~a~]"
                            (status-clause status) (and only-status " AND status = ?") where-sql))
              (params (append (list space model) (and only-status (list only-status)) where-params))

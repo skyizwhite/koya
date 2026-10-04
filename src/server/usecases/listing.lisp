@@ -21,15 +21,6 @@
 
 (defun empty-p (string) (or (null string) (string= string "")))
 
-(defparameter +searchable-types+ '(:text :textarea :slug :richtext))
-
-(defun search-filters (model search-text)
-  (let ((text-fields (loop :for field :in (model-fields model)
-                           :when (member (field-type field) +searchable-types+)
-                             :collect (field-name field))))
-    (cons (list (list "id" "equals" search-text))
-          (mapcar (lambda (name) (list (list name "contains" search-text))) text-fields))))
-
 (defun sortable-p (model name)
   (and (not (empty-p name))
        (or (model-field model name)
@@ -48,7 +39,7 @@
   (let ((query (make-query :limit page-size
                            :offset (* (1- page) page-size)
                            :orders (sort-orders sort-name sort-direction)
-                           :filters (unless (empty-p search-text) (search-filters model search-text)))))
+                           :search (unless (empty-p search-text) search-text))))
     (multiple-value-bind (contents total)
         (list-contents space (model-name model) model query :status :all :only-status status)
       (values contents total (max 1 (ceiling total page-size))))))
