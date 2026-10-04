@@ -193,7 +193,7 @@ by its model's `label` field, or by its id.
 | `select` | dropdown, or checkboxes when `many` |
 | `reference` | dropdown, or chips plus a dropdown when `many` |
 | `media` | thumbnail with **Choose…** (opens the media picker) and **Clear** |
-| `custom` | a box of the controls of the custom field's fields, under a heading like any field's: its name, `custom`, a red `*` when required, and its help beside them |
+| `custom` | a box of the controls of the custom field's fields, under a heading like any field's: its name, `custom`, a red `*` when required, and its help beside them. One that is not required starts absent with an **Add** button and, once there, has a **Remove** button; only one that is there is saved, and a box left unchecked inside it is `false` |
 
 - A reference dropdown lists every content of the target model, drafts included,
   by its label. A reference to a content that no longer exists is kept and shown

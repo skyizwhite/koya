@@ -5,7 +5,7 @@
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
-                #:model-name #:model-preview-url #:model-public-url #:field-fields)
+                #:model-name #:model-preview-url #:model-public-url #:field-fields #:field-option)
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy
@@ -54,9 +54,11 @@
 (defcomp ~editor-field (&key space field data errors)
   (let ((value (and data (gethash (field-name field) data))))
     (if (eq (field-type field) :custom)
-        (hsx (~custom-input :field field :error (field-error errors (field-name field))
+        (hsx (~custom-input :field field :present (hash-table-p value) :error (field-error errors (field-name field))
                (loop :for inner :in (field-fields field) :collect
-                 (let ((inner-value (and (hash-table-p value) (gethash (field-name inner) value))))
+                 (let ((inner-value (if (hash-table-p value)
+                                        (gethash (field-name inner) value)
+                                        (and (eq (field-type inner) :boolean) (field-option inner :default) t))))
                    (hsx (~field-input :field inner :parent field :value inner-value
                                       :references (reference-options space inner)
                                       :media (media-for space inner inner-value)

@@ -120,7 +120,7 @@ the same name, so the schema can be edited live from the REPL.
 - **`(defcustomfield name &body fields)`** — a set of fields a model uses as one
   field of type `:custom`, its value an object of these fields. The fields are
   written as in `defmodel`, but none is a `:slug` or a `:custom`, nor `:unique`
-  or `:was`, and they are not `:boolean`s alone. Its name follows the field rule below.
+  or `:was`. Its name follows the field rule below.
 - **`:was`**, on the model or on a field, names what it used to be called, so
   that a deploy renames it instead of dropping it — see
   [Renaming a model or a field](#renaming-a-model-or-a-field).

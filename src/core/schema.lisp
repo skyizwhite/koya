@@ -214,8 +214,6 @@
     (let ((names (mapcar #'field-name fields)))
       (when (/= (length names) (length (remove-duplicates names :test #'string=)))
         (fail "custom field ~s has duplicate field names" name)))
-    (when (every (lambda (field) (eq (field-type field) :boolean)) fields)
-      (fail "custom field ~s holds booleans alone; use boolean fields instead" name))
     (dolist (field fields)
       (when (member (field-type field) '(:slug :custom))
         (fail "custom field ~s: a ~(~a~) field cannot be inside a custom field" name (field-type field)))

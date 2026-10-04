@@ -203,8 +203,7 @@
              (ok (= status 200))
              (ok (every (lambda (c) (null (jget c "misfits"))) (jget json "changes"))
                  "a custom field made required is checked with what the same deploy removes from it gone"))
-           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject))))
-           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "image" "Only"))))
+           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject)))
            (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
                                                      :body (schema->jobject (cards (make-field :title :text :required t)))
                                                      :query "force=true")

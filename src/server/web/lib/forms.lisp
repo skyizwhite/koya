@@ -3,7 +3,6 @@
   (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p #:field-fields)
   (:import-from #:koya-core/json
                 #:json-null)
-  (:import-from #:koya-core/validate #:blank-for-field-p)
   (:import-from #:cl-ppcre
                 #:split)
   (:import-from #:koya-server/domain/number #:parse-decimal)
@@ -39,9 +38,8 @@
              (raw (form-value params name)))
         (case (field-type field)
           (:custom
-           (let ((inner (form->fields (field-fields field) params field)))
-             (unless (blank-for-field-p field inner)
-               (setf (gethash (field-name field) data) inner))))
+           (when raw
+             (setf (gethash (field-name field) data) (form->fields (field-fields field) params field))))
           (:boolean
            (setf (gethash (field-name field) data) (and raw t)))
           (:number

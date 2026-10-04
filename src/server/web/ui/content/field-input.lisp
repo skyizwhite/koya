@@ -95,19 +95,35 @@
 (defcomp ~field-error (&key field parent error)
   (hsx (p :id (format nil "~a-error" (field-param-name field parent)) :class "text-xs text-danger" :hidden (null error) error)))
 
-(defcomp ~custom-input (&key field error children)
-  (let ((name (field-param-name field)))
+(defcomp ~custom-input (&key field present error children)
+  (let* ((name (field-param-name field))
+         (required (field-required-p field))
+         (on (or required present)))
     (hsx
-     (div :class "space-y-1.5"
-       (div :id (format nil "~a-label" name) :class "label"
-         (field-name field)
-         (span :class "ml-2 text-xs font-normal text-muted" "custom")
-         (when (field-required-p field) (hsx (span :class "ml-1 text-danger" "*")))
-         (when (field-option field :help)
-           (hsx (span :id (format nil "~a-help" name) :class "ml-3 text-xs font-normal text-muted"
-                  (field-option field :help)))))
+     (div :class "space-y-1.5" :nm-data (format nil "...koya.customField(~:[false~;true~])" on)
+       (div :class "flex items-center justify-between gap-3"
+         (div :id (format nil "~a-label" name) :class "label"
+           (field-name field)
+           (span :class "ml-2 text-xs font-normal text-muted" "custom")
+           (when required (hsx (span :class "ml-1 text-danger" "*")))
+           (when (field-option field :help)
+             (hsx (span :id (format nil "~a-help" name) :class "ml-3 text-xs font-normal text-muted"
+                    (field-option field :help)))))
+         (unless required
+           (hsx (button :type "button" :class "btn" :hidden (not on)
+                        :nm-bind "{ hidden: () => !_on, onclick: () => _remove() }"
+                  (~icon :name :close) (format nil "Remove ~a" (field-name field))))))
+       (input :type "hidden" :name name :value "on" :disabled (not on) :nm-ref "marker"
+              :nm-bind "{ disabled: () => !_on }")
+       (unless required
+         (hsx (div :class "rounded-md border border-dashed border-line p-4" :hidden on
+                   :nm-bind "{ hidden: () => _on }"
+                (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add() }"
+                  (~icon :name :plus) (format nil "Add ~a" (field-name field))))))
        (fieldset :id name :aria-labelledby (format nil "~a-label" name)
                  :class "space-y-4 rounded-md border border-line p-4"
+                 :hidden (not on) :disabled (not on)
+                 :nm-bind "{ hidden: () => !_on, disabled: () => !_on }"
          children)
        (~field-error :field field :error error)))))
 

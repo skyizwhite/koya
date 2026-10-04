@@ -181,19 +181,10 @@
   (json-equal (booleans-filled model a) (booleans-filled model b)))
 
 (defun default-data (model)
-  (fields-default-data (model-fields model)))
-
-(defun fields-default-data (fields)
   (let ((data (make-hash-table :test 'equal)))
-    (dolist (field fields data)
-      (case (field-type field)
-        (:boolean
-         (when (field-option field :default)
-           (setf (gethash (field-name field) data) t)))
-        (:custom
-         (let ((inner (fields-default-data (field-fields field))))
-           (when (plusp (hash-table-count inner))
-             (setf (gethash (field-name field) data) inner))))))))
+    (dolist (field (model-fields model) data)
+      (when (and (eq (field-type field) :boolean) (field-option field :default))
+        (setf (gethash (field-name field) data) t)))))
 
 (defun fill-defaults (model data)
   (fill-field-defaults (model-fields model) data))

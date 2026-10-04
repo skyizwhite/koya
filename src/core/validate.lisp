@@ -40,14 +40,7 @@
 (defun blank-for-field-p (field value)
   (or (json-null-p value)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
-      (and (field-many-p field) (json-array-p value) (zerop (length value)))
-      (and (eq (field-type field) :custom) (hash-table-p value)
-           (loop :for key :being :the :hash-keys :of value :using (:hash-value inner-value)
-                 :for inner := (find key (field-fields field) :key #'field-name :test #'string=)
-                 :always (and inner
-                              (if (eq (field-type inner) :boolean)
-                                  (member inner-value '(t nil null))
-                                  (and inner-value (blank-value-p inner-value))))))))
+      (and (field-many-p field) (json-array-p value) (zerop (length value)))))
 
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
