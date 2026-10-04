@@ -144,7 +144,7 @@ it is stale.
 | `schema_version` | which migrations have run |
 | `spaces` | a space, its webhooks and its webhook secret |
 | `models` | a deployed model, as the schema document's own JSON |
-| `contents` | every model's contents; `published` and `draft` are JSON |
+| `contents` | every model's contents; `published` and `draft` are JSON, and `published_text` and `draft_text` hold the text of their string values, tags taken out, for searching rich text |
 | `content_revisions` | what each write left a content with, kept until the content is deleted |
 | `schema_deploys` | what each deploy changed |
 | `delivery_keys` `management_keys` | keys, as SHA-256 |

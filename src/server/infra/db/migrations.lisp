@@ -4,6 +4,8 @@
                 #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
   (:import-from #:koya-core/time
                 #:now-iso)
+  (:import-from #:koya-core/json #:parse-json)
+  (:import-from #:koya-server/infra/db/contents #:text-column)
   (:export #:migrate
            #:current-version))
 (in-package #:koya-server/infra/db/migrations)
@@ -200,7 +202,17 @@
      "ALTER TABLE contents_by_space RENAME TO contents"
      "ALTER TABLE content_revisions_by_space RENAME TO content_revisions"
      "CREATE INDEX contents_by_model ON contents (space, model, status, published_at)"
-     "CREATE INDEX content_revisions_by_content ON content_revisions (space, content_id, id DESC)")))
+     "CREATE INDEX content_revisions_by_content ON content_revisions (space, content_id, id DESC)")
+    (14
+     "ALTER TABLE contents ADD COLUMN published_text TEXT"
+     "ALTER TABLE contents ADD COLUMN draft_text TEXT"
+     fill-content-texts)))
+
+(defun fill-content-texts ()
+  (flet ((text (json) (and json (text-column (parse-json json)))))
+    (dolist (row (fetch "SELECT rowid AS r, published, draft FROM contents"))
+      (exec "UPDATE contents SET published_text = ?, draft_text = ? WHERE rowid = ?"
+            (text (col row "published")) (text (col row "draft")) (col row "r")))))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))
@@ -211,7 +223,8 @@
 
 (defun apply-migration (version statements &key check-keys)
   (with-db-transaction
-    (dolist (sql statements) (exec sql))
+    (dolist (step statements)
+      (if (stringp step) (exec step) (funcall step)))
     (when (and check-keys (fetch "PRAGMA foreign_key_check"))
       (error "Migration ~a leaves rows whose foreign keys point nowhere" version))
     (exec "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)" version (now-iso))))

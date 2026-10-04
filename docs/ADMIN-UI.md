@@ -142,7 +142,7 @@ sort. The search goes as the typing stops and the status as it is picked; there
 is no button.
 
 - The search matches the model's text fields — `text`, `textarea`, `slug` and
-  `richtext` — and a whole content id. It looks at what the table shows: the
+  `richtext`, whose text is searched without its tags — and a whole content id. It looks at what the table shows: the
   draft, when there is one.
 - The status filter offers the three badges: `draft`, `published` and
   `published+draft`.

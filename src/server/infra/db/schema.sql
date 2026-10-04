@@ -19,7 +19,7 @@ CREATE TABLE "contents" (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   published_at TEXT,
-  revised_at TEXT,
+  revised_at TEXT, published_text TEXT, draft_text TEXT,
   PRIMARY KEY (space, id),
   FOREIGN KEY (space, model) REFERENCES models(space, name) ON DELETE CASCADE);
 CREATE INDEX contents_by_model ON contents (space, model, status, published_at);

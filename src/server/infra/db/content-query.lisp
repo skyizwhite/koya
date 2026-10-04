@@ -38,11 +38,14 @@
            (cond ((string= value "true") 1) ((string= value "false") 0) (t (bad-query "~a expects true or false" name))))
           (t value))))
 
-(defun term-sql (term model column)
+(defun term-sql (term model column text-column)
   (destructuring-bind (name op value) term
     (let* ((field (model-field model name))
            (many (and field (field-many-p field)))
-           (expr (field-expr name model column)))
+           (expr (field-expr name model column))
+           (text (if (and field text-column (eq (field-type field) :richtext))
+                     (format nil "json_extract(~a, '$.~a')" text-column name)
+                     expr)))
       (flet ((cmp (operator)
                (values (format nil "~a ~a ?" expr operator) (list (coerce-value name model value)))))
         (cond
@@ -56,11 +59,11 @@
           ((string= op "greater_than") (cmp ">"))
           ((string= op "contains") (if many
                                        (values (format nil "EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ?)" expr) (list value))
-                                       (values (format nil "~a LIKE ? ESCAPE '\\'" expr) (list (format nil "%~a%" (escape-like value))))))
+                                       (values (format nil "~a LIKE ? ESCAPE '\\'" text) (list (format nil "%~a%" (escape-like value))))))
           ((string= op "not_contains") (if many
                                            (values (format nil "NOT EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ?)" expr) (list value))
-                                           (values (format nil "(~a IS NULL OR ~a NOT LIKE ? ESCAPE '\\')" expr expr) (list (format nil "%~a%" (escape-like value))))))
-          ((string= op "begins_with") (values (format nil "~a LIKE ? ESCAPE '\\'" expr) (list (format nil "~a%" (escape-like value)))))
+                                           (values (format nil "(~a IS NULL OR ~a NOT LIKE ? ESCAPE '\\')" text text) (list (format nil "%~a%" (escape-like value))))))
+          ((string= op "begins_with") (values (format nil "~a LIKE ? ESCAPE '\\'" text) (list (format nil "~a%" (escape-like value)))))
           ((string= op "exists") (values (present-sql expr many) '()))
           ((string= op "not_exists") (values (format nil "NOT ~a" (present-sql expr many)) '()))
           (t (bad-query "unknown filter operator ~s" op)))))))
@@ -71,17 +74,26 @@
           :do (when (member c '(#\% #\_ #\\)) (write-char #\\ out))
               (write-char c out))))
 
-(defun build-where (filters model column)
-  (when filters
-    (let ((group-sqls '()) (params '()))
-      (dolist (group filters)
-        (let ((term-sqls '()))
-          (dolist (term group)
-            (multiple-value-bind (sql ps) (term-sql term model column)
-              (push sql term-sqls)
-              (setf params (append params ps))))
-          (push (format nil "(~{~a~^ AND ~})" (nreverse term-sqls)) group-sqls)))
-      (values (format nil "(~{~a~^ OR ~})" (nreverse group-sqls)) params))))
+(defun groups-sql (filters model column text-column)
+  (let ((group-sqls '()) (params '()))
+    (dolist (group filters)
+      (let ((term-sqls '()))
+        (dolist (term group)
+          (multiple-value-bind (sql ps) (term-sql term model column text-column)
+            (push sql term-sqls)
+            (setf params (append params ps))))
+        (push (format nil "(~{~a~^ AND ~})" (nreverse term-sqls)) group-sqls)))
+    (values (format nil "(~{~a~^ OR ~})" (nreverse group-sqls)) params)))
+
+(defun build-where (filters model column &key and text-column)
+  (let ((sqls '()) (params '()))
+    (dolist (set (list filters and))
+      (when set
+        (multiple-value-bind (sql ps) (groups-sql set model column text-column)
+          (push sql sqls)
+          (setf params (append params ps)))))
+    (when sqls
+      (values (format nil "~{~a~^ AND ~}" (nreverse sqls)) params))))
 
 (defun build-order-by (orders model column)
   (if (null orders)
