@@ -1,7 +1,7 @@
 (defpackage #:koya-spec/core/diff
   (:use #:cl #:rove)
   (:import-from #:koya-core/schema
-                #:make-field #:make-model #:make-schema #:make-webhook)
+                #:make-field #:make-model #:make-schema #:make-webhook #:make-custom-field)
   (:import-from #:koya-core/diff
                 #:diff-schemas
                 #:destructive-changes-p
@@ -218,3 +218,54 @@
       (ok (equal (ops changes) '(:change-field-options)) "a help text is an option of its field")
       (ng (destructive-changes-p changes))
       (ng (tightened-change-p (first changes)) "and no content stops fitting for it"))))
+
+(defun with-custom (seo-fields &key (used t) (name "seo"))
+  (make-schema :custom-fields (list (make-custom-field name seo-fields))
+               :models (list (make-model "blog" :list
+                                         (append (list (make-field :title :text))
+                                                 (and used (list (make-field :meta :custom :custom-field name)))))
+                             (make-model "page" :list
+                                         (and used (list (make-field :meta :custom :custom-field name)))))))
+
+(defun seo-fields (&rest more)
+  (append (list (make-field :title :text)) more))
+
+(deftest custom-fields
+  (testing "a definition changes on its own, so a deploy keeps it even where nothing uses it"
+    (let ((changes (diff-schemas (with-custom (seo-fields) :used nil)
+                                 (with-custom (seo-fields (make-field :image :media)) :used nil))))
+      (ok (equal (ops changes) '(:change-custom-fields)))
+      (ng (destructive-changes-p changes))
+      (ok (search "customFields changed" (format-change (first changes))))))
+  (testing "a field added inside is added in every model that uses it"
+    (let ((changes (remove :change-custom-fields
+                           (diff-schemas (with-custom (seo-fields)) (with-custom (seo-fields (make-field :image :media))))
+                           :key (lambda (c) (getf c :op)))))
+      (ok (equal (mapcar (lambda (c) (list (getf c :op) (getf c :model) (getf c :field))) changes)
+                 '((:add-field "blog" "meta.image") (:add-field "page" "meta.image"))))
+      (ng (destructive-changes-p changes))
+      (ok (search "blog.meta.image (media)" (format-change (first changes))))))
+  (testing "removing or retyping one inside is destructive, there"
+    (let ((removed (diff-schemas (with-custom (seo-fields (make-field :image :media))) (with-custom (seo-fields)))))
+      (ok (member :remove-field (ops removed)))
+      (ok (destructive-changes-p removed)))
+    (let ((retyped (diff-schemas (with-custom (seo-fields)) (with-custom (list (make-field :title :textarea))))))
+      (ok (equal (remove :change-custom-fields (ops retyped)) '(:change-field-type :change-field-type)))
+      (ok (destructive-changes-p retyped))))
+  (testing "tightening one inside is tightening"
+    (let ((change (find :change-field-options
+                        (diff-schemas (with-custom (seo-fields)) (with-custom (list (make-field :title :text :required t))))
+                        :key (lambda (c) (getf c :op)))))
+      (ok (string= (getf change :field) "meta.title"))
+      (ok (tightened-change-p change))))
+  (testing "a field pointed at another custom field holds values of another type"
+    (let* ((two (lambda (target)
+                  (make-schema :custom-fields (list (make-custom-field "seo" (seo-fields))
+                                                    (make-custom-field "card" (seo-fields)))
+                               :models (list (make-model "blog" :list
+                                                         (list (make-field :meta :custom :custom-field target)))))))
+           (changes (diff-schemas (funcall two "seo") (funcall two "card"))))
+      (ok (equal (ops changes) '(:change-field-type)))
+      (ok (destructive-changes-p changes))))
+  (testing "nothing changed is no change"
+    (ng (diff-schemas (with-custom (seo-fields)) (with-custom (seo-fields))))))

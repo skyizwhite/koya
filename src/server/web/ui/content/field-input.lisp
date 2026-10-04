@@ -9,7 +9,7 @@
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/usecases/settings #:display-timezone-name)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:export #:~field-input))
+  (:export #:~field-input #:~custom-input))
 (in-package #:koya-server/web/ui/content/field-input)
 
 (defun present-p (value) (and value (not (eq value json-null))))
@@ -92,11 +92,24 @@
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
              (~icon :name :close) "Clear")))))))
 
-(defcomp ~field-error (&key field error)
-  (hsx (p :id (format nil "~a-error" (field-param-name field)) :class "text-xs text-danger" :hidden (null error) error)))
+(defcomp ~field-error (&key field parent error)
+  (hsx (p :id (format nil "~a-error" (field-param-name field parent)) :class "text-xs text-danger" :hidden (null error) error)))
 
-(defcomp ~field-input (&key field value error references media)
-  (let* ((name (field-param-name field))
+(defcomp ~custom-input (&key field error children)
+  (let ((name (field-param-name field)))
+    (hsx
+     (fieldset :id name :class "space-y-4 rounded-md border border-line p-4"
+       (legend :class "label px-1"
+         (field-name field)
+         (span :class "ml-2 text-xs font-normal text-muted" "custom")
+         (when (field-required-p field) (hsx (span :class "ml-1 text-danger" "*"))))
+       (when (field-option field :help)
+         (hsx (p :id (format nil "~a-help" name) :class "text-xs text-muted" (field-option field :help))))
+       children
+       (~field-error :field field :error error)))))
+
+(defcomp ~field-input (&key field parent value error references media)
+  (let* ((name (field-param-name field parent))
          (id name)
          (type (field-type field))
          (string (value->string field value)))
@@ -147,4 +160,4 @@
          (:media
           (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media)))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))
-       (~field-error :field field :error error)))))
+       (~field-error :field field :parent parent :error error)))))

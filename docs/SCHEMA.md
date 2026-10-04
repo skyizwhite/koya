@@ -19,6 +19,7 @@ naming the problem.
 - [Webhook](#webhook)
 - [Model](#model)
 - [Field](#field)
+- [Custom field](#custom-field)
 - [Renames](#renames)
 - [Content values](#content-values)
 - [Changes](#changes)
@@ -30,7 +31,8 @@ naming the problem.
 {
   "koyaSchema": 1,
   "webhooks": [ …webhook… ],
-  "models": [ …model… ]
+  "models": [ …model… ],
+  "customFields": [ …custom field… ]
 }
 ```
 
@@ -39,6 +41,7 @@ naming the problem.
 | `koyaSchema` | integer | must be `1` |
 | `webhooks` | array of [webhook](#webhook) | optional; labels unique |
 | `models` | array of [model](#model) | optional; names unique |
+| `customFields` | array of [custom field](#custom-field) | optional; names unique; omitted from the output when empty |
 
 The `models` order is the order the admin UI shows. A deploy to a space that does
 not exist is refused with `404 not_found`; it never makes one.
@@ -107,7 +110,7 @@ to:
 | `fields` | array of [field](#field) | optional; names unique within the model |
 | `previewUrl` | string | optional; template for the editor's *Preview draft* link, starting with `http://` or `https://` |
 | `publicUrl` | string | optional; template for the editor's *Published page* link, starting with `http://` or `https://` |
-| `label` | string | optional; a `text` or `slug` field of this model, whose value the admin UI shows for a content. Without it a content is shown by its id |
+| `label` | string | optional; a `text` or `slug` field of this model (not one inside a custom field), whose value the admin UI shows for a content. Without it a content is shown by its id |
 | `was` | string | optional; the name this model had, see [Renames](#renames) |
 
 The URL templates substitute `{CONTENT_ID}` and `{DRAFT_KEY}`. Optional keys are
@@ -149,6 +152,7 @@ take their names.
 | `media` | `required` |
 | `reference` | `required` `model` `many` |
 | `slug` | `required` `from` `unique` `pattern` |
+| `custom` | `required` `customField` |
 
 | Option | Type | Rules |
 |---|---|---|
@@ -159,6 +163,7 @@ take their names.
 | `options` | array of string | non-empty, no duplicates, no commas in an option (checked when the schema is deployed); **required** on `select` |
 | `model` | string | a model name; **required** on `reference`, and the model must exist in the same space |
 | `from` | string | a field name; **required** on `slug`, and must name a `text` or `textarea` field of the same model other than the slug itself |
+| `customField` | string | a custom field name; **required** on `custom`, and must name a [custom field](#custom-field) of the same schema |
 | `was` | string | a field name other than this one and not a system field, see [Renames](#renames) |
 | `help` | string | non-empty; shown under the field's name in the editor, to say what the field expects |
 
@@ -166,6 +171,38 @@ take their names.
 `data` does not mention it; an explicit `false` is kept. On output the
 options of a field are written in alphabetical key order, so two equal fields
 serialize identically.
+
+## Custom field
+
+A custom field is a group of fields defined once in the document's
+`customFields` and used by any number of models through a field of type
+`custom`:
+
+```json
+{
+  "name": "seo",
+  "fields": [
+    {"name": "title", "type": "text", "maxLength": 60},
+    {"name": "image", "type": "media", "help": "1200x630"}
+  ]
+}
+```
+
+| Key | Type | Rules |
+|---|---|---|
+| `name` | string | `^[a-z][a-zA-Z0-9]*$` |
+| `fields` | array of [field](#field) | at least one; names unique within the custom field |
+
+Its fields are written as a model's, with every type and its options except
+`slug` and `custom`, and without `unique`. `was` is not carried through a custom
+field: renaming one, or a field inside one, is a removal and an addition.
+
+A model uses it by name, and its field JSON holds only that name; the fields come
+from the definition:
+
+```json
+{"name": "meta", "type": "custom", "customField": "seo"}
+```
 
 ## Renames
 
@@ -222,11 +259,17 @@ boolean is `false`. Otherwise:
 | `datetime` | ISO 8601 with seconds optional and an explicit zone: `2026-09-20T10:00:00.000Z`, `2026-09-20T19:00+09:00`. Stored to the minute in UTC: seconds are dropped, so the second example is kept as `2026-09-20T10:00:00.000Z` | |
 | `select` | one of `options` (`option`) | |
 | `media` `reference` | an id: `^[A-Za-z0-9_-]{1,64}$` | |
+| `custom` | an object of its fields' values, each checked as above; an error names the path, such as `meta.title`, and a key that is not one of its fields is `unknown_field` | |
 
 A `many` field takes an array of such values (`type` when not an array). A wrong
 type is `type`. `unique` is checked by the server against both the draft and the
 published data of the model's other contents (`unique`). A blank `slug` is filled
 from its `from` field before validation.
+
+A `custom` value whose fields are all blank (or `false`) is blank itself. A
+`required` field inside a custom field is required only once the object is
+there, and a `boolean` field's `default` inside applies when the object is
+given.
 
 Validation failures come back as `422 validation_failed` with
 `details: [{"field", "code", "message"}, …]`.
@@ -252,15 +295,22 @@ the difference between the space's stored schema and the one sent as a list of
 | `remove_model` `remove_field` | something gone | **yes** |
 | `rename_model` `rename_field` | a `was` was matched, see [Renames](#renames) | no |
 | `change_kind` | a model's `kind` changed; its contents are deleted | **yes** |
-| `change_field_type` | a field's `type` changed, or the `model` a `reference` points at | **yes** |
+| `change_field_type` | a field's `type` changed, the `model` a `reference` points at, or the `customField` a `custom` field uses | **yes** |
 | `change_field_options` | a field's options changed | no; when tightened, refused while stored content does not fit, see below |
 | `change_model_options` | `previewUrl` / `publicUrl` / `label` changed | no |
 | `change_webhooks` | the space's webhooks changed | no |
+| `change_custom_fields` | the definitions in `customFields` changed | no |
 
 Options are **tightened** when they can reject content the old ones accepted:
 `required`, `unique` or `integer` turned on, `many` switched either way,
 `maxLength` or `max` lowered, `min` raised, `pattern` changed, or a value dropped
 from `options`.
+
+A custom field's definition is kept as deployed, used by a model or not. For
+every field that uses a changed custom field, the changes to the fields inside
+are listed too, as `add_field`, `remove_field`, `change_field_type` or
+`change_field_options` with the path `model.field.subfield`, and judged as at the
+top.
 
 A tightened option, or a `required` field added to a model that has contents, is
 checked against every stored published object and draft of the model (not the
@@ -273,11 +323,13 @@ changes in `details`: change those contents under the schema as it is, then
 deploy again. Stored content always fits the schema it is stored under. A
 tightened option that every stored value fits is applied without `force`.
 
-`path` is `webhooks` (the space's own), `model` or `model.field`. A `PUT` whose changes
+`path` is `webhooks` (the space's own), `customFields`, `model`, `model.field`
+or, inside a custom field, `model.field.subfield`, where a misfit's `field` is
+`field.subfield`, such as `card.title`. A `PUT` whose changes
 include a destructive one is refused with `409 destructive_changes` (the changes
 in `details`) unless `?force=true` is given. Applying a schema carries a rename
 through the stored content, and takes the values of a removed field, or of one
-whose type or target model changed, out of every published object, draft and
+whose type or target model changed (inside a custom field too), out of every published object, draft and
 revision, in the same transaction. Changing a model's `kind` makes it anew: its
 contents and their history are deleted, as if the model were removed and added
 again under the same name. A field added later under that name starts
@@ -304,7 +356,8 @@ empty.
         {"name": "slug",    "type": "slug", "from": "title", "unique": true},
         {"name": "cover",   "type": "media"},
         {"name": "content", "type": "richtext"},
-        {"name": "tags",    "type": "reference", "many": true, "model": "tag"}
+        {"name": "tags",    "type": "reference", "many": true, "model": "tag"},
+        {"name": "meta",    "type": "custom", "customField": "seo"}
       ]
     },
     {
@@ -316,6 +369,15 @@ empty.
       "name": "about",
       "kind": "object",
       "fields": [{"name": "body", "type": "richtext"}]
+    }
+  ],
+  "customFields": [
+    {
+      "name": "seo",
+      "fields": [
+        {"name": "title", "type": "text", "maxLength": 60},
+        {"name": "image", "type": "media"}
+      ]
     }
   ]
 }

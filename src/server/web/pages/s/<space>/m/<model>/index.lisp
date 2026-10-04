@@ -5,7 +5,7 @@
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
-                #:webhook-covers-p)
+                #:webhook-covers-p #:field-fields)
   (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/web/lib/target #:target-model)
@@ -87,6 +87,12 @@
     (:boolean (if value "Yes" "No"))
     (:number (if (realp value) (number->string value) (princ-to-string value)))
     (:reference (collapse-whitespace (princ-to-string (reference-label field value ref-labels))))
+    (:custom (if (hash-table-p value)
+                 (format nil "~{~a~^ · ~}"
+                         (loop :for inner :in (field-fields field)
+                               :for text := (field-preview inner value nil)
+                               :when text :collect text))
+                 (princ-to-string value)))
     (t (collapse-whitespace (princ-to-string value)))))
 
 (defun field-preview (field data ref-labels)
@@ -164,6 +170,8 @@
                  (:asc (format nil "-~a" name))
                  (:desc nil)
                  (t name))))
+    (if (eq (field-type field) :custom)
+        (hsx (th :class "py-2 pr-4 font-medium" (span :class (clsx "block truncate" (column-width field)) name)))
     (hsx
      (th :class "py-2 pr-4 font-medium"
          :aria-sort (case direction (:asc "ascending") (:desc "descending"))
@@ -173,7 +181,7 @@
          (if direction
              (hsx (span :class "shrink-0 text-accent" (if (eq direction :asc) "↑" "↓")))
              (hsx (span :class "shrink-0 opacity-50" :aria-hidden "true" "↕")))
-         (span :class "truncate" name))))))
+         (span :class "truncate" name)))))))
 
 (defcomp ~bulk-bar (&key space model state)
   (labels ((url (op)

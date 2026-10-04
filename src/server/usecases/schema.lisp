@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
-                #:field-name #:field-option #:model-kind)
+                #:field-name #:field-option #:model-kind #:field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/usecases/ports/contents #:space-contents)
@@ -60,12 +60,21 @@
 (defun made-anew-p (changes model)
   (find-if (lambda (c) (and (eq (getf c :op) :change-kind) (equal (getf c :model) model))) changes))
 
+(defun outer-name (path)
+  (subseq path 0 (position #\. path)))
+
+(defun changed-field (schema change)
+  (let ((field (model-field (schema-model schema (getf change :model)) (outer-name (getf change :field))))
+        (dot (position #\. (getf change :field))))
+    (if dot
+        (find (subseq (getf change :field) (1+ dot)) (field-fields field) :key #'field-name :test #'string=)
+        field)))
+
 (defun checked-change-p (change schema changes)
   (and (not (made-anew-p changes (getf change :model)))
        (or (tightened-change-p change)
            (and (eq (getf change :op) :add-field)
-                (field-option (model-field (schema-model schema (getf change :model)) (getf change :field))
-                              :required)))))
+                (field-option (changed-field schema change) :required)))))
 
 (defun stored-name (changes op model &optional field)
   (let ((rename (find-if (lambda (c) (and (eq (getf c :op) op) (equal (getf c :model) model)
@@ -88,7 +97,7 @@
                         :append (let ((one (jobject)))
                                   (multiple-value-bind (value found) (gethash key data)
                                     (when found (setf (gethash name one) value)))
-                                  (mapcar (lambda (e) (misfit content version name (getf e :message)))
+                                  (mapcar (lambda (e) (misfit content version (getf e :field) (getf e :message)))
                                           (validate-content check one)))))))
 
 (defun unique-misfits (contents field key)
@@ -110,9 +119,10 @@
     (mapcar (lambda (change)
               (if (checked-change-p change schema changes)
                   (let* ((model (getf change :model))
-                         (field (model-field (schema-model schema model) (getf change :field)))
+                         (outer (outer-name (getf change :field)))
+                         (field (model-field (schema-model schema model) outer))
                          (stored-model (stored-name changes :rename-model model))
-                         (key (stored-name changes :rename-field model (getf change :field)))
+                         (key (stored-name changes :rename-field model outer))
                          (of-model (remove-if-not (lambda (c) (equal (content-model c) stored-model)) contents))
                          (misfits (append (value-misfits of-model field key)
                                           (and (field-option field :unique) (unique-misfits of-model field key)))))

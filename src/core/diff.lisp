@@ -1,12 +1,12 @@
 (defpackage #:koya-core/diff
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:schema-webhooks #:schema-models
+                #:schema-webhooks #:schema-models #:schema-custom-fields #:custom-field->jobject #:field-fields
                 #:model-name #:model-kind #:model-fields #:model-options #:model-was
                 #:field-name #:field-type #:field-options #:field-was
                 #:forget-rename)
   (:import-from #:koya-core/json
-                #:jobject)
+                #:jobject #:json-equal)
   (:import-from #:koya-core/case
                 #:camel-key)
   (:export #:diff-schemas
@@ -74,11 +74,25 @@
   (remove-if (lambda (item) (find item pairs :key pick)) items))
 
 (defun field-target (field)
-  (and (eq (field-type field) :reference) (getf (field-options field) :model)))
+  (case (field-type field)
+    (:reference (getf (field-options field) :model))
+    (:custom (getf (field-options field) :custom-field))))
 
 (defun renamed-target (field renames)
   (let ((target (field-target field)))
-    (or (cdr (assoc target renames :test #'equal)) target)))
+    (if (eq (field-type field) :reference)
+        (or (cdr (assoc target renames :test #'equal)) target)
+        target)))
+
+(defun inner-changes (model outer old new)
+  (flet ((path (field) (format nil "~a.~a" outer (field-name field))))
+    (diff-named
+     old new #'field-name
+     (lambda (f) (list (list :op :add-field :model model :field (path f) :to (field-type f))))
+     (lambda (f) (list (list :op :remove-field :model model :field (path f) :from (field-type f))))
+     (lambda (o n)
+       (mapcar (lambda (change) (list* :op (getf change :op) :model model :field (path n) (nthcdr 6 change)))
+               (field-changes model o n nil))))))
 
 (defun field-changes (model old new renames)
   (let ((from (forget-rename (field-options old)))
@@ -88,10 +102,12 @@
            (list (list :op :change-field-type :model model :field (field-name new)
                        :from (field-type old) :to (field-type new)
                        :from-target (field-target old) :to-target (field-target new))))
-          ((not (plist-equal from to))
-           (list (list :op :change-field-options :model model :field (field-name new)
-                       :from from :to to)))
-          (t nil))))
+          (t
+           (append (unless (plist-equal from to)
+                     (list (list :op :change-field-options :model model :field (field-name new)
+                                 :from from :to to)))
+                   (when (eq (field-type new) :custom)
+                     (inner-changes model (field-name new) (field-fields old) (field-fields new))))))))
 
 (defun diff-fields (model old new renames)
   (let ((pairs (rename-pairs old new #'field-name #'field-was)))
@@ -129,10 +145,15 @@
       (lambda (m) (list (list :op :remove-model :model (model-name m))))
       (lambda (o n) (model-changes o n renames))))))
 
+(defun custom-fields-equal (a b)
+  (json-equal (map 'vector #'custom-field->jobject a) (map 'vector #'custom-field->jobject b)))
+
 (defun diff-schemas (old new)
   (append (unless (equal (and old (schema-webhooks old)) (schema-webhooks new))
             (list (list :op :change-webhooks
                         :from (and old (schema-webhooks old)) :to (schema-webhooks new))))
+          (unless (custom-fields-equal (and old (schema-custom-fields old)) (schema-custom-fields new))
+            (list (list :op :change-custom-fields)))
           (diff-models (and old (schema-models old)) (schema-models new))))
 
 (defparameter +absent+ '%missing)
@@ -162,7 +183,9 @@
         label)))
 
 (defun path (change)
-  (format nil "~@[~a~]~@[.~a~]" (or (getf change :model) "webhooks") (getf change :field)))
+  (format nil "~@[~a~]~@[.~a~]"
+          (or (getf change :model) (if (eq (getf change :op) :change-custom-fields) "customFields" "webhooks"))
+          (getf change :field)))
 
 (defun misfit-note (change)
   (let ((ids (remove-duplicates (mapcar (lambda (m) (getf m :id)) (getf change :misfits)) :test #'equal)))
@@ -193,7 +216,7 @@
               (:change-field-options
                (options-detail change (if (tightened-change-p change) "options tightened" "options changed")))
               (:change-model-options (options-detail change "options changed"))
-              (:change-webhooks "changed")
+              ((:change-webhooks :change-custom-fields) "changed")
               (t nil))
             (misfit-note change))))
 

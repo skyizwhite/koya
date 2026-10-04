@@ -54,10 +54,16 @@
                                   (t (write-char c out) (incf i)))))
                          (t (write-char c out) (incf i)))))))))
 
+(defun object-text (object)
+  (format nil "~{~a~^ ~}"
+          (loop :for value :being :the :hash-values :of object
+                :when (stringp value) :collect (html-text value))))
+
 (defun data-text (data)
   (when data
     (let ((text (make-hash-table :test 'equal)))
       (maphash (lambda (name value)
-                 (when (stringp value) (setf (gethash name text) (html-text value))))
+                 (cond ((stringp value) (setf (gethash name text) (html-text value)))
+                       ((hash-table-p value) (setf (gethash name text) (object-text value)))))
                data)
       text)))

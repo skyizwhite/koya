@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/lib/forms
   (:use #:cl)
-  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p)
+  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p #:field-fields)
   (:import-from #:koya-core/json
                 #:json-null)
   (:import-from #:cl-ppcre
@@ -17,8 +17,8 @@
            #:number->string))
 (in-package #:koya-server/web/lib/forms)
 
-(defun field-param-name (field)
-  (format nil "f-~a" (field-name field)))
+(defun field-param-name (field &optional parent)
+  (format nil "f-~@[~a.~]~a" (and parent (field-name parent)) (field-name field)))
 
 (defun form-value (params name)
   (let ((v (first (form-values params name))))
@@ -29,11 +29,18 @@
   (remove "" (mapcar (lambda (s) (string-trim " " s)) (split "[,\\s]+" string)) :test #'string=))
 
 (defun form->data (model params)
+  (form->fields (model-fields model) params nil))
+
+(defun form->fields (fields params parent)
   (let ((data (make-hash-table :test 'equal)))
-    (dolist (field (model-fields model))
-      (let* ((name (field-param-name field))
+    (dolist (field fields)
+      (let* ((name (field-param-name field parent))
              (raw (form-value params name)))
         (case (field-type field)
+          (:custom
+           (let ((inner (form->fields (field-fields field) params field)))
+             (when (loop :for value :being :the :hash-values :of inner :thereis value)
+               (setf (gethash (field-name field) data) inner))))
           (:boolean
            (setf (gethash (field-name field) data) (and raw t)))
           (:number

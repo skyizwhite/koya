@@ -9,7 +9,7 @@
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/content #:content-id)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field)
   (:import-from #:koya-core/json #:jget))
 (in-package #:koya-spec/server/usecases/revisions)
 
@@ -91,3 +91,19 @@
     (ok (string= (jget (restore-data "site" (post) (content-id other) (object "title" "Taken" "slug" "taken") (object)) "slug")
                  "taken")
         "a content's own value is not taken from it")))
+
+(deftest what-a-custom-field-no-longer-has
+  (replace-schema "site" (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
+                                                                                          (make-field :photo :media)
+                                                                                          (make-field :caption :text))))
+                                      :models (list (make-model "post" :list (list (make-field :title :text)
+                                                                                   (make-field :card :custom :custom-field "card")))
+                                                    (make-model "tag" :list (list (make-field :name :text))))))
+  (multiple-value-bind (data notes)
+      (restore-data "site" (post) "x" (object "title" "Old" "card" (object "link" "gone" "photo" "01GONE" "caption" "Kept"))
+                    (object))
+    (let ((card (jget data "card")))
+      (ng (nth-value 1 (gethash "link" card)) "a reference inside to what is gone is dropped")
+      (ng (nth-value 1 (gethash "photo" card)) "and a media")
+      (ok (string= (jget card "caption") "Kept") "the rest of the custom field comes back"))
+    (ok (equal (notes-of notes) '("card")) "and the note names the custom field")))

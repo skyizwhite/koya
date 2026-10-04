@@ -4,8 +4,8 @@ For a site written in Common Lisp, this repository's `koya-sdk` system is to it
 what [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk) is to a TypeScript
 site. It holds three things:
 
-- a **schema DSL** — `defmodel`, `defwebhooks`, `webhook` — that defines the
-  space's models as code in the site's own repository;
+- a **schema DSL** — `defmodel`, `defcustomfield`, `defwebhooks`, `webhook` —
+  that defines the space's models as code in the site's own repository;
 - **`plan` / `deploy` / `pull`**, which compare that schema with the one the
   server stores and push it across;
 - an **HTTP client** for reading published content, managing content, keys and
@@ -97,7 +97,12 @@ the same name, so the schema can be edited live from the REPL.
   (slug    :slug :from title :unique t)
   (cover   :media)
   (content :richtext)
-  (tags    :reference :model tag :many t))
+  (tags    :reference :model tag :many t)
+  (meta    :custom :custom-field seo))
+
+(defcustomfield seo
+  (title :text :max-length 60)
+  (image :media :help "1200x630"))
 
 (defmodel tag (:kind :list)
   (name :text :required t))
@@ -112,6 +117,10 @@ the same name, so the schema can be edited live from the REPL.
   `:kind` is required and is `:list` (many contents) or `:object` (exactly one).
   The URL templates are evaluated; each field form `(name type . options)` is
   taken literally. A model carries no webhooks: they all live in `defwebhooks`.
+- **`(defcustomfield name &body fields)`** — a set of fields a model uses as one
+  field of type `:custom`, its value an object of these fields. The fields are
+  written as in `defmodel`, but none is a `:slug` or a `:custom`, nor `:unique`;
+  `:was` is not carried through one. Its name follows the field rule below.
 - **`:was`**, on the model or on a field, names what it used to be called, so
   that a deploy renames it instead of dropping it — see
   [Renaming a model or a field](#renaming-a-model-or-a-field).
@@ -121,7 +130,8 @@ the same name, so the schema can be edited live from the REPL.
 - **`:label`** names the `:text` or `:slug` field whose value the admin UI shows
   for a content — in the list's reference previews, the reference dropdowns and
   the history. It is taken literally, like a field name (`:label title`).
-  Without it a content is shown by its id; no field is guessed at.
+  Without it a content is shown by its id; no field is guessed at. It cannot name
+  a field inside a custom field.
 
 Naming rules, checked as the schema is built:
 
@@ -134,7 +144,7 @@ Naming rules, checked as the schema is built:
 that every content already has; declaring one is an error.
 
 Other helpers: `(koya-sdk:current-schema)` returns the validated schema built so
-far, `(koya-sdk:clear-schema)` empties the registry, and
+far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, and
 `(koya-sdk:find-model name)` looks a definition up.
 
 ## Field types and options
@@ -152,17 +162,19 @@ far, `(koya-sdk:clear-schema)` empties the registry, and
 | `:media` | `:required` | media id (expanded to an object by the delivery API) |
 | `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |
 | `:slug` | `:required` `:from` `:unique` `:pattern` | lowercase-hyphen string |
+| `:custom` | `:required` `:custom-field` | an object of the custom field's fields |
 
 - Every type also takes `:was`, which names the field this one was renamed from —
   see [Renaming a model or a field](#renaming-a-model-or-a-field).
 - Every type also takes `:help`, a non-empty string the editor shows under the
   field's name to say what it expects, e.g. `(cover :media :help "1200x630")`.
   Changing it changes nothing stored.
-- `:options` takes strings or symbols, which are downcased; `:model` and `:from`
-  take a symbol or a string too.
+- `:options` takes strings or symbols, which are downcased; `:model`, `:from`
+  and `:custom-field` take a symbol or a string too.
 - `:model` names another model of the same space; `:from` names a `:text` or
-  `:textarea` field of the same model other than itself. Both are checked against
-  the whole schema, so a typo fails before anything is sent.
+  `:textarea` field of the same model other than itself; `:custom-field` names a
+  `defcustomfield`. All three are checked against the whole schema, so a typo
+  fails before anything is sent.
 - `:default t` on a `:boolean` sets the field to true on a new content that does
   not mention it (the editor starts with the box checked); an explicit `false` is
   kept.

@@ -21,6 +21,8 @@
 (defun field-expr (name model column)
   (or (system-column name)
       (let ((field (or (model-field model name) (bad-query "unknown field ~s" name))))
+        (when (eq (field-type field) :custom)
+          (bad-query "~a is a custom field: only contains and not_contains read it" name))
         (format nil (if (eq (field-type field) :boolean) "COALESCE(json_extract(~a, '$.~a'), 0)" "json_extract(~a, '$.~a')")
                 column name))))
 
@@ -38,7 +40,22 @@
            (cond ((string= value "true") 1) ((string= value "false") 0) (t (bad-query "~a expects true or false" name))))
           (t value))))
 
+(defun custom-term-sql (name op value text-column)
+  (let ((text (format nil "json_extract(~a, '$.~a')" text-column name))
+        (like (format nil "%~a%" (escape-like value))))
+    (cond ((null text-column) (bad-query "~a is a custom field and cannot be filtered here" name))
+          ((string= op "contains") (values (format nil "~a LIKE ? ESCAPE '\\'" text) (list like)))
+          ((string= op "not_contains") (values (format nil "(~a IS NULL OR ~a NOT LIKE ? ESCAPE '\\')" text text) (list like)))
+          (t (bad-query "~a is a custom field: only contains and not_contains read it" name)))))
+
 (defun term-sql (term model column text-column)
+  (destructuring-bind (name op value) term
+    (let ((field (model-field model name)))
+      (if (and field (eq (field-type field) :custom))
+          (custom-term-sql name op value text-column)
+          (field-term-sql term model column text-column)))))
+
+(defun field-term-sql (term model column text-column)
   (destructuring-bind (name op value) term
     (let* ((field (model-field model name))
            (many (and field (field-many-p field)))

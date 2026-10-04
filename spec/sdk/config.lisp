@@ -1,12 +1,12 @@
 (defpackage #:koya-spec/sdk/config
   (:use #:cl #:rove)
   (:import-from #:koya-sdk/config
-                #:defwebhooks #:defmodel #:webhook #:current-schema #:clear-schema #:find-model)
+                #:defwebhooks #:defmodel #:defcustomfield #:webhook #:current-schema #:clear-schema #:find-model)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:schema-model #:model-field #:model-kind
                 #:field-option #:field-type #:schema-error #:model-preview-url #:model-public-url
                 #:model-label #:model-name #:webhook-url #:model-was #:field-was #:webhook-label
-                #:webhook-only))
+                #:webhook-only #:field-name #:field-fields))
 (in-package #:koya-spec/sdk/config)
 
 (defhook :before (clear-schema))
@@ -91,3 +91,20 @@
 (deftest errors
   (defmodel blog (:kind :list) (tags :reference :model ghost))
   (ok (signals (current-schema) 'schema-error) "dangling reference is caught on current-schema"))
+
+(deftest custom-fields
+  (defcustomfield seo
+    (title :text :max-length 60)
+    (image :media :help "1200x630"))
+  (defmodel blog (:kind :list)
+    (meta :custom :custom-field seo))
+  (let* ((schema (current-schema))
+         (meta (model-field (schema-model schema "blog") "meta")))
+    (ok (string= (field-option meta :custom-field) "seo") "the name is taken literally")
+    (ok (equal (mapcar #'field-name (field-fields meta)) '("title" "image")))
+    (ok (string= (field-option (second (field-fields meta)) :help) "1200x630")))
+  (defcustomfield seo (title :text))
+  (ok (= (length (field-fields (model-field (schema-model (current-schema) "blog") "meta"))) 1)
+      "redefining replaces it")
+  (defmodel page (:kind :list) (card :custom :custom-field nowhere))
+  (ok (signals (current-schema) 'schema-error) "a custom field that is not defined is caught on current-schema"))

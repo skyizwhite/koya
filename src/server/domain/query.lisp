@@ -93,7 +93,7 @@
               :include (let ((i (param params "include"))) (and i (parse-include i)))
               :search (param params "q")))
 
-(defparameter +searchable-types+ '(:text :textarea :slug :richtext))
+(defparameter +searchable-types+ '(:text :textarea :slug :richtext :custom))
 
 (defun search-filters (model search-text)
   (let ((text-fields (loop :for field :in (model-fields model)

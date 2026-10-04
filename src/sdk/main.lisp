@@ -2,7 +2,7 @@
   (:nicknames #:koya-sdk/main)
   (:use #:cl)
   (:import-from #:koya-sdk/config
-                #:defmodel #:defwebhooks #:webhook #:current-schema #:clear-schema #:find-model)
+                #:defmodel #:defcustomfield #:defwebhooks #:webhook #:current-schema #:clear-schema #:find-model)
   (:import-from #:koya-sdk/client
                 #:*base-url* #:*space* #:*delivery-key* #:*management-key* #:configure
                 #:plan #:deploy #:pull
@@ -18,7 +18,7 @@
                 #:koya-error-details)
   (:import-from #:koya-core/time #:now-iso #:format-iso #:parse-iso)
   (:import-from #:koya-core/ulid #:make-ulid)
-  (:export #:defmodel #:defwebhooks #:webhook #:current-schema #:clear-schema #:find-model
+  (:export #:defmodel #:defcustomfield #:defwebhooks #:webhook #:current-schema #:clear-schema #:find-model
            #:*base-url* #:*space* #:*delivery-key* #:*management-key* #:configure
            #:plan #:deploy #:pull
            #:get-list #:get-list-content #:get-object

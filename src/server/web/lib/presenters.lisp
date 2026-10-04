@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/lib/presenters
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject #:json-null #:to-json)
-  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type)
+  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-fields)
   (:import-from #:koya-core/diff #:change->jobject)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -47,16 +47,24 @@
     (media (media->jobject value))
     (delivered (delivered->jobject value))
     ((and vector (not string)) (map 'vector #'present-value value))
+    (hash-table (let ((out (make-hash-table :test 'equal)))
+                  (maphash (lambda (k v) (setf (gethash k out) (present-value v))) value)
+                  out))
     (t value)))
 
 (defun absolutize-richtext (object model)
-  (let ((base (string-right-trim "/" (public-url))))
-    (dolist (field (model-fields model) object)
-      (when (eq (field-type field) :richtext)
-        (let ((value (gethash (field-name field) object)))
-          (when (stringp value)
-            (setf (gethash (field-name field) object)
-                  (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))))))
+  (absolutize-fields object (model-fields model) (string-right-trim "/" (public-url))))
+
+(defun absolutize-fields (object fields base)
+  (dolist (field fields object)
+    (let ((value (gethash (field-name field) object)))
+      (case (field-type field)
+        (:richtext
+         (when (stringp value)
+           (setf (gethash (field-name field) object)
+                 (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))
+        (:custom
+         (when (hash-table-p value) (absolutize-fields value (field-fields field) base)))))))
 
 (defparameter +system-fields+ '("id" "createdAt" "updatedAt" "publishedAt" "revisedAt"))
 

@@ -1,7 +1,7 @@
 (defpackage #:koya-server/domain/content
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:model-label #:field-name #:field-type #:field-option)
+                #:model-fields #:model-label #:field-name #:field-type #:field-option #:field-fields)
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
@@ -166,11 +166,16 @@
     out))
 
 (defun booleans-filled (model data)
+  (fields-booleans-filled (model-fields model) data))
+
+(defun fields-booleans-filled (fields data)
   (let ((out (merge-data data (make-hash-table :test 'equal))))
-    (dolist (field (model-fields model) out)
-      (when (and (eq (field-type field) :boolean)
-                 (member (gethash (field-name field) out json-null) (list nil json-null)))
-        (setf (gethash (field-name field) out) nil)))))
+    (dolist (field fields out)
+      (let ((value (gethash (field-name field) out json-null)))
+        (cond ((and (eq (field-type field) :boolean) (member value (list nil json-null)))
+               (setf (gethash (field-name field) out) nil))
+              ((and (eq (field-type field) :custom) (hash-table-p value))
+               (setf (gethash (field-name field) out) (fields-booleans-filled (field-fields field) value))))))))
 
 (defun same-data-p (model a b)
   (json-equal (booleans-filled model a) (booleans-filled model b)))
@@ -182,20 +187,30 @@
         (setf (gethash (field-name field) data) t)))))
 
 (defun fill-defaults (model data)
-  (maphash (lambda (key value)
-             (unless (nth-value 1 (gethash key data))
-               (setf (gethash key data) value)))
-           (default-data model))
-  data)
+  (fill-field-defaults (model-fields model) data))
+
+(defun fill-field-defaults (fields data)
+  (dolist (field fields data)
+    (multiple-value-bind (value found) (gethash (field-name field) data)
+      (cond ((and (eq (field-type field) :boolean) (field-option field :default) (not found))
+             (setf (gethash (field-name field) data) t))
+            ((and (eq (field-type field) :custom) (hash-table-p value))
+             (fill-field-defaults (field-fields field) value))))))
 
 (defun to-the-minute (model data)
-  (dolist (field (model-fields model) data)
-    (when (eq (field-type field) :datetime)
-      (let* ((value (gethash (field-name field) data))
-             (timestamp (and (datetime-string-p value) (parse-iso value))))
-        (when timestamp
-          (setf (gethash (field-name field) data)
-                (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+))))))))
+  (fields-to-the-minute (model-fields model) data))
+
+(defun fields-to-the-minute (fields data)
+  (dolist (field fields data)
+    (let ((value (gethash (field-name field) data)))
+      (case (field-type field)
+        (:datetime
+         (let ((timestamp (and (datetime-string-p value) (parse-iso value))))
+           (when timestamp
+             (setf (gethash (field-name field) data)
+                   (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+))))))
+        (:custom
+         (when (hash-table-p value) (fields-to-the-minute (field-fields field) value)))))))
 
 (defun slugify (string)
   (let* ((lower (string-downcase string))

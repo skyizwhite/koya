@@ -1,7 +1,8 @@
 (defpackage #:koya-server/domain/references
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:schema-models #:schema-model #:model-name #:model-fields #:field-name #:field-type #:field-option)
+                #:schema-models #:schema-model #:model-name #:model-fields #:field-name #:field-type #:field-option
+                #:field-fields)
   (:import-from #:koya-server/domain/content
                 #:content-model #:content-published #:content-draft #:content-id #:content-label)
   (:export #:reference-fields
@@ -11,10 +12,16 @@
            #:mentioned-ids))
 (in-package #:koya-server/domain/references)
 
+(defun matching (fields predicate)
+  (loop :for field :in fields
+        :for inner := (and (eq (field-type field) :custom) (matching (field-fields field) predicate))
+        :when (or inner (funcall predicate field))
+          :collect (cons field inner)))
+
 (defun fields-by-model (schema predicate)
   (let ((table (make-hash-table :test 'equal)))
     (dolist (model (and schema (schema-models schema)) table)
-      (let ((fields (remove-if-not predicate (model-fields model))))
+      (let ((fields (matching (model-fields model) predicate)))
         (when fields (setf (gethash (model-name model) table) fields))))))
 
 (defun reference-fields (schema target)
@@ -25,12 +32,15 @@
   (fields-by-model schema (lambda (f) (member (field-type f) '(:media :richtext)))))
 
 (defun data-refers-p (fields data id)
-  (and data
-       (some (lambda (field)
-               (let ((value (gethash (field-name field) data)))
-                 (typecase value
-                   (string (string= value id))
-                   (vector (find id value :test #'equal)))))
+  (and (hash-table-p data)
+       (some (lambda (entry)
+               (destructuring-bind (field . inner) entry
+                 (let ((value (gethash (field-name field) data)))
+                   (if inner
+                       (data-refers-p inner value id)
+                       (typecase value
+                         (string (string= value id))
+                         (vector (find id value :test #'equal)))))))
              fields)))
 
 (defun refers-p (content fields id)
@@ -40,16 +50,19 @@
              (data-refers-p fields (content-draft content) id))
          t)))
 
+(defun mentions-p (fields data id)
+  (and (hash-table-p data)
+       (some (lambda (entry)
+               (destructuring-bind (field . inner) entry
+                 (let ((value (gethash (field-name field) data)))
+                   (if inner
+                       (mentions-p inner value id)
+                       (and (stringp value)
+                            (if (eq (field-type field) :media) (string= value id) (search id value)))))))
+             fields)))
+
 (defun data-mentioned-ids (fields data ids)
-  (and data
-       (remove-if-not
-        (lambda (id)
-          (some (lambda (field)
-                  (let ((value (gethash (field-name field) data)))
-                    (and (stringp value)
-                         (if (eq (field-type field) :media) (string= value id) (search id value)))))
-                fields))
-        ids)))
+  (and data (remove-if-not (lambda (id) (mentions-p fields data id)) ids)))
 
 (defun mentioned-ids (content fields ids)
   (let ((fields (gethash (content-model content) fields)))

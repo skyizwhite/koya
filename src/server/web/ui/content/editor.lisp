@@ -5,7 +5,7 @@
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
-                #:model-name #:model-preview-url #:model-public-url)
+                #:model-name #:model-preview-url #:model-public-url #:field-fields)
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy
@@ -30,7 +30,7 @@
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
   (:import-from #:koya-server/usecases/media #:find-media)
-  (:import-from #:koya-server/web/ui/content/field-input #:~field-input #:~field-error)
+  (:import-from #:koya-server/web/ui/content/field-input #:~field-input #:~field-error #:~custom-input)
   (:import-from #:koya-server/usecases/revisions #:restore-data #:find-revision)
   (:import-from #:koya-server/web/ui/media/picker #:~media-picker-dialog)
   (:import-from #:koya-server/domain/revision #:revision-data #:revision-created-at)
@@ -47,6 +47,31 @@
 (defun field-error (errors name)
   (let ((e (find name errors :key (lambda (e) (getf e :field)) :test #'string=)))
     (and e (getf e :message))))
+
+(defun inner-path (field inner)
+  (format nil "~a.~a" (field-name field) (field-name inner)))
+
+(defcomp ~editor-field (&key space field data errors)
+  (let ((value (and data (gethash (field-name field) data))))
+    (if (eq (field-type field) :custom)
+        (hsx (~custom-input :field field :error (field-error errors (field-name field))
+               (loop :for inner :in (field-fields field) :collect
+                 (let ((inner-value (and (hash-table-p value) (gethash (field-name inner) value))))
+                   (hsx (~field-input :field inner :parent field :value inner-value
+                                      :references (reference-options space inner)
+                                      :media (media-for space inner inner-value)
+                                      :error (field-error errors (inner-path field inner))))))))
+        (hsx (~field-input :field field :value value
+                           :references (reference-options space field)
+                           :media (media-for space field value)
+                           :error (field-error errors (field-name field)))))))
+
+(defcomp ~editor-field-errors (&key field errors)
+  (hsx
+   (<> (~field-error :field field :error (field-error errors (field-name field)))
+       (when (eq (field-type field) :custom)
+         (loop :for inner :in (field-fields field) :collect
+           (hsx (~field-error :field inner :parent field :error (field-error errors (inner-path field inner)))))))))
 
 (defcomp ~external-link (&key href children)
   (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" children (~icon :name :external))))
@@ -136,11 +161,7 @@
          (when content
            (hsx (input :type "hidden" :name "updated-at" :value (content-updated-at content))))
          (loop :for field :in (model-fields model) :collect
-           (hsx (~field-input :field field
-                              :value (and data (gethash (field-name field) data))
-                              :references (reference-options space field)
-                              :media (media-for space field (and data (gethash (field-name field) data)))
-                              :error (field-error errors (field-name field))))))
+           (hsx (~editor-field :space space :field field :data data :errors errors))))
        (when (and content (or published (not object-p)))
          (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
                 (div
@@ -267,7 +288,7 @@
              (let ((errors (validation-error-errors e)))
                (hsx (<> (~errors :id "editor-errors" :errors errors)
                         (loop :for field :in (model-fields model) :collect
-                          (hsx (~field-error :field field :error (field-error errors (field-name field)))))))))
+                          (hsx (~editor-field-errors :field field :errors errors)))))))
            (koya-error (e)
              (if (equal (koya-error-code e) "changed_elsewhere")
                  (changed-elsewhere (editor-url space model (content-id content)))
