@@ -911,8 +911,10 @@ components:
         `greater_than`. On a `many` field, `equals` and `contains` mean "has
         this value". On a `richtext` field, `contains`, `not_contains` and
         `begins_with` read its text without tags. On a `custom` field only
-        `contains` and `not_contains` work, reading the text of the fields
-        inside; any other operator, or `orders` on it, is `bad_query`. Example:
+        `contains` and `not_contains` work: `contains` matches when one of its
+        text, textarea, slug or richtext fields contains the value,
+        `not_contains` when none does; any other operator, or `orders` on it,
+        is `bad_query`. Example:
         `title[contains]lisp[and]publishedAt[exists]`.
     q:
       name: q

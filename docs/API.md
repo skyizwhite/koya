@@ -100,9 +100,10 @@ category[equals]tech[or]category[equals]life
 On a `many` field, `equals` and `contains` mean "has this value". On a
 `richtext` field, `contains`, `not_contains` and `begins_with` read the text
 without its tags, with `&amp;` and the like as the characters they stand for, as
-`q` does. On a `custom` field only `contains` and `not_contains` work, reading
-the text of the fields inside; any other operator, or `orders` on it, is
-`400 bad_query`. A value for a
+`q` does. On a `custom` field only `contains` and `not_contains` work:
+`contains` matches when one of its `text`, `textarea`, `slug` or `richtext`
+fields contains the value, `not_contains` when none does; any other operator,
+or `orders` on it, is `400 bad_query`. A value for a
 `number` field is a decimal of at most 64 characters, such as `42`, `-2.5` or
 `1e3`. An unknown field in `filters`, `orders` or `include`, or a number field
 given anything else, is `400 bad_query`.

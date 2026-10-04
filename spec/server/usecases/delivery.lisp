@@ -181,6 +181,8 @@
 
 (defun with-byline ()
   (make-schema :custom-fields (list (make-custom-field "byline" (list (make-field :note :richtext)
+                                                                      (make-field :caption :text)
+                                                                      (make-field :kind :select :options '("zebra" "other"))
                                                                       (make-field :photo :media)
                                                                       (make-field :by :reference :model "author"))))
                :models (list (make-model "story" :list (list (make-field :title :text)
@@ -194,6 +196,7 @@
               (ann (make "author" (list "name" "Ann") :publish t))
               (story (make "story" (list "title" "Plain"
                                          "byline" (jobject "note" "<p>Written <em>slowly</em> <img src=\"/media/site/x.png\"></p>"
+                                                           "caption" "a <b and c> d" "kind" "zebra"
                                                            "photo" photo "by" (content-id ann)))
                            :publish t)))
          (let ((byline (jget (delivered-data (deliver story (model "story") "site")) "byline")))
@@ -208,6 +211,9 @@
          (ok (signals (delivered-list "site" (model "story") (query "include" "byline.note")) 'query-error))
          (flet ((found (&rest kv) (length (delivered-list "site" (model "story") (apply #'query kv)))))
            (ok (= (found "q" "slowly") 1) "q reads the text inside")
+           (ok (= (found "q" "b and c") 1) "a text inside is matched as it is written, not as HTML")
+           (ok (= (found "q" "zebra") 0) "only the text fields inside are searched")
+           (ok (= (found "q" "d written") 0) "each one on its own")
            (ok (= (found "filters" "byline[contains]written slowly") 1) "and so does contains")
            (ok (signals (found "filters" "byline[equals]x") 'query-error) "but nothing else filters it")
            (ok (signals (found "orders" "byline") 'query-error) "or orders by it")))

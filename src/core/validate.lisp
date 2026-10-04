@@ -19,6 +19,7 @@
            #:validation-error
            #:validation-error-errors
            #:blank-value-p
+           #:blank-for-field-p
            #:datetime-string-p
            #:content-id-p))
 (in-package #:koya-core/validate)

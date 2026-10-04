@@ -195,6 +195,7 @@
     (unwind-protect
          (progn
            (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "T" "image" "I"))))
+           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject))))
            (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
                                                      :body (schema->jobject (cards (make-field :title :text :required t)))
                                                      :query "force=true")

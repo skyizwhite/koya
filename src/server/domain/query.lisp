@@ -1,7 +1,7 @@
 (defpackage #:koya-server/domain/query
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:+system-fields+ #:model-fields #:field-name #:field-type)
+                #:+system-fields+ #:model-fields #:field-name #:field-type #:field-fields)
   (:import-from #:koya-server/domain/errors
                 #:invalid-input)
   (:import-from #:cl-ppcre
@@ -93,11 +93,15 @@
               :include (let ((i (param params "include"))) (and i (parse-include i)))
               :search (param params "q")))
 
-(defparameter +searchable-types+ '(:text :textarea :slug :richtext :custom))
+(defparameter +searchable-types+ '(:text :textarea :slug :richtext))
 
 (defun search-filters (model search-text)
   (let ((text-fields (loop :for field :in (model-fields model)
                            :when (member (field-type field) +searchable-types+)
-                             :collect (field-name field))))
+                             :collect (field-name field)
+                           :when (eq (field-type field) :custom)
+                             :append (loop :for inner :in (field-fields field)
+                                           :when (member (field-type inner) +searchable-types+)
+                                             :collect (format nil "~a.~a" (field-name field) (field-name inner))))))
     (cons (list (list "id" "equals" search-text))
           (mapcar (lambda (name) (list (list name "contains" search-text))) text-fields))))

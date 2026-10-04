@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
                 #:field-name #:field-option #:model-kind #:field-fields)
-  (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
+  (:import-from #:koya-core/validate #:validate-content #:blank-value-p #:blank-for-field-p)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/usecases/ports/contents #:space-contents)
   (:import-from #:koya-server/domain/content #:content-id #:content-model #:content-published #:content-draft)
@@ -110,7 +110,7 @@
                                   (when (hash-table-p object)
                                     (multiple-value-bind (value found) (gethash name object)
                                       (when found (setf (gethash name one) value))))
-                                  (if (hash-table-p object)
+                                  (if (and (hash-table-p object) (not (blank-for-field-p outer object)))
                                       (mapcar (lambda (e)
                                                 (misfit content version
                                                         (format nil "~a.~a" (field-name outer) (getf e :field))
