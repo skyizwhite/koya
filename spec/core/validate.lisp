@@ -132,6 +132,7 @@
       "false is no value only for a boolean")
   (ok (equal (seo-codes "{\"meta\": {\"bogus\": null}}") '(("meta.bogus" . "unknown_field") ("meta.title" . "required")))
       "and a key the custom field does not have is never blank")
+  (ok (null (seo-codes "{\"meta\": {\"indexed\": true}}")) "a boolean alone gives the object no value")
   (let ((post (schema-model (make-schema :custom-fields (list (make-custom-field "seo" (list (make-field :title :text))))
                                          :models (list (make-model "post" :list (list (make-field :meta :custom :custom-field "seo" :required t)))))
                             "post")))

@@ -190,12 +190,21 @@
 (deftest a-field-tightened-inside-is-checked-alone
   (flet ((cards (&rest fields)
            (make-schema :custom-fields (list (make-custom-field "card" fields))
-                        :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card")))))))
+                        :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card"))))))
+         (required-cards (&rest fields)
+           (make-schema :custom-fields (list (make-custom-field "card" fields))
+                        :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card" :required t)))))))
     (replace-schema "website" (cards (make-field :title :text) (make-field :image :text)))
     (unwind-protect
          (progn
            (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "T" "image" "I"))))
+           (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
+                                                     :body (schema->jobject (required-cards (make-field :title :text))))
+             (ok (= status 200))
+             (ok (every (lambda (c) (null (jget c "misfits"))) (jget json "changes"))
+                 "a custom field made required is checked with what the same deploy removes from it gone"))
            (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject))))
+           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "image" "Only"))))
            (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
                                                      :body (schema->jobject (cards (make-field :title :text :required t)))
                                                      :query "force=true")

@@ -191,7 +191,7 @@ A custom field is a group of fields defined once in the document's
 | Key | Type | Rules |
 |---|---|---|
 | `name` | string | `^[a-z][a-zA-Z0-9]*$` |
-| `fields` | array of [field](#field) | at least one; names unique within the custom field |
+| `fields` | array of [field](#field) | at least one, and not booleans alone; names unique within the custom field |
 
 Its fields are written as a model's, with every type and its options except
 `slug` and `custom`, and without `unique` or `was`: renaming a custom field, or a
@@ -266,9 +266,9 @@ type is `type`. `unique` is checked by the server against both the draft and the
 published data of the model's other contents (`unique`). A blank `slug` is filled
 from its `from` field before validation.
 
-A `custom` value whose fields are all blank (or `false`) is blank itself. A
-`required` field inside a custom field is required only once the object is
-there, and a `boolean` field's `default` inside applies when the object is
+A `custom` value is blank itself when every field inside but its booleans is
+blank: a box checked alone gives it no value. A `required` field inside a custom
+field is required only once the object has a value, and a `boolean` field's `default` inside applies when the object is
 given.
 
 Validation failures come back as `422 validation_failed` with

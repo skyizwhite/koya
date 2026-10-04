@@ -307,7 +307,9 @@
     (ok (signals (make-custom-field "seo" (list (make-field :inner :custom :custom-field "other"))) 'schema-error)
         "another custom field")
     (ok (signals (make-custom-field "seo" (list (make-field :title :text :was :headline))) 'schema-error)
-        "a rename, which does not reach inside"))
+        "a rename, which does not reach inside")
+    (ok (signals (make-custom-field "flags" (list (make-field :a :boolean) (make-field :b :boolean))) 'schema-error)
+        "booleans alone, which a boolean field holds already"))
   (testing "a model uses one by name"
     (ok (signals (make-field :meta :custom) 'schema-error) "and must name it")
     (ok (signals (make-field :meta :custom :custom-field "seo" :unique t) 'schema-error))

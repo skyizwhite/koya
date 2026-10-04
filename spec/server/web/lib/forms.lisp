@@ -33,4 +33,6 @@
       (ok (string= (jget card "title") "Hi") "each field inside is read as it is at the top")
       (ok (eq (jget card "shown") t))
       (ok (= (jget card "rank") 2)))
-    (ok (null (nth-value 1 (gethash "card" (form->data model '(("f-card.title" . " ")))))) "and all blank is no value")))
+    (ok (null (nth-value 1 (gethash "card" (form->data model '(("f-card.title" . " ")))))) "and all blank is no value")
+    (ok (null (nth-value 1 (gethash "card" (form->data model '(("f-card.shown" . "on"))))))
+        "and so is a checked box alone")))
