@@ -278,7 +278,9 @@ when the key is missing or `null`; what the object holds does not decide it.
 So a custom field that must be filled in is a `required` custom field with
 `required` fields inside, and one that may be left out but asks for its fields
 once given is a custom field without `required`, with `required` fields inside.
-A `boolean` field's `default` inside applies when the object is given.
+A `boolean` field's `default` inside applies, as one at the top does, to a new
+content created with the object; the editor starts the box checked whenever the
+object is added.
 
 Validation failures come back as `422 validation_failed` with
 `details: [{"field", "code", "message"}, …]`.
