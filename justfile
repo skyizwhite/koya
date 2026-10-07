@@ -25,15 +25,15 @@ build:
 
 # Run the spec
 spec:
-    @qlot exec ros --non-interactive -e '(handler-bind ((warning (function muffle-warning))) (ql:quickload :koya-spec :silent t))' -e '(uiop:quit (if (rove:run :koya-spec :style :dot) 0 1))' -q
+    @qlot exec sbcl --non-interactive --eval '(handler-bind ((warning (function muffle-warning))) (ql:quickload :koya-spec :silent t))' --eval '(uiop:quit (if (rove:run :koya-spec :style :dot) 0 1))'
 
 # Build the CSS and start the server in development mode (Hunchentoot, localhost:3100)
 dev: build
-    @qlot exec ros -e '(ql:quickload :koya-server :silent t)' -e '(koya-server:start)' -e '(handler-case (loop (sleep 3600)) (sb-sys:interactive-interrupt () (koya-server:stop) (uiop:quit 0)))'
+    @qlot exec sbcl --eval '(ql:quickload :koya-server :silent t)' --eval '(koya-server:start)' --eval '(handler-case (loop (sleep 3600)) (sb-sys:interactive-interrupt () (koya-server:stop) (uiop:quit 0)))'
 
 # Open a REPL with the server system loaded
 repl:
-    @qlot exec ros -e '(ql:quickload :koya-server :silent t)' run
+    @qlot exec sbcl --eval '(ql:quickload :koya-server :silent t)'
 
 # Remove downloaded binaries and Lisp dependencies
 clean:
