@@ -70,14 +70,14 @@
 (defmacro defcustomfield (name &body fields)
   "Define (or redefine) custom field NAME: a set of fields a model uses as one
 field, e.g. (defcustomfield seo (title :text) (image :media)). Each field is
-(NAME TYPE . OPTIONS) as in DEFMODEL, but cannot be a :slug or a :custom field,
-nor :unique. A model uses it as (meta :custom :custom-field seo), and its value
+(NAME TYPE . OPTIONS) as in DEFMODEL, but cannot be a :slug, :custom or :repeater
+field, be :unique, take :was or be named fieldId. A model uses it as (meta :custom :custom-field seo), and its value
 is an object of these fields."
   `(register-custom-field (make-custom-field ',name ,(field-forms fields))))
 
 (defun webhook (label url &key only)
   "A webhook for DEFWEBHOOKS. It is sent every event (publish, unpublish, delete,
-draft) and the payload's \"event\" says which. ONLY narrows it to one model or a
+draft, discard, deploy) and the payload's \"event\" says which. ONLY narrows it to one model or a
 list of them; without it the webhook fires for every model of the space."
   (make-webhook label url :only only))
 

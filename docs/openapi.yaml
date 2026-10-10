@@ -119,8 +119,8 @@ paths:
         The content whose published slug it is, as `getListContent` reads it.
         With the content's `draftKey`, its draft's slug finds it too, and its
         draft is read; a key that is not the content's finds it by its published
-        slug only. 404 for an `object` model, a model without a slug field, or a
-        slug two contents hold.
+        slug only. 404 for an `object` model, a model without exactly one slug
+        field, or a slug two contents hold.
       security: [{ deliveryKey: [] }]
       parameters:
         - $ref: "#/components/parameters/space"
@@ -423,7 +423,8 @@ paths:
   /admin/api/{space}/lists/{model}/slugs/{slug}:
     description: |
       A list content found by its published slug or its draft's. 404 for an
-      `object` model, a model without a slug field, or a slug two contents hold.
+      `object` model, a model without exactly one slug field, or a slug two
+      contents hold.
       Publishing and the rest are done at its id.
     parameters:
       - $ref: "#/components/parameters/space"
@@ -523,7 +524,8 @@ paths:
       summary: Unpublish
       description: |
         Takes the content off the delivery API. Its data (the draft when there is
-        one) is kept as a draft with a new draft key; `publishedAt` is cleared.
+        one) is kept as a draft with a new draft key; `publishedAt` and `revisedAt`
+        are cleared.
         Fires `unpublish` webhooks. A content that is not published is refused
         with 409 `not_published`, and a published one with 409 `in_use` while
         another content refers to it.
@@ -1583,7 +1585,7 @@ components:
         fields are present; the system fields always are.
       required: [id, createdAt, updatedAt, publishedAt, revisedAt]
       properties:
-        id: { type: string }
+        id: { type: string, description: "12 lowercase letters and digits, made by the server; a content stored before keeps the id it had" }
         createdAt: { $ref: "#/components/schemas/Timestamp" }
         updatedAt: { $ref: "#/components/schemas/Timestamp" }
         publishedAt:
@@ -1627,7 +1629,7 @@ components:
       description: "Admin shape: status, both data versions as stored (ids, not expanded) and metadata."
       required: [id, status, published, draft, draftKey, createdAt, updatedAt, publishedAt, revisedAt]
       properties:
-        id: { type: string }
+        id: { type: string, description: "12 lowercase letters and digits, made by the server; a content stored before keeps the id it had" }
         status: { type: string, enum: [draft, published, published+draft] }
         published:
           oneOf: [{ $ref: "#/components/schemas/ContentData" }, { type: "null" }]
