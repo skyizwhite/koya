@@ -71,7 +71,7 @@ const { contents, totalCount, offset, limit } = await res.json();
 |---|---|
 | `limit` | default 10; above 100 is clamped to 100 |
 | `offset` | default 0; above 2^63−1 answers `400 bad_query` |
-| `orders` | comma-separated field names, `-` for descending: `-publishedAt,title`. Default: newest published first |
+| `orders` | comma-separated field names, `-` for descending: `-publishedAt,title`. Default: newest published first. `id` orders by the ids' text, not by when the contents were made; `createdAt` by its value, which creating the content may have given |
 | `filters` | see below |
 | `q` | search: the text of the model's `text`, `textarea`, `slug` and `richtext` fields, those inside a custom field or a repeater's rows included, contains it, or it is a content's whole id. Combined with `filters`, both apply |
 | `include` | reference fields to embed, dotted for nesting and to reach into a custom field or a repeater's rows: `tags,author.team,meta.author,blocks.by` |
@@ -136,7 +136,7 @@ A content is its fields plus the system fields:
 
 ```json
 {
-  "id": "01J8Q0Z5X2W3V4U5T6S7R8Q9P0",
+  "id": "k3x9m2qa7t0b",
   "title": "Hello",
   "slug": "hello",
   "cover": {
@@ -145,7 +145,7 @@ A content is its fields plus the system fields:
     "filename": "cover.png", "mime": "image/png", "size": 12345,
     "width": 1200, "height": 630, "alt": "Cover", "createdAt": "2026-09-20T05:04:03.123Z"
   },
-  "tags": ["01J8Q0Z5X2W3V4U5T6S7R8Q9P2"],
+  "tags": ["p8f2w6zc1n4d"],
   "createdAt": "2026-09-20T05:04:03.123Z",
   "updatedAt": "2026-09-20T05:04:03.123Z",
   "publishedAt": "2026-09-20T05:04:03.123Z",
@@ -229,7 +229,7 @@ under `objects/` (`404`).
 
 ```json
 {
-  "id": "01J…",
+  "id": "k3x9m2qa7t0b",
   "status": "published+draft",
   "published": { "title": "Hello" },
   "draft": { "title": "Hello, again" },
@@ -256,8 +256,12 @@ under `objects/` (`404`).
   revision, no webhook); when it is the published data again, the draft is
   dropped, as `discard-draft` would.
 - Publishing takes `data` when given, else the draft, else re-publishes.
-- Creating a list content may give `id` and the four timestamps, for imports
-  that keep another system's ids and dates. An id is the space's own: another
+- A content's id is made by the server: 12 lowercase letters and digits, drawn
+  at random. Ids from before stay as they were: 26-character ULIDs, or up to 64
+  letters, digits, `-` and `_` when the content was created with its own. A
+  space imported from an archive keeps the ids the archive holds.
+  Creating a list content cannot give `id` (`400`; `null` is as absent), but
+  may give the four timestamps, for imports that keep another system's dates. An id is the space's own: another
   space may hold a content of the same id. A timestamp needs a date, a time and
   an offset or `Z`, and is stored in UTC with milliseconds.
 - An object model holds one object. Two first writes at once make only one: the
@@ -322,7 +326,7 @@ its `only` names — and the payload says which:
 {
   "space": "website",
   "model": "blog",
-  "id": "01J…",
+  "id": "k3x9m2qa7t0b",
   "event": "publish",
   "contents": { "old": null, "new": { … } }
 }

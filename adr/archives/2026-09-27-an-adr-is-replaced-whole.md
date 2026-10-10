@@ -1,5 +1,9 @@
 # An ADR is replaced whole, and one ADR holds one decision
 
+Superseded by adr/2026-10-11-an-adr-holds-one-decision.md
+Superseded by adr/2026-10-11-a-new-decision-replaces-an-adr-whole.md
+Superseded by adr/2026-10-11-an-adr-is-not-edited-once-it-is-on-master.md
+
 *2026-09-27*
 
 ## Context

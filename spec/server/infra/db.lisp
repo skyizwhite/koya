@@ -508,7 +508,11 @@
   (testing "another space may hold a content of the same id"
     (create-space "two")
     (replace-schema "two" (make-schema :models (list (make-model "post" :list (list (make-field :title :text))))))
-    (ok (create "two" (find-model "two" "post") (jobject "title" "Two") :id "about" :publish t))
+    (exec "INSERT INTO contents (id, space, model, status, published, created_at, updated_at, published_at, revised_at)
+           VALUES ('about', 'two', 'post', 'published', '{\"title\":\"Two\"}',
+                   '2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z')")
+    (exec "INSERT INTO content_revisions (space, content_id, event, data, created_at)
+           VALUES ('two', 'about', 'publish', '{\"title\":\"Two\"}', '2026-01-02T00:00:00.000Z')")
     (ok (string= (jget (content-published (get-content "two" "about")) "title") "Two"))
     (ok (string= (jget (content-published (get-content "one" "about")) "title") "One") "and neither touches the other")
     (ok (= (count-revisions "two" "about") 1))
@@ -518,8 +522,14 @@
     (ok (get-content "one" "about") "deleting one leaves the other")
     (ok (= (count-revisions "one" "about") 1) "with its history"))
   (testing "within a space an id is still one content"
-    (ok (signals (create "one" (find-model "one" "post") (jobject "title" "Again") :id "about")
-                 'koya-server/domain/errors:conflict)))
+    (ok (search "UNIQUE constraint failed: contents.space, contents.id"
+                (handler-case (progn (exec "INSERT INTO contents (id, space, model, status, draft, created_at, updated_at)
+                                            VALUES ('about', 'one', 'post', 'draft', '{\"title\":\"Again\"}',
+                                                    '2026-01-03T00:00:00.000Z', '2026-01-03T00:00:00.000Z')")
+                                     "")
+                  (dbi.error:dbi-database-error (e) (princ-to-string e))))
+        "a second content of the same id is refused by the key")
+    (ok (string= (jget (content-published (get-content "one" "about")) "title") "One") "and the first is kept"))
   (migrated-fully))
 
 (deftest a-rolled-back-deploy-leaves-nothing

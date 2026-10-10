@@ -289,15 +289,15 @@ list of list contents; an `:object` model's one content is its object.
 (koya-sdk:get-list 'blog)
 (koya-sdk:get-list 'blog :query '(:limit 10 :orders "-publishedAt" :fields "title"))
 (koya-sdk:get-list 'blog :query '(:include "tags"))                  ; embed referenced contents
-(koya-sdk:get-list-content 'blog "01J…")
-(koya-sdk:get-list-content 'blog "01J…" :query '(:draft-key "…"))    ; preview a draft
+(koya-sdk:get-list-content 'blog "k3x9m2qa7t0b")
+(koya-sdk:get-list-content 'blog "k3x9m2qa7t0b" :query '(:draft-key "…"))    ; preview a draft
 (koya-sdk:get-object 'about)
 ```
 
 Each takes `:space` to override the default. `get-list` returns a plist:
 
 ```lisp
-(:contents ((:id "01J…" :title "…" :tags ("01J…") :published-at "2026-09-20T…Z" …) …)
+(:contents ((:id "k3x9m2qa7t0b" :title "…" :tags ("p8f2w6zc1n4d") :published-at "2026-09-20T…Z" …) …)
  :total-count 42 :offset 0 :limit 10)
 ```
 
@@ -343,16 +343,16 @@ These use the management key and see drafts as well. Their names start with
 
 ```lisp
 (koya-sdk:admin-get-list 'blog :query '(:limit 100))   ; every list content, drafts included
-(koya-sdk:admin-get-list-content 'blog "01J…")
+(koya-sdk:admin-get-list-content 'blog "k3x9m2qa7t0b")
 (koya-sdk:admin-create-list-content 'blog '(:title "Hello" :content "<p>…</p>"))   ; as a draft
 (koya-sdk:admin-create-list-content 'blog '(:title "Hello") :publish t)
-(koya-sdk:admin-update-list-content 'blog "01J…" '(:title "New title"))            ; save a draft
-(koya-sdk:admin-publish-list-content 'blog "01J…")                                 ; publish the draft
-(koya-sdk:admin-publish-list-content 'blog "01J…" :data '(:title "…") :published-at "2026-09-20T10:00:00.000Z")
-(koya-sdk:admin-unpublish-list-content 'blog "01J…")
-(koya-sdk:admin-discard-list-content-draft 'blog "01J…")
-(koya-sdk:admin-delete-list-content 'blog "01J…")
-(koya-sdk:admin-list-content-draft-key 'blog "01J…")   ; for a preview URL
+(koya-sdk:admin-update-list-content 'blog "k3x9m2qa7t0b" '(:title "New title"))            ; save a draft
+(koya-sdk:admin-publish-list-content 'blog "k3x9m2qa7t0b")                                 ; publish the draft
+(koya-sdk:admin-publish-list-content 'blog "k3x9m2qa7t0b" :data '(:title "…") :published-at "2026-09-20T10:00:00.000Z")
+(koya-sdk:admin-unpublish-list-content 'blog "k3x9m2qa7t0b")
+(koya-sdk:admin-discard-list-content-draft 'blog "k3x9m2qa7t0b")
+(koya-sdk:admin-delete-list-content 'blog "k3x9m2qa7t0b")
+(koya-sdk:admin-list-content-draft-key 'blog "k3x9m2qa7t0b")   ; for a preview URL
 ```
 
 An object is reached through its model, with no id:
@@ -373,10 +373,9 @@ An object is reached through its model, with no id:
 - `admin-update-list-content` and `admin-update-object` **merge** the plist onto
   the current draft (or the published data when there is none); a key whose
   value is `nil` is removed. Publishing with `:data` replaces the data outright.
-- `admin-create-list-content` also takes `:id`, `:created-at`, `:updated-at`, `:published-at`
-  and `:revised-at` — everything an import from another CMS needs to keep its ids
-  and dates. Ids are 1–64 characters from `A-Za-z0-9_-`; without one a ULID is
-  generated. A duplicate id is a 409.
+- `admin-create-list-content` also takes `:created-at`, `:updated-at`, `:published-at`
+  and `:revised-at`, for an import from another CMS that keeps its dates. The
+  server makes the id: 12 lowercase letters and digits.
 - An `:object` model's object is made by its first `admin-update-object`, or an
   `admin-publish-object` with `:data`; `admin-create-list-content` answers 404
   for it, as do the other functions that take an id. It has no delete: it goes
@@ -453,7 +452,7 @@ Arguments are converted to JSON and responses back to Lisp by the same rules:
 
 and coming back, an object becomes a kebab-case keyword plist, an array a list and
 `null` `nil`. So `(getf item :published-at)` is `nil` for a draft, and
-`:tags '("01J…" "01J…")` is an array of ids.
+`:tags '("k3x9m2qa7t0b" "p8f2w6zc1n4d")` is an array of ids.
 
 There is no Lisp spelling for JSON `false`: the server treats `null` and `false`
 alike for booleans, so `nil` means "off". On `admin-update-list-content` and
@@ -463,8 +462,7 @@ than dropped.
 
 Timestamps are ISO 8601 in UTC with milliseconds, e.g.
 `"2026-09-20T05:04:03.123Z"`. `koya-sdk:now-iso`, `koya-sdk:format-iso` and
-`koya-sdk:parse-iso` are exported for building them, and `koya-sdk:make-ulid`
-for generating ids.
+`koya-sdk:parse-iso` are exported for building them.
 
 ## The HTTP API underneath
 

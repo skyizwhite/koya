@@ -17,7 +17,9 @@ package moved, a table of what went where, or a trick that works around a
 library is a change, not a decision: git holds it, and a constraint worth
 keeping is a spec. Write what is decided, not how the code got there.
 
-**An ADR is not edited, and it is replaced whole.** When a decision changes,
+**An ADR is not edited once it is on `master`, and it is replaced whole.** An
+ADR that only the branch being worked on has added is still a draft: edit it,
+rename it or delete it as the work goes. When a decision on `master` changes,
 write the new one, and write again, one ADR each, whatever of the old ADR still
 holds. Then add `Superseded by adr/<file>` lines under the old one's title and
 move it to `adr/archives/`. `.ignore` keeps `adr/archives/` out of searches: do

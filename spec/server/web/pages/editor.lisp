@@ -59,7 +59,7 @@
         (let* ((loc (moved-to body))
                (path (subseq loc 0 (position #\? loc))))
           (setf id (subseq path (1+ (position #\/ path :from-end t))))
-          (ok (= (length id) 26))))
+          (ok (cl-ppcre:scan "^[a-z0-9]{12}\\z" id) "the server makes an id of twelve lowercase letters and digits")))
       (let ((content (first (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))
         (ok (string= (content-status content) "draft"))
         (let ((draft (content-draft content)))

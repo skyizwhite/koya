@@ -1,5 +1,8 @@
 # A new content may bring its own id and dates
 
+Superseded by adr/2026-10-11-a-new-content-may-bring-its-own-dates.md
+Superseded by adr/2026-10-11-a-content-id-is-koya-s-to-make.md
+
 *2026-09-27, restating a decision of 2026-09-20*
 
 ## Context

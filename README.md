@@ -177,7 +177,7 @@ Every webhook of the space is POSTed on every event, with the space's webhook
 secret (on its **Keys** page) in `X-KOYA-WEBHOOK-KEY`:
 
 ```json
-{ "space": "website", "model": "blog", "id": "01J…", "event": "publish", "contents": { "old": null, "new": { … } } }
+{ "space": "website", "model": "blog", "id": "k3x9m2qa7t0b", "event": "publish", "contents": { "old": null, "new": { … } } }
 ```
 
 `event` is `publish`, `unpublish`, `delete`, `draft` or `discard`. `draft` and

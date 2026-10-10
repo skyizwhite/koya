@@ -9,7 +9,7 @@
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-server/usecases/ports/contents
-                #:get-content #:list-contents
+                #:get-content #:list-contents #:model-contents #:space-contents
                 #:find-object-content #:unique-value-taken-p #:list-revisions
                 #:count-revisions #:find-revision)
   (:import-from #:koya-server/usecases/contents
@@ -65,6 +65,33 @@
   (apply #'create "website" (blog) (data json) args))
 (defun q (&rest kv) (parse-query (loop :for (k v) :on kv :by #'cddr :collect (cons k v))))
 (defun titles (contents) (mapcar (lambda (c) (jget (content-published c) "title")) contents))
+
+(deftest an-id-koya-makes-is-twelve-letters-and-digits
+  (let ((ids (loop :for n :below 20 :collect (content-id (make (format nil "{\"title\": \"T~a\"}" n))))))
+    (ok (every (lambda (id) (cl-ppcre:scan "^[a-z0-9]{12}\\z" id)) ids) "lowercase letters and digits, twelve of them")
+    (ok (= (length (remove-duplicates ids :test #'string=)) 20) "drawn afresh for each content")))
+
+(defun with-drawn-ids (ids thunk)
+  (let ((original (fdefinition 'koya-server/domain/content:new-content-id)))
+    (unwind-protect
+         (progn (setf (fdefinition 'koya-server/domain/content:new-content-id) (lambda () (pop ids)))
+                (funcall thunk))
+      (setf (fdefinition 'koya-server/domain/content:new-content-id) original))))
+
+(deftest a-taken-id-is-drawn-again
+  (let ((taken (content-id (make "{\"title\": \"First\"}"))))
+    (ok (string= (content-id (with-drawn-ids (list taken "zzzzzzzzzzzz") (lambda () (make "{\"title\": \"Second\"}"))))
+                 "zzzzzzzzzzzz"))
+    (ok (string= (jget (content-draft (get-content "website" taken)) "title") "First") "and the content that holds it is untouched")))
+
+(deftest contents-made-at-once-are-written-out-in-the-order-they-were-made
+  (with-drawn-ids (list "zzzzzzzzzzzz" "aaaaaaaaaaaa")
+    (lambda ()
+      (make "{\"title\": \"Earlier\"}" :created-at "2026-01-01T00:00:00.000Z")
+      (make "{\"title\": \"Later\"}" :created-at "2026-01-01T00:00:00.000Z")))
+  (ok (equal (mapcar #'content-id (model-contents "website" "blog")) '("zzzzzzzzzzzz" "aaaaaaaaaaaa")))
+  (ok (equal (mapcar #'content-id (space-contents "website")) '("zzzzzzzzzzzz" "aaaaaaaaaaaa"))
+      "not in the order of their ids"))
 
 (deftest lifecycle
   (let ((c (make "{\"title\": \"Draft one\"}")))

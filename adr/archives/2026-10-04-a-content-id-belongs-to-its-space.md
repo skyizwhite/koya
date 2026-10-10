@@ -1,5 +1,7 @@
 # A content id belongs to its space
 
+Superseded by adr/2026-10-11-a-content-id-belongs-to-its-space.md
+
 *2026-10-04*
 
 ## Context

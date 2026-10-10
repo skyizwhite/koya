@@ -323,9 +323,10 @@ paths:
       tags: [lists]
       summary: Create a list content
       description: |
-        Saved as a draft unless `publish` is true. `id` and the system timestamps
-        may be supplied, for imports that keep another system's ids and dates; an
-        id need only be unique within the space;
+        Saved as a draft unless `publish` is true. The server makes the id: 12
+        lowercase letters and digits drawn at random, one the space does not
+        hold, and a body that gives `id` is a 400 (`null` is as absent). The system timestamps may be
+        supplied, for imports that keep another system's dates;
         a timestamp needs a date, a time and an offset or `Z`, and is stored in
         UTC with milliseconds.
         `publishedAt` and `revisedAt` are only stored when publishing. 404 for an
@@ -346,11 +347,6 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409":
-          description: "`conflict`: a content with this `id` already exists in the space"
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ApiError" }
         "413": { $ref: "#/components/responses/TooLarge" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
@@ -1021,7 +1017,9 @@ components:
       schema: { type: string }
       description: |
         Comma-separated field or system field names, `-` prefix for descending,
-        e.g. `-publishedAt,title`. Default: newest published first.
+        e.g. `-publishedAt,title`. Default: newest published first. `id`
+        orders by the ids' text, not by when the contents were made;
+        `createdAt` by its value, which creating the content may have given.
     filters:
       name: filters
       in: query
@@ -1545,10 +1543,6 @@ components:
       properties:
         data: { $ref: "#/components/schemas/ContentData" }
         publish: { type: [boolean, "null"], default: false, description: "`null` is as absent" }
-        id:
-          type: string
-          pattern: "^[A-Za-z0-9_-]{1,64}$"
-          description: Defaults to a fresh ULID. `new` is refused, as the admin UI's new-content form.
         createdAt: { $ref: "#/components/schemas/Timestamp" }
         updatedAt: { $ref: "#/components/schemas/Timestamp" }
         publishedAt: { $ref: "#/components/schemas/Timestamp" }
@@ -1598,7 +1592,7 @@ components:
           oneOf: [{ $ref: "#/components/schemas/Timestamp" }, { type: "null" }]
       additionalProperties: true
       example:
-        id: 01J8Q0Z5X2W3V4U5T6S7R8Q9P0
+        id: k3x9m2qa7t0b
         title: Hello
         slug: hello
         cover:
@@ -1611,7 +1605,7 @@ components:
           height: 630
           alt: Cover
           createdAt: "2026-09-20T05:04:03.123Z"
-        tags: [01J8Q0Z5X2W3V4U5T6S7R8Q9P2]
+        tags: [p8f2w6zc1n4d]
         createdAt: "2026-09-20T05:04:03.123Z"
         updatedAt: "2026-09-20T05:04:03.123Z"
         publishedAt: "2026-09-20T05:04:03.123Z"
