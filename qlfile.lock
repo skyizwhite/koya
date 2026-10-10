@@ -36,8 +36,8 @@
   :version "git-e72e5bc27e9d7921639fe186449e0a78c3cabdbb"))
 ("woo" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/woo.git" :branch "fix/body-buffer-limit-and-files")
-  :version "git-7a120fd5b2d41bbe516c050c1210e41f5e3f3042"))
+  :initargs (:remote-url "https://github.com/fukamachi/woo.git")
+  :version "git-51b8cb2653116cd05f6a8d0029719ce6ce106711"))
 ("cl-dotenv" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
