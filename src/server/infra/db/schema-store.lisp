@@ -94,20 +94,12 @@
   (exec "UPDATE contents SET model = ? WHERE space = ? AND model = ?" to space from)
   (exec "DELETE FROM models WHERE space = ? AND name = ?" space from))
 
-(defun rename-key (object from to)
-  (multiple-value-bind (value presentp) (gethash from object)
-    (when presentp
-      (remhash from object)
-      (setf (gethash to object) value)
-      t)))
-
-(defun rename-content-field (space model from to)
-  (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?"
-                      space model))
+(defun rewrite-content-data (space model fn)
+  (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?" space model))
     (let* ((published (let ((v (col row "published"))) (and v (parse-json v))))
            (draft (let ((v (col row "draft"))) (and v (parse-json v))))
-           (in-published (and published (rename-key published from to)))
-           (in-draft (and draft (rename-key draft from to))))
+           (in-published (and published (funcall fn published)))
+           (in-draft (and draft (funcall fn draft))))
       (when (or in-published in-draft)
         (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
               (and published (to-json published)) (and draft (to-json draft))
@@ -117,8 +109,18 @@
                         WHERE c.space = ? AND c.model = ?"
                       space model))
     (let ((data (parse-json (col row "data"))))
-      (when (rename-key data from to)
+      (when (funcall fn data)
         (exec "UPDATE content_revisions SET data = ? WHERE id = ?" (to-json data) (col row "id"))))))
+
+(defun rename-key (object from to)
+  (multiple-value-bind (value presentp) (gethash from object)
+    (when presentp
+      (remhash from object)
+      (setf (gethash to object) value)
+      t)))
+
+(defun rename-content-field (space model from to)
+  (rewrite-content-data space model (lambda (data) (rename-key data from to))))
 
 (defun drop-inner-key (data outer kind inner)
   (let ((value (and data (gethash outer data))))
@@ -132,22 +134,7 @@
              dropped)))))
 
 (defun drop-inner-field (space model outer kind inner)
-  (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?" space model))
-    (let* ((published (let ((v (col row "published"))) (and v (parse-json v))))
-           (draft (let ((v (col row "draft"))) (and v (parse-json v))))
-           (in-published (drop-inner-key published outer kind inner))
-           (in-draft (drop-inner-key draft outer kind inner)))
-      (when (or in-published in-draft)
-        (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
-              (and published (to-json published)) (and draft (to-json draft))
-              (text-column published) (text-column draft) space (col row "id")))))
-  (dolist (row (fetch "SELECT r.id, r.data FROM content_revisions r
-                        JOIN contents c ON c.space = r.space AND c.id = r.content_id
-                        WHERE c.space = ? AND c.model = ?"
-                      space model))
-    (let ((data (parse-json (col row "data"))))
-      (when (drop-inner-key data outer kind inner)
-        (exec "UPDATE content_revisions SET data = ? WHERE id = ?" (to-json data) (col row "id"))))))
+  (rewrite-content-data space model (lambda (data) (drop-inner-key data outer kind inner))))
 
 (defun drop-content-field (space model field)
   (multiple-value-bind (outer kind inner) (field-path-parts field)

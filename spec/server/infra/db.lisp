@@ -263,7 +263,9 @@
         (ok (string= (content-model content) "article"))
         (ok (string= (jget (content-published content) "subtitle") "First words"))
         (ng (jget (content-published content) "lede") "the orphaned key is gone")
-        (ok (string= (jget (content-published content) "title") "One") "the rest is untouched")))
+        (ok (string= (jget (content-published content) "title") "One") "the rest is untouched")
+        (ok (string= (jget (parse-json (fetch-text "magazine" (content-id published))) "subtitle") "First words")
+            "and its text is found under the new name")))
     (testing "so did the draft"
       (let ((content (get-content "magazine" (content-id drafted))))
         (ok (string= (content-model content) "article"))
