@@ -34,6 +34,7 @@
            #:schema-custom-fields
            #:schema-custom-field
            #:field-required-p
+           #:field-unique-p
            #:field-many-p
            #:field-was
            #:forget-rename
@@ -44,6 +45,7 @@
            #:model-kind
            #:model-fields
            #:model-field
+           #:model-slug-field
            #:model-options
            #:model-was
            #:model-forget-renames
@@ -91,7 +93,7 @@
     (:select    :required :options :many)
     (:media     :required :many)
     (:reference :required :model :many)
-    (:slug      :required :from :unique :pattern)
+    (:slug      :required :pattern)
     (:custom    :required :custom-field)
     (:repeater  :required :custom-fields)))
 
@@ -126,7 +128,7 @@
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
     (case key
       (:model (name-string value))
-      ((:from :was :custom-field) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
+      ((:was :custom-field) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
       (:options (if (or (listp value) (json-array-p value))
                     (map 'list #'name-string value)
                     value))
@@ -154,7 +156,7 @@
          (bad "a list without duplicates")))
       (:model
        (unless (slug-name-p value) (bad "a model name")))
-      ((:from :custom-field)
+      (:custom-field
        (unless (field-name-p value) (bad "a field name")))
       (:custom-fields
        (unless (and (consp value) (every #'field-name-p value)) (bad "a non-empty list of custom field names"))
@@ -186,8 +188,6 @@
       (fail "select field ~s needs :options" name))
     (when (and (eq type :reference) (null (getf options :model)))
       (fail "reference field ~s needs :model" name))
-    (when (and (eq type :slug) (null (getf options :from)))
-      (fail "slug field ~s needs :from" name))
     (when (and (eq type :custom) (null (getf options :custom-field)))
       (fail "custom field ~s needs :custom-field" name))
     (when (and (eq type :repeater) (null (getf options :custom-fields)))
@@ -254,6 +254,7 @@
                 (and dot (subseq path (1+ dot)))))))
 
 (defun field-required-p (field) (and (field-option field :required) t))
+(defun field-unique-p (field) (or (eq (field-type field) :slug) (and (field-option field :unique) t)))
 (defun field-many-p (field) (and (field-option field :many) t))
 
 (defun webhook-label (webhook) (getf webhook :label))
@@ -371,6 +372,10 @@
                :fields (mapcar #'field-forget-rename (model-fields model))
                :options (forget-rename (model-options model))))
 
+(defun model-slug-field (model)
+  (let ((slugs (remove-if-not (lambda (field) (eq (field-type field) :slug)) (model-fields model))))
+    (and (eq (model-kind model) :list) (= (length slugs) 1) (first slugs))))
+
 (defun model-field (model name)
   (find (if (stringp name) name (camel-key name)) (model-fields model)
         :key #'field-name :test #'string=))
@@ -451,18 +456,22 @@
              (unless (schema-custom-field schema name)
                (push (format nil "~a.~a: :customFields names unknown custom field ~s"
                              (model-name model) (field-name field) name)
-                     errors))))
-          (:slug
-           (let* ((from (field-option field :from))
-                  (source (model-field model from)))
-             (cond ((null source)
-                    (push (format nil "~a.~a: :from refers to unknown field ~s"
-                                  (model-name model) (field-name field) from)
-                          errors))
-                   ((or (eq source field) (not (member (field-type source) '(:text :textarea))))
-                    (push (format nil "~a.~a: :from must name a text or textarea field other than itself"
-                                  (model-name model) (field-name field))
-                          errors))))))))
+                     errors)))))))
+    (dolist (model (schema-models schema))
+      (let ((slugs (count :slug (model-fields model) :key #'field-type)))
+        (cond ((and (eq (model-kind model) :object) (plusp slugs))
+               (push (format nil "model ~a: an object model has no slug field" (model-name model))
+                     errors))
+              ((> slugs 1)
+               (push (format nil "model ~a: a model has one slug field at most, and this one has ~a"
+                             (model-name model) slugs)
+                     errors))
+              ((and (zerop slugs)
+                    (some (lambda (url) (and url (search "{CONTENT_SLUG}" url)))
+                          (list (model-preview-url model) (model-public-url model))))
+               (push (format nil "model ~a: a URL template fills in {CONTENT_SLUG}, and the model has no slug field"
+                             (model-name model))
+                     errors)))))
     (dolist (custom (schema-custom-fields schema))
       (dolist (field (custom-field-fields custom))
         (when (eq (field-type field) :reference)

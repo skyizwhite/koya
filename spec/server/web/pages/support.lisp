@@ -27,7 +27,7 @@
 
 (defun blog-model ()
   (make-model "blog" :list (list (make-field :title :text :required t)
-                                 (make-field :slug :slug :from :title :unique t)
+                                 (make-field :slug :slug)
                                  (make-field :body :richtext)
                                  (make-field :featured :boolean)
                                  (make-field :category :select :options '("news" "tech"))

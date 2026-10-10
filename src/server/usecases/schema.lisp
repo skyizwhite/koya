@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
-                #:field-name #:field-option #:model-kind #:field-fields #:field-row-kinds
+                #:field-name #:field-option #:field-unique-p #:model-kind #:field-fields #:field-row-kinds
                 #:field-path-parts #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:jobject)
@@ -183,7 +183,7 @@
                                       (inner-misfits of-model field (nth-value 1 (field-path-parts (getf change :field)))
                                                      (changed-field schema change) key gone)
                                       (append (value-misfits of-model field key gone)
-                                              (and (field-option field :unique) (unique-misfits of-model field key))))))
+                                              (and (field-unique-p field) (unique-misfits of-model field key))))))
                     (if misfits (append change (list :misfits misfits)) change))
                   change))
             changes)))

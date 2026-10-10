@@ -1,7 +1,7 @@
 (defpackage #:koya-server/usecases/revisions
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-name #:model-fields #:field-name #:field-type #:field-option
+                #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-unique-p
                 #:field-required-p #:field-fields #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:json-array-p)
@@ -100,7 +100,7 @@
                      (note name (format nil "keeps the current value: the field no longer accepts this version's (it ~a)"
                                         (getf (first errors) :message)))
                      (keep-current name))
-                    ((and (field-option field :unique) (not (blank-value-p value))
+                    ((and (field-unique-p field) (not (blank-value-p value))
                           (unique-value-taken-p space (model-name model) name value :exclude-id id))
                      (note name "keeps the current value: this version's is taken by another content")
                      (keep-current name))

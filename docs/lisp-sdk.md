@@ -91,10 +91,10 @@ the same name, so the schema can be edited live from the REPL.
 
 (defmodel blog (:kind :list
                 :label       title
-                :public-url  "https://example.com/blog/{CONTENT_ID}"
-                :preview-url "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}")
+                :public-url  "https://example.com/blog/{CONTENT_SLUG}"
+                :preview-url "https://example.com/blog/{CONTENT_SLUG}?draft-key={DRAFT_KEY}")
   (title   :text :required t)
-  (slug    :slug :from title :unique t)
+  (slug    :slug :required t)
   (cover   :media)
   (content :richtext)
   (tags    :reference :model tag :many t)
@@ -126,8 +126,11 @@ the same name, so the schema can be edited live from the REPL.
   that a deploy renames it instead of dropping it — see
   [Renaming a model or a field](#renaming-a-model-or-a-field).
 - **`:preview-url` / `:public-url`** are templates for the editor's two links.
-  They start with `http://` or `https://`, and `{CONTENT_ID}` and `{DRAFT_KEY}`
-  are substituted.
+  They start with `http://` or `https://`, and `{CONTENT_ID}`, `{CONTENT_SLUG}`
+  and `{DRAFT_KEY}` are substituted. `{CONTENT_SLUG}` is the model's `:slug`
+  field, the published value in `:public-url` and the draft's in
+  `:preview-url`; a template using it needs the model to have one, and the link
+  is not shown while it is blank.
 - **`:label`** names the `:text` or `:slug` field whose value the admin UI shows
   for a content — in the list's reference previews, the reference dropdowns and
   the history. It is taken literally, like a field name (`:label title`).
@@ -162,7 +165,7 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
 | `:select` | `:required` `:options` `:many` | one of `:options`, or an array of them |
 | `:media` | `:required` `:many` | media id, or an array of them with `:many` (expanded to objects by the delivery API) |
 | `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |
-| `:slug` | `:required` `:from` `:unique` `:pattern` | lowercase-hyphen string |
+| `:slug` | `:required` `:pattern` | lowercase-hyphen string, unique within the model; a list model has one at most, an object model none |
 | `:custom` | `:required` `:custom-field` | an object of the custom field's fields |
 | `:repeater` | `:required` `:custom-fields` | an array of rows, each naming its custom field in `fieldId` beside that custom field's fields |
 
@@ -171,12 +174,11 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
 - Every type also takes `:help`, a non-empty string the editor shows under the
   field's name to say what it expects, e.g. `(cover :media :help "1200x630")`.
   Changing it changes nothing stored.
-- `:options` takes strings or symbols, which are downcased; `:model`, `:from`
-  and `:custom-field` take a symbol or a string too.
-- `:model` names another model of the same space; `:from` names a `:text` or
-  `:textarea` field of the same model other than itself; `:custom-field` names a
-  `defcustomfield`. All three are checked against the whole schema, so a typo
-  fails before anything is sent.
+- `:options` takes strings or symbols, which are downcased; `:model` and
+  `:custom-field` take a symbol or a string too.
+- `:model` names another model of the same space; `:custom-field` names a
+  `defcustomfield`. Both are checked against the whole schema, so a typo fails
+  before anything is sent.
 - `:custom-fields` is a non-empty list of `defcustomfield` names, without
   duplicates, taken literally and camelised like field names:
   `(blocks :repeater :custom-fields (heading body))`. A `:repeater` sits only in
@@ -186,8 +188,8 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
   kept.
 
 What each type stores, what counts as blank, and how every option is enforced
-(`:unique` across drafts and published data, `:pattern` as a `cl-ppcre` regex, a
-blank `:slug` filled from `:from`, …) is specified in
+(`:unique` across drafts and published data, `:pattern` as a `cl-ppcre` regex,
+…) is specified in
 [SCHEMA.md, "Content values"](SCHEMA.md#content-values).
 
 ## Webhooks

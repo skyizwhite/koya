@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p
-                #:field-fields #:field-row-kinds #:row-kind #:custom-field-fields)
+                #:field-fields #:field-row-kinds #:row-kind #:custom-field-fields #:model-slug-field)
   (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
@@ -11,7 +11,7 @@
   (:import-from #:koya-server/usecases/auth #:secure-string=)
   (:import-from #:koya-server/usecases/ports/media #:find-media)
   (:import-from #:koya-server/usecases/ports/contents
-                #:find-content #:find-object-content #:list-contents)
+                #:find-content #:find-object-content #:list-contents #:find-contents-by-slug)
   (:export #:delivered
            #:delivered-content
            #:delivered-model
@@ -19,6 +19,7 @@
            #:deliver
            #:delivered-list
            #:delivered-list-content
+           #:delivered-list-content-by-slug
            #:delivered-object))
 (in-package #:koya-server/usecases/delivery)
 
@@ -136,6 +137,19 @@
   (check-include space model (query-include query))
   (let ((content (or (find-content space (model-name model) id)
                      (fail 'not-found "Content does not exist"))))
+    (deliver-if-allowed space model content query draft-key)))
+
+(defun published-slug-p (model content slug)
+  (let ((field (model-slug-field model))
+        (live (content-published content)))
+    (and field live (equal (gethash (field-name field) live) slug))))
+
+(defun delivered-list-content-by-slug (space model slug query &key draft-key)
+  (check-include space model (query-include query))
+  (let* ((found (find-contents-by-slug space (model-name model) slug))
+         (content (and (= (length found) 1) (first found))))
+    (unless (and content (or (draft-key-p content draft-key) (published-slug-p model content slug)))
+      (fail 'not-found "Content does not exist"))
     (deliver-if-allowed space model content query draft-key)))
 
 (defun delivered-object (space model query &key draft-key)

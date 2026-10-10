@@ -33,7 +33,7 @@
                 #:key-id #:key-hash #:key-label #:key-created-at #:new-webhook-secret)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p
-                #:model-name #:model-fields #:field-name #:field-option)
+                #:model-name #:model-fields #:field-name #:field-unique-p)
   (:import-from #:koya-core/json
                 #:jobject #:jget #:json-null #:json-null-p #:json-array-p #:parse-json #:to-json)
   (:import-from #:koya-core/time #:now-iso)
@@ -254,10 +254,23 @@
     (unwind-protect (call-with-upload id (lambda (archive) (import-from-archive archive :by by)))
       (delete-upload id))))
 
+(defun forget-slug-options (schema)
+  (when (hash-table-p schema)
+    (let ((models (jget schema "models")))
+      (when (json-array-p models)
+        (loop :for model :across models
+              :for fields := (and (hash-table-p model) (jget model "fields"))
+              :when (json-array-p fields)
+                :do (loop :for field :across fields
+                          :when (and (hash-table-p field) (equal (jget field "type") "slug"))
+                            :do (remhash "from" field)
+                                (remhash "unique" field))))))
+  schema)
+
 (defun import-from-archive (archive &key by)
   (let* ((document (read-document archive))
          (space (string-field document "space" :required t))
-         (schema (jobject->schema (jget document "schema"))))
+         (schema (jobject->schema (forget-slug-options (jget document "schema")))))
     (unless (slug-name-p space) (fail "~s is not a space name" space))
     (check-target space)
     (let ((contents (map 'list (lambda (o) (parse-content o space schema))
@@ -281,7 +294,7 @@
   (dolist (model (schema-models schema))
     (let ((of-model (remove-if-not (lambda (c) (equal (content-model c) (model-name model))) contents)))
       (dolist (field (model-fields model))
-        (when (field-option field :unique)
+        (when (field-unique-p field)
           (let ((misfit (first (unique-misfits of-model field (field-name field)))))
             (when misfit
               (fail "Content ~a: ~a ~a" (getf misfit :id) (getf misfit :field) (getf misfit :message)))))))))

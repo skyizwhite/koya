@@ -11,7 +11,7 @@
 (defparameter *model*
   (make-model "blog" :list
               (list (make-field :title :text :required t :max-length 10 :pattern "^[A-Z]")
-                    (make-field :slug :slug :from :title)
+                    (make-field :slug :slug)
                     (make-field :body :richtext)
                     (make-field :count :number :integer t :min 0 :max 10)
                     (make-field :featured :boolean)

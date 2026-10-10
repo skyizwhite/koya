@@ -19,7 +19,7 @@
                    (make-webhook "blog-only" "https://example.com/blog-hook" :only '(blog)))
    :models (list (make-model "blog" :list
                              (list (make-field :title :text :required t :max-length 100)
-                                   (make-field :slug :slug :from :title :unique t)
+                                   (make-field :slug :slug)
                                    (make-field :content :richtext)
                                    (make-field :tags :reference :model "tag" :many t)
                                    (make-field :event-at :datetime)))
@@ -52,7 +52,9 @@
     (ok (signals (make-field :x :text :min 3) 'schema-error))
     (ok (signals (make-field :x :select) 'schema-error) "select needs options")
     (ok (signals (make-field :x :reference) 'schema-error) "reference needs model")
-    (ok (signals (make-field :x :slug) 'schema-error) "slug needs from")
+    (ok (make-field :x :slug) "a slug takes nothing to make it from")
+    (ok (signals (make-field :x :slug :from :title) 'schema-error) "a slug is typed, not made from another field")
+    (ok (signals (make-field :x :slug :unique t) 'schema-error) "a slug is unique without saying so")
     (ok (signals (make-field "Bad Name" :text) 'schema-error))
     (ok (signals (make-field (format nil "title~%") :text) 'schema-error) "no trailing newline")
     (ok (signals (make-field :x :text :pattern "(") 'schema-error) "broken regex")
@@ -170,8 +172,25 @@
   (let ((broken (make-schema :models (list (make-model "m" :list (list (make-field :r :reference :model "ghost")))))))
     (ok (= (length (schema-errors broken)) 1))
     (ok (signals (check-schema broken) 'schema-error)))
-  (let ((broken (make-schema :models (list (make-model "m" :list (list (make-field :s :slug :from :ghost)))))))
-    (ok (= (length (schema-errors broken)) 1)))
+  (testing "a list model has one slug at most, and an object model none"
+    (let ((broken (make-schema :models (list (make-model "m" :list (list (make-field :a :slug) (make-field :b :slug)))))))
+      (ok (= (length (schema-errors broken)) 1) "a slug is a key, so there is one to find a content by")
+      (ok (signals (check-schema broken) 'schema-error)))
+    (let ((broken (make-schema :models (list (make-model "m" :object (list (make-field :s :slug)))))))
+      (ok (= (length (schema-errors broken)) 1) "the one object of a model is found by its model")
+      (ok (signals (check-schema broken) 'schema-error)))
+    (ok (make-schema :models (list (make-model "m" :list (list (make-field :a :slug) (make-field :b :slug)))))
+        "a schema stored before the rule is still read"))
+  (testing "a URL template fills in the slug only where there is one"
+    (dolist (key '(:preview-url :public-url))
+      (let ((template "https://x/{CONTENT_SLUG}"))
+        (ok (= (length (schema-errors (make-schema :models (list (make-model "m" :list (list (make-field :title :text))
+                                                                             key template)))))
+               1)
+            (format nil "~(~a~) on a model without a slug field" key))
+        (ok (null (schema-errors (make-schema :models (list (make-model "m" :list (list (make-field :s :slug))
+                                                                        key template)))))
+            (format nil "~(~a~) on a model with one" key)))))
   (testing "two models cannot be renamed from the same one"
     (let ((broken (make-schema :models (list (make-model "article" :list nil :was 'post)
                                              (make-model "news" :list nil :was 'post)))))
@@ -202,7 +221,7 @@
   (flet ((errors (fields label)
            (schema-errors (make-schema :models (list (make-model "m" :list fields :label label))))))
     (ok (null (errors (list (make-field :title :text)) :title)))
-    (ok (null (errors (list (make-field :slug :slug :from :title) (make-field :title :text)) :slug)))
+    (ok (null (errors (list (make-field :slug :slug) (make-field :title :text)) :slug)))
     (ok (= (length (errors (list (make-field :title :text)) :headline)) 1)
         "a field that is not there, removed or renamed without the label following")
     (ok (= (length (errors (list (make-field :body :richtext)) :body)) 1)
@@ -236,7 +255,7 @@
       (ok (= (field-option (model-field blog :title) :max-length) 100))
       (ok (field-option (model-field blog :tags) :many))
       (ok (string= (field-option (model-field blog :tags) :model) "tag"))
-      (ok (string= (field-option (model-field blog :slug) :from) "title")))
+      (ok (eq (field-type (model-field blog :slug)) :slug)))
     (let ((about (schema-model back :about)))
       (ok (string= (model-preview-url about) "https://x/about?draft-key={DRAFT_KEY}"))
       (ok (string= (model-public-url about) "https://x/about"))
@@ -254,7 +273,9 @@
                     "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"LIST\"}]}"
                     "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"text\", \"pattern\": \"(\"}]}]}"
                     "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"text\", \"bogus\": 1}]}]}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"select\", \"options\": \"abc\"}]}]}"))
+                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"select\", \"options\": \"abc\"}]}]}"
+                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"t\", \"type\": \"text\"}, {\"name\": \"s\", \"type\": \"slug\", \"from\": \"t\"}]}]}"
+                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"s\", \"type\": \"slug\", \"unique\": true}]}]}"))
       (ok (signals (jobject->schema (parse-json json)) 'schema-error) json))))
 
 (deftest options-are-written-in-one-order
@@ -303,7 +324,7 @@
     (ok (signals (make-custom-field "seo" nil) 'schema-error) "it has fields")
     (ok (signals (make-custom-field "seo" (list (make-field :title :text) (make-field :title :textarea))) 'schema-error)))
   (testing "what cannot be inside one"
-    (ok (signals (make-custom-field "seo" (list (make-field :slug :slug :from :title))) 'schema-error) "a slug")
+    (ok (signals (make-custom-field "seo" (list (make-field :slug :slug))) 'schema-error) "a slug")
     (ok (signals (make-custom-field "seo" (list (make-field :title :text :unique t))) 'schema-error) "a unique field")
     (ok (signals (make-custom-field "seo" (list (make-field :inner :custom :custom-field "other"))) 'schema-error)
         "another custom field")

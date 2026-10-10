@@ -5,7 +5,7 @@
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
-                #:model-name #:model-preview-url #:model-public-url #:field-fields #:field-option
+                #:model-name #:model-preview-url #:model-public-url #:model-slug-field #:field-fields #:field-option
                 #:field-row-kinds #:row-kind #:custom-field-name #:custom-field-fields #:model-field)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/ulid #:make-ulid)
@@ -189,6 +189,11 @@
               (loop :for note :in notes :collect
                 (hsx (li (strong (getf note :field)) " " (getf note :note))))))))))
 
+(defun slug-of (model data)
+  (let* ((field (model-slug-field model))
+         (value (and field (gethash (field-name field) data))))
+    (and (stringp value) value)))
+
 (defcomp ~editor (&key space model content data errors restoring)
   (let* ((space-name space)
          (model-name (model-name model))
@@ -198,8 +203,10 @@
          (draft (and content (content-draft content)))
          (preview-url (and draft (content-draft-key content)
                            (expand-url-template (model-preview-url model)
-                                                :id id :draft-key (content-draft-key content))))
-         (public-url (and published (expand-url-template (model-public-url model) :id id))))
+                                                :id id :draft-key (content-draft-key content)
+                                                :slug (slug-of model draft))))
+         (public-url (and published (expand-url-template (model-public-url model)
+                                                         :id id :slug (slug-of model published)))))
     (hsx
      (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring errors))
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"

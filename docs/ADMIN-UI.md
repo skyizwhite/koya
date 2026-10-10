@@ -185,7 +185,7 @@ by its model's `label` field, or by its id.
 
 | Field type | Control |
 |---|---|
-| `text`, `slug` | text input — a blank `slug` is generated from its `from` field on save |
+| `text`, `slug` | text input; a `slug` is typed, and nothing fills a blank one |
 | `textarea` | multi-line text |
 | `richtext` | a rich text editor; its image button opens the media picker |
 | `number` | number input |

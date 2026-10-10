@@ -100,9 +100,12 @@ what it expects, e.g. (cover :media :help \"1200x630\").
 :CUSTOM-FIELD names a custom field made with DEFCUSTOMFIELD, for a :custom
 field, e.g. (meta :custom :custom-field seo).
 PREVIEW-URL and PUBLIC-URL are evaluated; they are URL templates for the admin UI,
-starting with http:// or https://, where {CONTENT_ID} and {DRAFT_KEY} are
-substituted, e.g.
-\"https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}\".
+starting with http:// or https://, where {CONTENT_ID}, {CONTENT_SLUG} and
+{DRAFT_KEY} are substituted, e.g.
+\"https://example.com/blog/{CONTENT_SLUG}?draft-key={DRAFT_KEY}\".
+{CONTENT_SLUG} is the model's :slug field, published in PUBLIC-URL and the
+draft's in PREVIEW-URL; a template using it needs one, and no link is shown
+while it is blank.
 LABEL names the :text or :slug field whose value the admin UI shows for a
 content -- in lists, reference pickers and the history. Without one a content
 is shown by its id."

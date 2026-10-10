@@ -4,8 +4,8 @@
                 #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
   (:import-from #:koya-core/time
                 #:now-iso)
-  (:import-from #:koya-core/json #:parse-json)
-  (:import-from #:koya-server/infra/db/contents #:text-column)
+  (:import-from #:koya-core/json #:parse-json #:to-json #:jget)
+  (:import-from #:koya-server/infra/db/contents #:text-column #:refresh-slugs)
   (:export #:migrate
            #:current-version))
 (in-package #:koya-server/infra/db/migrations)
@@ -208,7 +208,27 @@
      "ALTER TABLE contents ADD COLUMN draft_text TEXT"
      fill-content-texts)
     (15
-     "ALTER TABLE spaces ADD COLUMN custom_fields TEXT NOT NULL DEFAULT '[]'")))
+     "ALTER TABLE spaces ADD COLUMN custom_fields TEXT NOT NULL DEFAULT '[]'")
+    (16
+     forget-slug-options
+     "ALTER TABLE contents ADD COLUMN published_slug TEXT"
+     "ALTER TABLE contents ADD COLUMN draft_slug TEXT"
+     "CREATE INDEX contents_by_published_slug ON contents (space, model, published_slug)"
+     "CREATE INDEX contents_by_draft_slug ON contents (space, model, draft_slug)"
+     refresh-slugs)))
+
+(defun forget-slug-options ()
+  (dolist (row (fetch "SELECT space, name, definition FROM models"))
+    (let ((definition (parse-json (col row "definition")))
+          (changed nil))
+      (loop :for field :across (or (jget definition "fields") #())
+            :when (equal (jget field "type") "slug")
+              :do (let ((from (remhash "from" field))
+                        (unique (remhash "unique" field)))
+                    (when (or from unique) (setf changed t))))
+      (when changed
+        (exec "UPDATE models SET definition = ? WHERE space = ? AND name = ?"
+              (to-json definition) (col row "space") (col row "name"))))))
 
 (defun fill-content-texts ()
   (flet ((text (json) (and json (text-column (parse-json json)))))

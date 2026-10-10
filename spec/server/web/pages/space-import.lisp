@@ -24,7 +24,8 @@
   (:import-from #:koya-spec/server/usecases/media #:png-bytes)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-core/schema #:make-webhook)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-field #:field-type #:field-option)
+  (:import-from #:koya-server/usecases/ports/archives #:write-archive)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-revisions #:count-revisions #:get-content #:insert-content)
@@ -380,3 +381,34 @@
                                        :label "" :created-at "2024-01-01T00:00:00.000Z")
       (ok (equal (refusal octets) "A key in the archive is already a key of another space"))
       (delete-space "elsewhere"))))
+
+(defun legacy-archive ()
+  (let ((path (write-archive
+               (list (cons "space.json"
+                           (string-to-octets
+                            "{\"koyaExport\": 1, \"space\": \"legacy\",
+                              \"schema\": {\"koyaSchema\": 1, \"webhooks\": [],
+                                           \"models\": [{\"name\": \"post\", \"kind\": \"list\",
+                                                         \"fields\": [{\"name\": \"title\", \"type\": \"text\", \"unique\": true},
+                                                                      {\"name\": \"slug\", \"type\": \"slug\", \"from\": \"title\", \"unique\": true}]}]},
+                              \"contents\": [{\"id\": \"p1\", \"model\": \"post\", \"draft\": {\"title\": \"One\", \"slug\": \"one\"},
+                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}"
+                            :encoding :utf-8))))))
+    (prog1 (read-file-bytes path) (delete-file path))))
+
+(defun read-file-bytes (path)
+  (with-open-file (in path :element-type '(unsigned-byte 8))
+    (let ((octets (make-array (file-length in) :element-type '(unsigned-byte 8))))
+      (read-sequence octets in)
+      octets)))
+
+(deftest an-archive-from-before-slugs-were-typed-is-imported
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (ok (string= (nth-value 1 (import-archive (legacy-archive))) "/s/legacy")
+      "its slug fields lose what a slug no longer takes")
+  (let ((post (find-model "legacy" "post")))
+    (ok (eq (field-type (model-field post :slug)) :slug))
+    (ok (field-option (model-field post :title) :unique) "a text field keeps its unique"))
+  (ok (string= (jget (content-draft (get-content "legacy" "p1")) "slug") "one") "and its contents come with it")
+  (delete-space "legacy"))

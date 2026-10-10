@@ -53,9 +53,10 @@ load on koya lower. The admin API answers no cross-origin request.
 ## Reading content
 
 ```
-GET /api/v1/{space}/lists/{model}         a page of a list
-GET /api/v1/{space}/lists/{model}/{id}    one list content
-GET /api/v1/{space}/objects/{model}       an object
+GET /api/v1/{space}/lists/{model}                a page of a list
+GET /api/v1/{space}/lists/{model}/{id}           one list content
+GET /api/v1/{space}/lists/{model}/slugs/{slug}   one list content, by its slug
+GET /api/v1/{space}/objects/{model}              an object
 ```
 
 ```ts
@@ -112,13 +113,22 @@ fields of every row. A value for a
 `1e3`. An unknown field in `filters`, `orders` or `include`, or a number field
 given anything else, is `400 bad_query`.
 
+**By slug.** A list model with a `slug` field (see
+[SCHEMA.md](SCHEMA.md#field)) reaches a content at its slug as well as at its
+id, and the reply is the same. The slug found is the published one; with the
+content's `draftKey`, its draft's slug finds it too. A key that is not the
+content's finds it by its published slug only, so a draft's slug is not given
+away. Nothing found, a model without a slug field, or a slug two contents hold
+(only contents stored before slugs were unique can) is `404`.
+
 **Previews.** A content's draft is served by the delivery API to whoever has its
 draft key. The editor's *Preview draft* link opens the model's `previewUrl` with
-`{CONTENT_ID}` and `{DRAFT_KEY}` filled in; the preview page passes the key on as
-`draftKey`. Saving the draft again issues a new key, so an old link stops
-working. The key opens only its own content's draft: the references it embeds
-are published data, as publishing that one content would show them, so a new
-content it links is published first to appear in the preview.
+`{CONTENT_ID}`, `{CONTENT_SLUG}` and `{DRAFT_KEY}` filled in; the preview page
+passes the key on as `draftKey`. Saving the draft again issues a new key, so an
+old link stops working. The key opens only its own content's draft: the
+references it embeds are published data, as publishing that one content would
+show them, so a new content it links is published first to appear in the
+preview.
 
 ## What comes back
 
@@ -189,6 +199,15 @@ POST   /admin/api/{space}/lists/{model}/{id}/publish
 POST   /admin/api/{space}/lists/{model}/{id}/unpublish
 POST   /admin/api/{space}/lists/{model}/{id}/discard-draft
 POST   /admin/api/{space}/lists/{model}/{id}/draft-key    the key for a preview URL
+```
+
+A list content is also read, saved and deleted at its slug, found by its
+published slug or its draft's; the rest is done at its id:
+
+```
+GET    /admin/api/{space}/lists/{model}/slugs/{slug}
+PATCH  /admin/api/{space}/lists/{model}/slugs/{slug}      save a draft
+DELETE /admin/api/{space}/lists/{model}/slugs/{slug}
 ```
 
 An object is part of its model, and is reached through the model:

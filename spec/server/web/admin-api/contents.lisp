@@ -4,8 +4,8 @@
   (:import-from #:koya-spec/server/web/api-support
                 #:*webhooks* #:admin #:delivery #:webhook-events #:setup-api #:reset-api
                 #:test-schema #:*management-key*)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya-server/infra/db/connection #:disconnect-db)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:schema-webhooks #:schema-models)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-core/json #:jobject #:jget #:json-null #:jkeys #:parse-json #:json-parse-error)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
@@ -389,3 +389,57 @@
   (multiple-value-bind (status json) (admin :get "/admin/api/website/lists/blog" :body (jobject "orders" 1 "q" 1))
     (ok (= status 200) "a value that is not text, here from a JSON body, is no part of the query")
     (ok (jget json "contents"))))
+
+(defun with-pages (thunk)
+  (replace-schema "website"
+                  (make-schema :webhooks (schema-webhooks (test-schema))
+                               :models (append (schema-models (test-schema))
+                                               (list (make-model "page" :list (list (make-field :title :text)
+                                                                                    (make-field :slug :slug)))))))
+  (unwind-protect (funcall thunk)
+    (exec "DELETE FROM contents")
+    (replace-schema "website" (test-schema))))
+
+(deftest a-list-content-is-reached-by-its-slug
+  (with-pages
+    (lambda ()
+      (let ((id (jget (nth-value 1 (admin :post "/admin/api/website/lists/page"
+                                          :body (jobject "data" (jobject "title" "Live" "slug" "live") "publish" t)))
+                      "id")))
+        (testing "the admin API reads, saves and deletes it at its slug"
+          (multiple-value-bind (status json) (admin :get "/admin/api/website/lists/page/slugs/live")
+            (ok (= status 200))
+            (ok (string= (jget json "id") id)))
+          (multiple-value-bind (status json) (admin :patch "/admin/api/website/lists/page/slugs/live"
+                                                    :body (jobject "data" (jobject "slug" "live-next")))
+            (ok (= status 200))
+            (ok (string= (jget json "draft" "slug") "live-next")))
+          (ok (string= (jget (nth-value 1 (admin :get "/admin/api/website/lists/page/slugs/live-next")) "id") id)
+              "by its draft's slug too")
+          (ok (= (admin :get "/admin/api/website/lists/page/slugs/nope") 404)))
+        (testing "the delivery API reads it at its published slug"
+          (multiple-value-bind (status json) (delivery "/api/v1/website/lists/page/slugs/live")
+            (ok (= status 200))
+            (ok (string= (jget json "id") id))
+            (ok (string= (jget json "slug") "live")))
+          (ok (= (delivery "/api/v1/website/lists/page/slugs/live-next") 404) "not at its draft's")
+          (let ((key (jget (nth-value 1 (admin :post (format nil "/admin/api/website/lists/page/~a/draft-key" id))) "draftKey")))
+            (multiple-value-bind (status json) (delivery "/api/v1/website/lists/page/slugs/live-next"
+                                                         :query (format nil "draftKey=~a" key))
+              (ok (= status 200) "unless the draft key opens it")
+              (ok (string= (jget json "slug") "live-next")))))
+        (testing "a slug that reads like a content's action is a slug still"
+          (ok (= (nth-value 0 (admin :post "/admin/api/website/lists/page"
+                                     :body (jobject "data" (jobject "title" "P" "slug" "publish") "publish" t)))
+                 201))
+          (ok (= (admin :get "/admin/api/website/lists/page/slugs/publish") 200))
+          (ok (= (delivery "/api/v1/website/lists/page/slugs/publish") 200)))
+        (testing "a model without a slug field has none to find"
+          (ok (= (admin :get "/admin/api/website/lists/blog/slugs/live") 404))
+          (ok (= (delivery "/api/v1/website/lists/blog/slugs/live") 404)))
+        (testing "nor does an object model have the address"
+          (ok (= (admin :get "/admin/api/website/lists/about/slugs/live") 404)))
+        (multiple-value-bind (status json) (admin :delete "/admin/api/website/lists/page/slugs/live-next")
+          (ok (= status 200))
+          (ok (eq (jget json "deleted") t)))
+        (ok (= (admin :get (format nil "/admin/api/website/lists/page/~a" id)) 404) "it is gone")))))

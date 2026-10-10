@@ -97,8 +97,8 @@ to:
 {
   "name": "blog",
   "kind": "list",
-  "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
-  "publicUrl": "https://example.com/blog/{CONTENT_ID}",
+  "previewUrl": "https://example.com/blog/{CONTENT_SLUG}?draft-key={DRAFT_KEY}",
+  "publicUrl": "https://example.com/blog/{CONTENT_SLUG}",
   "label": "title",
   "fields": [ …field… ]
 }
@@ -114,7 +114,11 @@ to:
 | `label` | string | optional; a `text` or `slug` field of this model (not one inside a custom field), whose value the admin UI shows for a content. Without it a content is shown by its id |
 | `was` | string | optional; the name this model had, see [Renames](#renames) |
 
-The URL templates substitute `{CONTENT_ID}` and `{DRAFT_KEY}`. Optional keys are
+The URL templates substitute `{CONTENT_ID}`, `{CONTENT_SLUG}` and `{DRAFT_KEY}`.
+`{CONTENT_SLUG}` is the value of the model's `slug` field: the published one in
+`publicUrl`, the draft's in `previewUrl`. While it is blank the link is not
+shown, and a template that uses it on a model without a slug field is refused
+when the schema is deployed. Optional keys are
 omitted from the output when they have no value. A model carries no webhooks of
 its own: a `webhooks` key here, which schemas written before they all moved to
 the space had, is ignored on input.
@@ -152,9 +156,13 @@ take their names.
 | `select` | `required` `options` `many` |
 | `media` | `required` `many` |
 | `reference` | `required` `model` `many` |
-| `slug` | `required` `from` `unique` `pattern` |
+| `slug` | `required` `pattern` |
 | `custom` | `required` `customField` |
 | `repeater` | `required` `customFields` |
+
+A `slug` field is a second key of a list content, beside its id (see
+[API.md](API.md#reading-content)): a list model has at most one, and an object
+model none. Its value is unique within the model without a `unique` option.
 
 | Option | Type | Rules |
 |---|---|---|
@@ -164,7 +172,6 @@ take their names.
 | `pattern` | string | a Perl-style regular expression, checked when the schema is deployed |
 | `options` | array of string | non-empty, no duplicates, no commas in an option (checked when the schema is deployed); **required** on `select` |
 | `model` | string | a model name; **required** on `reference`, and the model must exist in the same space |
-| `from` | string | a field name; **required** on `slug`, and must name a `text` or `textarea` field of the same model other than the slug itself |
 | `customField` | string | a custom field name; **required** on `custom`, and must name a [custom field](#custom-field) of the same schema |
 | `customFields` | array of string | custom field names; **required** on `repeater`, non-empty, no duplicates, and each must name a [custom field](#custom-field) of the same schema |
 | `was` | string | a field name other than this one and not a system field, see [Renames](#renames) |
@@ -278,8 +285,8 @@ boolean is `false`. Otherwise:
 
 A `many` field takes an array of such values (`type` when not an array). A wrong
 type is `type`. `unique` is checked by the server against both the draft and the
-published data of the model's other contents (`unique`). A blank `slug` is filled
-from its `from` field before validation.
+published data of the model's other contents (`unique`), and so is a `slug`,
+always. A blank value is never taken, and nothing fills a blank `slug`.
 
 A `custom` value is there when an object is given, `{}` included, and absent
 when the key is missing or `null`; what the object holds does not decide it.
@@ -392,12 +399,12 @@ empty.
     {
       "name": "blog",
       "kind": "list",
-      "publicUrl": "https://example.com/blog/{CONTENT_ID}",
+      "publicUrl": "https://example.com/blog/{CONTENT_SLUG}",
       "label": "title",
-      "previewUrl": "https://example.com/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}",
+      "previewUrl": "https://example.com/blog/{CONTENT_SLUG}?draft-key={DRAFT_KEY}",
       "fields": [
         {"name": "title",   "type": "text", "required": true},
-        {"name": "slug",    "type": "slug", "from": "title", "unique": true},
+        {"name": "slug",    "type": "slug", "required": true},
         {"name": "cover",   "type": "media"},
         {"name": "content", "type": "richtext"},
         {"name": "tags",    "type": "reference", "many": true, "model": "tag"},

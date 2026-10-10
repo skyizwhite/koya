@@ -15,10 +15,10 @@
   (:import-from #:koya-server/domain/html #:data-text)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:get-content #:find-content
-                #:find-contents-by-ids #:list-contents #:count-contents
+                #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
                 #:find-object-content #:unique-value-taken-p #:space-contents
                 #:contents-mentioning)
-  (:export #:text-column))
+  (:export #:text-column #:refresh-slugs))
 (in-package #:koya-server/infra/db/contents)
 
 (defparameter +columns+
@@ -35,6 +35,20 @@
 (defun json-column (value) (and value (to-json value)))
 
 (defun text-column (data) (json-column (data-text data)))
+
+(defparameter +slug-field+
+  "(SELECT json_extract(f.value, '$.name') FROM models m, json_each(m.definition, '$.fields') f
+     WHERE m.space = contents.space AND m.name = contents.model AND m.kind = 'list'
+       AND json_extract(f.value, '$.type') = 'slug'
+     GROUP BY m.space, m.name HAVING COUNT(*) = 1)")
+
+(defun slug-of (column)
+  (format nil "NULLIF(TRIM(json_extract(~a, '$.' || ~a)), '')" column +slug-field+))
+
+(defun refresh-slugs (&optional space id)
+  (apply #'exec (format nil "UPDATE contents SET published_slug = ~a, draft_slug = ~a~:[~; WHERE space = ?~]~:[~; AND id = ?~]"
+                        (slug-of "published") (slug-of "draft") space id)
+         (remove nil (list space id))))
 
 (defmethod get-content (space id)
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND id = ?" +columns+) space id)))
@@ -63,7 +77,8 @@
         (content-draft-key content)
         (content-created-at content) (content-updated-at content)
         (content-published-at content) (content-revised-at content)
-        (text-column (content-published content)) (text-column (content-draft content))))
+        (text-column (content-published content)) (text-column (content-draft content)))
+  (refresh-slugs (content-space content) (content-id content)))
 
 (defmethod update-content (content)
   (exec "UPDATE contents SET status = ?, published = ?, draft = ?, draft_key = ?, updated_at = ?,
@@ -73,7 +88,8 @@
         (content-draft-key content) (content-updated-at content)
         (content-published-at content) (content-revised-at content)
         (text-column (content-published content)) (text-column (content-draft content))
-        (content-space content) (content-id content)))
+        (content-space content) (content-id content))
+  (refresh-slugs (content-space content) (content-id content)))
 
 (defmethod delete-content (space id)
   (exec "DELETE FROM contents WHERE space = ? AND id = ?" space id))
@@ -85,6 +101,12 @@
                                  +columns+ exclude-id)
                  space (append (and exclude-id (list exclude-id))
                                (let ((like (format nil "%~a%" needle))) (list like like))))))
+
+(defmethod find-contents-by-slug (space model slug)
+  (mapcar #'row->content
+          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ?
+                                AND (published_slug = ? OR draft_slug = ?)" +columns+)
+                 space model slug slug)))
 
 (defmethod find-object-content (space model)
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" +columns+) space model)))

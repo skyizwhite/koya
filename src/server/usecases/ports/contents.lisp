@@ -3,6 +3,7 @@
   (:export #:get-content
            #:find-content
            #:find-contents-by-ids
+           #:find-contents-by-slug
            #:find-object-content
            #:list-contents
            #:count-contents
@@ -24,6 +25,8 @@
 (defgeneric find-content (space model id))
 
 (defgeneric find-contents-by-ids (space model ids))
+
+(defgeneric find-contents-by-slug (space model slug))
 
 (defgeneric find-object-content (space model))
 

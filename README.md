@@ -93,7 +93,7 @@ export default defineConfig({
         previewUrl: "https://example.com/blog/{CONTENT_ID}?draftKey={DRAFT_KEY}",
         fields: [
           { name: "title", type: "text", required: true },
-          { name: "slug", type: "slug", from: "title", unique: true },
+          { name: "slug", type: "slug", required: true },
           { name: "cover", type: "media", help: "1200x630, also shown when the post is shared" },
           { name: "body", type: "repeater", customFields: ["heading", "paragraph"] },
           { name: "gallery", type: "media", many: true },

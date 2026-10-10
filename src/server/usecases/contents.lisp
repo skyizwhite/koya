@@ -1,7 +1,7 @@
 (defpackage #:koya-server/usecases/contents
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-fields #:field-name #:field-option #:model-name)
+                #:model-kind #:model-fields #:field-name #:field-unique-p #:model-name)
   (:import-from #:koya-core/validate
                 #:validate-content #:validation-error #:blank-value-p #:content-id-p #:datetime-string-p
                 #:validation-error-errors)
@@ -15,10 +15,10 @@
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:record-revision
                 #:find-object-content #:unique-value-taken-p #:get-content #:find-content
-                #:contents-mentioning)
+                #:find-contents-by-slug #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
-                #:merge-data #:same-data-p #:fill-defaults #:fill-slugs #:to-the-minute #:new-content #:drafted #:published
+                #:merge-data #:same-data-p #:fill-defaults #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
@@ -37,6 +37,7 @@
            #:update-object
            #:publish-object
            #:resolve-content
+           #:content-by-slug
            #:find-content
            #:bulk-action-p
            #:apply-to-each
@@ -44,10 +45,9 @@
 (in-package #:koya-server/usecases/contents)
 
 (defun check-content (space-name model data &key partial exclude-id)
-  (fill-slugs model data)
   (let ((errors (validate-content model data :partial partial)))
     (dolist (field (model-fields model))
-      (when (field-option field :unique)
+      (when (field-unique-p field)
         (multiple-value-bind (value found) (gethash (field-name field) data)
           (when (and found (not (blank-value-p value))
                      (unique-value-taken-p space-name (model-name model) (field-name field) value
@@ -134,7 +134,7 @@
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
          (live (content-published content))
-         (data (fill-slugs model (to-the-minute model (if replace patch (merge-data current patch))))))
+         (data (to-the-minute model (if replace patch (merge-data current patch)))))
     (check-unchanged-since content since)
     (cond ((same-data-p model data current) (values content :unchanged))
           ((and live (same-data-p model data live))
@@ -242,6 +242,12 @@
 (defun resolve-content (space-name model-name id)
   (or (find-content space-name model-name id)
       (fail 'not-found (format nil "Content ~a does not exist" id))))
+
+(defun content-by-slug (space-name model-name slug)
+  (let ((found (find-contents-by-slug space-name model-name slug)))
+    (if (= (length found) 1)
+        (first found)
+        (fail 'not-found (format nil "No content has the slug ~a" slug)))))
 
 (defparameter +bulk-actions+
   '(("publish" :publish publish)
