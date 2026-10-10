@@ -3,7 +3,7 @@
   (:import-from #:jingle
                 #:set-response-status #:*request* #:request-content)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/http #:param)
+  (:import-from #:koya-server/web/lib/http #:param #:integer-param)
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
@@ -202,8 +202,7 @@
   (hsx (<> (begin-import))))
 
 (defaction continue-import-action :post (params)
-  (let* ((raw (param params "offset"))
-         (offset (and (stringp raw) (handler-case (parse-integer raw) (parse-error () nil)))))
+  (let ((offset (integer-param params "offset")))
     (handler-case
         (hsx (<> (princ-to-string (continue-import (param params "id") offset
                                                    (request-content *request*)))))

@@ -384,3 +384,8 @@
       (admin-octets :post "/admin/api/website/lists/blog" (coerce #(123 34 100 34 58 34 255 34 125) '(vector (unsigned-byte 8))))
     (ok (= status 400) "a body that is not UTF-8 is no JSON")
     (ok (string= (jget json "error" "code") "bad_json"))))
+
+(deftest a-list-query-value-that-is-not-text-is-none
+  (multiple-value-bind (status json) (admin :get "/admin/api/website/lists/blog" :body (jobject "orders" 1 "q" 1))
+    (ok (= status 200) "a value that is not text, here from a JSON body, is no part of the query")
+    (ok (jget json "contents"))))

@@ -27,6 +27,8 @@
            #:read-json-body
            #:path-param
            #:param
+           #:integer-param
+           #:integer-text
            #:blank-p
            #:redirect-to
            #:body-field
@@ -125,7 +127,13 @@
 
 (defun param (params name)
   (let ((v (cdr (assoc name params :test #'equal))))
-    (if (and (stringp v) (blank-p v)) nil v)))
+    (and (stringp v) (not (blank-p v)) v)))
+
+(defun integer-text (text)
+  (and text (handler-case (parse-integer text) (parse-error () nil))))
+
+(defun integer-param (params name)
+  (integer-text (param params name)))
 
 (defun redirect-to (path &optional (status 303))
   (redirect path status))
