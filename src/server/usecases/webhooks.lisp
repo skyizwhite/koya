@@ -1,5 +1,6 @@
 (defpackage #:koya-server/usecases/webhooks
   (:use #:cl)
+  (:import-from #:koya-core/json #:blank-p)
   (:import-from #:koya-core/schema #:model-name #:webhook-covers-p #:webhook-label #:webhook-url)
   (:import-from #:koya-server/usecases/ports/spaces #:space-webhooks)
   (:import-from #:quri #:uri #:uri-host #:uri-error)
@@ -36,7 +37,7 @@
 
 (defun url-host (url)
   (let ((host (handler-case (uri-host (uri url)) (uri-error () nil))))
-    (and host (plusp (length host)) (string-trim "[]" host))))
+    (and (not (blank-p host)) (string-trim "[]" host))))
 
 (defun url-reach (url)
   (let* ((host (url-host url))

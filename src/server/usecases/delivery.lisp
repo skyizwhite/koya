@@ -32,9 +32,6 @@
     (and content (content-published content)
          (deliver content target space :include include))))
 
-(defun rows-of (value)
-  (and (json-array-p value) value))
-
 (defun next-fields (space field)
   (case (field-type field)
     (:custom (field-fields field))
@@ -68,7 +65,7 @@
               (when (hash-table-p value)
                 (setf (gethash name object) (embed-references (copy-object value) (field-fields field) space nested))))
             (:repeater
-              (when (rows-of value)
+              (when (json-array-p value)
                 (setf (gethash name object)
                       (map 'vector (lambda (row)
                                      (let ((kind (row-kind field row)))
@@ -89,7 +86,7 @@
     (let ((value (gethash (field-name field) object)))
       (case (field-type field)
         (:media
-         (cond ((rows-of value)
+         (cond ((json-array-p value)
                 (setf (gethash (field-name field) object)
                       (coerce (remove nil (map 'list (lambda (id) (and (stringp id) (find-media space id))) value)) 'vector)))
                ((and value (not (eq value json-null)))
@@ -100,7 +97,7 @@
            (setf (gethash (field-name field) object)
                  (expand-media (copy-object value) (field-fields field) space))))
         (:repeater
-         (when (rows-of value)
+         (when (json-array-p value)
            (setf (gethash (field-name field) object)
                  (map 'vector (lambda (row)
                                 (let ((kind (row-kind field row)))
