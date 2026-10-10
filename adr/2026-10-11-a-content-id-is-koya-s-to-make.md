@@ -20,5 +20,7 @@ Creating a content that gives `id` is refused, not given another id in silence.
 
 - An import from another CMS gets new ids; references between the imported
   contents are written with them.
+- koya-sdk no longer exports `make-ulid`, which a site used to make an id to
+  give.
 - Ids given before stay as they are, and a space's archive keeps its ids when it
   is imported, so that its references hold.
