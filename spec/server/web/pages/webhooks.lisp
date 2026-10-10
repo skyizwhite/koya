@@ -18,7 +18,9 @@
 
 (deftest webhook-log-page
   (let ((hooked (make-schema :webhooks (list (make-webhook "revalidate" "https://site.test/api/revalidate")
-                                             (make-webhook "blog-build" "https://site.test/api/build" :only '(blog about)))
+                                             (make-webhook "blog-build" "https://site.test/api/build" :only '(blog))
+                                             (make-webhook "search-index" "https://site.test/api/index"
+                                                           :only '(blog about)))
                              :models (list (blog-model)
                                            (make-model "about" :object (list (make-field :body :richtext)))))))
     (unwind-protect
@@ -43,8 +45,10 @@
                (ok (search "View log" body))
                (ok (cl-ppcre:scan "revalidate</span><span[^>]*>all models</span>" body)
                    "a webhook's label, then all models when it has no :only")
-               (ok (cl-ppcre:scan "blog-build</span><span[^>]*>blog, about</span>" body)
-                   "and one with :only names the models it covers")))
+               (ok (cl-ppcre:scan "blog-build</span><span[^>]*>blog</span>" body)
+                   "one with :only names the model it covers")
+               (ok (cl-ppcre:scan "search-index</span><span[^>]*>blog, about</span>" body)
+                   "and several, joined by commas")))
            (testing "an object model the webhooks leave out offers no log"
              (multiple-value-bind (status body)
                  (let ((narrow (make-schema :webhooks (list (make-webhook "blog-build" "https://site.test/api/build"
