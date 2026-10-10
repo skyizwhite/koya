@@ -21,6 +21,7 @@ which is why one repository holds all three. A site depends on `koya-sdk` alone;
 ```
 koya-core.asd  koya-sdk.asd  koya-server.asd  koya-spec.asd
 qlfile  justfile  Dockerfile
+.githooks/            ; pre-commit: just lint and just spec
 adr/                  ; one file per design decision
 docs/                 ; this, and the documents above
 src/
@@ -28,13 +29,13 @@ src/
                       ; case, time, ulid, and main, which re-exports them
   sdk/                ; the koya-sdk system (MIT)
     main.lisp         ; the koya-sdk package: the site's API from config, client and core
-    config.lisp       ; defmodel / defwebhooks / current-schema
+    config.lisp       ; defmodel / defcustomfield / defwebhooks / current-schema
     client.lisp       ; plan / deploy / pull, get-list …, the admin API wrappers
   server/             ; the koya-server system (AGPL)
     main.lisp         ; the composition root: loads infra/, then web/
     domain/           ; what koya is made of: content, media, revision, deploy,
                       ; key, webhook-delivery, references, query, errors, image,
-                      ; totp, timezone
+                      ; totp, timezone, address, html, number
     usecases/         ; what koya does, knowing neither HTTP nor SQL, one file
                       ; per part: contents (writes), listing (the admin's reads),
                       ; delivery (the delivery API's reads), revisions, spaces,
@@ -47,10 +48,12 @@ src/
                       ; every one
     infra/            ; the ports, implemented: main (all of infra, as main loads it),
                       ; env, media-files, webhook-sender, archives, and
-      db/             ;   main, connection, migrations, schema.sql, one file per table
+      db/             ;   main, connection, migrations, schema.sql, schema-dump,
+                      ;   content-query, schema-store, and one file per table
     web/              ; the way in: app, which mounts the routers below behind the middlewares
       lib/            ;   middlewares, http, auth, presenters, forms, media, paging,
-                      ;   display, urls, assets, document, target
+                      ;   display, urls, assets, document, target, binds, health,
+                      ;   list-content, toast
       pages/          ;   the admin UI (ningle-fbr: the directory is the URL), GET only
       ui/             ;   hsx components shared by pages: layout, icon, toast,
                       ;   elements at the top; content/ and media/ below
@@ -177,7 +180,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Layer | |
 |---|---|
 | HTTP | Clack / Lack; Hunchentoot in development, Woo in production |
-| Middlewares | lack-mw: Lack's own, and the guards combined with `mw-every` / `mw-some` / `mw-except` |
+| Middlewares | lack-mw: Lack's own, and the guards combined with `mw-every` / `mw-except` |
 | Router | jingle (a ningle extension) + ningle-fbr |
 | Templates | hsx; ningle-actions for everything done on a page |
 | Browser | Nomini (requests, swaps and a page's state), `koya.js` (what a page holds) |
@@ -187,6 +190,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Archives | zippy (a space's export and import) |
 | Other | ironclad, local-time, cl-dotenv, Tailwind CSS v4 (standalone) |
 | Checks | okite: the ports as the server loads, the layers in the tests |
+| Lint | mallet (`just lint`, and the pre-commit hook) |
 | Spec | rove (`koya-spec`) |
 
 The four apps — pages, delivery API, admin API and actions — are separate ningle

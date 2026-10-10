@@ -87,7 +87,9 @@ they are made and deleted.
   be — it must fit its model, its ids and unique values must not repeat, and its
   timestamps need a date, a time and a zone (they are kept in UTC) — and a media
   or key that another space already holds is refused; the first problem is named
-  and nothing changes. Nothing is sent to the webhooks. A bar
+  and nothing changes. Slugs are taken as they are: contents that share one are
+  imported, and find nothing by that slug until one is changed. Nothing is sent
+  to the webhooks. A bar
   shows the upload; the server then makes the space in one step and answers
   nothing else until it is done.
 
@@ -211,8 +213,8 @@ content can be seen on the left, what can be done to it on the right:
 
 | Button | What it does |
 |---|---|
-| **Preview draft** | opens the model's preview URL for this draft — shown when the schema gives the model a `previewUrl` and a draft exists |
-| **Published page** | opens the content on the site — shown when the schema gives the model a `publicUrl` and the content is published |
+| **Preview draft** | opens the model's preview URL for this draft — shown when the schema gives the model a `previewUrl` and a draft exists, and, when the URL uses `{CONTENT_SLUG}`, the draft's slug is not blank |
+| **Published page** | opens the content on the site — shown when the schema gives the model a `publicUrl` and the content is published, and, when the URL uses `{CONTENT_SLUG}`, the published slug is not blank |
 | **History** | the content's revisions, and where an old version is restored from — see [History](#history) |
 | **Webhooks** | an object model's delivery log — shown while a webhook covers the model |
 | **Discard draft** | throws the draft away and goes back to the published version — asks first |
@@ -288,8 +290,9 @@ goes back to the current data.
 
 The schema and the space may have changed since the version was written, so not
 everything always comes back. The banner lists each field that did not: a value
-that no longer fits the field leaves the current value in place, and a reference
-or media that has since been deleted is dropped. A custom field comes back as
+that no longer fits the field, or a unique value or slug another content has
+taken since, leaves the current value in place, and a reference or media that
+has since been deleted is dropped. A custom field comes back as
 one value: a reference inside it to a content now missing or unpublished, or a
 media that is gone, is dropped, and the banner names the custom field. A
 repeater comes back with its rows the same way, and the banner names the

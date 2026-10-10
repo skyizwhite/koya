@@ -1,5 +1,5 @@
 # koya: one image with the server; SQLite and uploaded media live under /data.
-# Published as ghcr.io/skyizwhite/koya (see README, "Deployment"). Run it with
+# Published as ghcr.io/skyizwhite/koya (see README, "Running it"). Run it with
 # port 3100 exposed, a volume at /data, and KOYA_SECRET and KOYA_BASE_URL set.
 
 # --- build: dependencies, stylesheet, and the server saved as one executable ---

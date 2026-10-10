@@ -76,7 +76,7 @@ const { contents, totalCount, offset, limit } = await res.json();
 | `q` | search: the text of the model's `text`, `textarea`, `slug` and `richtext` fields, those inside a custom field or a repeater's rows included, contains it, or it is a content's whole id. Combined with `filters`, both apply |
 | `include` | reference fields to embed, dotted for nesting and to reach into a custom field or a repeater's rows: `tags,author.team,meta.author,blocks.by` |
 | `fields` | top-level keys to keep in each content: `id,title` |
-| `draftKey` | on one list content or an object, serves its draft instead — for previews |
+| `draftKey` | on one list content, by id or slug, or an object, serves its draft instead — for previews |
 
 `limit`, `offset`, `orders`, `filters` and `q` apply to a list; an object ignores
 them. A list model is not found under `objects/` nor an object model under
@@ -118,8 +118,8 @@ given anything else, is `400 bad_query`.
 id, and the reply is the same. The slug found is the published one; with the
 content's `draftKey`, its draft's slug finds it too. A key that is not the
 content's finds it by its published slug only, so a draft's slug is not given
-away. Nothing found, a model without a slug field, or a slug two contents hold
-(only contents stored before slugs were unique can) is `404`.
+away. Nothing found, a model without exactly one slug field, or a slug two
+contents hold (only contents stored before slugs were unique can) is `404`.
 
 **Previews.** A content's draft is served by the delivery API to whoever has its
 draft key. The editor's *Preview draft* link opens the model's `previewUrl` with
@@ -304,7 +304,7 @@ route, is answered with `413 too_large` before koya reads it.
 | 401 | `unauthorized` | no key, or a wrong one |
 | 403 | `forbidden` | a key of another space; a space that does not exist is another space too |
 | 404 | `not_found` | no such model, content or media |
-| 409 | `conflict` `destructive_changes` `contents_do_not_fit` `in_use` `not_published` `no_draft` `object_exists` | refused as things stand |
+| 409 | `destructive_changes` `contents_do_not_fit` `in_use` `not_published` `no_draft` `object_exists` | refused as things stand |
 | 413 | `too_large` | images over 20 MB, alone or together, or a request body over 21 MB |
 | 422 | `validation_failed` `empty_file` `unsupported_type` | the content or file is not acceptable |
 | 500 | `internal_error` | the message is only detailed with `KOYA_ENV=dev` |

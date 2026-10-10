@@ -165,7 +165,7 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
 | `:select` | `:required` `:options` `:many` | one of `:options`, or an array of them |
 | `:media` | `:required` `:many` | media id, or an array of them with `:many` (expanded to objects by the delivery API) |
 | `:reference` | `:required` `:model` `:many` | content id (embeddable with `include`) |
-| `:slug` | `:required` `:pattern` | lowercase-hyphen string, unique within the model; a list model has one at most, an object model none |
+| `:slug` | `:required` `:pattern` | lowercase-hyphen string, unique within the model; a list model has one at most, an object model none, which the server checks when the schema is planned or deployed |
 | `:custom` | `:required` `:custom-field` | an object of the custom field's fields |
 | `:repeater` | `:required` `:custom-fields` | an array of rows, each naming its custom field in `fieldId` beside that custom field's fields |
 
@@ -206,8 +206,8 @@ one to a model, or to a list of them; it takes symbols or strings, and each name
 must be a model of the schema, so a typo fails before anything is sent. A webhook
 without `:only` also covers models added later. Labels must be unique.
 
-Every webhook is sent every event — `publish`, `unpublish`, `delete`, `draft`
-and `discard` — with the space's webhook secret in `X-KOYA-WEBHOOK-KEY`, which
+Every webhook is sent every event — `publish`, `unpublish`, `delete`, `draft`,
+`discard` and `deploy` — with the space's webhook secret in `X-KOYA-WEBHOOK-KEY`, which
 `(koya-sdk:webhook-secret)` returns. The payload and when each event fires are
 in [API.md, "Webhooks"](API.md#webhooks).
 
@@ -249,10 +249,11 @@ rules are in [SCHEMA.md, "Renames"](SCHEMA.md#renames).
 (koya-sdk:pull)                ; the schema the server currently stores, as a schema object
 ```
 
-All four work on `koya-sdk:*space*`, or on the `:space` given to them. **The
-space must already exist**: it is made in the admin UI, and a deploy to a name
-that has none is refused with `404 not_found` rather than quietly making one, so
-a typo in `KOYA_SPACE` cannot grow a second, empty space.
+All three work on `koya-sdk:*space*`, or on the `:space` given to them. **The
+space must already exist**: it is made in the admin UI, and a deploy is refused
+with `403 forbidden` rather than quietly making one: a management key reaches its
+own space and nothing else, so a typo in `KOYA_SPACE` cannot grow a second, empty
+space.
 
 Both `plan` and `deploy` take `:schema` (defaulting to `(current-schema)`) and
 `:stream`; `deploy` also takes `:confirm` (default `t`). When a deploy would
@@ -394,6 +395,8 @@ An object is reached through its model, with no id:
   unpublishing needs a published content (`not_published`), and discarding a
   draft a published content with a draft (`not_published`, `no_draft`).
   The table is in [API.md](API.md#managing-content).
+- A content other contents refer to cannot be unpublished or deleted
+  (`409 in_use`).
 
 ## Delivery keys and the webhook secret
 
