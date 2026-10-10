@@ -1,6 +1,5 @@
 (defpackage #:koya-server/web/pages/s/<space>/keys
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/usecases/keys
                 #:space-webhook-secret #:rotate-webhook-secret #:create-delivery-key
                 #:list-delivery-keys #:delete-delivery-key #:create-management-key

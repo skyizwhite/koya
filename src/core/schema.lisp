@@ -1,8 +1,7 @@
 (defpackage #:koya-core/schema
   (:use #:cl)
   (:import-from #:koya-core/case
-                #:camel-key
-                #:kebab-keyword)
+                #:camel-key)
   (:import-from #:koya-core/json
                 #:jobject
                 #:jget

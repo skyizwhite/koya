@@ -3,7 +3,7 @@
   (:import-from #:dexador)
   (:import-from #:usocket #:get-hosts-by-name)
   (:import-from #:quri #:uri #:make-uri #:uri-scheme #:uri-host #:uri-port #:uri-path #:uri-query
-                #:merge-uris #:render-uri)
+                #:merge-uris #:render-uri #:uri-error)
   (:import-from #:koya-server/domain/address #:address-string)
   (:import-from #:dexador.error
                 #:http-request-failed #:response-status #:response-body)
@@ -25,7 +25,7 @@
 
 (defun redirection (url status headers)
   (let ((location (and (member status '(301 302 303 307 308)) (gethash "location" headers))))
-    (and location (ignore-errors (render-uri (merge-uris (uri location) (uri url)))))))
+    (and location (handler-case (render-uri (merge-uris (uri location) (uri url))) (uri-error () nil)))))
 
 (defmethod send-webhook (url payload headers address)
   (handler-case

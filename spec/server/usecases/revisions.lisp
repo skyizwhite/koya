@@ -63,9 +63,9 @@
       (ok (equal (notes-of notes) '("lede"))))))
 
 (deftest what-the-space-no-longer-has
-  (let* ((live (create "site" (find-model "site" "tag") (object "name" "live") :publish t))
-         (drafted (create "site" (find-model "site" "tag") (object "name" "draft")))
-         (media (insert-media "site" :filename "c.png" :mime "image/png" :size 1)))
+  (let ((live (create "site" (find-model "site" "tag") (object "name" "live") :publish t))
+        (drafted (create "site" (find-model "site" "tag") (object "name" "draft")))
+        (media (insert-media "site" :filename "c.png" :mime "image/png" :size 1)))
     (testing "references to what is gone or unpublished are dropped, the rest kept"
       (multiple-value-bind (data notes)
           (restore-data "site" (post) "x"

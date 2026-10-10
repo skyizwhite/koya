@@ -276,7 +276,7 @@
 (defun requested-revision (params content)
   (let ((raw (param params "revision")))
     (when (and raw content)
-      (let* ((n (ignore-errors (parse-integer raw)))
+      (let* ((n (handler-case (parse-integer raw) (parse-error () nil)))
              (revision (and n (find-revision (content-space content) (content-id content) n))))
         (values revision (null revision))))))
 
@@ -342,7 +342,7 @@
                 (done space model (discard space model (content-id content) :since (param params "updated-at"))
                       "Draft discarded."))
                ((and object-p (string= op "publish"))
-                (done space model (publish-object space model data :since (param params "updated-at")) "Published."))
+                (done space model (publish-object space model :data data :since (param params "updated-at")) "Published."))
                ((and object-p (null content))
                 (done space model (update-object space model data) "Draft saved."))
                ((null content)
@@ -350,7 +350,7 @@
                   (move-on (content-url space model-name (content-id made))
                       (if (string= op "publish") "Published." "Draft saved."))))
                ((string= op "publish")
-                (done space model (publish space model (content-id content) data :since (param params "updated-at"))
+                (done space model (publish space model (content-id content) :data data :since (param params "updated-at"))
                       "Published."))
                (t
                 (multiple-value-bind (saved outcome) (update-draft space model (content-id content) data :replace t

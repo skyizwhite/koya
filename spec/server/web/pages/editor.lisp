@@ -2,9 +2,9 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/usecases/schema #:replace-schema #:resolve-model)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id>/history #:browse-history)
-  (:import-from #:koya-server/web/lib/binds #:on-click #:on-submit)
+  (:import-from #:koya-server/web/lib/binds #:on-click)
   (:import-from #:koya-spec/server/web/pages/support
-                #:replaced-url #:bound #:call-action #:edit #:moved-to #:blog-model #:request #:location #:setup-pages
+                #:replaced-url #:bound #:call-action #:edit #:moved-to #:blog-model #:request #:setup-pages
                 #:log-in #:asked-first)
   (:import-from #:koya-server/web/ui/content/editor #:editor-action #:repeater-row)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
@@ -316,8 +316,8 @@
                                                         :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
                                                         :public-url "https://site.test/blog/{CONTENT_ID}")
                                             (make-model "about" :object (list (make-field :body :richtext))))))
-    (let* ((published (find "publish" (list-revisions "website" id) :key #'revision-event :test #'string=))
-           (before (count-revisions "website" id)))
+    (let ((published (find "publish" (list-revisions "website" id) :key #'revision-event :test #'string=))
+          (before (count-revisions "website" id)))
       (testing "a restore fills the editor with what can come back, and says what cannot"
         (multiple-value-bind (status body)
             (request :get url :query (format nil "revision=~a" (revision-id published)))

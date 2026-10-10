@@ -4,7 +4,7 @@
                 #:load-env)
   (:import-from #:koya-server/usecases/ports/config
                 #:public-url #:owner-secret #:dev-mode-p)
-  (:import-from #:quri #:uri #:uri-scheme #:uri-host)
+  (:import-from #:quri #:uri #:uri-scheme #:uri-host #:uri-error)
   (:export #:env
            #:setting-error
            #:setting-error-problems
@@ -49,7 +49,7 @@
   (let ((value (env "KOYA_BASE_URL")))
     (cond ((null value)
            "KOYA_BASE_URL is not set: give the URL the server is reached at, such as https://cms.example.com")
-          ((not (let ((uri (ignore-errors (uri value))))
+          ((not (let ((uri (handler-case (uri value) (uri-error () nil))))
                   (and uri (member (uri-scheme uri) '("http" "https") :test #'equal)
                        (plusp (length (or (uri-host uri) ""))))))
            (format nil "KOYA_BASE_URL must be an http or https URL, not ~s" value)))))

@@ -1,7 +1,7 @@
 (defpackage #:koya-spec/server/usecases/contents
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/errors #:conflict #:invalid-input #:not-found #:koya-error-code)
-  (:import-from #:koya-server/domain/key #:key-id #:key-label)
+  (:import-from #:koya-server/domain/key #:key-label)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:fetch-one #:col #:exec)
@@ -9,7 +9,7 @@
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-server/usecases/ports/contents
-                #:get-content #:find-content #:list-contents
+                #:get-content #:list-contents
                 #:find-object-content #:unique-value-taken-p #:list-revisions
                 #:count-revisions #:find-revision)
   (:import-from #:koya-server/usecases/contents
@@ -26,7 +26,7 @@
                 #:create-delivery-key #:list-delivery-keys #:delete-delivery-key
                 #:space-for-delivery-key)
   (:import-from #:koya-server/domain/query
-                #:parse-query #:make-query #:query-limit #:query-offset #:query-orders
+                #:parse-query #:make-query #:query-limit #:query-offset
                 #:query-filters #:query-fields #:query-include #:query-error)
   (:import-from #:koya-core/validate #:validation-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name #:make-custom-field)
@@ -116,8 +116,8 @@
       (ok (= (count-revisions "website" id :published-only t) 1))
       (ok (equal (mapcar #'revision-event (list-revisions "website" id :published-only t)) '("publish"))))
     (testing "what changes nothing that was live is not an event"
-      (let* ((draft (make "{\"title\": \"Never live\"}"))
-             (live (make "{\"title\": \"Live\"}" :publish t)))
+      (let ((draft (make "{\"title\": \"Never live\"}"))
+            (live (make "{\"title\": \"Live\"}" :publish t)))
         (ok (signals (unpublish "website" (blog) (content-id draft)) 'conflict)
             "a content that was never published cannot be unpublished")
         (ok (equal (mapcar #'revision-event (list-revisions "website" (content-id draft))) '("draft")) "and nothing is kept")
@@ -168,13 +168,13 @@
         (ok (string= (content-id (object-content "website" about)) id) "and makes no second")))
     (testing "publishing publishes the draft, or the data given"
       (ok (string= (jget (content-published (publish-object "website" about)) "body") "draft"))
-      (ok (string= (jget (content-published (publish-object "website" about (data "{\"body\": \"given\"}"))) "body")
+      (ok (string= (jget (content-published (publish-object "website" about :data (data "{\"body\": \"given\"}"))) "body")
                    "given"))))
   (testing "a first write can publish at once"
     (exec "DELETE FROM contents")
     (let ((about (find-model "website" "about")))
       (ok (signals (publish-object "website" about) 'not-found) "though not with no data at all")
-      (ok (string= (content-status (publish-object "website" about (data "{\"body\": \"live\"}"))) "published")))))
+      (ok (string= (content-status (publish-object "website" about :data (data "{\"body\": \"live\"}"))) "published")))))
 
 (deftest an-object-content-is-not-deleted
   (let* ((about (find-model "website" "about"))
@@ -345,7 +345,7 @@
       (testing "a change and a publish keep it to the minute too"
         (update-draft "website" model id (data "{\"at\": \"2024-03-01T08:30:15+01:00\"}"))
         (ok (string= (jget (content-draft (get-content "website" id)) "at") "2024-03-01T07:30:00.000Z"))
-        (publish "website" model id (data "{\"at\": \"2024-04-01T00:00:01Z\"}"))
+        (publish "website" model id :data (data "{\"at\": \"2024-04-01T00:00:01Z\"}"))
         (ok (string= (jget (content-published (get-content "website" id)) "at") "2024-04-01T00:00:00.000Z"))))))
 
 (deftest a-missing-boolean-and-false-are-the-same-draft

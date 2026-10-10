@@ -8,7 +8,8 @@
   (:import-from #:koya-server/usecases/contents #:create)
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/usecases/ports/media
-                #:find-media #:list-media #:count-media #:update-media #:media-file-path)
+                #:find-media #:list-media #:count-media #:update-media #:media-file-path
+                #:insert-media #:delete-media-file)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-spec/server/domain/image #:jpeg #:octets)
   (:import-from #:koya-server/web/lib/presenters #:media-url #:media->jobject)
@@ -41,9 +42,9 @@
                            (be32 width) (be32 height) '(8 6 0 0 0)))))
 
 (defun multipart-body (parts)
-  (let* ((boundary "----koyatest")
-         (crlf (string-to-octets (format nil "~c~c" #\Return #\Linefeed)))
-         (chunks '()))
+  (let ((boundary "----koyatest")
+        (crlf (string-to-octets (format nil "~c~c" #\Return #\Linefeed)))
+        (chunks '()))
     (flet ((text (s) (push (string-to-octets s :encoding :utf-8) chunks))
            (raw (o) (push o chunks)))
       (dolist (part parts)
@@ -199,6 +200,23 @@
       (delete-file blocker))
     (ok (= (count-media "website") before) "and no row names the file it could not write")))
 
+(deftest a-failed-insert-is-the-error-told
+  (let* ((left nil)
+         (insert (defmethod insert-media :around (space &key &allow-other-keys)
+                   (declare (ignore space))
+                   (error "The row is not written")))
+         (cleanup (defmethod delete-media-file :around (space id mime)
+                    (setf left (list space id mime))
+                    (error "The file will not go"))))
+    (unwind-protect
+         (ok (equal (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
+                      (error (e) (princ-to-string e)))
+                    "The row is not written")
+             "the insert's error, not the one taking its file away")
+      (remove-method #'insert-media insert)
+      (remove-method #'delete-media-file cleanup)
+      (when left (apply #'delete-media-file left)))))
+
 (deftest removing-each-goes-past-a-file-that-will-not-go
   (let* ((stuck (store-upload "website" (png-bytes) :filename "stuck.png"))
          (free (store-upload "website" (png-bytes) :filename "free.png"))
@@ -226,8 +244,8 @@
   (replace-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
                                                                                      (make-field :photos :media :many t))))))
   (unwind-protect
-       (let* ((a (store-upload "website" (png-bytes) :filename "a.png"))
-              (b (store-upload "website" (png-bytes) :filename "b.png")))
+       (let ((a (store-upload "website" (png-bytes) :filename "a.png"))
+             (b (store-upload "website" (png-bytes) :filename "b.png")))
          (create "website" (find-model "website" "blog") (parse-json (format nil "{\"title\": \"x\", \"photos\": [\"~a\", \"~a\"]}" (media-id a) (media-id b))))
          (ok (= (length (media-references "website" (media-id b))) 1) "each one of them is a use")
          (ok (= (gethash (media-id a) (media-reference-counts "website" (list (media-id a)))) 1) "and the library counts it")

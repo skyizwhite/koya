@@ -6,7 +6,6 @@
                 #:validate-content #:validation-error #:blank-value-p #:content-id-p #:datetime-string-p
                 #:validation-error-errors)
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
-  (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:invalid-input #:not-found #:koya-error #:koya-error-message)
@@ -93,12 +92,12 @@
   content)
 
 (defun create (space model data &key publish id created-at updated-at published-at revised-at)
-  (let* ((space-name space)
-         (model-name (model-name model))
-         (created-at (check-timestamp "createdAt" created-at))
-         (updated-at (check-timestamp "updatedAt" updated-at))
-         (published-at (check-published-at published-at))
-         (revised-at (check-timestamp "revisedAt" revised-at)))
+  (let ((space-name space)
+        (model-name (model-name model))
+        (created-at (check-timestamp "createdAt" created-at))
+        (updated-at (check-timestamp "updatedAt" updated-at))
+        (published-at (check-published-at published-at))
+        (revised-at (check-timestamp "revisedAt" revised-at)))
     (fill-defaults model data)
     (to-the-minute model data)
     (let ((content
@@ -146,7 +145,7 @@
            (check-content space model data :exclude-id id)
            (values (store (drafted content data) "draft" data) :saved)))))
 
-(defun publish (space model id &optional data &key published-at since)
+(defun publish (space model id &key data published-at since)
   (let ((published-at (check-published-at published-at)))
     (multiple-value-bind (live old)
         (with-transaction (publish-now space model id data published-at since))
@@ -226,9 +225,9 @@
         (update-draft space model (content-id content) data :replace replace :since since)
         (create space model data))))
 
-(defun publish-object (space model &optional data &key published-at since)
+(defun publish-object (space model &key data published-at since)
   (let ((content (find-object-content space (model-name model))))
-    (cond (content (publish space model (content-id content) data :published-at published-at :since since))
+    (cond (content (publish space model (content-id content) :data data :published-at published-at :since since))
           (data (create space model data :publish t :published-at published-at))
           (t (object-content space model)))))
 

@@ -1,7 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/m/<model>/index
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
@@ -244,13 +243,13 @@
              (format nil "~a content~:p" total)))))
 
 (defcomp ~content-list (&key space model state contents pages)
-  (let* ((model-name (model-name model))
-         (fields (model-fields model))
-         (ref-labels (reference-labels space model contents))
-         (media (page-media space model contents))
-         (page (getf state :page))
-         (search-text (getf state :search-text))
-         (status (getf state :status)))
+  (let ((model-name (model-name model))
+        (fields (model-fields model))
+        (ref-labels (reference-labels space model contents))
+        (media (page-media space model contents))
+        (page (getf state :page))
+        (search-text (getf state :search-text))
+        (status (getf state :status)))
     (hsx
      (div :id "contents"
        (if (null contents)
@@ -356,10 +355,10 @@
               (format nil "~a could not be~@[: ~a~]" failed message)))))
 
 (defaction bulk-contents :post (params)
-  (let* ((space (param params "space"))
-         (model (target-model params))
-         (op (param params "op"))
-         (ids (form-list params "id")))
+  (let ((space (param params "space"))
+        (model (target-model params))
+        (op (param params "op"))
+        (ids (form-list params "id")))
     (cond ((or (null model) (not (bulk-action-p op)))
            (action-refusal "Unknown model or action." 404))
           (t
@@ -371,8 +370,8 @@
              (answer-list space model (read-state params model) :message message :kind kind))))))
 
 (defaction browse-contents :get (params)
-  (let* ((space (param params "space"))
-         (model (target-model params)))
+  (let ((space (param params "space"))
+        (model (target-model params)))
     (if (and model (eq (model-kind model) :list))
         (answer-list space model (read-state params model) :clear (equal (param params "clear") "1"))
         (action-refusal "Unknown model." 404))))

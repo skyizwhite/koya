@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/key #:key-id #:key-label #:hash-key)
   (:import-from #:koya-server/usecases/ports/keys #:insert-delivery-key)
-  (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
+  (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-spec/server/web/pages/support
                 #:moved-to #:post-login #:*secret* #:*cookie* #:request #:location #:setup-pages #:log-in)
@@ -241,6 +241,10 @@
         (ok (= 409 (post-piece (piece-url id 5) (subseq octets 0 5))) "one that skips ahead is refused")
         (ok (search "has 0 bytes" (nth-value 1 (post-piece (piece-url id 5) (subseq octets 0 5))))
             "and says where the import stands")
+        (ok (= 409 (request :post (continue-import-action) :query (format nil "id=~a" id) :headers +from-the-page+
+                            :multipart (list (list "offset" "offset.txt" "text/plain" (string-to-octets "0")))))
+            "one whose offset is a file is refused too")
+        (ok (= 409 (post-piece (piece-url id "abc") (subseq octets 0 5))) "and one whose offset is not a number")
         (ok (= 200 (post-piece (piece-url id 0) (subseq octets 0 5))))
         (ok (= 409 (post-piece (piece-url id 0) (subseq octets 0 5))) "one sent twice is refused")
         (ok (string= (string-trim '(#\Space) (nth-value 1 (post-piece (piece-url id 5) (subseq octets 5 9))))
@@ -268,6 +272,7 @@
       (ng (find-space "archive")))
     (testing "a file larger than an upload may be is refused before it is read"
       (let ((+max-upload-bytes+ 10))
+        (declare (special +max-upload-bytes+))
         (ok (string= (nth-value 1 (import-archive octets)) "/")))
       (ok (search "larger than an upload may be" (nth-value 1 (request :get "/"))))
       (ng (find-space "archive")))

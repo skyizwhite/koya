@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/content-list
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:on-follow #:on-search #:on-click)
+  (:import-from #:koya-server/web/lib/binds #:on-search)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:setup-pages #:log-in #:asked-first)
@@ -58,8 +58,8 @@
     (exec "DELETE FROM contents WHERE json_extract(COALESCE(draft, published), '$.title') LIKE 'Page filler %'")))
 
 (deftest list-search-filter-and-sort
-  (let* ((origin '(("origin" . "http://localhost:3000")))
-         (query '(("orders" . "-createdAt"))))
+  (let ((origin '(("origin" . "http://localhost:3000")))
+        (query '(("orders" . "-createdAt"))))
     (setf *cookie* nil)
     (post-login :form `(("secret" . ,*secret*)))
     (labels ((newest ()
@@ -322,24 +322,23 @@
 
 (deftest bulk-actions-leave-a-referenced-content
   (exec "DELETE FROM contents")
-  (let ((origin '(("origin" . "http://localhost:3000"))))
-    (multiple-value-bind (space model) (resolve-model "website" "blog")
-      (flet ((make (title &rest data)
-               (content-id (create space model (apply #'jobject "title" title data) :publish t))))
-        (let* ((target (make "Target"))
-               (other (make "Other"))
-               (referrer (make "Refers" "related" (vector target))))
-          (testing "unpublishing a selection skips the one another refers to"
-            (ok (search "Unpublished 1 content. 1 could not be: This content is referenced by 1 other content"
-                        (nth-value 1 (bulk "unpublish" (list target other)))))
-            (ok (content-published (get-content "website" target)) "it is still published")
-            (ng (content-published (get-content "website" other)) "the rest of the selection went"))
-          (testing "deleting a selection does the same"
-            (bulk "delete" (list target referrer))
-            (ok (get-content "website" target) "refused while the referrer was still there")
-            (ng (get-content "website" referrer))
-            (bulk "delete" (list target))
-            (ng (get-content "website" target) "and it goes once nothing refers to it")))))))
+  (multiple-value-bind (space model) (resolve-model "website" "blog")
+    (flet ((make (title &rest data)
+             (content-id (create space model (apply #'jobject "title" title data) :publish t))))
+      (let* ((target (make "Target"))
+             (other (make "Other"))
+             (referrer (make "Refers" "related" (vector target))))
+        (testing "unpublishing a selection skips the one another refers to"
+          (ok (search "Unpublished 1 content. 1 could not be: This content is referenced by 1 other content"
+                      (nth-value 1 (bulk "unpublish" (list target other)))))
+          (ok (content-published (get-content "website" target)) "it is still published")
+          (ng (content-published (get-content "website" other)) "the rest of the selection went"))
+        (testing "deleting a selection does the same"
+          (bulk "delete" (list target referrer))
+          (ok (get-content "website" target) "refused while the referrer was still there")
+          (ng (get-content "website" referrer))
+          (bulk "delete" (list target))
+          (ng (get-content "website" target) "and it goes once nothing refers to it"))))))
 
 (deftest the-list-is-read-in-place
   (exec "DELETE FROM contents")

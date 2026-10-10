@@ -393,7 +393,7 @@
           "and no data has no text")
       (update-draft "texts" (post) live (jobject "title" "Live, edited"))
       (ok (texts-fit-p "texts") "a draft saved")
-      (publish "texts" (post) live (jobject "title" "Live, edited" "body" "<p>again</p>"))
+      (publish "texts" (post) live :data (jobject "title" "Live, edited" "body" "<p>again</p>"))
       (ok (texts-fit-p "texts") "published")
       (update-draft "texts" (post) live (jobject "title" "Next"))
       (discard "texts" (post) live)

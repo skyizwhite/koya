@@ -63,7 +63,7 @@
           (insert-media space :id id :filename (safe-filename filename) :mime mime :size (length bytes)
                               :width width :height height :alt alt)
         (error (e)
-          (ignore-errors (delete-media-file space id mime))
+          (handler-case (delete-media-file space id mime) (error () nil))
           (error e))))))
 
 (defun store-uploads (space files &key (alt ""))

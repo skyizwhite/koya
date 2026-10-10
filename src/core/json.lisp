@@ -2,8 +2,10 @@
   (:use #:cl)
   (:import-from #:com.inuoe.jzon
                 #:parse
-                #:stringify)
+                #:stringify
+                #:json-parse-error)
   (:export #:parse-json
+           #:json-parse-error
            #:to-json
            #:json-null
            #:json-null-p

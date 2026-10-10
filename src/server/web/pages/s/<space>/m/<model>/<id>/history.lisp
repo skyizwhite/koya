@@ -16,7 +16,6 @@
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by
                 #:revision-created-at #:changed-keys)
-  (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/usecases/media #:find-media)
   (:import-from #:koya-server/domain/media #:media-filename)
   (:import-from #:koya-server/web/lib/http #:path-param #:param)
@@ -195,8 +194,8 @@
                :browse (lambda (n) (browse-history :space space :model model-name :id id :view view :page n)))))))
 
 (defcomp ~history-page (&key space model content published-only page)
-  (let* ((model-name (model-name model))
-         (id (content-id content)))
+  (let ((model-name (model-name model))
+        (id (content-id content)))
     (hsx
      (~layout :space space
               :crumbs (if (eq (model-kind model) :object)

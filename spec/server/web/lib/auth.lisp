@@ -64,7 +64,8 @@
     (ok (public-p "/log%69n") "decoded, as path-info is")
     (ok (public-p "http://localhost:3000/login") "a request line in absolute form")
     (ng (public-p "/login/extra"))
-    (ng (public-p "/%zz") "a path that does not decode is not public")))
+    (ng (public-p "/%zz") "a path that does not decode is not public")
+    (ng (public-p "/%ff") "nor one that does not decode as UTF-8")))
 
 (deftest the-admin-api-is-called-with-a-key-not-the-session
   (ok (= 401 (request :get "/admin/api/me")) "the owner's session does not reach it")

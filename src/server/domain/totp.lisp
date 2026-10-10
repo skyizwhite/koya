@@ -46,8 +46,8 @@
         (write-char (char +alphabet+ (ash bits (- 5 nbits))) out)))))
 
 (defun hotp (secret-octets counter &key (digits +digits+))
-  (let* ((message (make-array 8 :element-type '(unsigned-byte 8)))
-         (hmac (make-hmac secret-octets :sha1)))
+  (let ((message (make-array 8 :element-type '(unsigned-byte 8)))
+        (hmac (make-hmac secret-octets :sha1)))
     (loop :for i :from 7 :downto 0 :do (setf (aref message i) (ldb (byte 8 (* 8 (- 7 i))) counter)))
     (update-hmac hmac message)
     (let* ((digest (hmac-digest hmac))

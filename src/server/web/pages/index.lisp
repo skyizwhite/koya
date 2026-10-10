@@ -202,7 +202,8 @@
   (hsx (<> (begin-import))))
 
 (defaction continue-import-action :post (params)
-  (let ((offset (ignore-errors (parse-integer (or (param params "offset") "")))))
+  (let* ((raw (param params "offset"))
+         (offset (and (stringp raw) (handler-case (parse-integer raw) (parse-error () nil)))))
     (handler-case
         (hsx (<> (princ-to-string (continue-import (param params "id") offset
                                                    (request-content *request*)))))

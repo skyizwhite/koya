@@ -6,7 +6,7 @@
                 #:test-schema #:*management-key*)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-core/json #:jobject #:jget #:json-null #:jkeys #:parse-json)
+  (:import-from #:koya-core/json #:jobject #:jget #:json-null #:jkeys #:parse-json #:json-parse-error)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
   (:import-from #:koya-server/web/app #:app))
@@ -301,9 +301,9 @@
         (ok (= 200 (admin :post (format nil "/admin/api/website/lists/tag/~a/unpublish" tag))))
         (ok (= 200 (admin :delete (format nil "/admin/api/website/lists/tag/~a" tag)))))))
   (testing "a reference field removed by a deploy no longer holds anything"
-    (let* ((tag (jget (nth-value 1 (admin :post "/admin/api/website/lists/tag"
-                                          :body (jobject "data" (jobject "name" "cl") "publish" t)))
-                      "id")))
+    (let ((tag (jget (nth-value 1 (admin :post "/admin/api/website/lists/tag"
+                                         :body (jobject "data" (jobject "name" "cl") "publish" t)))
+                     "id")))
       (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Keeps an id" "tags" (vector tag))))
       (ok (= 409 (admin :delete (format nil "/admin/api/website/lists/tag/~a" tag))))
       (replace-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text :required t)))
@@ -362,7 +362,7 @@
                    :raw-body (make-in-memory-input-stream octets))))
     (destructuring-bind (status headers body) (funcall (app) env)
       (declare (ignore headers))
-      (values status (ignore-errors (parse-json (apply #'concatenate 'string (if (listp body) body (list body)))))))))
+      (values status (handler-case (parse-json (apply #'concatenate 'string (if (listp body) body (list body)))) (json-parse-error () nil))))))
 
 (deftest wrongly-typed-input-is-refused
   (multiple-value-bind (status json)

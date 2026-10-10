@@ -18,8 +18,8 @@
              "webhookSecret" (space-webhook-secret space))))
 
 (defun @post (params)
-  (let* ((space (resolve-space (path-param params :space)))
-         (label (body-field (read-json-body) "label" "")))
+  (let ((space (resolve-space (path-param params :space)))
+        (label (body-field (read-json-body) "label" "")))
     (unless (stringp label) (fail-api 400 "bad_request" "\"label\" must be a string"))
     (multiple-value-bind (key id) (create-delivery-key space :label label)
       (ok-status 201)
