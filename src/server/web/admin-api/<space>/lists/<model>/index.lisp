@@ -25,7 +25,7 @@
       (unless (hash-table-p data) (fail-api 400 "bad_request" "\"data\" must be an object"))
       (unless (member (body-field body "publish") (list t nil json-null))
         (fail-api 400 "bad_request" "\"publish\" must be true or false"))
-      (unless (member (body-field body "id") (list nil json-null))
+      (unless (eq (body-field body "id" json-null) json-null)
         (fail-api 400 "bad_request" "\"id\" is made by the server"))
       (let ((content (create space model data :publish (eq (body-field body "publish") t)
                              :created-at (body-field body "createdAt")

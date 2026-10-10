@@ -71,7 +71,7 @@ const { contents, totalCount, offset, limit } = await res.json();
 |---|---|
 | `limit` | default 10; above 100 is clamped to 100 |
 | `offset` | default 0; above 2^63−1 answers `400 bad_query` |
-| `orders` | comma-separated field names, `-` for descending: `-publishedAt,title`. Default: newest published first. `id` orders by the ids' text; `createdAt` by when the contents were made |
+| `orders` | comma-separated field names, `-` for descending: `-publishedAt,title`. Default: newest published first. `id` orders by the ids' text, not by when the contents were made; `createdAt` by its value, which an import may have given |
 | `filters` | see below |
 | `q` | search: the text of the model's `text`, `textarea`, `slug` and `richtext` fields, those inside a custom field or a repeater's rows included, contains it, or it is a content's whole id. Combined with `filters`, both apply |
 | `include` | reference fields to embed, dotted for nesting and to reach into a custom field or a repeater's rows: `tags,author.team,meta.author,blocks.by` |

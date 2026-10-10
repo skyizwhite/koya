@@ -164,6 +164,8 @@
         (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "x") "id" "hg2papkhis4"))
           (ok (= status 400) "an id given on create is refused, not replaced")
           (ok (string= (jget json "error" "code") "bad_request")))
+        (multiple-value-bind (status) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "x") "id" nil))
+          (ok (= status 400) "false is not absent"))
         (ok (= (tags) before) "and nothing is made"))
       (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "y") "id" json-null))
         (ok (= status 201) "a null id is as absent")

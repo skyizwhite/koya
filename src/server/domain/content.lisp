@@ -101,10 +101,8 @@
 (defun new-draft-key ()
   (byte-array-to-hex-string (random-data 16)))
 
-(defparameter +id-characters+ "abcdefghijklmnopqrstuvwxyz0123456789")
-
 (defun new-content-id ()
-  (map-into (make-string 12) (lambda () (char +id-characters+ (strong-random 36)))))
+  (string-downcase (format nil "~36,12,'0R" (strong-random (expt 36 12)))))
 
 (defun touched (content now)
   (setf (content-updated-at content) now)

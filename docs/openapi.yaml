@@ -1018,7 +1018,8 @@ components:
       description: |
         Comma-separated field or system field names, `-` prefix for descending,
         e.g. `-publishedAt,title`. Default: newest published first. `id`
-        orders by the ids' text; `createdAt` by when the contents were made.
+        orders by the ids' text, not by when the contents were made;
+        `createdAt` by its value, which an import may have given.
     filters:
       name: filters
       in: query
