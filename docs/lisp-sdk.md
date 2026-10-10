@@ -373,10 +373,9 @@ An object is reached through its model, with no id:
 - `admin-update-list-content` and `admin-update-object` **merge** the plist onto
   the current draft (or the published data when there is none); a key whose
   value is `nil` is removed. Publishing with `:data` replaces the data outright.
-- `admin-create-list-content` also takes `:id`, `:created-at`, `:updated-at`, `:published-at`
-  and `:revised-at` — everything an import from another CMS needs to keep its ids
-  and dates. Ids are 1–64 characters from `A-Za-z0-9_-`; without one a ULID is
-  generated. A duplicate id is a 409.
+- `admin-create-list-content` also takes `:created-at`, `:updated-at`, `:published-at`
+  and `:revised-at`, for an import from another CMS that keeps its dates. The
+  server makes the id: 12 lowercase letters and digits.
 - An `:object` model's object is made by its first `admin-update-object`, or an
   `admin-publish-object` with `:data`; `admin-create-list-content` answers 404
   for it, as do the other functions that take an id. It has no delete: it goes

@@ -258,9 +258,9 @@ under `objects/` (`404`).
 - Publishing takes `data` when given, else the draft, else re-publishes.
 - A content's id is made by the server: 12 lowercase letters and digits, drawn
   at random (ids made before are 26-character ULIDs, and stay so). Creating a
-  list content may instead give `id` and the four timestamps, for imports that
-  keep another system's ids and dates. An id is the space's own: another space
-  may hold a content of the same id. A timestamp needs a date, a time and
+  list content cannot give `id` (`400`), but may give the four timestamps, for
+  imports that keep another system's dates. An id is the space's own: another
+  space may hold a content of the same id. A timestamp needs a date, a time and
   an offset or `Z`, and is stored in UTC with milliseconds.
 - An object model holds one object. Two first writes at once make only one: the
   other is refused (`409 object_exists`).

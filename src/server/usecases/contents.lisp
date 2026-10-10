@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-unique-p #:model-name #:model-slug-field)
   (:import-from #:koya-core/validate
-                #:validate-content #:validation-error #:blank-value-p #:content-id-p #:datetime-string-p
+                #:validate-content #:validation-error #:blank-value-p #:datetime-string-p
                 #:validation-error-errors)
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:koya-server/domain/errors
@@ -71,13 +71,6 @@
 (defun check-published-at (value)
   (check-timestamp "publishedAt" value))
 
-(defun check-new-id (space id)
-  (cond ((null id) nil)
-        ((not (content-id-p id)) (fail 'invalid-input "\"id\" must be 1-64 letters, digits, '-' or '_'"))
-        ((string= id "new") (fail 'invalid-input "\"id\" cannot be \"new\""))
-        ((get-content space id) (fail 'conflict (format nil "Content ~a already exists" id)))
-        (t id)))
-
 (defun fresh-id (space)
   (loop :for id := (new-content-id)
         :unless (get-content space id) :return id))
@@ -100,7 +93,7 @@
   (record-revision (content-space content) (content-id content) event data :by *actor*)
   content)
 
-(defun create (space model data &key publish id created-at updated-at published-at revised-at)
+(defun create (space model data &key publish created-at updated-at published-at revised-at)
   (let ((space-name space)
         (model-name (model-name model))
         (created-at (check-timestamp "createdAt" created-at))
@@ -115,7 +108,7 @@
                 (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
                       :code "object_exists"))
               (check-content space-name model data)
-              (let ((content (new-content (or (check-new-id space-name id) (fresh-id space-name)) space-name model-name data
+              (let ((content (new-content (fresh-id space-name) space-name model-name data
                                           :publish publish
                                           :created-at created-at :updated-at updated-at
                                           :published-at published-at :revised-at revised-at)))

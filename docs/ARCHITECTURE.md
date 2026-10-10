@@ -152,8 +152,8 @@ it is stale.
 | `webhook_deliveries` | what each webhook call answered |
 | `sessions` `settings` | the admin UI's own state |
 
-Ids are ULIDs, but a content's id koya makes is 12 lowercase letters and
-digits. A model's fields are not columns: they are keys in the JSON, so
+Ids are ULIDs, but a content's id is 12 lowercase letters and digits, koya's
+to make (one made before is a ULID). A model's fields are not columns: they are keys in the JSON, so
 changing a schema never changes a table.
 
 One connection, and one lock around every statement and every transaction

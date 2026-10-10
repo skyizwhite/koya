@@ -178,12 +178,12 @@ names them, e.g. :include \"tags\" or :include '(\"tags\" \"author.avatar\")."
   "Content ID of list model MODEL as the admin API has it, draft included."
   (jvalue->lisp (request :get (list-path space model id) :auth :management)))
 
-(defun admin-create-list-content (model data &key space publish id created-at updated-at published-at revised-at)
-  "Create a content of list model MODEL. DATA is a kebab plist of field values. ID
-and the system timestamps CREATED-AT, UPDATED-AT, PUBLISHED-AT and REVISED-AT (ISO
-8601 strings) can be given explicitly, e.g. when importing from another CMS."
+(defun admin-create-list-content (model data &key space publish created-at updated-at published-at revised-at)
+  "Create a content of list model MODEL. DATA is a kebab plist of field values. The
+server makes its id. The system timestamps CREATED-AT, UPDATED-AT, PUBLISHED-AT and
+REVISED-AT (ISO 8601 strings) can be given explicitly, e.g. when importing from
+another CMS."
   (let ((body (jobject "data" (lisp->jvalue data) "publish" (and publish t))))
-    (when id (setf (gethash "id" body) id))
     (loop :for (key value) :on (list "createdAt" created-at "updatedAt" updated-at
                                      "publishedAt" published-at "revisedAt" revised-at)
           :by #'cddr

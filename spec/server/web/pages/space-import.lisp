@@ -107,7 +107,7 @@
   (replace-schema "archive" (archive-schema))
   (let* ((media (store-upload "archive" (png-bytes 4 5) :filename "cover.png" :alt "A cover"))
          (tag (content-id (create "archive" (find-model "archive" "tag") (alist-hash-table '(("name" . "lisp")) :test 'equal)
-                                          :publish t :id "tag-1" :created-at "2020-01-01T00:00:00.000Z"
+                                          :publish t :created-at "2020-01-01T00:00:00.000Z"
                                           :published-at "2020-01-02T00:00:00.000Z")))
          (post (content-id (create "archive" (find-model "archive" "post")
                                            (alist-hash-table `(("title" . "Old") ("cover" . ,(media-id media))

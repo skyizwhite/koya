@@ -69,9 +69,7 @@
 (deftest an-id-koya-makes-is-twelve-letters-and-digits
   (let ((ids (loop :for n :below 20 :collect (content-id (make (format nil "{\"title\": \"T~a\"}" n))))))
     (ok (every (lambda (id) (cl-ppcre:scan "^[a-z0-9]{12}\\z" id)) ids) "lowercase letters and digits, twelve of them")
-    (ok (= (length (remove-duplicates ids :test #'string=)) 20) "drawn afresh for each content"))
-  (ok (string= (content-id (make "{\"title\": \"Given\"}" :id "01J8Q0Z5X2W3V4U5T6S7R8Q9P0")) "01J8Q0Z5X2W3V4U5T6S7R8Q9P0")
-      "while an id given on create is kept as it is"))
+    (ok (= (length (remove-duplicates ids :test #'string=)) 20) "drawn afresh for each content")))
 
 (deftest lifecycle
   (let ((c (make "{\"title\": \"Draft one\"}")))

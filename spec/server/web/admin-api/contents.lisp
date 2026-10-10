@@ -147,26 +147,24 @@
           "every entry the history records is sent with its kind; a delete as delete while published, as discard when only a draft"))))
 
 (deftest import-style-create
-  (testing "explicit id and publishedAt"
+  (testing "explicit dates"
     (multiple-value-bind (status json)
         (admin :post "/admin/api/website/lists/tag"
-               :body (jobject "data" (jobject "name" "old") "publish" t "id" "hg2papkhis4" "publishedAt" "2025-04-30T15:00:00.000Z"))
+               :body (jobject "data" (jobject "name" "old") "publish" t "publishedAt" "2025-04-30T15:00:00.000Z"))
       (ok (= status 201))
-      (ok (string= (jget json "id") "hg2papkhis4"))
-      (ok (string= (jget json "publishedAt") "2025-04-30T15:00:00.000Z")))
-    (multiple-value-bind (status json) (delivery "/api/v1/website/lists/tag/hg2papkhis4")
-      (ok (= status 200))
-      (ok (string= (jget json "publishedAt") "2025-04-30T15:00:00.000Z")))
-    (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "dup") "id" "hg2papkhis4"))
-      (ok (= status 409))
-      (ok (string= (jget json "error" "code") "conflict")))
-    (multiple-value-bind (status) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "x") "id" "bad id!"))
-      (ok (= status 400)))
-    (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "x") "id" "new"))
-      (ok (= status 400) "new is the admin UI's new-content form, so no content takes it as its id")
-      (ok (string= (jget json "error" "code") "bad_request")))
+      (ok (string= (jget json "publishedAt") "2025-04-30T15:00:00.000Z"))
+      (multiple-value-bind (status json) (delivery (format nil "/api/v1/website/lists/tag/~a" (jget json "id")))
+        (ok (= status 200))
+        (ok (string= (jget json "publishedAt") "2025-04-30T15:00:00.000Z"))))
     (multiple-value-bind (status) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "x") "publish" t "publishedAt" "yesterday"))
       (ok (= status 400))))
+  (testing "an id is the server's to make"
+    (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "x") "id" "hg2papkhis4"))
+      (ok (= status 400) "an id given on create is refused, not replaced")
+      (ok (string= (jget json "error" "code") "bad_request")))
+    (multiple-value-bind (status) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "x") "id" json-null))
+      (ok (= status 400) "even a null one"))
+    (ok (= (jget (nth-value 1 (admin :get "/admin/api/website/lists/tag")) "totalCount") 1) "and nothing is made"))
   (testing "publish with publishedAt override"
     (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" "later")))
       (ok (= status 201))

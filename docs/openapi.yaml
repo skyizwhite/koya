@@ -323,9 +323,10 @@ paths:
       tags: [lists]
       summary: Create a list content
       description: |
-        Saved as a draft unless `publish` is true. `id` and the system timestamps
-        may be supplied, for imports that keep another system's ids and dates; an
-        id need only be unique within the space;
+        Saved as a draft unless `publish` is true. The server makes the id: 12
+        lowercase letters and digits drawn at random, one the space does not
+        hold, and a body that gives `id` is a 400. The system timestamps may be
+        supplied, for imports that keep another system's dates;
         a timestamp needs a date, a time and an offset or `Z`, and is stored in
         UTC with milliseconds.
         `publishedAt` and `revisedAt` are only stored when publishing. 404 for an
@@ -346,11 +347,6 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409":
-          description: "`conflict`: a content with this `id` already exists in the space"
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ApiError" }
         "413": { $ref: "#/components/responses/TooLarge" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
 
@@ -1546,10 +1542,6 @@ components:
       properties:
         data: { $ref: "#/components/schemas/ContentData" }
         publish: { type: [boolean, "null"], default: false, description: "`null` is as absent" }
-        id:
-          type: string
-          pattern: "^[A-Za-z0-9_-]{1,64}$"
-          description: Defaults to 12 lowercase letters and digits drawn at random, one the space does not hold. `new` is refused, as the admin UI's new-content form.
         createdAt: { $ref: "#/components/schemas/Timestamp" }
         updatedAt: { $ref: "#/components/schemas/Timestamp" }
         publishedAt: { $ref: "#/components/schemas/Timestamp" }
