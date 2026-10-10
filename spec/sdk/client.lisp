@@ -9,7 +9,8 @@
   (:import-from #:koya-core/schema #:schema-models #:model-name)
   (:import-from #:koya-sdk/client
                 #:configure #:koya-error #:koya-error-status #:koya-error-code #:pull #:get-list
-                #:get-list-content #:get-object #:admin-get-list #:admin-get-list-content
+                #:get-list-content #:get-list-content-by-slug #:get-object #:admin-get-list
+                #:admin-get-list-content #:admin-get-list-content-by-slug
                 #:admin-create-list-content #:admin-update-list-content #:admin-publish-list-content
                 #:admin-unpublish-list-content #:admin-discard-list-content-draft
                 #:admin-delete-list-content #:admin-list-content-draft-key #:list-delivery-keys
@@ -46,6 +47,7 @@
   (clear-schema)
   (defmodel blog (:kind :list)
     (title :text :required t)
+    (slug :slug)
     (body :richtext)
     (tags :reference :model tag :many t)
     (cover :media))
@@ -60,9 +62,9 @@
 
 (deftest deploy-plan-pull
   (let ((changes (koya-sdk/client:plan :stream (make-broadcast-stream))))
-    (ok (= (length changes) 9) "everything is new"))
+    (ok (= (length changes) 10) "everything is new"))
   (let ((applied (deploy :stream (make-broadcast-stream))))
-    (ok (= (length applied) 9)))
+    (ok (= (length applied) 10)))
   (ok (null (koya-sdk/client:plan :stream (make-broadcast-stream))) "nothing left to change")
   (let ((remote (pull)))
     (ok (equal (mapcar #'model-name (schema-models remote)) '("blog" "tag" "about"))))
@@ -77,7 +79,7 @@
     (ok (= (length (schema-models (pull))) 3) "untouched")
     (ok (deploy :force t :stream (make-broadcast-stream)))
     (ok (= (length (schema-models (pull))) 1))
-    (defmodel blog (:kind :list) (title :text :required t) (body :richtext) (tags :reference :model tag :many t) (cover :media))
+    (defmodel blog (:kind :list) (title :text :required t) (slug :slug) (body :richtext) (tags :reference :model tag :many t) (cover :media))
     (defmodel tag (:kind :list) (name :text :required t))
     (defmodel about (:kind :object) (body :richtext))
     (deploy :force t :stream (make-broadcast-stream))))
@@ -118,6 +120,19 @@
         (ok (string= (getf (get-list-content 'blog (getf post :id) :query (list :draft-key key)) :title) "Hello v2")))
       (ok (string= (getf (admin-get-list-content 'blog (getf post :id)) :status) "published+draft"))
       (ok (= (getf (admin-get-list 'blog) :total-count) 1)))
+    (testing "a list content is read by its slug"
+      (admin-update-list-content 'blog (getf post :id) '(:slug "hello"))
+      (admin-publish-list-content 'blog (getf post :id))
+      (admin-update-list-content 'blog (getf post :id) '(:slug "hello-v2"))
+      (ok (string= (getf (get-list-content-by-slug 'blog "hello") :id) (getf post :id)) "by its published slug")
+      (ok (signals (get-list-content-by-slug 'blog "hello-v2") 'koya-error) "not by its draft's slug")
+      (let ((key (admin-list-content-draft-key 'blog (getf post :id))))
+        (ok (string= (getf (get-list-content-by-slug 'blog "hello-v2" :query (list :draft-key key)) :slug) "hello-v2")
+            "its draft's slug previews with its draft key"))
+      (ok (string= (getf (admin-get-list-content-by-slug 'blog "hello-v2") :id) (getf post :id))
+          "the admin API finds it by either slug")
+      (ok (string= (getf (admin-get-list-content-by-slug 'blog "hello") :id) (getf post :id)))
+      (admin-discard-list-content-draft 'blog (getf post :id)))
     (testing "object model"
       (ok (string= (getf (admin-update-object 'about '(:body "about")) :status) "draft") "the first save makes its content")
       (ok (string= (getf (admin-publish-object 'about) :status) "published"))
