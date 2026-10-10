@@ -270,11 +270,7 @@
       (let ((content (get-content "magazine" (content-id drafted))))
         (ok (string= (content-model content) "article"))
         (ok (string= (jget (content-draft content) "subtitle") "Later words"))
-        (ok (string= (jget (parse-json (col (first (fetch "SELECT draft_text FROM contents WHERE space = ? AND id = ?"
-                                                         "magazine" (content-id drafted)))
-                                            "draft_text"))
-                           "subtitle")
-                     "Later words")
+        (ok (string= (jget (parse-json (fetch-text "magazine" (content-id drafted) "draft_text")) "subtitle") "Later words")
             "and its text")))
     (testing "and the history, so an old version still restores into the field"
       (let ((data (revision-data (first (list-revisions "magazine" (content-id published))))))
@@ -603,8 +599,8 @@
       (ng (nth-value 1 (gethash "note" (jget (revision-data revision) "meta"))) "and the history's")))
   (delete-space "inner"))
 
-(defun fetch-text (space id)
-  (col (first (fetch "SELECT published_text FROM contents WHERE space = ? AND id = ?" space id)) "published_text"))
+(defun fetch-text (space id &optional (column "published_text"))
+  (col (first (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND id = ?" column) space id)) column))
 
 (defun blocks-schema (&rest heading-fields)
   (make-schema :custom-fields (list (make-custom-field "heading" heading-fields)
