@@ -36,7 +36,7 @@
 
 (defun param (params name)
   (let ((v (cdr (assoc name params :test #'string=))))
-    (if (and (stringp v) (string= v "")) nil v)))
+    (and (stringp v) (string/= v "") v)))
 
 (defun parse-integer-param (params name default &key (min 0) max)
   (let ((raw (param params name)))

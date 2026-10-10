@@ -242,3 +242,13 @@
                                     (list "file" "paged.png" "image/png" (png-bytes 2 2))))
     (ok (= status 200))
     (ok (search "Uploaded 1 file." body))))
+
+(deftest a-search-sent-as-a-file-is-no-search
+  (multiple-value-bind (status body)
+      (call-action :post (upload-media :space "website" :page 1)
+                   :multipart (list (list "q" "q.txt" "text/plain" (string-to-octets "x"))
+                                    (list "file" "searched.png" "image/png" (png-bytes 2 2))))
+    (ok (= status 200))
+    (ok (search "Uploaded 1 file." body))
+    (ok (search "searched.png" body) "and the library shows it, with no search to hide it")
+    (ng (search "q.txt" body) "the file's name is not taken for one")))

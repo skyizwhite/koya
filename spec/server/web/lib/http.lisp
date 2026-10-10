@@ -9,7 +9,7 @@
   (:import-from #:koya-server/usecases/keys #:create-management-key)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook)
-  (:import-from #:koya-server/web/lib/http #:origin-allowed-p)
+  (:import-from #:koya-server/web/lib/http #:origin-allowed-p #:param #:integer-param #:integer-text)
   (:import-from #:koya-core/json #:jobject #:jget #:jkeys)
   (:import-from #:alexandria #:alist-hash-table))
 (in-package #:koya-spec/server/web/lib/http)
@@ -19,6 +19,27 @@
 (teardown (disconnect-db))
 
 (defhook :before (reset-api))
+
+(deftest a-param-is-a-string
+  (ok (string= (param '(("q" . "lisp")) "q") "lisp") "text is taken as it is")
+  (ok (null (param '(("q" . "")) "q")) "a blank one is none")
+  (with-input-from-string (file "lisp")
+    (ok (null (param (list (list "q" file "q.txt" "text/plain")) "q"))
+        "and so is a file sent under its name")))
+
+(deftest integer-text
+  (ok (= (integer-text "42") 42) "is the number the text says")
+  (ok (null (integer-text "forty-two")) "or none when it is no number")
+  (ok (null (integer-text nil)) "or no text at all"))
+
+(deftest an-integer-param
+  (ok (= (integer-param '(("page" . "3")) "page") 3) "is the number its text says")
+  (ok (null (integer-param '(("page" . "three")) "page")) "or none when the text is no number")
+  (ok (null (integer-param '(("page" . "")) "page")) "or blank")
+  (ok (null (integer-param '() "page")) "or missing")
+  (with-input-from-string (file "3")
+    (ok (null (integer-param (list (list "page" file "page.txt" "text/plain")) "page"))
+        "or a file")))
 
 (deftest origin-check
   (flet ((allowed (origin referer host) (origin-allowed-p origin referer host "https://cms.example.com")))

@@ -26,8 +26,8 @@
                 #:create-delivery-key #:list-delivery-keys #:delete-delivery-key
                 #:space-for-delivery-key)
   (:import-from #:koya-server/domain/query
-                #:parse-query #:make-query #:query-limit #:query-offset
-                #:query-filters #:query-fields #:query-include #:query-error)
+                #:parse-query #:make-query #:query-limit #:query-offset #:query-orders
+                #:query-filters #:query-fields #:query-include #:query-search #:query-error)
   (:import-from #:koya-core/validate #:validation-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name #:make-custom-field)
   (:import-from #:koya-core/json #:parse-json #:jget))
@@ -416,6 +416,16 @@
     (ok (equal (query-fields query) '("id" "title")))
     (ok (equal (query-include query) '(("tags") ("author" "avatar"))))
     (ok (equal (query-filters query) '((("a" "equals" "1") ("b" "exists" "")) (("c" "equals" "2")))))))
+
+(deftest a-query-param-that-is-not-a-string-is-none
+  (let ((query (parse-query (list (cons "limit" 5) (cons "orders" 1) (cons "filters" (list "a"))
+                                  (cons "fields" 1) (cons "include" 1) (cons "q" 1)))))
+    (ok (= (query-limit query) 10) "a limit that is not text is the default")
+    (ok (null (query-orders query)) "and so are the rest")
+    (ok (null (query-filters query)))
+    (ok (null (query-fields query)))
+    (ok (null (query-include query)))
+    (ok (null (query-search query)))))
 
 (deftest api-keys
   (multiple-value-bind (key id) (create-delivery-key "website" :label "site")

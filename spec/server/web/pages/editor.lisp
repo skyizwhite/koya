@@ -348,7 +348,11 @@
       (multiple-value-bind (status body) (request :get url :query "revision=999999")
         (ok (= status 200))
         (ok (search "does not exist for this content" body))
-        (ng (search "Restoring the version of" body))))
+        (ng (search "Restoring the version of" body)))
+      (dolist (revision '("9223372036854775808" "99999999999999999999" "-1" "first"))
+        (multiple-value-bind (status body) (request :get url :query (format nil "revision=~a" revision))
+          (ok (= status 200) (format nil "revision=~a is answered" revision))
+          (ok (search "does not exist for this content" body) "as one the content does not have"))))
     (testing "a deleted content has no history left"
       (edit url  :form '(("action" . "delete")))
       (ok (= (count-revisions "website" id) 0))

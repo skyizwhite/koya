@@ -18,7 +18,7 @@
                 #:content-id #:content-space #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
                 #:default-data #:content-label)
-  (:import-from #:koya-server/web/lib/http #:param #:form-list)
+  (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
   (:import-from #:koya-server/web/lib/forms #:form->data #:field-param-name #:row-prefix)
@@ -276,8 +276,9 @@
 (defun requested-revision (params content)
   (let ((raw (param params "revision")))
     (when (and raw content)
-      (let* ((n (handler-case (parse-integer raw) (parse-error () nil)))
-             (revision (and n (find-revision (content-space content) (content-id content) n))))
+      (let* ((n (integer-text raw))
+             (revision (and (typep n '(and (signed-byte 64) (integer 1)))
+                            (find-revision (content-space content) (content-id content) n))))
         (values revision (null revision))))))
 
 (defun show-editor (params space model content)
