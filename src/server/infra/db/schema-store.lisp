@@ -10,7 +10,7 @@
   (:import-from #:koya-core/json
                 #:parse-json #:to-json #:json-array-p)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
-  (:import-from #:koya-server/infra/db/contents #:text-column)
+  (:import-from #:koya-server/infra/db/contents #:json-col #:json-column #:text-column)
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/spaces
@@ -96,13 +96,13 @@
 
 (defun rewrite-content-data (space model fn)
   (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?" space model))
-    (let* ((published (let ((v (col row "published"))) (and v (parse-json v))))
-           (draft (let ((v (col row "draft"))) (and v (parse-json v))))
+    (let* ((published (json-col row "published"))
+           (draft (json-col row "draft"))
            (in-published (and published (funcall fn published)))
            (in-draft (and draft (funcall fn draft))))
       (when (or in-published in-draft)
         (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
-              (and published (to-json published)) (and draft (to-json draft))
+              (json-column published) (json-column draft)
               (text-column published) (text-column draft) space (col row "id")))))
   (dolist (row (fetch "SELECT r.id, r.data FROM content_revisions r
                         JOIN contents c ON c.space = r.space AND c.id = r.content_id
