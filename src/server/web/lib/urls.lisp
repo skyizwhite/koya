@@ -39,8 +39,11 @@
                                        (unless (blank-p model) `(("model" . ,model)))
                                        (when (and page (> page 1)) `(("page" . ,page)))))))
 
-(defun expand-url-template (template &key id draft-key)
+(defun expand-url-template (template &key id draft-key slug)
   (and template
-       (regex-replace-all "\\{DRAFT_KEY\\}"
-                          (regex-replace-all "\\{CONTENT_ID\\}" template (or id ""))
-                          (or draft-key ""))))
+       (or (not (search "{CONTENT_SLUG}" template)) (not (blank-p slug)))
+       (regex-replace-all "\\{CONTENT_SLUG\\}"
+                          (regex-replace-all "\\{DRAFT_KEY\\}"
+                                             (regex-replace-all "\\{CONTENT_ID\\}" template (or id ""))
+                                             (or draft-key ""))
+                          (or slug ""))))

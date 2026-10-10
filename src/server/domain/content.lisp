@@ -1,7 +1,7 @@
 (defpackage #:koya-server/domain/content
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:model-label #:field-name #:field-type #:field-option #:field-fields
+                #:model-fields #:model-label #:model-slug-field #:field-name #:field-type #:field-option #:field-fields
                 #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
@@ -11,8 +11,6 @@
                 #:now-iso #:parse-iso #:format-iso)
   (:import-from #:local-time
                 #:timestamp-minimize-part #:+utc-zone+)
-  (:import-from #:cl-ppcre
-                #:regex-replace-all)
   (:import-from #:ironclad
                 #:random-data #:byte-array-to-hex-string)
   (:import-from #:koya-server/domain/errors
@@ -39,9 +37,10 @@
            #:same-data-p
            #:default-data
            #:fill-defaults
-           #:fill-slugs
            #:to-the-minute
-           #:slugify))
+           #:slug-value
+           #:content-slugs
+           #:only-one))
 (in-package #:koya-server/domain/content)
 
 (defstruct content
@@ -228,18 +227,14 @@
                  :for kind := (row-kind field row)
                  :when kind :do (fields-to-the-minute (custom-field-fields kind) row))))))))
 
-(defun slugify (string)
-  (let* ((lower (string-downcase string))
-         (dashed (regex-replace-all "[^a-z0-9]+" lower "-")))
-    (string-trim "-" dashed)))
+(defun slug-value (model data)
+  (let* ((field (model-slug-field model))
+         (value (and field data (gethash (field-name field) data))))
+    (and (stringp value) (not (blank-value-p value)) value)))
 
-(defun fill-slugs (model data)
-  (dolist (field (model-fields model))
-    (when (eq (field-type field) :slug)
-      (let ((current (gethash (field-name field) data))
-            (source (gethash (field-option field :from) data)))
-        (when (and (blank-value-p current) (stringp source) (not (blank-value-p source)))
-          (let ((slug (slugify source)))
-            (when (plusp (length slug))
-              (setf (gethash (field-name field) data) slug)))))))
-  data)
+(defun content-slugs (model content)
+  (list (slug-value model (content-published content))
+        (slug-value model (content-draft content))))
+
+(defun only-one (contents)
+  (and contents (null (rest contents)) (first contents)))

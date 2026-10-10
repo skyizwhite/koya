@@ -3,14 +3,17 @@
   (:export #:get-content
            #:find-content
            #:find-contents-by-ids
+           #:find-contents-by-slug
            #:find-object-content
            #:list-contents
            #:count-contents
            #:space-contents
+           #:model-contents
            #:insert-content
            #:update-content
            #:delete-content
            #:unique-value-taken-p
+           #:slug-taken-p
            #:contents-mentioning
            #:record-revision
            #:list-revisions
@@ -25,6 +28,8 @@
 
 (defgeneric find-contents-by-ids (space model ids))
 
+(defgeneric find-contents-by-slug (space model slug))
+
 (defgeneric find-object-content (space model))
 
 (defgeneric list-contents (space model schema-model query &key status only-status))
@@ -33,13 +38,17 @@
 
 (defgeneric space-contents (space))
 
-(defgeneric insert-content (content))
+(defgeneric model-contents (space model))
 
-(defgeneric update-content (content))
+(defgeneric insert-content (content published-slug draft-slug))
+
+(defgeneric update-content (content published-slug draft-slug))
 
 (defgeneric delete-content (space id))
 
 (defgeneric unique-value-taken-p (space model field value &key exclude-id))
+
+(defgeneric slug-taken-p (space model slug &key exclude-id))
 
 (defgeneric contents-mentioning (space needle &key exclude-id))
 

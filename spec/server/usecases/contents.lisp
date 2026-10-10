@@ -14,7 +14,7 @@
                 #:count-revisions #:find-revision)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key
-                #:object-content #:update-object #:publish-object #:content-references)
+                #:object-content #:update-object #:publish-object #:content-references #:content-by-slug)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -50,7 +50,7 @@
                                           (make-model "tag" :list (list (make-field :name :text)))
                                           (make-model "event" :list (list (make-field :at :datetime)))
                                           (make-model "page" :list (list (make-field :title :text)
-                                                                         (make-field :slug :slug :from :title)))
+                                                                         (make-field :slug :slug)))
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
 
 (teardown (disconnect-db))
@@ -370,17 +370,35 @@
     (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": true}"))) :saved)
         "while true is a change")))
 
-(deftest an-emptied-slug-that-comes-back-the-same-is-no-change
+(deftest a-blank-slug-stays-blank
+  (let ((id (content-id (create "website" (find-model "website" "page") (data "{\"title\": \"Hello World\"}") :publish t))))
+    (ng (nth-value 1 (gethash "slug" (content-published (get-content "website" id))))
+        "nothing makes a slug from the title")))
+
+(deftest a-slug-is-unique-without-saying-so
   (let* ((model (find-model "website" "page"))
-         (id (content-id (create "website" model (data "{\"title\": \"Hello World\"}") :publish t))))
-    (ok (string= (jget (content-published (get-content "website" id)) "slug") "hello-world"))
-    (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"title\": \"Hello World\"}") :replace t))
-            :unchanged)
-        "a save with the slug emptied makes the same slug again, and that is no change")
-    (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"slug\": \"\"}"))) :unchanged)
-        "nor is a patch that blanks it")
-    (ok (string= (content-status (get-content "website" id)) "published"))
-    (ok (= (count-revisions "website" id) 1))))
+         (live (content-id (create "website" model (data "{\"title\": \"Live\", \"slug\": \"live\"}") :publish t)))
+         (drafted (content-id (create "website" model (data "{\"title\": \"Drafted\", \"slug\": \"drafted\"}")))))
+    (ok (signals (create "website" model (data "{\"slug\": \"live\"}")) 'validation-error)
+        "against another content's published slug")
+    (ok (signals (create "website" model (data "{\"slug\": \"drafted\"}")) 'validation-error)
+        "and against its draft's")
+    (update-draft "website" model live (data "{\"slug\": \"live-next\"}"))
+    (ok (signals (update-draft "website" model drafted (data "{\"slug\": \"live\"}")) 'validation-error)
+        "a published slug a draft moves away from is still taken until the move is published")
+    (ok (create "website" model (data "{\"title\": \"One\"}")) "a blank slug is not a value")
+    (ok (create "website" model (data "{\"title\": \"Two\"}")) "so two blanks are no clash")))
+
+(deftest a-content-is-found-by-its-slug
+  (let* ((model (find-model "website" "page"))
+         (live (content-id (create "website" model (data "{\"title\": \"Live\", \"slug\": \"live\"}") :publish t)))
+         (drafted (content-id (create "website" model (data "{\"title\": \"Drafted\", \"slug\": \"drafted\"}")))))
+    (update-draft "website" model live (data "{\"slug\": \"live-next\"}"))
+    (ok (string= (content-id (content-by-slug "website" "page" "live")) live) "by its published slug")
+    (ok (string= (content-id (content-by-slug "website" "page" "live-next")) live) "by its draft's")
+    (ok (string= (content-id (content-by-slug "website" "page" "drafted")) drafted) "a content that is only a draft too")
+    (ok (signals (content-by-slug "website" "page" "nope") 'not-found))
+    (ok (signals (content-by-slug "website" "tag" "live") 'not-found) "only in its own model")))
 
 (deftest system-timestamps-given-on-create-are-kept-in-utc
   (let ((c (make "{\"title\": \"Dated\"}" :publish t
@@ -469,7 +487,7 @@
                                                (make-model "tag" :list (list (make-field :name :text)))
                                                (make-model "event" :list (list (make-field :at :datetime)))
                                                (make-model "page" :list (list (make-field :title :text)
-                                                                              (make-field :slug :slug :from :title)))
+                                                                              (make-field :slug :slug)))
                                                (make-model "about" :object (list (make-field :body :richtext))))))))
 
 (deftest inside-a-repeater
@@ -503,5 +521,5 @@
                                                (make-model "tag" :list (list (make-field :name :text)))
                                                (make-model "event" :list (list (make-field :at :datetime)))
                                                (make-model "page" :list (list (make-field :title :text)
-                                                                              (make-field :slug :slug :from :title)))
+                                                                              (make-field :slug :slug)))
                                                (make-model "about" :object (list (make-field :body :richtext))))))))

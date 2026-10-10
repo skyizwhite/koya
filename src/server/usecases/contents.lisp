@@ -1,7 +1,7 @@
 (defpackage #:koya-server/usecases/contents
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-fields #:field-name #:field-option #:model-name)
+                #:model-kind #:model-fields #:field-name #:field-unique-p #:model-name #:model-slug-field)
   (:import-from #:koya-core/validate
                 #:validate-content #:validation-error #:blank-value-p #:content-id-p #:datetime-string-p
                 #:validation-error-errors)
@@ -14,12 +14,12 @@
                 #:space-webhook-secret #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:record-revision
-                #:find-object-content #:unique-value-taken-p #:get-content #:find-content
-                #:contents-mentioning)
+                #:find-object-content #:unique-value-taken-p #:slug-taken-p #:get-content #:find-content
+                #:find-contents-by-slug #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
-                #:merge-data #:same-data-p #:fill-defaults #:fill-slugs #:to-the-minute #:new-content #:drafted #:published
-                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition)
+                #:merge-data #:same-data-p #:fill-defaults #:to-the-minute #:new-content #:drafted #:published
+                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
@@ -37,21 +37,26 @@
            #:update-object
            #:publish-object
            #:resolve-content
+           #:content-by-slug
+           #:value-taken-p
            #:find-content
            #:bulk-action-p
            #:apply-to-each
            #:content-references))
 (in-package #:koya-server/usecases/contents)
 
+(defun value-taken-p (space-name model field value &key exclude-id)
+  (if (eq field (model-slug-field model))
+      (slug-taken-p space-name (model-name model) value :exclude-id exclude-id)
+      (unique-value-taken-p space-name (model-name model) (field-name field) value :exclude-id exclude-id)))
+
 (defun check-content (space-name model data &key partial exclude-id)
-  (fill-slugs model data)
   (let ((errors (validate-content model data :partial partial)))
     (dolist (field (model-fields model))
-      (when (field-option field :unique)
+      (when (field-unique-p field)
         (multiple-value-bind (value found) (gethash (field-name field) data)
           (when (and found (not (blank-value-p value))
-                     (unique-value-taken-p space-name (model-name model) (field-name field) value
-                                           :exclude-id exclude-id))
+                     (value-taken-p space-name model field value :exclude-id exclude-id))
             (setf errors (append errors (list (list :field (field-name field) :code "unique"
                                                     :message "must be unique"))))))))
     (when errors
@@ -86,8 +91,8 @@
                    :old old
                    :new new))
 
-(defun store (content event data)
-  (update-content content)
+(defun store (model content event data)
+  (apply #'update-content content (content-slugs model content))
   (record-revision (content-space content) (content-id content) event data :by *actor*)
   content)
 
@@ -110,7 +115,7 @@
                                           :publish publish
                                           :created-at created-at :updated-at updated-at
                                           :published-at published-at :revised-at revised-at)))
-                (insert-content content)
+                (apply #'insert-content content (content-slugs model content))
                 (record-revision space-name (content-id content) (if publish "publish" "draft") data :by *actor*)
                 content))))
       (if publish
@@ -134,16 +139,16 @@
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
          (live (content-published content))
-         (data (fill-slugs model (to-the-minute model (if replace patch (merge-data current patch))))))
+         (data (to-the-minute model (if replace patch (merge-data current patch)))))
     (check-unchanged-since content since)
     (cond ((same-data-p model data current) (values content :unchanged))
           ((and live (same-data-p model data live))
            (check-transition content :discard)
-           (values (store (discarded content) "discard" live) :published (draft-view space model content)))
+           (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
           (t
            (check-transition content :save)
            (check-content space model data :exclude-id id)
-           (values (store (drafted content data) "draft" data) :saved)))))
+           (values (store model (drafted content data) "draft" data) :saved)))))
 
 (defun publish (space model id &key data published-at since)
   (let ((published-at (check-published-at published-at)))
@@ -158,7 +163,7 @@
     (check-unchanged-since content since)
     (check-transition content :publish)
     (check-content space model data :exclude-id id)
-    (values (store (published content data :published-at published-at) "publish" data)
+    (values (store model (published content data :published-at published-at) "publish" data)
             (published-view space model content))))
 
 (defun check-unreferenced (space-name model-name id verb)
@@ -177,7 +182,7 @@
             (check-transition content :unpublish)
             (check-unreferenced space-name model-name (content-id content) "unpublish")
             (let ((next (unpublished content)))
-              (values (store next "unpublish" (content-draft next))
+              (values (store model next "unpublish" (content-draft next))
                       (published-view space model content)))))
       (notify space model id :unpublish :old old)
       next)))
@@ -190,7 +195,7 @@
           (let ((content (resolve-content space-name model-name id)))
             (check-unchanged-since content since)
             (check-transition content :discard)
-            (values (store (discarded content) "discard" (content-published content))
+            (values (store model (discarded content) "discard" (content-published content))
                     (draft-view space model content))))
       (notify space model id :discard :old old :new (published-view space model next))
       next)))
@@ -232,16 +237,20 @@
           (t (object-content space model)))))
 
 (defun draft-key (space-name model-name id)
-  (resolve-model space-name model-name)
-  (with-transaction
-    (let* ((content (resolve-content space-name model-name id))
-           (keyed (keyed content)))
-      (unless (eq keyed content) (update-content keyed))
-      (content-draft-key keyed))))
+  (let ((model (nth-value 1 (resolve-model space-name model-name))))
+    (with-transaction
+      (let* ((content (resolve-content space-name model-name id))
+             (keyed (keyed content)))
+        (unless (eq keyed content) (apply #'update-content keyed (content-slugs model keyed)))
+        (content-draft-key keyed)))))
 
 (defun resolve-content (space-name model-name id)
   (or (find-content space-name model-name id)
       (fail 'not-found (format nil "Content ~a does not exist" id))))
+
+(defun content-by-slug (space-name model-name slug)
+  (or (only-one (find-contents-by-slug space-name model-name slug))
+      (fail 'not-found (format nil "No content has the slug ~a" slug))))
 
 (defparameter +bulk-actions+
   '(("publish" :publish publish)

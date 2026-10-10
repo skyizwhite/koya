@@ -2,12 +2,14 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
-                #:field-name #:field-option #:model-kind #:field-fields #:field-row-kinds
+                #:field-name #:field-option #:field-unique-p #:model-kind #:field-fields #:field-row-kinds
                 #:field-path-parts #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:jobject)
-  (:import-from #:koya-server/usecases/ports/contents #:space-contents)
-  (:import-from #:koya-server/domain/content #:content-id #:content-model #:content-published #:content-draft)
+  (:import-from #:koya-server/usecases/ports/contents #:space-contents #:model-contents #:update-content)
+  (:import-from #:koya-server/usecases/ports/store #:with-transaction)
+  (:import-from #:koya-server/domain/content
+                #:content-id #:content-model #:content-published #:content-draft #:content-slugs)
   (:import-from #:koya-server/domain/deploy #:changes-by-served-model)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-core/diff #:diff-schemas #:destructive-changes-p #:tightened-change-p)
@@ -183,7 +185,7 @@
                                       (inner-misfits of-model field (nth-value 1 (field-path-parts (getf change :field)))
                                                      (changed-field schema change) key gone)
                                       (append (value-misfits of-model field key gone)
-                                              (and (field-option field :unique) (unique-misfits of-model field key))))))
+                                              (and (field-unique-p field) (unique-misfits of-model field key))))))
                     (if misfits (append change (list :misfits misfits)) change))
                   change))
             changes)))
@@ -197,9 +199,29 @@
   (check-schema schema)
   (diff-schemas (load-schema space) schema))
 
+(defun slug-change-p (change)
+  (case (getf change :op)
+    (:add-field (eq (getf change :to) :slug))
+    (:remove-field (eq (getf change :from) :slug))
+    (:change-field-type (or (eq (getf change :from) :slug) (eq (getf change :to) :slug)))))
+
+(defun store-schema (space schema changes by)
+  (with-transaction
+    (save-schema space schema changes :by by)
+    (let ((models (remove-duplicates (mapcar (lambda (change) (getf change :model))
+                                             (remove-if-not #'slug-change-p changes))
+                                     :test #'equal)))
+      (when models
+        (let ((stored (load-schema space)))
+          (dolist (name models)
+            (let ((model (schema-model stored name)))
+              (when model
+                (dolist (content (model-contents space name))
+                  (apply #'update-content content (content-slugs model content)))))))))))
+
 (defun replace-schema (space schema &key (by *actor*))
   (let ((changes (changes-of space schema)))
-    (save-schema space schema changes :by by)
+    (store-schema space schema changes by)
     changes))
 
 (defun notify-deploy (space before changes)
@@ -219,6 +241,6 @@
     (when (and (destructive-changes-p changes) (not force))
       (fail 'conflict "Schema deploy contains destructive changes; retry with force=true"
             :code "destructive_changes" :details changes))
-    (save-schema space schema changes :by *actor*)
+    (store-schema space schema changes *actor*)
     (notify-deploy space before changes)
     changes))

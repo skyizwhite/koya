@@ -17,7 +17,7 @@
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
-                #:default-data #:content-label)
+                #:default-data #:content-label #:slug-value)
   (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
@@ -198,8 +198,10 @@
          (draft (and content (content-draft content)))
          (preview-url (and draft (content-draft-key content)
                            (expand-url-template (model-preview-url model)
-                                                :id id :draft-key (content-draft-key content))))
-         (public-url (and published (expand-url-template (model-public-url model) :id id))))
+                                                :id id :draft-key (content-draft-key content)
+                                                :slug (slug-value model draft))))
+         (public-url (and published (expand-url-template (model-public-url model)
+                                                         :id id :slug (slug-value model published)))))
     (hsx
      (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring errors))
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"

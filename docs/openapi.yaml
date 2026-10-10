@@ -110,6 +110,36 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/{space}/lists/{model}/slugs/{slug}:
+    get:
+      operationId: getListContentBySlug
+      tags: [delivery]
+      summary: Read one published list content by its slug
+      description: |
+        The content whose published slug it is, as `getListContent` reads it.
+        With the content's `draftKey`, its draft's slug finds it too, and its
+        draft is read; a key that is not the content's finds it by its published
+        slug only. 404 for an `object` model, a model without a slug field, or a
+        slug two contents hold.
+      security: [{ deliveryKey: [] }]
+      parameters:
+        - $ref: "#/components/parameters/space"
+        - $ref: "#/components/parameters/model"
+        - $ref: "#/components/parameters/slug"
+        - $ref: "#/components/parameters/fields"
+        - $ref: "#/components/parameters/include"
+        - $ref: "#/components/parameters/draftKey"
+      responses:
+        "200":
+          description: The list content
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Content" }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/{space}/objects/{model}:
     get:
       operationId: getObject
@@ -382,6 +412,69 @@ paths:
         Removes both versions. Fires `delete` webhooks, or `discard` for a content
         that was only a draft.
         Refused with 409 `in_use` while another content refers to it.
+      security: [{ managementKey: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Deleted" }
+        "409":
+          description: "`in_use`: other contents refer to it through a reference field of the current schema, one inside a custom field or a repeater's rows included; the message names how many"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/api/{space}/lists/{model}/slugs/{slug}:
+    description: |
+      A list content found by its published slug or its draft's. 404 for an
+      `object` model, a model without a slug field, or a slug two contents hold.
+      Publishing and the rest are done at its id.
+    parameters:
+      - $ref: "#/components/parameters/space"
+      - $ref: "#/components/parameters/model"
+      - $ref: "#/components/parameters/slug"
+    get:
+      operationId: getAdminListContentBySlug
+      tags: [lists]
+      summary: Read a list content by its slug, both versions
+      security: [{ managementKey: [] }]
+      responses:
+        "200":
+          description: The content
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminContent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateAdminListContentBySlug
+      tags: [lists]
+      summary: Save a draft of a list content found by its slug
+      description: As `updateAdminListContent`.
+      security: [{ managementKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateDraft" }
+      responses:
+        "200":
+          description: The content with its new draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminContent" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      operationId: deleteAdminListContentBySlug
+      tags: [lists]
+      summary: Delete a list content found by its slug
+      description: As `deleteAdminListContent`.
       security: [{ managementKey: [] }]
       responses:
         "200": { $ref: "#/components/responses/Deleted" }
@@ -908,6 +1001,11 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: "^[A-Za-z0-9_-]{1,64}$" }
+    slug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
     limit:
       name: limit
       in: query
@@ -1130,11 +1228,11 @@ components:
         previewUrl:
           type: string
           pattern: "^[Hh][Tt][Tt][Pp][Ss]?://."
-          description: Template for the editor's preview link, starting with `http://` or `https://`; `{CONTENT_ID}` and `{DRAFT_KEY}` are substituted.
+          description: Template for the editor's preview link, starting with `http://` or `https://`; `{CONTENT_ID}`, `{CONTENT_SLUG}` (the draft's) and `{DRAFT_KEY}` are substituted. A template with `{CONTENT_SLUG}` needs a slug field, and no link is shown while the slug is blank.
         publicUrl:
           type: string
           pattern: "^[Hh][Tt][Tt][Pp][Ss]?://."
-          description: Template for the editor's published page link, starting with `http://` or `https://`; `{CONTENT_ID}` is substituted.
+          description: Template for the editor's published page link, starting with `http://` or `https://`; `{CONTENT_ID}` and `{CONTENT_SLUG}` (the published one) are substituted. A template with `{CONTENT_SLUG}` needs a slug field, and no link is shown while the slug is blank.
         label:
           type: string
           description: |
@@ -1329,16 +1427,17 @@ components:
 
     SlugField:
       type: object
-      required: [name, type, from]
+      required: [name, type]
       additionalProperties: false
+      description: |
+        A second key of a list content, typed by the editor and unique within
+        the model. A list model has one at most, an object model none.
       properties:
         name: { $ref: "#/components/schemas/FieldName" }
         type: { type: string, const: slug }
         was: { $ref: "#/components/schemas/FieldName" }
         help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
-        from: { type: string, description: "A text or textarea field of the same model, filled into a blank slug" }
-        unique: { type: boolean }
         pattern: { type: string }
 
     CustomFieldField:

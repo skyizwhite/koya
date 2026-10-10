@@ -19,10 +19,12 @@ CREATE TABLE "contents" (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   published_at TEXT,
-  revised_at TEXT, published_text TEXT, draft_text TEXT,
+  revised_at TEXT, published_text TEXT, draft_text TEXT, published_slug TEXT, draft_slug TEXT,
   PRIMARY KEY (space, id),
   FOREIGN KEY (space, model) REFERENCES models(space, name) ON DELETE CASCADE);
+CREATE INDEX contents_by_draft_slug ON contents (space, model, draft_slug);
 CREATE INDEX contents_by_model ON contents (space, model, status, published_at);
+CREATE INDEX contents_by_published_slug ON contents (space, model, published_slug);
 CREATE TABLE "delivery_keys" (
   id TEXT PRIMARY KEY,
   space TEXT NOT NULL REFERENCES spaces(name) ON DELETE CASCADE,

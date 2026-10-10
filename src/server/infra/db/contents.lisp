@@ -15,8 +15,8 @@
   (:import-from #:koya-server/domain/html #:data-text)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:get-content #:find-content
-                #:find-contents-by-ids #:list-contents #:count-contents
-                #:find-object-content #:unique-value-taken-p #:space-contents
+                #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
+                #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
   (:export #:text-column))
 (in-package #:koya-server/infra/db/contents)
@@ -54,25 +54,28 @@
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE id = ? AND space = ? AND model = ?" +columns+) id space model)))
     (and row (row->content row))))
 
-(defmethod insert-content (content)
+(defmethod insert-content (content published-slug draft-slug)
   (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at,
-                               published_text, draft_text)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                               published_text, draft_text, published_slug, draft_slug)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         (content-id content) (content-space content) (content-model content) (content-status content)
         (json-column (content-published content)) (json-column (content-draft content))
         (content-draft-key content)
         (content-created-at content) (content-updated-at content)
         (content-published-at content) (content-revised-at content)
-        (text-column (content-published content)) (text-column (content-draft content))))
+        (text-column (content-published content)) (text-column (content-draft content))
+        published-slug draft-slug))
 
-(defmethod update-content (content)
+(defmethod update-content (content published-slug draft-slug)
   (exec "UPDATE contents SET status = ?, published = ?, draft = ?, draft_key = ?, updated_at = ?,
-           published_at = ?, revised_at = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
+           published_at = ?, revised_at = ?, published_text = ?, draft_text = ?, published_slug = ?, draft_slug = ?
+         WHERE space = ? AND id = ?"
         (content-status content)
         (json-column (content-published content)) (json-column (content-draft content))
         (content-draft-key content) (content-updated-at content)
         (content-published-at content) (content-revised-at content)
         (text-column (content-published content)) (text-column (content-draft content))
+        published-slug draft-slug
         (content-space content) (content-id content)))
 
 (defmethod delete-content (space id)
@@ -85,6 +88,12 @@
                                  +columns+ exclude-id)
                  space (append (and exclude-id (list exclude-id))
                                (let ((like (format nil "%~a%" needle))) (list like like))))))
+
+(defmethod find-contents-by-slug (space model slug)
+  (mapcar #'row->content
+          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ?
+                                AND (published_slug = ? OR draft_slug = ?)" +columns+)
+                 space model slug slug)))
 
 (defmethod find-object-content (space model)
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" +columns+) space model)))
@@ -126,6 +135,17 @@
                             (format nil expr "published") (format nil expr "draft"))
                     space model (or exclude-id "") value value)
          t)))
+
+(defmethod slug-taken-p (space model slug &key exclude-id)
+  (and (fetch-one "SELECT 1 FROM contents WHERE space = ? AND model = ? AND id != ?
+                     AND (published_slug = ? OR draft_slug = ?) LIMIT 1"
+                  space model (or exclude-id "") slug slug)
+       t))
+
+(defmethod model-contents (space model)
+  (mapcar #'row->content
+          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at, id" +columns+)
+                 space model)))
 
 (defmethod space-contents (space)
   (mapcar #'row->content

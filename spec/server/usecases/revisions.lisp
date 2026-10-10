@@ -30,7 +30,7 @@
   (replace-schema "site" (schema (make-field :title :text :required t)
                                  (make-field :lede :text)
                                  (make-field :count :number :max 10)
-                                 (make-field :slug :slug :from :title :unique t)
+                                 (make-field :slug :slug)
                                  (make-field :cover :media)
                                  (make-field :tags :reference :model "tag" :many t))))
 

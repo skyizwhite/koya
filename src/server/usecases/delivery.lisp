@@ -6,12 +6,12 @@
   (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
-  (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data)
+  (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data #:slug-value #:only-one)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/auth #:secure-string=)
   (:import-from #:koya-server/usecases/ports/media #:find-media)
   (:import-from #:koya-server/usecases/ports/contents
-                #:find-content #:find-object-content #:list-contents)
+                #:find-content #:find-object-content #:list-contents #:find-contents-by-slug)
   (:export #:delivered
            #:delivered-content
            #:delivered-model
@@ -19,6 +19,7 @@
            #:deliver
            #:delivered-list
            #:delivered-list-content
+           #:delivered-list-content-by-slug
            #:delivered-object))
 (in-package #:koya-server/usecases/delivery)
 
@@ -136,6 +137,16 @@
   (check-include space model (query-include query))
   (let ((content (or (find-content space (model-name model) id)
                      (fail 'not-found "Content does not exist"))))
+    (deliver-if-allowed space model content query draft-key)))
+
+(defun published-slug-p (model content slug)
+  (equal (slug-value model (content-published content)) slug))
+
+(defun delivered-list-content-by-slug (space model slug query &key draft-key)
+  (check-include space model (query-include query))
+  (let ((content (only-one (find-contents-by-slug space (model-name model) slug))))
+    (unless (and content (or (draft-key-p content draft-key) (published-slug-p model content slug)))
+      (fail 'not-found "Content does not exist"))
     (deliver-if-allowed space model content query draft-key)))
 
 (defun delivered-object (space model query &key draft-key)

@@ -16,7 +16,7 @@
   (:import-from #:koya-server/domain/content
                 #:make-content #:content-id #:content-space #:content-model #:content-published #:content-draft
                 #:content-draft-key #:content-created-at #:content-updated-at #:content-published-at
-                #:content-revised-at)
+                #:content-revised-at #:content-slugs)
   (:import-from #:koya-server/domain/revision
                 #:revision-event #:revision-data #:revision-by #:revision-created-at)
   (:import-from #:koya-server/usecases/ports/media
@@ -33,7 +33,7 @@
                 #:key-id #:key-hash #:key-label #:key-created-at #:new-webhook-secret)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:schema->jobject #:jobject->schema #:slug-name-p
-                #:model-name #:model-fields #:field-name #:field-option)
+                #:model-name #:model-fields #:field-name #:field-option #:forget-slug-options)
   (:import-from #:koya-core/json
                 #:jobject #:jget #:json-null #:json-null-p #:json-array-p #:parse-json #:to-json)
   (:import-from #:koya-core/time #:now-iso)
@@ -254,10 +254,16 @@
     (unwind-protect (call-with-upload id (lambda (archive) (import-from-archive archive :by by)))
       (delete-upload id))))
 
+(defun without-slug-options (schema)
+  (let ((models (and (hash-table-p schema) (jget schema "models"))))
+    (when (json-array-p models)
+      (map nil #'forget-slug-options models)))
+  schema)
+
 (defun import-from-archive (archive &key by)
   (let* ((document (read-document archive))
          (space (string-field document "space" :required t))
-         (schema (jobject->schema (jget document "schema"))))
+         (schema (jobject->schema (without-slug-options (jget document "schema")))))
     (unless (slug-name-p space) (fail "~s is not a space name" space))
     (check-target space)
     (let ((contents (map 'list (lambda (o) (parse-content o space schema))
@@ -312,7 +318,8 @@
                                    :size (getf m :size) :width (getf m :width) :height (getf m :height)
                                    :alt (getf m :alt) :created-at (getf m :created-at)))
              (loop :for (content revisions) :in contents
-                   :do (insert-content content)
+                   :do (apply #'insert-content content
+                              (content-slugs (schema-model schema (content-model content)) content))
                        (dolist (r revisions)
                          (record-revision space (content-id content) (getf r :event) (getf r :data)
                                           :by (getf r :by) :created-at (getf r :created-at)))))

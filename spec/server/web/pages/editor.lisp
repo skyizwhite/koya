@@ -12,13 +12,13 @@
                 #:list-contents #:list-revisions #:count-revisions #:get-content #:count-contents
                 #:update-content #:delete-content)
   (:import-from #:koya-server/domain/content
-                #:content-status #:content-published #:content-draft #:content-id #:slugify #:unpublished)
+                #:content-status #:content-published #:content-draft #:content-id #:unpublished)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:koya-server/domain/revision #:revision-id #:revision-event #:revision-by)
   (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:field-name #:model-fields #:make-custom-field)
-  (:import-from #:koya-core/json #:jget #:jobject)
+  (:import-from #:koya-core/json #:jget #:jobject #:json-null)
   (:import-from #:koya-server/usecases/ports/media #:insert-media #:delete-media)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
   (:import-from #:koya-server/domain/content #:content-updated-at))
@@ -63,7 +63,7 @@
       (let ((content (first (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))
         (ok (string= (content-status content) "draft"))
         (let ((draft (content-draft content)))
-          (ok (string= (jget draft "slug") "hello-world") "slug generated from title")
+          (ng (nth-value 1 (gethash "slug" draft)) "no slug is made from the title")
           (ok (eq (jget draft "featured") t))
           (ok (equalp (jget draft "labels") #("a" "b")))
           (ok (= (jget draft "count") 2.5))
@@ -73,7 +73,6 @@
       (multiple-value-bind (status body) (request :get (format nil "/s/website/m/blog/~a" id))
         (ok (= status 200))
         (ok (search "value=\"Hello World\"" body))
-        (ok (search "value=\"hello-world\"" body))
         (ok (search "checked" body))
         (ok (search "value=\"2026-09-20T10:00\"" body))
         (ok (search "value=\"2.5\"" body) "floats render without an exponent marker")
@@ -243,10 +242,31 @@
       (edit path :form '(("action" . "save") ("f-title" . "Renamed") ("f-body" . "<p>c</p><p>d</p>")))
       (ok (string= (jget (content-draft (get-content "website" id)) "body") "<p>c</p><p>d</p>")))))
 
-(deftest slugify-test
-  (ok (string= (slugify "Hello, World!") "hello-world"))
-  (ok (string= (slugify "  Common  Lisp 2026 ") "common-lisp-2026"))
-  (ok (string= (slugify "日本語") "") "non-ascii yields empty; validation then reports it"))
+(deftest url-templates-fill-in-the-slug
+  (flet ((deploy (&rest templates)
+           (replace-schema "website"
+                           (make-schema :models (list (apply #'make-model "blog" :list (model-fields (blog-model))
+                                                             :label :title templates)
+                                                      (make-model "about" :object (list (make-field :body :richtext))))))))
+    (deploy :preview-url "https://site.test/posts/{CONTENT_SLUG}?draft-key={DRAFT_KEY}"
+            :public-url "https://site.test/posts/{CONTENT_SLUG}")
+    (unwind-protect
+         (let* ((model (nth-value 1 (resolve-model "website" "blog")))
+                (id (content-id (create "website" model (jobject "title" "Live" "slug" "live") :publish t)))
+                (path (format nil "/s/website/m/blog/~a" id)))
+           (ok (search "href=\"https://site.test/posts/live\"" (nth-value 1 (request :get path)))
+               "the published page is at the published slug")
+           (update-draft "website" model id (jobject "slug" "live-next"))
+           (let ((body (nth-value 1 (request :get path))))
+             (ok (search "https://site.test/posts/live-next?draft-key=" body) "the preview is at the draft's")
+             (ok (search "href=\"https://site.test/posts/live\"" body) "while the published page stays where it is"))
+           (update-draft "website" model id (jobject "slug" json-null))
+           (let ((body (nth-value 1 (request :get path))))
+             (ng (search "Preview draft" body) "a draft without a slug has no preview to link")
+             (ok (search "Published page" body) "and the published one still has its page"))
+           (exec "DELETE FROM contents WHERE id = ?" id))
+      (deploy :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
+              :public-url "https://site.test/blog/{CONTENT_ID}"))))
 
 (defun new-blog (form)
   (multiple-value-bind (status body) (edit "/s/website/m/blog/new" :form form)
@@ -301,7 +321,7 @@
         (ng (search "Draft saved" body))
         (ok (search "Published" body))))
 
-    (update-content (unpublished (get-content "website" unpublished)))
+    (update-content (unpublished (get-content "website" unpublished)) nil nil)
     (delete-content "website" deleted)
     (delete-media "website" media)
     (replace-schema "website"

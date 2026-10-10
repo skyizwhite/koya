@@ -24,7 +24,8 @@
   (:import-from #:koya-spec/server/usecases/media #:png-bytes)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-core/schema #:make-webhook)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-field #:model-fields #:field-type #:field-option)
+  (:import-from #:koya-server/usecases/ports/archives #:write-archive)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-revisions #:count-revisions #:get-content #:insert-content)
@@ -312,7 +313,8 @@
             (insert-content (make-content :id id :space "odd" :model "tag"
                                           :published (alist-hash-table '(("name" . "x")) :test 'equal)
                                           :created-at "2024-01-01T00:00:00.000Z" :updated-at "2024-01-01T00:00:00.000Z"
-                                          :published-at "2024-01-01T00:00:00.000Z" :revised-at "2024-01-01T00:00:00.000Z"))
+                                          :published-at "2024-01-01T00:00:00.000Z" :revised-at "2024-01-01T00:00:00.000Z")
+                            nil nil)
             (let ((octets (nth-value 1 (request :get "/s/odd/export"))))
               (delete-space "odd")
               (ok (string= (nth-value 1 (import-archive octets)) "/"))
@@ -326,7 +328,8 @@
   (dolist (c contents)
     (insert-content (apply #'make-content (append c (list :space "odd" :model "tag"
                                                           :created-at "2024-01-01T00:00:00.000Z"
-                                                          :updated-at "2024-01-01T00:00:00.000Z")))))
+                                                          :updated-at "2024-01-01T00:00:00.000Z")))
+                    nil nil))
   (let ((stored (and media (store-upload "odd" (png-bytes 2 2) :filename "a.png")))
         (made (and key (create-delivery-key "odd" :label "site"))))
     (let ((octets (nth-value 1 (request :get "/s/odd/export"))))
@@ -380,3 +383,44 @@
                                        :label "" :created-at "2024-01-01T00:00:00.000Z")
       (ok (equal (refusal octets) "A key in the archive is already a key of another space"))
       (delete-space "elsewhere"))))
+
+(defun legacy-archive ()
+  (let ((path (write-archive
+               (list (cons "space.json"
+                           (string-to-octets
+                            "{\"koyaExport\": 1, \"space\": \"legacy\",
+                              \"schema\": {\"koyaSchema\": 1, \"webhooks\": [],
+                                           \"models\": [{\"name\": \"post\", \"kind\": \"list\",
+                                                         \"fields\": [{\"name\": \"title\", \"type\": \"text\", \"unique\": true},
+                                                                      {\"name\": \"slug\", \"type\": \"slug\", \"from\": \"title\", \"unique\": true}]},
+                                                        {\"name\": \"page\", \"kind\": \"list\",
+                                                         \"fields\": [{\"name\": \"slug\", \"type\": \"slug\", \"from\": \"path\"},
+                                                                      {\"name\": \"path\", \"type\": \"slug\", \"from\": \"slug\"}]}]},
+                              \"contents\": [{\"id\": \"p1\", \"model\": \"post\", \"draft\": {\"title\": \"One\", \"slug\": \"one\"},
+                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
+                                             {\"id\": \"g1\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
+                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
+                                             {\"id\": \"g2\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
+                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}"
+                            :encoding :utf-8))))))
+    (prog1 (read-file-bytes path) (delete-file path))))
+
+(defun read-file-bytes (path)
+  (with-open-file (in path :element-type '(unsigned-byte 8))
+    (let ((octets (make-array (file-length in) :element-type '(unsigned-byte 8))))
+      (read-sequence octets in)
+      octets)))
+
+(deftest an-archive-from-before-slugs-were-typed-is-imported
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (ok (string= (nth-value 1 (import-archive (legacy-archive))) "/s/legacy")
+      "its slug fields lose what a slug no longer takes")
+  (let ((post (find-model "legacy" "post")))
+    (ok (eq (field-type (model-field post :slug)) :slug))
+    (ok (field-option (model-field post :title) :unique) "a text field keeps its unique"))
+  (ok (string= (jget (content-draft (get-content "legacy" "p1")) "slug") "one") "and its contents come with it")
+  (testing "what the server keeps from before slugs were keys, it takes back from an archive"
+    (ok (= (length (model-fields (find-model "legacy" "page"))) 2) "a model with two slug fields")
+    (ok (and (get-content "legacy" "g1") (get-content "legacy" "g2")) "and two contents that share a slug"))
+  (delete-space "legacy"))

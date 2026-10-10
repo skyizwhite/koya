@@ -7,7 +7,8 @@
   (:import-from #:koya-server/usecases/contents #:create #:update-draft #:draft-key)
   (:import-from #:koya-server/usecases/delivery
                 #:deliver #:delivered-data #:delivered-p #:delivered-content
-                #:delivered-list-content #:delivered-list #:delivered-object)
+                #:delivered-list-content #:delivered-list #:delivered-object
+                #:delivered-list-content-by-slug)
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/domain/media #:media-p #:media-id)
   (:import-from #:koya-server/domain/content #:content-id)
@@ -31,6 +32,8 @@
                                                                              (make-field :avatar :media)
                                                                              (make-field :favorite :reference :model "tag")))
                                              (make-model "tag" :list (list (make-field :name :text)))
+                                             (make-model "page" :list (list (make-field :title :text)
+                                                                           (make-field :slug :slug)))
                                              (make-model "about" :object (list (make-field "body" :text)))))))
 
 (teardown (disconnect-db))
@@ -188,6 +191,30 @@
                :models (list (make-model "story" :list (list (make-field :title :text)
                                                              (make-field :byline :custom :custom-field "byline")))
                              (make-model "author" :list (list (make-field :name :text))))))
+
+(deftest a-content-is-delivered-by-its-slug
+  (flet ((title (slug &key draft-key)
+           (jget (delivered-data (delivered-list-content-by-slug "site" (model "page") slug (query) :draft-key draft-key))
+                 "title")))
+    (let ((live (content-id (make "page" (list "title" "Live" "slug" "live") :publish t)))
+          (drafted (content-id (make "page" (list "title" "Drafted" "slug" "drafted")))))
+      (update-draft "site" (model "page") live (jobject-from (list "title" "Live, next" "slug" "live-next")))
+      (ok (string= (title "live") "Live") "by its published slug, as published")
+      (ok (signals (title "live-next") 'not-found) "not by its draft's")
+      (ok (signals (title "drafted") 'not-found) "nor a content that is only a draft")
+      (ok (signals (title "nope") 'not-found))
+      (testing "with its draft key"
+        (let ((key (draft-key "site" "page" live)))
+          (ok (string= (title "live-next" :draft-key key) "Live, next") "by its draft's slug, as the draft")
+          (ok (string= (title "live" :draft-key key) "Live, next") "and by its published slug, as the draft too"))
+        (ok (string= (title "drafted" :draft-key (draft-key "site" "page" drafted)) "Drafted")
+            "a content that is only a draft"))
+      (testing "with a key that is not the content's"
+        (ok (signals (title "live-next" :draft-key "wrong") 'not-found)
+            "its draft's slug finds nothing, so the slug is not given away")
+        (ok (signals (title "live-next" :draft-key (draft-key "site" "page" drafted)) 'not-found)
+            "nor does another content's key")
+        (ok (string= (title "live" :draft-key "wrong") "Live") "its published slug finds it, as published")))))
 
 (deftest a-custom-field-is-delivered-like-the-fields-it-holds
   (replace-schema "site" (with-byline))

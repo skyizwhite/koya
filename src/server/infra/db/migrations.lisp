@@ -4,7 +4,8 @@
                 #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
   (:import-from #:koya-core/time
                 #:now-iso)
-  (:import-from #:koya-core/json #:parse-json)
+  (:import-from #:koya-core/json #:parse-json #:to-json)
+  (:import-from #:koya-core/schema #:forget-slug-options)
   (:import-from #:koya-server/infra/db/contents #:text-column)
   (:export #:migrate
            #:current-version))
@@ -208,7 +209,28 @@
      "ALTER TABLE contents ADD COLUMN draft_text TEXT"
      fill-content-texts)
     (15
-     "ALTER TABLE spaces ADD COLUMN custom_fields TEXT NOT NULL DEFAULT '[]'")))
+     "ALTER TABLE spaces ADD COLUMN custom_fields TEXT NOT NULL DEFAULT '[]'")
+    (16
+     drop-slug-options
+     "ALTER TABLE contents ADD COLUMN published_slug TEXT"
+     "ALTER TABLE contents ADD COLUMN draft_slug TEXT"
+     "CREATE INDEX contents_by_published_slug ON contents (space, model, published_slug)"
+     "CREATE INDEX contents_by_draft_slug ON contents (space, model, draft_slug)"
+     "UPDATE contents SET
+        published_slug = NULLIF(json_extract(published, '$.' || s.name), ''),
+        draft_slug = NULLIF(json_extract(draft, '$.' || s.name), '')
+        FROM (SELECT m.space, m.name AS model, json_extract(f.value, '$.name') AS name
+                FROM models m, json_each(m.definition, '$.fields') f
+               WHERE m.kind = 'list' AND json_extract(f.value, '$.type') = 'slug'
+               GROUP BY m.space, m.name HAVING COUNT(*) = 1) AS s
+       WHERE contents.space = s.space AND contents.model = s.model")))
+
+(defun drop-slug-options ()
+  (dolist (row (fetch "SELECT space, name, definition FROM models"))
+    (let ((definition (parse-json (col row "definition"))))
+      (when (forget-slug-options definition)
+        (exec "UPDATE models SET definition = ? WHERE space = ? AND name = ?"
+              (to-json definition) (col row "space") (col row "name"))))))
 
 (defun fill-content-texts ()
   (flet ((text (json) (and json (text-column (parse-json json)))))
