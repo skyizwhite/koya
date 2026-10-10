@@ -21,9 +21,9 @@ Media, keys and deploys keep their ULIDs.
 
 ## Consequences
 
-- About 62 bits: a space would need millions of contents before a draw is
-  likely to come out taken, and a taken one only means another draw.
-- Ids made before stay ULIDs; nothing is rewritten, and both shapes fit what an
-  id may be.
+- About 62 bits, 36^12 ids: with a million contents in a space, a draw comes out
+  taken about once in five trillion, and a taken one only means another draw.
+- Ids from before stay as they were, ULIDs or ids contents were created with;
+  nothing is rewritten, and every shape fits what an id may be.
 - A content id no longer tells when it was made, and a list ordered by `id` is
   in the order of the ids' text. `createdAt` orders by when they were made.

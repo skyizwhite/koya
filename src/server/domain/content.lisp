@@ -12,7 +12,7 @@
   (:import-from #:local-time
                 #:timestamp-minimize-part #:+utc-zone+)
   (:import-from #:ironclad
-                #:random-data #:byte-array-to-hex-string)
+                #:random-data #:byte-array-to-hex-string #:strong-random)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict)
   (:export #:content #:make-content #:content-p
@@ -104,14 +104,7 @@
 (defparameter +id-characters+ "abcdefghijklmnopqrstuvwxyz0123456789")
 
 (defun new-content-id ()
-  (let ((id (make-string 12))
-        (filled 0))
-    (loop :while (< filled 12)
-          :do (loop :for byte :across (random-data 16)
-                    :when (and (< filled 12) (< byte 252))
-                      :do (setf (char id filled) (char +id-characters+ (mod byte 36)))
-                          (incf filled)))
-    id))
+  (map-into (make-string 12) (lambda () (char +id-characters+ (strong-random 36)))))
 
 (defun touched (content now)
   (setf (content-updated-at content) now)

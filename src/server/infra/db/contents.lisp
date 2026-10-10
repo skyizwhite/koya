@@ -144,9 +144,9 @@
 
 (defmethod model-contents (space model)
   (mapcar #'row->content
-          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at, id" +columns+)
+          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at, rowid" +columns+)
                  space model)))
 
 (defmethod space-contents (space)
   (mapcar #'row->content
-          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? ORDER BY created_at, id" +columns+) space)))
+          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? ORDER BY created_at, rowid" +columns+) space)))

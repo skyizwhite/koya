@@ -325,7 +325,7 @@ paths:
       description: |
         Saved as a draft unless `publish` is true. The server makes the id: 12
         lowercase letters and digits drawn at random, one the space does not
-        hold, and a body that gives `id` is a 400. The system timestamps may be
+        hold, and a body that gives `id` is a 400 (`null` is as absent). The system timestamps may be
         supplied, for imports that keep another system's dates;
         a timestamp needs a date, a time and an offset or `Z`, and is stored in
         UTC with milliseconds.

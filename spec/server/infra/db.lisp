@@ -522,9 +522,14 @@
     (ok (get-content "one" "about") "deleting one leaves the other")
     (ok (= (count-revisions "one" "about") 1) "with its history"))
   (testing "within a space an id is still one content"
-    (ok (signals (exec "INSERT INTO contents (id, space, model, status, draft, created_at, updated_at)
-                        VALUES ('about', 'one', 'post', 'draft', '{\"title\":\"Again\"}',
-                                '2026-01-03T00:00:00.000Z', '2026-01-03T00:00:00.000Z')"))))
+    (ok (search "UNIQUE constraint failed: contents.space, contents.id"
+                (handler-case (progn (exec "INSERT INTO contents (id, space, model, status, draft, created_at, updated_at)
+                                            VALUES ('about', 'one', 'post', 'draft', '{\"title\":\"Again\"}',
+                                                    '2026-01-03T00:00:00.000Z', '2026-01-03T00:00:00.000Z')")
+                                     "")
+                  (dbi.error:dbi-database-error (e) (princ-to-string e))))
+        "a second content of the same id is refused by the key")
+    (ok (string= (jget (content-published (get-content "one" "about")) "title") "One") "and the first is kept"))
   (migrated-fully))
 
 (deftest a-rolled-back-deploy-leaves-nothing

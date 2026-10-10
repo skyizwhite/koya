@@ -106,9 +106,12 @@
   (create-space "archive")
   (replace-schema "archive" (archive-schema))
   (let* ((media (store-upload "archive" (png-bytes 4 5) :filename "cover.png" :alt "A cover"))
-         (tag (content-id (create "archive" (find-model "archive" "tag") (alist-hash-table '(("name" . "lisp")) :test 'equal)
-                                          :publish t :created-at "2020-01-01T00:00:00.000Z"
-                                          :published-at "2020-01-02T00:00:00.000Z")))
+         (tag (progn (insert-content (make-content :id "tag-1" :space "archive" :model "tag"
+                                                   :published (alist-hash-table '(("name" . "lisp")) :test 'equal)
+                                                   :created-at "2020-01-01T00:00:00.000Z" :updated-at "2020-01-02T00:00:00.000Z"
+                                                   :published-at "2020-01-02T00:00:00.000Z" :revised-at "2020-01-02T00:00:00.000Z")
+                                     nil nil)
+                     "tag-1"))
          (post (content-id (create "archive" (find-model "archive" "post")
                                            (alist-hash-table `(("title" . "Old") ("cover" . ,(media-id media))
                                                                ("tags" . ,(vector tag)))
@@ -160,6 +163,7 @@
       (testing "contents keep their ids, state, draft, timestamps and history"
         (let ((tag-content (get-content "archive" tag))
               (post-content (get-content "archive" post)))
+          (ok tag-content "an id given before koya made them all is kept too")
           (ok (string= (content-created-at tag-content) "2020-01-01T00:00:00.000Z"))
           (ok (string= (content-published-at tag-content) "2020-01-02T00:00:00.000Z"))
           (ok (string= (content-status post-content) "published+draft"))
