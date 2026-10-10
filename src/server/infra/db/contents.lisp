@@ -16,7 +16,7 @@
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:get-content #:find-content
                 #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
-                #:find-object-content #:unique-value-taken-p #:space-contents
+                #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
   (:export #:text-column))
 (in-package #:koya-server/infra/db/contents)
@@ -135,6 +135,17 @@
                             (format nil expr "published") (format nil expr "draft"))
                     space model (or exclude-id "") value value)
          t)))
+
+(defmethod slug-taken-p (space model slug &key exclude-id)
+  (and (fetch-one "SELECT 1 FROM contents WHERE space = ? AND model = ? AND id != ?
+                     AND (published_slug = ? OR draft_slug = ?) LIMIT 1"
+                  space model (or exclude-id "") slug slug)
+       t))
+
+(defmethod model-contents (space model)
+  (mapcar #'row->content
+          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at, id" +columns+)
+                 space model)))
 
 (defmethod space-contents (space)
   (mapcar #'row->content

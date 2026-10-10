@@ -39,7 +39,8 @@
            #:fill-defaults
            #:to-the-minute
            #:slug-value
-           #:content-slugs))
+           #:content-slugs
+           #:only-one))
 (in-package #:koya-server/domain/content)
 
 (defstruct content
@@ -234,3 +235,6 @@
 (defun content-slugs (model content)
   (list (slug-value model (content-published content))
         (slug-value model (content-draft content))))
+
+(defun only-one (contents)
+  (and contents (null (rest contents)) (first contents)))

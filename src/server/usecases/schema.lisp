@@ -6,7 +6,7 @@
                 #:field-path-parts #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:jobject)
-  (:import-from #:koya-server/usecases/ports/contents #:space-contents #:update-content)
+  (:import-from #:koya-server/usecases/ports/contents #:space-contents #:model-contents #:update-content)
   (:import-from #:koya-server/usecases/ports/store #:with-transaction)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-model #:content-published #:content-draft #:content-slugs)
@@ -213,10 +213,11 @@
                                      :test #'equal)))
       (when models
         (let ((stored (load-schema space)))
-          (dolist (content (space-contents space))
-            (when (member (content-model content) models :test #'equal)
-              (apply #'update-content content
-                     (content-slugs (schema-model stored (content-model content)) content)))))))))
+          (dolist (name models)
+            (let ((model (schema-model stored name)))
+              (when model
+                (dolist (content (model-contents space name))
+                  (apply #'update-content content (content-slugs model content)))))))))))
 
 (defun replace-schema (space schema &key (by *actor*))
   (let ((changes (changes-of space schema)))

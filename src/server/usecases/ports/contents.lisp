@@ -8,10 +8,12 @@
            #:list-contents
            #:count-contents
            #:space-contents
+           #:model-contents
            #:insert-content
            #:update-content
            #:delete-content
            #:unique-value-taken-p
+           #:slug-taken-p
            #:contents-mentioning
            #:record-revision
            #:list-revisions
@@ -36,6 +38,8 @@
 
 (defgeneric space-contents (space))
 
+(defgeneric model-contents (space model))
+
 (defgeneric insert-content (content published-slug draft-slug))
 
 (defgeneric update-content (content published-slug draft-slug))
@@ -43,6 +47,8 @@
 (defgeneric delete-content (space id))
 
 (defgeneric unique-value-taken-p (space model field value &key exclude-id))
+
+(defgeneric slug-taken-p (space model slug &key exclude-id))
 
 (defgeneric contents-mentioning (space needle &key exclude-id))
 

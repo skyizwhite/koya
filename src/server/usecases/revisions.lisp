@@ -1,15 +1,16 @@
 (defpackage #:koya-server/usecases/revisions
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-unique-p
+                #:model-fields #:field-name #:field-type #:field-option #:field-unique-p
                 #:field-required-p #:field-fields #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-server/usecases/ports/contents
-                #:find-content #:unique-value-taken-p #:list-revisions #:count-revisions
+                #:find-content #:list-revisions #:count-revisions
                 #:find-revision)
   (:import-from #:koya-server/domain/content #:content-published)
   (:import-from #:koya-server/usecases/ports/media #:find-media)
+  (:import-from #:koya-server/usecases/contents #:value-taken-p)
   (:export #:restore-data
            #:list-revisions
            #:count-revisions
@@ -101,7 +102,7 @@
                                         (getf (first errors) :message)))
                      (keep-current name))
                     ((and (field-unique-p field) (not (blank-value-p value))
-                          (unique-value-taken-p space (model-name model) name value :exclude-id id))
+                          (value-taken-p space model field value :exclude-id id))
                      (note name "keeps the current value: this version's is taken by another content")
                      (keep-current name))
                     (t (setf (gethash name data) value))))))))
