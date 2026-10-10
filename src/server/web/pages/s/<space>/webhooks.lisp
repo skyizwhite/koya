@@ -116,7 +116,7 @@
      (div :class "space-y-2 border-t border-line bg-base/50 px-4 py-3 text-sm"
        (~field :label "event" (delivery-event delivery))
        (~field :label "POST" (code :class "text-xs" (delivery-url delivery)))
-       (when (plusp (length (delivery-content-id delivery)))
+       (unless (blank-p (delivery-content-id delivery))
          (hsx (~field :label "content"
                 (a :href (let ((model (find-model space (delivery-model delivery))))
                            (if model

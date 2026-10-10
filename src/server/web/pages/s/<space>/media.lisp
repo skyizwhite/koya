@@ -85,7 +85,7 @@
          (span :class "text-muted" "PNG, JPEG, GIF or WebP, several at once.")
          (~upload-limit))
        (if (null items)
-           (hsx (~empty-state (if (plusp (length q)) "No file matches." "No media yet. Upload an image above.")))
+           (hsx (~empty-state (if (not (blank-p q)) "No file matches." "No media yet. Upload an image above.")))
            (hsx
             (<>
               (div :class "mb-4 flex flex-wrap items-center gap-3"

@@ -172,7 +172,7 @@
   (fields-booleans-filled (model-fields model) data))
 
 (defun fields-booleans-filled (fields data)
-  (let ((out (merge-data data (make-hash-table :test 'equal))))
+  (let ((out (copy-object data)))
     (dolist (field fields out)
       (let ((value (gethash (field-name field) out json-null)))
         (cond ((and (eq (field-type field) :boolean) (member value (list nil json-null)))
