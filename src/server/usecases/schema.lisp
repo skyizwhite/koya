@@ -2,8 +2,8 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
-                #:field-name #:field-option #:field-unique-p #:model-kind #:field-fields #:field-row-kinds
-                #:field-path-parts #:custom-field-name #:custom-field-fields)
+                #:field-name #:field-option #:field-unique-p #:model-kind #:field-fields #:field-row-kind
+                #:field-path-parts #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/usecases/ports/contents #:space-contents #:model-contents #:update-content)
@@ -68,7 +68,7 @@
 
 (defun inner-fields (field kind)
   (if kind
-      (let ((custom (find kind (field-row-kinds field) :key #'custom-field-name :test #'string=)))
+      (let ((custom (field-row-kind field kind)))
         (and custom (custom-field-fields custom)))
       (field-fields field)))
 

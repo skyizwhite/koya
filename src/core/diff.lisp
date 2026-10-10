@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:schema-webhooks #:schema-models #:schema-custom-fields #:custom-field->jobject #:field-fields
-                #:custom-field-name #:custom-field-fields
+                #:custom-field-name #:custom-field-fields #:field-row-kind
                 #:model-name #:model-kind #:model-fields #:model-options #:model-was
                 #:field-name #:field-type #:field-options #:field-was
                 #:forget-rename)
@@ -113,8 +113,7 @@
                       (inner-changes model (field-name new) (field-fields old) (field-fields new) renames))
                      (:repeater
                       (loop :for kind :in (field-fields new)
-                            :for before := (find (custom-field-name kind) (field-fields old)
-                                                 :key #'custom-field-name :test #'string=)
+                            :for before := (field-row-kind old (custom-field-name kind))
                             :when before
                               :append (inner-changes model (format nil "~a[~a]" (field-name new) (custom-field-name kind))
                                                      (custom-field-fields before) (custom-field-fields kind) renames)))))))))

@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/lib/forms
   (:use #:cl)
   (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p #:field-fields
-                #:field-row-kinds #:custom-field-name #:custom-field-fields)
+                #:field-row-kind #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/json
                 #:json-null)
   (:import-from #:cl-ppcre
@@ -47,8 +47,7 @@
              (setf (gethash (field-name field) data) (form->fields (field-fields field) params field))))
           (:repeater
            (let ((rows (loop :for key :in (form-list params name)
-                             :for kind := (find (form-value params (format nil "~a.~a.fieldId" name key))
-                                                (field-row-kinds field) :key #'custom-field-name :test #'equal)
+                             :for kind := (field-row-kind field (form-value params (format nil "~a.~a.fieldId" name key)))
                              :when kind
                                :collect (let ((row (form->fields (custom-field-fields kind) params (row-prefix field key))))
                                           (setf (gethash "fieldId" row) (custom-field-name kind))

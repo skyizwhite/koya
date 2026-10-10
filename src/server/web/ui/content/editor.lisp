@@ -6,7 +6,7 @@
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url #:field-fields #:field-option
-                #:field-row-kinds #:row-kind #:custom-field-name #:custom-field-fields #:model-field)
+                #:field-row-kind #:row-kind #:custom-field-name #:custom-field-fields #:model-field)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
@@ -131,8 +131,7 @@
           (let ((name (field-param-name field)))
             (loop :for key :in (form-list params name)
                   :for index :from 0
-                  :for kind := (find (param params (format nil "~a.~a.fieldId" name key)) (field-row-kinds field)
-                                     :key #'custom-field-name :test #'equal)
+                  :for kind := (field-row-kind field (param params (format nil "~a.~a.fieldId" name key)))
                   :when kind
                     :append (loop :for inner :in (custom-field-fields kind) :collect
                               (hsx (~field-error :field inner :parent (row-prefix field key)
@@ -143,7 +142,7 @@
          (model (target-model params))
          (field (and model (model-field model (or (param params "field") ""))))
          (kind (and field (eq (field-type field) :repeater)
-                    (find (param params "kind") (field-row-kinds field) :key #'custom-field-name :test #'equal))))
+                    (field-row-kind field (param params "kind")))))
     (if kind
         (hsx (div :id (format nil "~a-rows" (field-param-name field)) :nm-swap "append"
                (~repeater-row :space space :field field :kind kind :key (new-row-key) :fresh t)))

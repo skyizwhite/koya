@@ -23,6 +23,7 @@
            #:field-option
            #:field-fields
            #:field-row-kinds
+           #:field-row-kind
            #:field-path-parts
            #:row-kind
            #:custom-field
@@ -240,9 +241,11 @@
 
 (defun field-row-kinds (field) (field-fields field))
 
+(defun field-row-kind (field name)
+  (find name (field-row-kinds field) :key #'custom-field-name :test #'equal))
+
 (defun row-kind (field row)
-  (and (hash-table-p row)
-       (find (gethash "fieldId" row) (field-fields field) :key #'custom-field-name :test #'equal)))
+  (and (hash-table-p row) (field-row-kind field (gethash "fieldId" row))))
 
 (defun field-path-parts (path)
   (let* ((bracket (position #\[ path))
