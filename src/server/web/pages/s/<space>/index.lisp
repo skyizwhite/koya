@@ -55,11 +55,8 @@
                            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                                   (loop :for hook :in hooks :collect
                                     (hsx (li (a :href (webhook-log-url name :label (webhook-label hook))
-                                                :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
-                                               (span :class "min-w-0"
-                                                 (span :class "block font-medium" (webhook-label hook))
-                                                 (code :class "block truncate text-xs text-muted" (webhook-url hook)))
-                                               (span :class "shrink-0 text-sm text-muted"
-                                                 (if (webhook-only hook)
-                                                     (format nil "~{~a~^, ~} only" (webhook-only hook))
-                                                     "all models"))))))))))))))))))
+                                                :class "flex flex-col gap-1 px-4 py-3 hover:bg-base sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                                               (span :class "min-w-0 truncate font-medium"
+                                                 (format nil "~:[all models~;~:*~{~a~^, ~}~] · ~a"
+                                                         (webhook-only hook) (webhook-label hook)))
+                                               (code :class "min-w-0 truncate text-xs text-muted" (webhook-url hook))))))))))))))))))
