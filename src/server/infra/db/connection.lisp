@@ -13,6 +13,7 @@
                 #:with-recursive-lock-held)
   (:import-from #:koya-server/usecases/ports/store
                 #:call-with-transaction #:store-reachable-p)
+  (:import-from #:koya-core/json #:parse-json)
   (:export #:*db*
            #:*on-rollback*
            #:connect-db
@@ -22,7 +23,8 @@
            #:exec
            #:fetch
            #:fetch-one
-           #:col))
+           #:col
+           #:parsed-col))
 (in-package #:koya-server/infra/db/connection)
 
 (defvar *db* nil)
@@ -76,3 +78,6 @@
 
 (defun col (row name)
   (getf row (intern name :keyword)))
+
+(defun parsed-col (row name)
+  (let ((v (col row name))) (and v (parse-json v))))
