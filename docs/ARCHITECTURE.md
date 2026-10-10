@@ -153,7 +153,8 @@ it is stale.
 | `sessions` `settings` | the admin UI's own state |
 
 Ids are ULIDs, but a content's id is 12 lowercase letters and digits, koya's
-to make (one from before is a ULID, or the id it was created with). A model's fields are not columns: they are keys in the JSON, so
+to make (one from before is a ULID, or the id it was created with; a space
+imported from an archive keeps the archive's ids). A model's fields are not columns: they are keys in the JSON, so
 changing a schema never changes a table.
 
 One connection, and one lock around every statement and every transaction

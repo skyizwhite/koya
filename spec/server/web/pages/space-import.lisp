@@ -28,7 +28,7 @@
   (:import-from #:koya-server/usecases/ports/archives #:write-archive)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-revisions #:count-revisions #:get-content #:insert-content)
+                #:list-revisions #:count-revisions #:get-content #:insert-content #:record-revision)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
   (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
@@ -111,6 +111,7 @@
                                                    :created-at "2020-01-01T00:00:00.000Z" :updated-at "2020-01-02T00:00:00.000Z"
                                                    :published-at "2020-01-02T00:00:00.000Z" :revised-at "2020-01-02T00:00:00.000Z")
                                      nil nil)
+                     (record-revision "archive" "tag-1" "publish" (alist-hash-table '(("name" . "lisp")) :test 'equal))
                      "tag-1"))
          (post (content-id (create "archive" (find-model "archive" "post")
                                            (alist-hash-table `(("title" . "Old") ("cover" . ,(media-id media))
@@ -164,6 +165,7 @@
         (let ((tag-content (get-content "archive" tag))
               (post-content (get-content "archive" post)))
           (ok tag-content "an id given before koya made them all is kept too")
+          (ok (equal (mapcar #'revision-event (list-revisions "archive" tag)) '("publish")) "with its history")
           (ok (string= (content-created-at tag-content) "2020-01-01T00:00:00.000Z"))
           (ok (string= (content-published-at tag-content) "2020-01-02T00:00:00.000Z"))
           (ok (string= (content-status post-content) "published+draft"))

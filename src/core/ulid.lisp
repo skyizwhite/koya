@@ -34,7 +34,6 @@
     chars))
 
 (defun make-ulid (&optional (time-ms (unix-milliseconds)))
-  "Return a fresh ULID string. TIME-MS defaults to the current unix time in milliseconds."
   (check-type time-ms (integer 0 #.(1- (expt 2 48))))
   (encode (logior (ash time-ms 80) (random-80-bits))))
 

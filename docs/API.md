@@ -258,7 +258,8 @@ under `objects/` (`404`).
 - Publishing takes `data` when given, else the draft, else re-publishes.
 - A content's id is made by the server: 12 lowercase letters and digits, drawn
   at random. Ids from before stay as they were: 26-character ULIDs, or up to 64
-  letters, digits, `-` and `_` when the content was created with its own.
+  letters, digits, `-` and `_` when the content was created with its own. A
+  space imported from an archive keeps the ids the archive holds.
   Creating a list content cannot give `id` (`400`; `null` is as absent), but
   may give the four timestamps, for imports that keep another system's dates. An id is the space's own: another
   space may hold a content of the same id. A timestamp needs a date, a time and

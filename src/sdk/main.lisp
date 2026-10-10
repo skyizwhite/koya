@@ -17,7 +17,6 @@
                 #:koya-error #:koya-error-status #:koya-error-code #:koya-error-message
                 #:koya-error-details)
   (:import-from #:koya-core/time #:now-iso #:format-iso #:parse-iso)
-  (:import-from #:koya-core/ulid #:make-ulid)
   (:export #:defmodel #:defcustomfield #:defwebhooks #:webhook #:current-schema #:clear-schema #:find-model
            #:*base-url* #:*space* #:*delivery-key* #:*management-key* #:configure
            #:plan #:deploy #:pull
@@ -31,6 +30,5 @@
            #:list-delivery-keys #:create-delivery-key #:delete-delivery-key #:webhook-secret
            #:koya-error #:koya-error-status #:koya-error-code #:koya-error-message
            #:koya-error-details
-           #:now-iso #:format-iso #:parse-iso
-           #:make-ulid))
+           #:now-iso #:format-iso #:parse-iso))
 (in-package #:koya-sdk)

@@ -462,8 +462,7 @@ than dropped.
 
 Timestamps are ISO 8601 in UTC with milliseconds, e.g.
 `"2026-09-20T05:04:03.123Z"`. `koya-sdk:now-iso`, `koya-sdk:format-iso` and
-`koya-sdk:parse-iso` are exported for building them, and `koya-sdk:make-ulid`
-for generating ids.
+`koya-sdk:parse-iso` are exported for building them.
 
 ## The HTTP API underneath
 
