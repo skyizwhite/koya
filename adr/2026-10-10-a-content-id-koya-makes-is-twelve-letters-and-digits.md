@@ -27,4 +27,4 @@ Media, keys and deploys keep their ULIDs.
   nothing is rewritten, and every shape fits what an id may be.
 - A content id no longer tells when it was made, and a list ordered by `id` is
   in the order of the ids' text. A list ordered by `createdAt` is in the order
-  of those dates, which an import may have given.
+  of those dates, which creating a content may have given.
