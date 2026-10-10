@@ -1,10 +1,10 @@
 (defpackage #:koya-server/domain/content
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:model-label #:field-name #:field-type #:field-option #:field-fields
+                #:model-fields #:model-label #:model-slug-field #:field-name #:field-type #:field-option #:field-fields
                 #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/validate
-                #:datetime-string-p)
+                #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
                 #:json-null #:json-equal)
   (:import-from #:koya-core/time
@@ -37,7 +37,9 @@
            #:same-data-p
            #:default-data
            #:fill-defaults
-           #:to-the-minute))
+           #:to-the-minute
+           #:slug-value
+           #:content-slugs))
 (in-package #:koya-server/domain/content)
 
 (defstruct content
@@ -223,3 +225,12 @@
            (loop :for row :across value
                  :for kind := (row-kind field row)
                  :when kind :do (fields-to-the-minute (custom-field-fields kind) row))))))))
+
+(defun slug-value (model data)
+  (let* ((field (model-slug-field model))
+         (value (and field data (gethash (field-name field) data))))
+    (and (stringp value) (not (blank-value-p value)) value)))
+
+(defun content-slugs (model content)
+  (list :published-slug (slug-value model (content-published content))
+        :draft-slug (slug-value model (content-draft content))))

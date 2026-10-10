@@ -2,11 +2,11 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p
-                #:field-fields #:field-row-kinds #:row-kind #:custom-field-fields #:model-slug-field)
+                #:field-fields #:field-row-kinds #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
-  (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data)
+  (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data #:slug-value)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/auth #:secure-string=)
   (:import-from #:koya-server/usecases/ports/media #:find-media)
@@ -140,9 +140,7 @@
     (deliver-if-allowed space model content query draft-key)))
 
 (defun published-slug-p (model content slug)
-  (let ((field (model-slug-field model))
-        (live (content-published content)))
-    (and field live (equal (gethash (field-name field) live) slug))))
+  (equal (slug-value model (content-published content)) slug))
 
 (defun delivered-list-content-by-slug (space model slug query &key draft-key)
   (check-include space model (query-include query))

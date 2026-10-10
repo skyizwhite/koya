@@ -18,7 +18,7 @@
                 #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
                 #:find-object-content #:unique-value-taken-p #:space-contents
                 #:contents-mentioning)
-  (:export #:text-column #:refresh-slugs))
+  (:export #:text-column))
 (in-package #:koya-server/infra/db/contents)
 
 (defparameter +columns+
@@ -35,20 +35,6 @@
 (defun json-column (value) (and value (to-json value)))
 
 (defun text-column (data) (json-column (data-text data)))
-
-(defparameter +slug-field+
-  "(SELECT json_extract(f.value, '$.name') FROM models m, json_each(m.definition, '$.fields') f
-     WHERE m.space = contents.space AND m.name = contents.model AND m.kind = 'list'
-       AND json_extract(f.value, '$.type') = 'slug'
-     GROUP BY m.space, m.name HAVING COUNT(*) = 1)")
-
-(defun slug-of (column)
-  (format nil "NULLIF(TRIM(json_extract(~a, '$.' || ~a)), '')" column +slug-field+))
-
-(defun refresh-slugs (&optional space id)
-  (apply #'exec (format nil "UPDATE contents SET published_slug = ~a, draft_slug = ~a~:[~; WHERE space = ?~]~:[~; AND id = ?~]"
-                        (slug-of "published") (slug-of "draft") space id)
-         (remove nil (list space id))))
 
 (defmethod get-content (space id)
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND id = ?" +columns+) space id)))
@@ -68,28 +54,29 @@
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE id = ? AND space = ? AND model = ?" +columns+) id space model)))
     (and row (row->content row))))
 
-(defmethod insert-content (content)
+(defmethod insert-content (content &key published-slug draft-slug)
   (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at,
-                               published_text, draft_text)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                               published_text, draft_text, published_slug, draft_slug)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         (content-id content) (content-space content) (content-model content) (content-status content)
         (json-column (content-published content)) (json-column (content-draft content))
         (content-draft-key content)
         (content-created-at content) (content-updated-at content)
         (content-published-at content) (content-revised-at content)
-        (text-column (content-published content)) (text-column (content-draft content)))
-  (refresh-slugs (content-space content) (content-id content)))
+        (text-column (content-published content)) (text-column (content-draft content))
+        published-slug draft-slug))
 
-(defmethod update-content (content)
+(defmethod update-content (content &key published-slug draft-slug)
   (exec "UPDATE contents SET status = ?, published = ?, draft = ?, draft_key = ?, updated_at = ?,
-           published_at = ?, revised_at = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
+           published_at = ?, revised_at = ?, published_text = ?, draft_text = ?, published_slug = ?, draft_slug = ?
+         WHERE space = ? AND id = ?"
         (content-status content)
         (json-column (content-published content)) (json-column (content-draft content))
         (content-draft-key content) (content-updated-at content)
         (content-published-at content) (content-revised-at content)
         (text-column (content-published content)) (text-column (content-draft content))
-        (content-space content) (content-id content))
-  (refresh-slugs (content-space content) (content-id content)))
+        published-slug draft-slug
+        (content-space content) (content-id content)))
 
 (defmethod delete-content (space id)
   (exec "DELETE FROM contents WHERE space = ? AND id = ?" space id))

@@ -74,6 +74,7 @@
            #:field->jobject
            #:model->jobject
            #:jobject->model
+           #:forget-slug-options
            #:slug-name-p
            #:field-name-p))
 (in-package #:koya-core/schema)
@@ -458,20 +459,12 @@
                              (model-name model) (field-name field) name)
                      errors)))))))
     (dolist (model (schema-models schema))
-      (let ((slugs (count :slug (model-fields model) :key #'field-type)))
-        (cond ((and (eq (model-kind model) :object) (plusp slugs))
-               (push (format nil "model ~a: an object model has no slug field" (model-name model))
-                     errors))
-              ((> slugs 1)
-               (push (format nil "model ~a: a model has one slug field at most, and this one has ~a"
-                             (model-name model) slugs)
-                     errors))
-              ((and (zerop slugs)
-                    (some (lambda (url) (and url (search "{CONTENT_SLUG}" url)))
-                          (list (model-preview-url model) (model-public-url model))))
-               (push (format nil "model ~a: a URL template fills in {CONTENT_SLUG}, and the model has no slug field"
-                             (model-name model))
-                     errors)))))
+      (when (and (notany (lambda (field) (eq (field-type field) :slug)) (model-fields model))
+                 (some (lambda (url) (and url (search "{CONTENT_SLUG}" url)))
+                       (list (model-preview-url model) (model-public-url model))))
+        (push (format nil "model ~a: a URL template fills in {CONTENT_SLUG}, and the model has no slug field"
+                      (model-name model))
+              errors)))
     (dolist (custom (schema-custom-fields schema))
       (dolist (field (custom-field-fields custom))
         (when (eq (field-type field) :reference)
@@ -505,9 +498,18 @@
         :when comma
           :collect (format nil "~a: field ~s: option ~s holds a comma" where (field-name field) comma)))
 
+(defun slug-errors (model)
+  (let ((slugs (count :slug (model-fields model) :key #'field-type)))
+    (cond ((and (eq (model-kind model) :object) (plusp slugs))
+           (list (format nil "model ~a: an object model has no slug field" (model-name model))))
+          ((> slugs 1)
+           (list (format nil "model ~a: a model has one slug field at most, and this one has ~a"
+                         (model-name model) slugs))))))
+
 (defun check-deployable (schema)
   (let ((errors (append (loop :for model :in (schema-models schema)
-                              :append (comma-errors (format nil "model ~a" (model-name model)) (model-fields model)))
+                              :append (comma-errors (format nil "model ~a" (model-name model)) (model-fields model))
+                              :append (slug-errors model))
                         (loop :for custom :in (schema-custom-fields schema)
                               :append (comma-errors (format nil "custom field ~a" (custom-field-name custom))
                                                     (custom-field-fields custom))))))
@@ -597,6 +599,17 @@
     (unless (stringp name) (fail "custom field without a name"))
     (unless (json-array-p fields) (fail "custom field ~s: fields must be an array" name))
     (make-custom-field name (map 'list #'jobject->field fields))))
+
+(defun forget-slug-options (obj)
+  (let ((fields (and (hash-table-p obj) (jget obj "fields")))
+        (forgot nil))
+    (when (json-array-p fields)
+      (loop :for field :across fields
+            :when (and (hash-table-p field) (equal (jget field "type") "slug"))
+              :do (let ((from (remhash "from" field))
+                        (unique (remhash "unique" field)))
+                    (when (or from unique) (setf forgot t)))))
+    forgot))
 
 (defun jobject->model (obj)
   (unless (hash-table-p obj) (fail "each model must be an object"))

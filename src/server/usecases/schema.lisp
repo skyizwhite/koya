@@ -6,8 +6,10 @@
                 #:field-path-parts #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:jobject)
-  (:import-from #:koya-server/usecases/ports/contents #:space-contents)
-  (:import-from #:koya-server/domain/content #:content-id #:content-model #:content-published #:content-draft)
+  (:import-from #:koya-server/usecases/ports/contents #:space-contents #:update-content)
+  (:import-from #:koya-server/usecases/ports/store #:with-transaction)
+  (:import-from #:koya-server/domain/content
+                #:content-id #:content-model #:content-published #:content-draft #:content-slugs)
   (:import-from #:koya-server/domain/deploy #:changes-by-served-model)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-core/diff #:diff-schemas #:destructive-changes-p #:tightened-change-p)
@@ -197,9 +199,19 @@
   (check-schema schema)
   (diff-schemas (load-schema space) schema))
 
+(defun store-schema (space schema changes by)
+  (with-transaction
+    (save-schema space schema changes :by by)
+    (when changes
+      (let ((stored (load-schema space)))
+        (dolist (content (space-contents space))
+          (let ((model (schema-model stored (content-model content))))
+            (when model
+              (apply #'update-content content (content-slugs model content)))))))))
+
 (defun replace-schema (space schema &key (by *actor*))
   (let ((changes (changes-of space schema)))
-    (save-schema space schema changes :by by)
+    (store-schema space schema changes by)
     changes))
 
 (defun notify-deploy (space before changes)
@@ -219,6 +231,6 @@
     (when (and (destructive-changes-p changes) (not force))
       (fail 'conflict "Schema deploy contains destructive changes; retry with force=true"
             :code "destructive_changes" :details changes))
-    (save-schema space schema changes :by *actor*)
+    (store-schema space schema changes *actor*)
     (notify-deploy space before changes)
     changes))

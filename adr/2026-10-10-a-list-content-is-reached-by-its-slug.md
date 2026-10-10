@@ -38,8 +38,12 @@ A slug is a second key of a list content, beside its id.
 - Schemas stored before this lose `unique` on their slug fields when the server
   is upgraded, and an archive exported before this is imported without it.
   Contents stored before may share a slug, and a model may hold two slug
-  fields: the upgrade leaves them as they are. Such a slug finds nothing, and a
+  fields: the upgrade leaves them as they are, and so does importing an archive
+  that holds them, so that a space exported after the upgrade is imported
+  again. Only a deploy refuses them. Such a slug finds nothing, and a
   model with two slug fields finds nothing by slug, until they are put right; a
   content sharing a slug is refused on its next save until it is changed.
 - A model's slug is kept beside each version's data when the content is
-  written, so that finding by it is a lookup.
+  written, and again for every content when a deploy changes the schema, so
+  that finding by it is a lookup. The use case says what the slug is; the store
+  keeps it.

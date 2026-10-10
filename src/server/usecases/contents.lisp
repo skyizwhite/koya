@@ -19,7 +19,7 @@
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
                 #:merge-data #:same-data-p #:fill-defaults #:to-the-minute #:new-content #:drafted #:published
-                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition)
+                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
@@ -86,8 +86,8 @@
                    :old old
                    :new new))
 
-(defun store (content event data)
-  (update-content content)
+(defun store (model content event data)
+  (apply #'update-content content (content-slugs model content))
   (record-revision (content-space content) (content-id content) event data :by *actor*)
   content)
 
@@ -110,7 +110,7 @@
                                           :publish publish
                                           :created-at created-at :updated-at updated-at
                                           :published-at published-at :revised-at revised-at)))
-                (insert-content content)
+                (apply #'insert-content content (content-slugs model content))
                 (record-revision space-name (content-id content) (if publish "publish" "draft") data :by *actor*)
                 content))))
       (if publish
@@ -139,11 +139,11 @@
     (cond ((same-data-p model data current) (values content :unchanged))
           ((and live (same-data-p model data live))
            (check-transition content :discard)
-           (values (store (discarded content) "discard" live) :published (draft-view space model content)))
+           (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
           (t
            (check-transition content :save)
            (check-content space model data :exclude-id id)
-           (values (store (drafted content data) "draft" data) :saved)))))
+           (values (store model (drafted content data) "draft" data) :saved)))))
 
 (defun publish (space model id &key data published-at since)
   (let ((published-at (check-published-at published-at)))
@@ -158,7 +158,7 @@
     (check-unchanged-since content since)
     (check-transition content :publish)
     (check-content space model data :exclude-id id)
-    (values (store (published content data :published-at published-at) "publish" data)
+    (values (store model (published content data :published-at published-at) "publish" data)
             (published-view space model content))))
 
 (defun check-unreferenced (space-name model-name id verb)
@@ -177,7 +177,7 @@
             (check-transition content :unpublish)
             (check-unreferenced space-name model-name (content-id content) "unpublish")
             (let ((next (unpublished content)))
-              (values (store next "unpublish" (content-draft next))
+              (values (store model next "unpublish" (content-draft next))
                       (published-view space model content)))))
       (notify space model id :unpublish :old old)
       next)))
@@ -190,7 +190,7 @@
           (let ((content (resolve-content space-name model-name id)))
             (check-unchanged-since content since)
             (check-transition content :discard)
-            (values (store (discarded content) "discard" (content-published content))
+            (values (store model (discarded content) "discard" (content-published content))
                     (draft-view space model content))))
       (notify space model id :discard :old old :new (published-view space model next))
       next)))
@@ -232,12 +232,12 @@
           (t (object-content space model)))))
 
 (defun draft-key (space-name model-name id)
-  (resolve-model space-name model-name)
-  (with-transaction
-    (let* ((content (resolve-content space-name model-name id))
-           (keyed (keyed content)))
-      (unless (eq keyed content) (update-content keyed))
-      (content-draft-key keyed))))
+  (let ((model (nth-value 1 (resolve-model space-name model-name))))
+    (with-transaction
+      (let* ((content (resolve-content space-name model-name id))
+             (keyed (keyed content)))
+        (unless (eq keyed content) (apply #'update-content keyed (content-slugs model keyed)))
+        (content-draft-key keyed)))))
 
 (defun resolve-content (space-name model-name id)
   (or (find-content space-name model-name id)

@@ -10,7 +10,7 @@
   (:import-from #:koya-core/json
                 #:parse-json #:to-json)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
-  (:import-from #:koya-server/infra/db/contents #:text-column #:refresh-slugs)
+  (:import-from #:koya-server/infra/db/contents #:text-column)
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/spaces
@@ -199,5 +199,4 @@
                          definition = excluded.definition, position = excluded.position"
                       space-name (model-name model) (string-downcase (symbol-name (model-kind model)))
                       (to-json (model->jobject (model-forget-renames model))) position))
-      (refresh-slugs space-name)
       (forget-schema space-name))))
