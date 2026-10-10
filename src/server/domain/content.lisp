@@ -6,7 +6,7 @@
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
-                #:json-null #:json-equal)
+                #:json-null #:json-equal #:json-array-p)
   (:import-from #:koya-core/time
                 #:now-iso #:parse-iso #:format-iso)
   (:import-from #:local-time
@@ -180,7 +180,7 @@
                (setf (gethash (field-name field) out) nil))
               ((and (eq (field-type field) :custom) (hash-table-p value))
                (setf (gethash (field-name field) out) (fields-booleans-filled (field-fields field) value)))
-              ((and (eq (field-type field) :repeater) (vectorp value) (not (stringp value)))
+              ((and (eq (field-type field) :repeater) (json-array-p value))
                (setf (gethash (field-name field) out)
                      (map 'vector (lambda (row)
                                     (let ((kind (row-kind field row)))
@@ -206,7 +206,7 @@
              (setf (gethash (field-name field) data) t))
             ((and (eq (field-type field) :custom) (hash-table-p value))
              (fill-field-defaults (field-fields field) value))
-            ((and (eq (field-type field) :repeater) (vectorp value) (not (stringp value)))
+            ((and (eq (field-type field) :repeater) (json-array-p value))
              (loop :for row :across value
                    :for kind := (row-kind field row)
                    :when kind :do (fill-field-defaults (custom-field-fields kind) row)))))))
@@ -226,7 +226,7 @@
         (:custom
          (when (hash-table-p value) (fields-to-the-minute (field-fields field) value)))
         (:repeater
-         (when (and (vectorp value) (not (stringp value)))
+         (when (json-array-p value)
            (loop :for row :across value
                  :for kind := (row-kind field row)
                  :when kind :do (fields-to-the-minute (custom-field-fields kind) row))))))))

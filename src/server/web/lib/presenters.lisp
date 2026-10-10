@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/lib/presenters
   (:use #:cl)
-  (:import-from #:koya-core/json #:jobject #:json-null #:to-json)
+  (:import-from #:koya-core/json #:jobject #:json-null #:to-json #:json-array-p #:copy-object)
   (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-fields
                 #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/diff #:change->jobject)
@@ -67,7 +67,7 @@
         (:custom
          (when (hash-table-p value) (absolutize-fields value (field-fields field) base)))
         (:repeater
-         (when (and (vectorp value) (not (stringp value)))
+         (when (json-array-p value)
            (loop :for row :across value
                  :for kind := (row-kind field row)
                  :when kind :do (absolutize-fields row (custom-field-fields kind) base))))))))
@@ -105,11 +105,6 @@
     (when changes
       (setf (gethash "changes" payload) (changes->jarray changes)))
     (to-json payload)))
-
-(defun copy-object (object)
-  (let ((out (make-hash-table :test 'equal)))
-    (maphash (lambda (k v) (setf (gethash k out) v)) object)
-    out))
 
 (defun admin-content->jobject (content)
   (flet ((data (object) (and object (copy-object object))))

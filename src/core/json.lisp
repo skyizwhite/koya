@@ -11,6 +11,8 @@
            #:json-null-p
            #:json-array
            #:json-array-p
+           #:blank-p
+           #:copy-object
            #:jget
            #:jset
            #:jobject
@@ -25,6 +27,13 @@
 (defun json-array (&rest values) (coerce values 'vector))
 
 (defun json-array-p (value) (and (vectorp value) (not (stringp value))))
+
+(defun blank-p (value) (or (null value) (zerop (length value))))
+
+(defun copy-object (object)
+  (let ((out (make-hash-table :test 'equal)))
+    (when object (maphash (lambda (k v) (setf (gethash k out) v)) object))
+    out))
 
 (defun parse-json (string)
   (parse string))

@@ -1,5 +1,6 @@
 (defpackage #:koya-server/usecases/listing
   (:use #:cl)
+  (:import-from #:koya-core/json #:json-array-p #:blank-p)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type
                 #:+system-fields+ #:field-option)
@@ -19,18 +20,16 @@
            #:reference-labels))
 (in-package #:koya-server/usecases/listing)
 
-(defun empty-p (string) (or (null string) (string= string "")))
-
 (defun sortable-p (model name)
-  (and (not (empty-p name))
+  (and (not (blank-p name))
        (let ((field (model-field model name)))
          (if field
              (not (member (field-type field) '(:custom :repeater)))
              (member name +system-fields+ :test #'string=)))))
 
 (defun parse-sort (raw model)
-  (let* ((desc (and (not (empty-p raw)) (char= (char raw 0) #\-)))
-         (name (and (not (empty-p raw)) (if desc (subseq raw 1) raw))))
+  (let* ((desc (and (not (blank-p raw)) (char= (char raw 0) #\-)))
+         (name (and (not (blank-p raw)) (if desc (subseq raw 1) raw))))
     (when (sortable-p model name)
       (values name (if desc :desc :asc)))))
 
@@ -41,7 +40,7 @@
   (let ((query (make-query :limit page-size
                            :offset (* (1- page) page-size)
                            :orders (sort-orders sort-name sort-direction)
-                           :search (unless (empty-p search-text) search-text))))
+                           :search (unless (blank-p search-text) search-text))))
     (multiple-value-bind (contents total)
         (list-contents space (model-name model) model query :status :all :only-status status)
       (values contents total (max 1 (ceiling total page-size))))))
@@ -55,7 +54,7 @@
                       :for value := (and data (gethash (field-name field) data))
                       :when (and (eq (field-type field) :media) (stringp value) (plusp (length value)))
                         :collect value
-                      :when (and (eq (field-type field) :media) (vectorp value) (not (stringp value)) (plusp (length value))
+                      :when (and (eq (field-type field) :media) (json-array-p value) (plusp (length value))
                                  (stringp (aref value 0)))
                         :collect (aref value 0)))))
 

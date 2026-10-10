@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-many-p #:field-fields
                 #:field-row-kind #:custom-field-name #:custom-field-fields)
   (:import-from #:koya-core/json
-                #:json-null)
+                #:json-null #:json-array-p)
   (:import-from #:cl-ppcre
                 #:split)
   (:import-from #:koya-server/domain/number #:parse-decimal)
@@ -84,7 +84,7 @@
 (defun value->string (field value)
   (cond ((or (null value) (eq value json-null)) "")
         ((realp value) (number->string value))
-        ((and (vectorp value) (not (stringp value)))
+        ((json-array-p value)
          (format nil "~{~a~^, ~}" (coerce value 'list)))
         ((eq (field-type field) :datetime)
          (if (stringp value) (iso->local-input value :timezone (display-timezone)) (princ-to-string value)))

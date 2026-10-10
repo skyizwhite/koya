@@ -8,7 +8,7 @@
                 #:model-forget-renames #:schema-model #:schema-custom-fields
                 #:custom-field->jobject #:jobject->custom-field #:field-path-parts)
   (:import-from #:koya-core/json
-                #:parse-json #:to-json)
+                #:parse-json #:to-json #:json-array-p)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
   (:import-from #:koya-server/infra/db/contents #:text-column)
   (:import-from #:koya-core/time
@@ -124,7 +124,7 @@
   (let ((value (and data (gethash outer data))))
     (cond ((and (null kind) (hash-table-p value))
            (remhash inner value))
-          ((and kind (vectorp value) (not (stringp value)))
+          ((and kind (json-array-p value))
            (let ((dropped nil))
              (loop :for row :across value
                    :when (and (hash-table-p row) (equal (gethash "fieldId" row) kind) (remhash inner row))

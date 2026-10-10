@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p
                 #:field-fields #:field-row-kinds #:row-kind #:custom-field-fields)
-  (:import-from #:koya-core/json #:json-null)
+  (:import-from #:koya-core/json #:json-null #:json-array-p #:copy-object)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
   (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data #:slug-value #:only-one)
@@ -26,11 +26,6 @@
 (defstruct (delivered (:constructor make-delivered (content model data)))
   content model data)
 
-(defun copy-object (object)
-  (let ((out (make-hash-table :test 'equal)))
-    (when object (maphash (lambda (k v) (setf (gethash k out) v)) object))
-    out))
-
 (defun expand-reference (space target-model-name value include)
   (let* ((target (find-model space target-model-name))
          (content (and target (stringp value) (find-content space target-model-name value))))
@@ -38,7 +33,7 @@
          (deliver content target space :include include))))
 
 (defun rows-of (value)
-  (and (vectorp value) (not (stringp value)) value))
+  (and (json-array-p value) value))
 
 (defun next-fields (space field)
   (case (field-type field)
