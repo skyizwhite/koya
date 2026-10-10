@@ -6,7 +6,6 @@
                 #:validate-content #:validation-error #:blank-value-p #:content-id-p #:datetime-string-p
                 #:validation-error-errors)
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
-  (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict #:invalid-input #:not-found #:koya-error #:koya-error-message)
   (:import-from #:koya-server/usecases/ports/store #:with-transaction)
@@ -19,7 +18,8 @@
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
                 #:merge-data #:same-data-p #:fill-defaults #:to-the-minute #:new-content #:drafted #:published
-                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one)
+                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one
+                #:new-content-id)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
@@ -78,6 +78,10 @@
         ((get-content space id) (fail 'conflict (format nil "Content ~a already exists" id)))
         (t id)))
 
+(defun fresh-id (space)
+  (loop :for id := (new-content-id)
+        :unless (get-content space id) :return id))
+
 (defun published-view (space model content)
   (and (content-published content)
        (deliver content model space)))
@@ -111,7 +115,7 @@
                 (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
                       :code "object_exists"))
               (check-content space-name model data)
-              (let ((content (new-content (or (check-new-id space-name id) (make-ulid)) space-name model-name data
+              (let ((content (new-content (or (check-new-id space-name id) (fresh-id space-name)) space-name model-name data
                                           :publish publish
                                           :created-at created-at :updated-at updated-at
                                           :published-at published-at :revised-at revised-at)))

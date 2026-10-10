@@ -1021,7 +1021,8 @@ components:
       schema: { type: string }
       description: |
         Comma-separated field or system field names, `-` prefix for descending,
-        e.g. `-publishedAt,title`. Default: newest published first.
+        e.g. `-publishedAt,title`. Default: newest published first. `id`
+        orders by the ids' text; `createdAt` by when the contents were made.
     filters:
       name: filters
       in: query
@@ -1548,7 +1549,7 @@ components:
         id:
           type: string
           pattern: "^[A-Za-z0-9_-]{1,64}$"
-          description: Defaults to a fresh ULID. `new` is refused, as the admin UI's new-content form.
+          description: Defaults to 12 lowercase letters and digits drawn at random, one the space does not hold. `new` is refused, as the admin UI's new-content form.
         createdAt: { $ref: "#/components/schemas/Timestamp" }
         updatedAt: { $ref: "#/components/schemas/Timestamp" }
         publishedAt: { $ref: "#/components/schemas/Timestamp" }
@@ -1598,7 +1599,7 @@ components:
           oneOf: [{ $ref: "#/components/schemas/Timestamp" }, { type: "null" }]
       additionalProperties: true
       example:
-        id: 01J8Q0Z5X2W3V4U5T6S7R8Q9P0
+        id: k3x9m2qa7t0b
         title: Hello
         slug: hello
         cover:
@@ -1611,7 +1612,7 @@ components:
           height: 630
           alt: Cover
           createdAt: "2026-09-20T05:04:03.123Z"
-        tags: [01J8Q0Z5X2W3V4U5T6S7R8Q9P2]
+        tags: [p8f2w6zc1n4d]
         createdAt: "2026-09-20T05:04:03.123Z"
         updatedAt: "2026-09-20T05:04:03.123Z"
         publishedAt: "2026-09-20T05:04:03.123Z"

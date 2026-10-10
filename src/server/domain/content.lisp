@@ -22,6 +22,7 @@
            #:content-data
            #:status-of
            #:new-draft-key
+           #:new-content-id
            #:new-content
            #:drafted
            #:published
@@ -99,6 +100,18 @@
 
 (defun new-draft-key ()
   (byte-array-to-hex-string (random-data 16)))
+
+(defparameter +id-characters+ "abcdefghijklmnopqrstuvwxyz0123456789")
+
+(defun new-content-id ()
+  (let ((id (make-string 12))
+        (filled 0))
+    (loop :while (< filled 12)
+          :do (loop :for byte :across (random-data 16)
+                    :when (and (< filled 12) (< byte 252))
+                      :do (setf (char id filled) (char +id-characters+ (mod byte 36)))
+                          (incf filled)))
+    id))
 
 (defun touched (content now)
   (setf (content-updated-at content) now)
