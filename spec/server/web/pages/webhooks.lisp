@@ -36,6 +36,8 @@
            (testing "the space page sends each webhook to its own log"
              (multiple-value-bind (status body) (request :get "/s/website")
                (ok (= status 200))
+               (ok (search ">Models</h2>" body) "the models are under their heading")
+               (ok (search ">Webhooks</h2>" body) "and the webhooks under theirs")
                (ok (search "/s/website/webhooks?label=revalidate" body) "the row is a link to that hook's log")
                (ok (search "\"/s/website/webhooks\"" body) "and View log links to the unfiltered log")
                (ok (search "View log" body))

@@ -45,20 +45,21 @@
                                           (hsx (span :class "text-sm text-muted"
                                                  (format nil "~a content~:p" (count-contents name (model-name model))))))))))))))
               (let ((hooks (schema-webhooks schema)))
-                (when hooks
-                  (hsx (section :class "mt-8"
-                         (div :class "mb-2 flex items-baseline justify-between gap-3"
-                           (h2 :class "text-sm font-semibold text-muted" "Webhooks")
-                           (a :href (webhook-log-url name) :class "text-sm text-muted hover:text-fg hover:underline"
-                              "View log →"))
-                         (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                           (loop :for hook :in hooks :collect
-                             (hsx (li (a :href (webhook-log-url name :label (webhook-label hook))
-                                         :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
-                                        (span :class "min-w-0"
-                                          (span :class "block font-medium" (webhook-label hook))
-                                          (code :class "block truncate text-xs text-muted" (webhook-url hook)))
-                                        (span :class "shrink-0 text-sm text-muted"
-                                          (if (webhook-only hook)
-                                              (format nil "~{~a~^, ~} only" (webhook-only hook))
-                                              "all models")))))))))))))))))
+                (hsx (section :class "mt-8"
+                       (div :class "mb-2 flex items-baseline justify-between gap-3"
+                         (h2 :class "text-sm font-semibold text-muted" "Webhooks")
+                         (a :href (webhook-log-url name) :class "text-sm text-muted hover:text-fg hover:underline"
+                            "View log →"))
+                       (if (null hooks)
+                           (hsx (~empty-state "This space has no webhooks."))
+                           (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                                  (loop :for hook :in hooks :collect
+                                    (hsx (li (a :href (webhook-log-url name :label (webhook-label hook))
+                                                :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
+                                               (span :class "min-w-0"
+                                                 (span :class "block font-medium" (webhook-label hook))
+                                                 (code :class "block truncate text-xs text-muted" (webhook-url hook)))
+                                               (span :class "shrink-0 text-sm text-muted"
+                                                 (if (webhook-only hook)
+                                                     (format nil "~{~a~^, ~} only" (webhook-only hook))
+                                                     "all models"))))))))))))))))))
