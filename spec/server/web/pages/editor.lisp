@@ -708,6 +708,7 @@
              (update-content (drafted (get-content "website" id) (jobject "title" "D" "blocks" "abc")) nil nil)
              (multiple-value-bind (status body) (request :get "/s/website/m/doc")
                (ok (= status 200))
+               (ok (search (format nil "aria-label=\"Open ~a\"" id) body))
                (ng (search "3 rows" body) "and does not count a text's characters as rows"))
              (edit (format nil "/s/website/m/doc/~a" id)
                    :form '(("action" . "save") ("f-title" . "D") ("f-blocks" . "b")
