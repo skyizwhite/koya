@@ -7,7 +7,7 @@
   (ok (signals (parse-json "{x") 'json-parse-error) "is a json-parse-error, whatever parses it"))
 
 (deftest blank
-  (ok (blank-p nil) "nothing is blank")
+  (ok (blank-p nil) "nil is blank")
   (ok (blank-p "") "and so is an empty string")
   (ng (blank-p " ") "a space is not"))
 

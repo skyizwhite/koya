@@ -6,7 +6,7 @@
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
-                #:json-null #:json-equal #:json-array-p)
+                #:json-null #:json-equal #:json-array-p #:copy-object)
   (:import-from #:koya-core/time
                 #:now-iso #:parse-iso #:format-iso)
   (:import-from #:local-time
@@ -164,8 +164,7 @@
         (content-id content))))
 
 (defun merge-data (base patch)
-  (let ((out (make-hash-table :test 'equal)))
-    (when base (maphash (lambda (k v) (setf (gethash k out) v)) base))
+  (let ((out (copy-object base)))
     (maphash (lambda (k v) (if (eq v json-null) (remhash k out) (setf (gethash k out) v))) patch)
     out))
 

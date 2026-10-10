@@ -98,7 +98,7 @@
   (let ((value (and data (gethash (field-name field) data))))
     (cond ((eq value json-null) nil)
           ((eq (field-type field) :repeater)
-           (and (vectorp value) (plusp (length value)) (format nil "~a row~:p" (length value))))
+           (and (json-array-p value) (plusp (length value)) (format nil "~a row~:p" (length value))))
           ((eq (field-type field) :boolean)
            (and data (nth-value 1 (gethash (field-name field) data))
                 (scalar-preview field value ref-labels)))
@@ -129,7 +129,7 @@
     (cond
       ((and (eq (field-type field) :media) (stringp value) (plusp (length value)))
         (hsx (~media-cell :field field :id value :media media)))
-      ((and (eq (field-type field) :media) (vectorp value) (plusp (length value)) (stringp (aref value 0)))
+      ((and (eq (field-type field) :media) (json-array-p value) (plusp (length value)) (stringp (aref value 0)))
         (hsx (~media-cell :field field :id (aref value 0) :media media :more (1- (length value)))))
       (t
         (let ((preview (field-preview field data ref-labels)))

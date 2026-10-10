@@ -74,7 +74,7 @@
         :for data := (content-data content :draft t)
         :for value := (and data (gethash (field-name field) data))
         :nconc (cond ((stringp value) (list value))
-                     ((vectorp value) (remove-if-not #'stringp (coerce value 'list))))))
+                     ((json-array-p value) (remove-if-not #'stringp (coerce value 'list))))))
 
 (defun reference-labels (space model contents)
   (let ((table (make-hash-table :test 'equal)))

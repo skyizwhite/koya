@@ -1,5 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/media
   (:use #:cl #:hsx)
+  (:import-from #:koya-core/json #:blank-p)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-follow #:on-search #:on-pick)
@@ -32,7 +33,7 @@
 
 (defun library-url (space &key search (page 1))
   (render-uri (make-uri :path (media-page-url space)
-                        :query (append (and search (plusp (length search)) `(("q" . ,search)))
+                        :query (append (unless (blank-p search) `(("q" . ,search)))
                                        (and (> page 1) `(("page" . ,page)))))))
 
 (defparameter +bulk-form+ "media-bulk")

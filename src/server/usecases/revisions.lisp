@@ -4,7 +4,7 @@
                 #:model-fields #:field-name #:field-type #:field-option #:field-unique-p
                 #:field-required-p #:field-fields #:row-kind #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
-  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/json #:json-array-p #:copy-object)
   (:import-from #:koya-server/usecases/ports/contents
                 #:find-content #:list-revisions #:count-revisions
                 #:find-revision)
@@ -53,9 +53,8 @@
       (drop-unusable-in space (field-fields field) value)))
 
 (defun drop-unusable-in (space fields value)
-  (let ((kept (make-hash-table :test 'equal))
+  (let ((kept (copy-object value))
         (notes '()))
-    (maphash (lambda (k v) (setf (gethash k kept) v)) value)
     (dolist (inner fields)
       (let ((v (gethash (field-name inner) kept)))
         (when (and (member (field-type inner) '(:reference :media)) (not (blank-value-p v)))
