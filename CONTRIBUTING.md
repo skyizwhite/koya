@@ -5,12 +5,13 @@ it from a site is in the [README](README.md).
 
 ## Setting up
 
-SBCL, [qlot](https://github.com/fukamachi/qlot) and
-[just](https://github.com/casey/just), plus the C libraries the dependencies
-compile against: SQLite, libev and a C toolchain.
+SBCL, [qlot](https://github.com/fukamachi/qlot),
+[just](https://github.com/casey/just) and
+[mallet](https://github.com/fukamachi/mallet), plus the C libraries the
+dependencies compile against: SQLite, libev and a C toolchain.
 
 ```sh
-just install          # the Tailwind binary and the Lisp dependencies
+just install          # the Tailwind binary, the Lisp dependencies and the pre-commit hook
 cp .env.example .env  # set KOYA_SECRET (32+ characters); KOYA_PORT and KOYA_BASE_URL must agree
 just build            # the stylesheet (just watch rebuilds it on every change)
 just dev              # serves on KOYA_PORT (default 3100)
@@ -34,10 +35,14 @@ from its **Keys** page. A site's schema reaches it with `koya deploy` from
 ## The spec
 
 ```sh
+just lint
 just spec
 ```
 
 The spec in `spec/` comes first: a change starts as a spec that fails.
+
+The pre-commit hook in `.githooks/` runs both and refuses a commit when either
+fails; `just install` points git at it.
 
 `spec/` mirrors `src/`: `core/`, `sdk/` and `server/`. Anything touching the
 database uses an in-memory one, and the admin UI and both APIs are driven through
