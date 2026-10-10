@@ -56,7 +56,10 @@
                                   (loop :for hook :in hooks :collect
                                     (hsx (li (a :href (webhook-log-url name :label (webhook-label hook))
                                                 :class "flex flex-col gap-1 px-4 py-3 hover:bg-base sm:flex-row sm:items-center sm:justify-between sm:gap-3"
-                                               (span :class "min-w-0 truncate font-medium"
-                                                 (format nil "~:[all models~;~:*~{~a~^, ~}~] · ~a"
-                                                         (webhook-only hook) (webhook-label hook)))
+                                               (span :class "flex min-w-0 items-baseline gap-2"
+                                                 (span :class "shrink-0 font-medium" (webhook-label hook))
+                                                 (span :class "min-w-0 truncate text-sm text-muted"
+                                                   (if (webhook-only hook)
+                                                       (format nil "~{~a~^, ~}" (webhook-only hook))
+                                                       "all models")))
                                                (code :class "min-w-0 truncate text-xs text-muted" (webhook-url hook))))))))))))))))))
