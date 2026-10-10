@@ -2,8 +2,8 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-reveal #:on-pick)
   (:import-from #:koya-spec/server/web/pages/support
-                #:replaced-url #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
-                #:location #:request-url #:call-action #:setup-pages #:log-in)
+                #:replaced-url #:bound #:post-login #:edit #:*secret* #:*cookie* #:blog-model #:request
+                #:request-url #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/contents #:list-contents)
   (:import-from #:koya-server/domain/content #:content-id)
@@ -176,8 +176,8 @@
             (ok (string= (replaced-url body) "/s/website/media?q=bulk") "the URL keeps the search"))
           (ok (null (list-media "website" :search "bulk")) "both gone"))
         (testing "a file a content still uses stays, and the rest still go"
-          (let* ((kept (upload "bulk-kept.png"))
-                 (other (upload "bulk-other.png")))
+          (let ((kept (upload "bulk-kept.png"))
+                (other (upload "bulk-other.png")))
             (edit "/s/website/m/blog/new"
                       :form `(("action" . "save") ("f-title" . "Uses an image") ("f-cover" . ,kept))
                      :headers origin)
@@ -234,3 +234,11 @@
         (call-action :post (delete-media-action :space "website") :form `(("id" . ,id)))
         (ok (search "Used by" (nth-value 1 (call-action :get (preview-media :space "website" :id id))))
             "and a refused delete leaves it in use")))))
+
+(deftest a-page-sent-as-a-file-is-the-first-page
+  (multiple-value-bind (status body)
+      (call-action :post (upload-media :space "website" :q "")
+                   :multipart (list (list "page" "page.txt" "text/plain" (string-to-octets "2"))
+                                    (list "file" "paged.png" "image/png" (png-bytes 2 2))))
+    (ok (= status 200))
+    (ok (search "Uploaded 1 file." body))))

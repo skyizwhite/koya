@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/deploys
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
+  (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:post-login #:*secret* #:*cookie* #:request #:call-action #:setup-pages #:log-in)

@@ -54,14 +54,14 @@
       response))
 
 (defun request (method path &key form multipart json body content-type headers query)
-  (let* ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
-                    :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
-                    :request-uri (format nil "~a~@[?~a~]" path query)
-                    :url-scheme "http" :remote-addr "127.0.0.1"
-                    :headers (alist-hash-table (append headers (and *cookie* (list (cons "cookie" *cookie*)))
-                                                       (list (cons "host" "localhost:3000")))
-                                               :test 'equal)
-                    :content-type nil :content-length nil :raw-body nil)))
+  (let ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
+                   :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                   :request-uri (format nil "~a~@[?~a~]" path query)
+                   :url-scheme "http" :remote-addr "127.0.0.1"
+                   :headers (alist-hash-table (append headers (and *cookie* (list (cons "cookie" *cookie*)))
+                                                      (list (cons "host" "localhost:3000")))
+                                              :test 'equal)
+                   :content-type nil :content-length nil :raw-body nil)))
     (when form
       (let ((octets (string-to-octets (url-encode-params form) :encoding :utf-8)))
         (setf (getf env :content-type) "application/x-www-form-urlencoded"

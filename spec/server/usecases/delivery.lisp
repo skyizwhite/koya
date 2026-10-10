@@ -11,10 +11,10 @@
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/domain/media #:media-p #:media-id)
   (:import-from #:koya-server/domain/content #:content-id)
-  (:import-from #:koya-server/domain/errors #:not-found #:koya-error-code)
-  (:import-from #:koya-server/domain/query #:parse-query #:make-query #:query-error)
+  (:import-from #:koya-server/domain/errors #:not-found)
+  (:import-from #:koya-server/domain/query #:parse-query #:query-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field)
-  (:import-from #:koya-core/json #:jobject #:jget #:json-null #:json-null-p))
+  (:import-from #:koya-core/json #:jobject #:jget #:json-null-p))
 (in-package #:koya-spec/server/usecases/delivery)
 
 (setup
@@ -111,8 +111,8 @@
       (ok (refused (lambda () (delivered-object "site" (model "about") (query "include" "body"))))))))
 
 (deftest searching
-  (let* ((lisp (make "post" (list "title" "Lisp macros" "body" "<p>Write <strong>macros</strong> in Lisp</p>") :publish t))
-         (other (make "post" (list "title" "Other" "body" "<p>AT&amp;T and 100%</p>") :publish t)))
+  (let ((lisp (make "post" (list "title" "Lisp macros" "body" "<p>Write <strong>macros</strong> in Lisp</p>") :publish t))
+        (other (make "post" (list "title" "Other" "body" "<p>AT&amp;T and 100%</p>") :publish t)))
     (make "post" (list "title" "Draft lisp"))
     (flet ((found (&rest kv)
              (sort (mapcar (lambda (d) (content-id (delivered-content d))) (delivered-list "site" (model "post") (apply #'query kv)))

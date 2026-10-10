@@ -129,7 +129,10 @@
         (ok (search "href=\"/login?next=%2Fs%2Fwebsite%2Fkeys\" target=\"_blank\"" body)
             "with a link that logs in elsewhere and comes back to this page there")
         (ok (search "koya.closeDialogs()" body)
-            "and closes any dialog left open, which would hide the toast and its link"))))
+            "and closes any dialog left open, which would hide the toast and its link"))
+      (multiple-value-bind (status body) (call-action :post (create-key :space "website" :kind "delivery"))
+        (ok (= status 401))
+        (ok (search "href=\"/login\" target=\"_blank\"" body) "with no referer, the link is to the login page alone"))))
   (testing "next never leaves the server"
     (dolist (next '("//evil.test/" "/\\evil.test/" "https://evil.test/" "evil"))
       (let ((*cookie* nil))

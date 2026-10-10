@@ -12,7 +12,8 @@
 (defparameter +max-page+ (expt 2 32))
 
 (defun page-number (params)
-  (min +max-page+ (max 1 (or (ignore-errors (parse-integer (or (param params "page") "1"))) 1))))
+  (let ((page (param params "page")))
+    (min +max-page+ (max 1 (or (and (stringp page) (handler-case (parse-integer page) (parse-error () nil))) 1)))))
 
 (defun last-page (total &optional (size +page-size+))
   (max 1 (ceiling total size)))

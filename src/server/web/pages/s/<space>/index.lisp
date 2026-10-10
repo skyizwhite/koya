@@ -1,6 +1,5 @@
 (defpackage #:koya-server/web/pages/s/<space>/index
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:model-name #:model-kind
                 #:webhook-label #:webhook-url #:webhook-only)

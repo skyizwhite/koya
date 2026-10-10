@@ -9,6 +9,7 @@
                "koya-spec/core/schema"
                "koya-spec/core/validate"
                "koya-spec/core/diff"
+               "koya-spec/core/json"
                "koya-spec/sdk/config"
                "koya-spec/sdk/main"
                "koya-spec/server/domain/totp"

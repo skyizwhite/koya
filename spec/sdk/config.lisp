@@ -72,7 +72,7 @@
   (defwebhooks (webhook "revalidate" "https://site/revalidate")
                (webhook "preview" "https://preview/hook" :only 'blog)
                (webhook "index" "https://search/hook" :only '(blog tag)))
-  (ok (signals (eval '(defwebhooks "https://x")) 'schema-error) "a bare URL is not a webhook")
+  (ok (signals (defwebhooks "https://x") 'schema-error) "a bare URL is not a webhook")
   (defmodel blog (:kind :list) (title :text))
   (defmodel tag (:kind :list) (name :text))
   (let ((hooks (schema-webhooks (current-schema))))
@@ -83,7 +83,7 @@
   (testing ":only is checked against the models, once the schema is whole"
     (defwebhooks (webhook "ghost" "https://g" :only 'nowhere))
     (ok (signals (current-schema) 'schema-error)))
-  (ok (signals (eval '(webhook "x" "https://x" :events '(:publish))) 'error)
+  (ok (signals (apply #'webhook "x" "https://x" '(:events (:publish))) 'error)
       "the old :events argument is refused rather than ignored")
   (ok (signals (macroexpand-1 '(defmodel m (:kind :list :webhooks nil) (title :text))) 'error)
       "a model no longer carries webhooks"))

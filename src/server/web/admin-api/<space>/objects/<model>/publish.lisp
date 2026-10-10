@@ -14,5 +14,5 @@
            (data (body-field body "data")))
       (unless (or (null data) (eq data json-null) (hash-table-p data))
         (fail-api 400 "bad_request" "\"data\" must be an object or null"))
-      (admin-content->jobject (publish-object space model (and (hash-table-p data) data)
+      (admin-content->jobject (publish-object space model :data (and (hash-table-p data) data)
                                               :published-at (body-field body "publishedAt"))))))

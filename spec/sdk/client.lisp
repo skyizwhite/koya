@@ -5,7 +5,7 @@
   (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-server/usecases/spaces #:create-space)
-  (:import-from #:koya-sdk/config #:defmodel #:clear-schema #:current-schema)
+  (:import-from #:koya-sdk/config #:defmodel #:clear-schema)
   (:import-from #:koya-core/schema #:schema-models #:model-name)
   (:import-from #:koya-sdk/client
                 #:configure #:koya-error #:koya-error-status #:koya-error-code #:pull #:get-list

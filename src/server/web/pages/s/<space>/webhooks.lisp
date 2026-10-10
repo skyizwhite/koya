@@ -1,6 +1,5 @@
 (defpackage #:koya-server/web/pages/s/<space>/webhooks
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-follow)
   (:import-from #:koya-core/schema

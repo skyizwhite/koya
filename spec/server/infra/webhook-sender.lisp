@@ -4,7 +4,7 @@
   (:import-from #:koya-server/usecases/ports/webhooks #:send-webhook)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:usocket
-                #:socket-listen #:socket-accept #:socket-stream #:socket-close #:get-local-port)
+                #:socket-listen #:socket-accept #:socket-stream #:socket-close #:get-local-port #:socket-error)
   (:import-from #:bordeaux-threads-2 #:make-thread #:join-thread))
 (in-package #:koya-spec/server/infra/webhook-sender)
 
@@ -44,7 +44,7 @@
     (and line (string-trim " " (subseq line (1+ (length name)))))))
 
 (defun ipv6-here-p ()
-  (let ((listener (ignore-errors (socket-listen "::1" 0))))
+  (let ((listener (handler-case (socket-listen "::1" 0) (socket-error () nil))))
     (when listener (socket-close listener) t)))
 
 (deftest plain-http-connects-to-the-checked-address

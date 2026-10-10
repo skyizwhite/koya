@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:jingle
                 #:set-response-header #:set-response-status #:get-request-header #:redirect
-                #:*request* #:*response* #:process-response #:request-content #:response-status)
+                #:*request* #:process-response #:request-content)
   (:import-from #:koya-core/json
                 #:parse-json #:to-json #:jobject)
   (:import-from #:koya-core/schema
@@ -14,7 +14,7 @@
                 #:not-found #:conflict #:invalid-input #:rejected #:too-large)
   (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
   (:import-from #:quri
-                #:uri #:uri-scheme #:uri-host #:uri-port)
+                #:uri #:uri-scheme #:uri-host #:uri-port #:uri-error)
   (:import-from #:babel
                 #:octets-to-string)
   (:import-from #:alexandria
@@ -158,7 +158,7 @@
     (and values (string-trim " " (first values)))))
 
 (defun origin-key (url)
-  (let ((u (ignore-errors (uri (string-trim " " url)))))
+  (let ((u (handler-case (uri (string-trim " " url)) (uri-error () nil))))
     (and u (uri-host u)
          (let* ((scheme (string-downcase (or (uri-scheme u) "")))
                 (port (uri-port u))

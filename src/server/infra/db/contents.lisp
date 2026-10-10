@@ -1,7 +1,7 @@
 (defpackage #:koya-server/infra/db/contents
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection
-                #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
+                #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/infra/db/content-query #:build-where #:build-order-by)
   (:import-from #:koya-server/domain/query
                 #:query-limit #:query-offset #:query-orders #:query-filters #:query-search #:search-filters)

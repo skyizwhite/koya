@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/keys
   (:use #:cl #:rove)
-  (:import-from #:koya-server/domain/key #:key-id #:key-label)
+  (:import-from #:koya-server/domain/key #:key-id)
   (:import-from #:koya-server/web/lib/binds #:on-submit)
   (:import-from #:koya-spec/server/web/pages/support
                 #:bound #:request #:request-url #:call-action #:setup-pages #:log-in #:count-ids)

@@ -25,8 +25,8 @@
   (with-references (require-media params)))
 
 (defun @patch (params)
-  (let* ((media (require-media params))
-         (alt (body-field (read-json-body) "alt")))
+  (let ((media (require-media params))
+        (alt (body-field (read-json-body) "alt")))
     (unless (stringp alt) (fail-api 400 "bad_request" "\"alt\" must be a string"))
     (media->jobject (update-media (media-space media)
                                   (media-id media) :alt alt))))

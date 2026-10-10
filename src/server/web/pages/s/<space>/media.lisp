@@ -1,7 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/media
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-follow #:on-search #:on-pick)
   (:import-from #:koya-server/usecases/spaces #:find-space)

@@ -58,8 +58,8 @@
                   label))))))))
 
 (defcomp ~reference-select (&key field parent value references)
-  (let* ((name (field-param-name field parent))
-         (choices (reference-choices value references)))
+  (let ((name (field-param-name field parent))
+        (choices (reference-choices value references)))
     (hsx
      (<>
        (if (field-many-p field)

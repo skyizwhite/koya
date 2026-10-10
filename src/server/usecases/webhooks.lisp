@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema #:model-name #:webhook-covers-p #:webhook-label #:webhook-url)
   (:import-from #:koya-server/usecases/ports/spaces #:space-webhooks)
-  (:import-from #:quri #:uri #:uri-host)
+  (:import-from #:quri #:uri #:uri-host #:uri-error)
   (:import-from #:koya-server/domain/address #:addresses-reach)
   (:import-from #:koya-server/usecases/ports/webhooks
                 #:record-delivery #:send-webhook #:resolve-host #:list-deliveries #:count-deliveries
@@ -35,7 +35,7 @@
   (round (* 1000 (- (get-internal-real-time) start)) internal-time-units-per-second))
 
 (defun url-host (url)
-  (let ((host (ignore-errors (uri-host (uri url)))))
+  (let ((host (handler-case (uri-host (uri url)) (uri-error () nil))))
     (and host (plusp (length host)) (string-trim "[]" host))))
 
 (defun url-reach (url)

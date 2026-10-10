@@ -9,7 +9,7 @@
   (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook)
-  (:import-from #:koya-core/json #:parse-json #:to-json #:jget)
+  (:import-from #:koya-core/json #:parse-json #:json-parse-error #:to-json #:jget)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
@@ -36,11 +36,11 @@
                              (make-model "about" :object (list (make-field :body :richtext))))))
 
 (defun request (method path &key query body headers)
-  (let* ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
-                    :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
-                    :request-uri (format nil "~a~@[?~a~]" path query) :url-scheme "http" :remote-addr "127.0.0.1"
-                    :headers (alist-hash-table headers :test 'equal)
-                    :content-type nil :content-length nil :raw-body nil)))
+  (let ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
+                   :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
+                   :request-uri (format nil "~a~@[?~a~]" path query) :url-scheme "http" :remote-addr "127.0.0.1"
+                   :headers (alist-hash-table headers :test 'equal)
+                   :content-type nil :content-length nil :raw-body nil)))
     (when body
       (let ((octets (string-to-octets (to-json body) :encoding :utf-8)))
         (setf (getf env :content-type) "application/json"
@@ -50,7 +50,7 @@
       (if (pathnamep body)
           (values status response-headers body)
           (let ((text (apply #'concatenate 'string (if (listp body) body (list body)))))
-            (values status (and (plusp (length text)) (ignore-errors (parse-json text))) text))))))
+            (values status (and (plusp (length text)) (handler-case (parse-json text) (json-parse-error () nil))) text))))))
 
 (defun admin (method path &key body query)
   (request method path :query query :body body
@@ -67,7 +67,7 @@
       (destructuring-bind (status headers body) (funcall (app) env)
         (declare (ignore headers))
         (let ((text (apply #'concatenate 'string (if (listp body) body (list body)))))
-          (values status (and (plusp (length text)) (ignore-errors (parse-json text)))))))))
+          (values status (and (plusp (length text)) (handler-case (parse-json text) (json-parse-error () nil)))))))))
 
 (defun delivery (path &key query (key *api-key*))
   (request :get path :query query :headers (and key `(("x-koya-delivery-key" . ,key)))))

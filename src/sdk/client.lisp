@@ -1,18 +1,16 @@
 (defpackage #:koya-sdk/client
   (:use #:cl)
   (:import-from #:koya-core/json
-                #:parse-json #:to-json #:jobject #:jget #:json-null)
+                #:parse-json #:json-parse-error #:to-json #:jobject #:jget)
   (:import-from #:koya-core/case
                 #:camel-key #:jvalue->lisp #:lisp->jvalue)
   (:import-from #:koya-core/schema
                 #:schema->jobject #:jobject->schema)
-  (:import-from #:koya-core/diff
-                #:format-change)
   (:import-from #:koya-sdk/config
                 #:current-schema)
   (:import-from #:dexador)
   (:import-from #:quri
-                #:make-uri #:render-uri)
+                #:render-uri)
   (:export #:*base-url* #:*management-key* #:*delivery-key* #:*space*
            #:configure
            #:koya-error #:koya-error-status #:koya-error-code #:koya-error-message #:koya-error-details
@@ -90,7 +88,7 @@ deploy would make.")
               (jobject)))
       (dexador:http-request-failed (e)
         (let* ((text (dexador:response-body e))
-               (json (and (stringp text) (ignore-errors (parse-json text))))
+               (json (and (stringp text) (handler-case (parse-json text) (json-parse-error () nil))))
                (err (and (hash-table-p json) (jget json "error"))))
           (error 'koya-error
                  :status (dexador:response-status e)

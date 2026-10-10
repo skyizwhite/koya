@@ -12,7 +12,8 @@
                 #:*request* #:context #:request-env)
   (:import-from #:lack-mw
                 #:mw-every #:mw-except)
-  (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri #:url-decode)
+  (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri #:url-decode #:uri-error)
+  (:import-from #:babel #:character-decoding-error)
   (:import-from #:hsx #:hsx #:render-to-string)
   (:import-from #:koya-server/web/lib/toast #:~toast)
   (:export #:calling-space
@@ -114,14 +115,17 @@
   (equal (gethash "nm-request" (getf env :headers)) "true"))
 
 (defun login-location (env)
-  (let* ((current (ignore-errors (uri (gethash "referer" (getf env :headers)))))
+  (let* ((referer (gethash "referer" (getf env :headers)))
+         (current (and referer (handler-case (uri referer) (uri-error () nil))))
          (next (and current (render-uri (make-uri :path (or (uri-path current) "/") :query (uri-query current))))))
     (if (and next (string/= next "/"))
         (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
         "/login")))
 
 (defun public-request-p (env)
-  (let ((path (ignore-errors (url-decode (or (uri-path (uri (getf env :request-uri))) "")))))
+  (let ((path (handler-case (url-decode (or (uri-path (uri (getf env :request-uri))) ""))
+                (uri-error () nil)
+                (character-decoding-error () nil))))
     (and path (public-path-p path))))
 
 (defparameter *page-requests-only*
@@ -187,7 +191,7 @@
     (render-uri (make-uri :path (or (uri-path uri) "/") :query (uri-query uri)))))
 
 (defun page-login-location (env)
-  (let ((next (ignore-errors (path-and-query (getf env :request-uri)))))
+  (let ((next (handler-case (path-and-query (getf env :request-uri)) (uri-error () nil))))
     (if (and (local-path-p next) (string/= next "/"))
         (render-uri (make-uri :path "/login" :query `(("next" . ,next))))
         "/login")))
