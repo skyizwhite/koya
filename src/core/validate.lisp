@@ -9,6 +9,8 @@
                 #:field-many-p
                 #:field-fields
                 #:custom-field-name
+                #:field-row-kinds
+                #:field-row-kind
                 #:custom-field-fields)
   (:import-from #:koya-core/json
                 #:json-null-p
@@ -120,11 +122,11 @@
   (let ((path (format nil "~a[~a]" (field-name field) index)))
     (if (not (hash-table-p row))
         (list (list :field path :code "type" :message "must be an object"))
-        (let ((kind (find (gethash "fieldId" row) (field-fields field) :key #'custom-field-name :test #'equal)))
+        (let ((kind (field-row-kind field (gethash "fieldId" row))))
           (if (null kind)
               (list (list :field path :code "custom_field"
                           :message (format nil "must name its custom field in fieldId, one of ~{~a~^, ~}"
-                                           (mapcar #'custom-field-name (field-fields field)))))
+                                           (mapcar #'custom-field-name (field-row-kinds field)))))
               (let ((fields (make-hash-table :test 'equal)))
                 (maphash (lambda (k v) (unless (string= k "fieldId") (setf (gethash k fields) v))) row)
                 (inside path (validate-fields (custom-field-fields kind) fields nil))))))))

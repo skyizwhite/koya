@@ -8,7 +8,7 @@
                 #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
                 #:model-options #:check-deployable
                 #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields
-                #:field-row-kinds)
+                #:field-row-kinds #:field-row-kind)
   (:import-from #:koya-core/json
                 #:to-json #:parse-json #:jget))
 (in-package #:koya-spec/core/schema)
@@ -377,6 +377,11 @@
       (ok (equal (field-option field :custom-fields) '("heading" "body")) "taken as names, as a field's")
       (ok (equal (mapcar #'custom-field-name (field-row-kinds field)) '("heading" "body"))
           "and the schema gives it those custom fields")))
+  (testing "a row's custom field is found by its name"
+    (let ((field (model-field (schema-model (blocks-schema) "page") :blocks)))
+      (ok (string= (custom-field-name (field-row-kind field "body")) "body"))
+      (ok (null (field-row-kind field "ghost")) "and none by a name the repeater does not list")
+      (ok (null (field-row-kind field nil)) "or by no name")))
   (testing "the list"
     (ok (signals (make-field :blocks :repeater) 'schema-error) "is given")
     (ok (signals (make-field :blocks :repeater :custom-fields '()) 'schema-error) "is not empty")
