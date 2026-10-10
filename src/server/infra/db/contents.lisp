@@ -1,7 +1,7 @@
 (defpackage #:koya-server/infra/db/contents
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection
-                #:exec #:fetch #:fetch-one #:col #:parsed-col)
+                #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/infra/db/content-query #:build-where #:build-order-by)
   (:import-from #:koya-server/domain/query
                 #:query-limit #:query-offset #:query-orders #:query-filters #:query-search #:search-filters)
@@ -11,22 +11,25 @@
                 #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
                 #:content-status)
   (:import-from #:koya-core/json
-                #:to-json)
+                #:parse-json #:to-json)
   (:import-from #:koya-server/domain/html #:data-text)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:get-content #:find-content
                 #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
                 #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
-  (:export #:json-column #:text-column))
+  (:export #:json-col #:json-column #:text-column))
 (in-package #:koya-server/infra/db/contents)
 
 (defparameter +columns+
   "id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at")
 
+(defun json-col (row name)
+  (let ((v (col row name))) (and v (parse-json v))))
+
 (defun row->content (row)
   (make-content :id (col row "id") :space (col row "space") :model (col row "model")
-                :published (parsed-col row "published") :draft (parsed-col row "draft")
+                :published (json-col row "published") :draft (json-col row "draft")
                 :draft-key (col row "draft_key")
                 :created-at (col row "created_at") :updated-at (col row "updated_at")
                 :published-at (col row "published_at") :revised-at (col row "revised_at")))

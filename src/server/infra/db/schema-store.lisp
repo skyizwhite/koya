@@ -1,7 +1,7 @@
 (defpackage #:koya-server/infra/db/schema-store
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection
-                #:*db* #:*on-rollback* #:exec #:fetch #:col #:parsed-col #:with-db #:with-db-transaction)
+                #:*db* #:*on-rollback* #:exec #:fetch #:col #:with-db #:with-db-transaction)
   (:import-from #:koya-core/schema
                 #:make-schema #:schema-webhooks #:schema-models #:webhook->jobject
                 #:jobject->webhook #:model-name #:model-kind #:model->jobject #:jobject->model
@@ -10,7 +10,7 @@
   (:import-from #:koya-core/json
                 #:parse-json #:to-json #:json-array-p)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
-  (:import-from #:koya-server/infra/db/contents #:json-column #:text-column)
+  (:import-from #:koya-server/infra/db/contents #:json-col #:json-column #:text-column)
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/spaces
@@ -96,8 +96,8 @@
 
 (defun rewrite-content-data (space model fn)
   (dolist (row (fetch "SELECT id, published, draft FROM contents WHERE space = ? AND model = ?" space model))
-    (let* ((published (parsed-col row "published"))
-           (draft (parsed-col row "draft"))
+    (let* ((published (json-col row "published"))
+           (draft (json-col row "draft"))
            (in-published (and published (funcall fn published)))
            (in-draft (and draft (funcall fn draft))))
       (when (or in-published in-draft)
