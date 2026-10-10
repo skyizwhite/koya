@@ -145,8 +145,8 @@ confirmation when CONFIRM is true. Returns the applied changes."
   "Fetch the schema SPACE currently has on the server as a schema object."
   (jobject->schema (request :get (schema-path space) :auth :management)))
 
-(defun delivery-path (space kind model &optional id)
-  (format nil "/api/v1/~a/~a/~(~a~)~@[/~a~]" (space-name space) kind model id))
+(defun delivery-path (space kind model &optional id action)
+  (format nil "/api/v1/~a/~a/~(~a~)~@[/~a~]~@[/~a~]" (space-name space) kind model id action))
 
 (defun get-list (model &key space query)
   "List published contents of list model MODEL. QUERY is a kebab plist (:limit
@@ -161,8 +161,7 @@ names them, e.g. :include \"tags\" or :include '(\"tags\" \"author.avatar\")."
 (defun get-list-content-by-slug (model slug &key space query)
   "Fetch the published content of list model MODEL whose slug is SLUG. Pass
 :draft-key in QUERY to find it by its draft's slug and preview the draft."
-  (jvalue->lisp (request :get (delivery-path space "lists" model (format nil "slugs/~a" slug))
-                         :query query :auth :delivery)))
+  (jvalue->lisp (request :get (delivery-path space "lists" model "slugs" slug) :query query :auth :delivery)))
 
 (defun get-object (model &key space query)
   "Fetch the published object of object model MODEL. Pass :draft-key in QUERY to preview its draft."
