@@ -41,8 +41,8 @@
                (ok (search "/s/website/webhooks?label=revalidate" body) "the row is a link to that hook's log")
                (ok (search "\"/s/website/webhooks\"" body) "and View log links to the unfiltered log")
                (ok (search "View log" body))
-               (ok (search "all models" body) "a webhook without :only says so")
-               (ok (search "blog only" body) "and one with :only names the models it covers")))
+               (ok (search "all models · revalidate" body) "a webhook without :only says so before its label")
+               (ok (search "blog · blog-build" body) "and one with :only names the models it covers")))
            (testing "an object model the webhooks leave out offers no log"
              (multiple-value-bind (status body)
                  (let ((narrow (make-schema :webhooks (list (make-webhook "blog-build" "https://site.test/api/build"
