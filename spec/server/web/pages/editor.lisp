@@ -321,7 +321,7 @@
         (ng (search "Draft saved" body))
         (ok (search "Published" body))))
 
-    (update-content (unpublished (get-content "website" unpublished)))
+    (update-content (unpublished (get-content "website" unpublished)) nil nil)
     (delete-content "website" deleted)
     (delete-media "website" media)
     (replace-schema "website"

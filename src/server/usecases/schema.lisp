@@ -199,15 +199,24 @@
   (check-schema schema)
   (diff-schemas (load-schema space) schema))
 
+(defun slug-change-p (change)
+  (case (getf change :op)
+    (:add-field (eq (getf change :to) :slug))
+    (:remove-field (eq (getf change :from) :slug))
+    (:change-field-type (or (eq (getf change :from) :slug) (eq (getf change :to) :slug)))))
+
 (defun store-schema (space schema changes by)
   (with-transaction
     (save-schema space schema changes :by by)
-    (when changes
-      (let ((stored (load-schema space)))
-        (dolist (content (space-contents space))
-          (let ((model (schema-model stored (content-model content))))
-            (when model
-              (apply #'update-content content (content-slugs model content)))))))))
+    (let ((models (remove-duplicates (mapcar (lambda (change) (getf change :model))
+                                             (remove-if-not #'slug-change-p changes))
+                                     :test #'equal)))
+      (when models
+        (let ((stored (load-schema space)))
+          (dolist (content (space-contents space))
+            (when (member (content-model content) models :test #'equal)
+              (apply #'update-content content
+                     (content-slugs (schema-model stored (content-model content)) content)))))))))
 
 (defun replace-schema (space schema &key (by *actor*))
   (let ((changes (changes-of space schema)))

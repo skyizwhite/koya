@@ -54,7 +54,7 @@
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE id = ? AND space = ? AND model = ?" +columns+) id space model)))
     (and row (row->content row))))
 
-(defmethod insert-content (content &key published-slug draft-slug)
+(defmethod insert-content (content published-slug draft-slug)
   (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at,
                                published_text, draft_text, published_slug, draft_slug)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -66,7 +66,7 @@
         (text-column (content-published content)) (text-column (content-draft content))
         published-slug draft-slug))
 
-(defmethod update-content (content &key published-slug draft-slug)
+(defmethod update-content (content published-slug draft-slug)
   (exec "UPDATE contents SET status = ?, published = ?, draft = ?, draft_key = ?, updated_at = ?,
            published_at = ?, revised_at = ?, published_text = ?, draft_text = ?, published_slug = ?, draft_slug = ?
          WHERE space = ? AND id = ?"

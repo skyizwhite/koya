@@ -36,9 +36,9 @@
 
 (defgeneric space-contents (space))
 
-(defgeneric insert-content (content &key published-slug draft-slug))
+(defgeneric insert-content (content published-slug draft-slug))
 
-(defgeneric update-content (content &key published-slug draft-slug))
+(defgeneric update-content (content published-slug draft-slug))
 
 (defgeneric delete-content (space id))
 

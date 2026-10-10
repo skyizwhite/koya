@@ -232,5 +232,5 @@
     (and (stringp value) (not (blank-value-p value)) value)))
 
 (defun content-slugs (model content)
-  (list :published-slug (slug-value model (content-published content))
-        :draft-slug (slug-value model (content-draft content))))
+  (list (slug-value model (content-published content))
+        (slug-value model (content-draft content))))

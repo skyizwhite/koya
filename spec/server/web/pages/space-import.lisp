@@ -313,7 +313,8 @@
             (insert-content (make-content :id id :space "odd" :model "tag"
                                           :published (alist-hash-table '(("name" . "x")) :test 'equal)
                                           :created-at "2024-01-01T00:00:00.000Z" :updated-at "2024-01-01T00:00:00.000Z"
-                                          :published-at "2024-01-01T00:00:00.000Z" :revised-at "2024-01-01T00:00:00.000Z"))
+                                          :published-at "2024-01-01T00:00:00.000Z" :revised-at "2024-01-01T00:00:00.000Z")
+                            nil nil)
             (let ((octets (nth-value 1 (request :get "/s/odd/export"))))
               (delete-space "odd")
               (ok (string= (nth-value 1 (import-archive octets)) "/"))
@@ -327,7 +328,8 @@
   (dolist (c contents)
     (insert-content (apply #'make-content (append c (list :space "odd" :model "tag"
                                                           :created-at "2024-01-01T00:00:00.000Z"
-                                                          :updated-at "2024-01-01T00:00:00.000Z")))))
+                                                          :updated-at "2024-01-01T00:00:00.000Z")))
+                    nil nil))
   (let ((stored (and media (store-upload "odd" (png-bytes 2 2) :filename "a.png")))
         (made (and key (create-delivery-key "odd" :label "site"))))
     (let ((octets (nth-value 1 (request :get "/s/odd/export"))))

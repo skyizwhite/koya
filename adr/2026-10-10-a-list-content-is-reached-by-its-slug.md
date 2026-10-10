@@ -44,6 +44,6 @@ A slug is a second key of a list content, beside its id.
   model with two slug fields finds nothing by slug, until they are put right; a
   content sharing a slug is refused on its next save until it is changed.
 - A model's slug is kept beside each version's data when the content is
-  written, and again for every content when a deploy changes the schema, so
-  that finding by it is a lookup. The use case says what the slug is; the store
+  written, and again for the contents of a model whose slug field a deploy
+  adds, removes or gives another type, so that finding by it is a lookup. The use case says what the slug is; the store
   keeps it.
