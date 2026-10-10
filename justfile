@@ -14,6 +14,7 @@ install:
     curl -sLo {{ tw_bin }} https://github.com/tailwindlabs/tailwindcss/releases/download/v{{ tw_version }}/tailwindcss-{{ tw_platform }}
     chmod +x {{ tw_bin }}
     qlot install
+    git config core.hooksPath .githooks
 
 # Rebuild CSS on every change
 watch:
@@ -22,6 +23,10 @@ watch:
 # Build the CSS once
 build:
     @{{ tw_bin }} -i {{ style_src }} -o {{ style_dist }} --minify
+
+# Lint the source and the spec
+lint:
+    @mallet src spec
 
 # Run the spec
 spec:
