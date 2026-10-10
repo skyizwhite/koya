@@ -64,14 +64,13 @@
 (defcomp ~space-row (&key space)
   (let ((name (getf space :name)))
     (hsx
-     (li :class "flex items-center justify-between gap-3 px-4 py-3"
-       (a :href (space-url name) :class "min-w-0 flex-1 hover:underline"
+     (li :class "relative flex items-center gap-3 px-4 py-3 hover:bg-base"
+       (a :href (space-url name) :class "min-w-0 flex-1 after:absolute after:inset-0"
          (span :class "block font-semibold" name)
          (span :class "block text-sm text-muted" (format nil "~a model~:p" (getf space :models))))
-       (button :type "button" :class "btn btn-danger btn-icon shrink-0" :aria-label "Delete space"
+       (button :type "button" :class "btn btn-danger btn-icon relative z-10 shrink-0" :aria-label "Delete space"
                :commandfor (delete-dialog-id name) :command "show-modal"
-         (~icon :name :delete))
-       (~delete-space-dialog :name name)))))
+         (~icon :name :delete))))))
 
 (defcomp ~space-list (&key spaces)
   (hsx
@@ -81,8 +80,9 @@
                 (p "No spaces yet.")
                 (p :class "mt-2" "Make one with " (strong "New space") ", then deploy its models with "
                    (code "(koya-sdk:deploy)") " from your project's REPL.")))
-         (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                (loop :for space :in spaces :collect (hsx (~space-row :space space)))))))))
+         (hsx (<> (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                    (loop :for space :in spaces :collect (hsx (~space-row :space space))))
+                  (loop :for space :in spaces :collect (hsx (~delete-space-dialog :name (getf space :name))))))))))
 
 (defcomp ~new-space-error (&key message)
   (hsx (p :id "new-space-error" :class "mt-2 text-sm text-danger" message)))
