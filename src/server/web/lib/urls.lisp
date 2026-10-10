@@ -1,9 +1,9 @@
 (defpackage #:koya-server/web/lib/urls
   (:use #:cl)
+  (:import-from #:koya-core/json #:blank-p)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:cl-ppcre
                 #:regex-replace-all)
-  (:import-from #:koya-server/web/lib/http #:blank-p)
   (:import-from #:koya-core/schema #:model-kind #:model-name)
   (:export #:space-url
            #:model-url

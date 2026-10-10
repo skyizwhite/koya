@@ -12,7 +12,7 @@
                 #:list-contents #:list-revisions #:count-revisions #:get-content #:count-contents
                 #:update-content #:delete-content)
   (:import-from #:koya-server/domain/content
-                #:content-status #:content-published #:content-draft #:content-id #:unpublished)
+                #:content-status #:content-published #:content-draft #:content-id #:unpublished #:drafted)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:koya-server/domain/revision #:revision-id #:revision-event #:revision-by)
@@ -705,6 +705,11 @@
                (ok (search "aria-label=\"Move row up\"" editor) "each one movable")
                (ok (search "aria-label=\"Remove row\"" editor) "and removable"))
              (ok (search "2 rows" (nth-value 1 (request :get "/s/website/m/doc"))) "the list counts them")
+             (update-content (drafted (get-content "website" id) (jobject "title" "D" "blocks" "abc")) nil nil)
+             (multiple-value-bind (status body) (request :get "/s/website/m/doc")
+               (ok (= status 200) "a text in a repeater does not stop the list")
+               (ok (search (format nil "aria-label=\"Open ~a\"" id) body) "which draws that content")
+               (ng (search "3 rows" body) "and does not count a text's characters as rows"))
              (edit (format nil "/s/website/m/doc/~a" id)
                    :form '(("action" . "save") ("f-title" . "D") ("f-blocks" . "b")
                            ("f-blocks.b.fieldId" . "heading") ("f-blocks.b.text" . "Bye")))

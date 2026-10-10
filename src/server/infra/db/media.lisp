@@ -1,5 +1,6 @@
 (defpackage #:koya-server/infra/db/media
   (:use #:cl)
+  (:import-from #:koya-core/json #:blank-p)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/domain/media
                 #:make-media #:media-id)
@@ -42,13 +43,13 @@
     table))
 
 (defun search-clause (search)
-  (if (and search (plusp (length search)))
+  (if (blank-p search)
+      (values "" '())
       (values " AND filename LIKE ? ESCAPE '\\'"
               (list (format nil "%~a%" (with-output-to-string (out)
                                           (loop :for c :across search
                                                 :do (when (member c '(#\% #\_ #\\)) (write-char #\\ out))
-                                                    (write-char c out))))))
-      (values "" '())))
+                                                    (write-char c out))))))))
 
 (defmethod list-media (space &key search (limit 60) (offset 0))
   (multiple-value-bind (where params) (search-clause search)

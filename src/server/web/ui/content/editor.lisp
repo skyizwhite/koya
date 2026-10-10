@@ -46,7 +46,7 @@
 (defun media-for (space field value)
   (when (eq (field-type field) :media)
     (cond ((and (stringp value) (plusp (length value))) (find-media space value))
-          ((and (vectorp value) (not (stringp value)))
+          ((json-array-p value)
            (loop :for id :across value :when (stringp id) :collect (cons id (find-media space id)))))))
 
 (defun field-error (errors name)

@@ -1,5 +1,6 @@
 (defpackage #:koya-core/case
   (:use #:cl)
+  (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:kebab
                 #:to-camel-case
                 #:to-kebab-case)
@@ -25,7 +26,7 @@
          (plist->object value))
         ((listp value)
          (map 'vector #'lisp->jvalue value))
-        ((and (vectorp value) (not (stringp value)))
+        ((json-array-p value)
          (map 'vector #'lisp->jvalue value))
         ((hash-table-p value)
          (let ((out (make-hash-table :test 'equal)))
@@ -36,7 +37,7 @@
 (defun jvalue->lisp (value)
   (cond ((eq value 'null) nil)
         ((hash-table-p value) (object->plist value))
-        ((and (vectorp value) (not (stringp value)))
+        ((json-array-p value)
          (map 'list #'jvalue->lisp value))
         (t value)))
 

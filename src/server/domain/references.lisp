@@ -1,5 +1,6 @@
 (defpackage #:koya-server/domain/references
   (:use #:cl)
+  (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:model-name #:model-fields #:field-name #:field-type #:field-option
                 #:field-fields #:field-row-kinds #:custom-field-name #:custom-field-fields)
@@ -24,7 +25,7 @@
 
 (defun some-inside (test field inner value)
   (if (eq (field-type field) :repeater)
-      (and (vectorp value) (not (stringp value))
+      (and (json-array-p value)
            (some (lambda (row)
                    (and (hash-table-p row)
                         (let ((entries (cdr (assoc (gethash "fieldId" row) inner :test #'equal))))

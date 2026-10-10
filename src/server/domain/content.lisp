@@ -6,7 +6,7 @@
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
-                #:json-null #:json-equal)
+                #:json-null #:json-equal #:json-array-p #:copy-object)
   (:import-from #:koya-core/time
                 #:now-iso #:parse-iso #:format-iso)
   (:import-from #:local-time
@@ -164,8 +164,7 @@
         (content-id content))))
 
 (defun merge-data (base patch)
-  (let ((out (make-hash-table :test 'equal)))
-    (when base (maphash (lambda (k v) (setf (gethash k out) v)) base))
+  (let ((out (copy-object base)))
     (maphash (lambda (k v) (if (eq v json-null) (remhash k out) (setf (gethash k out) v))) patch)
     out))
 
@@ -173,14 +172,14 @@
   (fields-booleans-filled (model-fields model) data))
 
 (defun fields-booleans-filled (fields data)
-  (let ((out (merge-data data (make-hash-table :test 'equal))))
+  (let ((out (copy-object data)))
     (dolist (field fields out)
       (let ((value (gethash (field-name field) out json-null)))
         (cond ((and (eq (field-type field) :boolean) (member value (list nil json-null)))
                (setf (gethash (field-name field) out) nil))
               ((and (eq (field-type field) :custom) (hash-table-p value))
                (setf (gethash (field-name field) out) (fields-booleans-filled (field-fields field) value)))
-              ((and (eq (field-type field) :repeater) (vectorp value) (not (stringp value)))
+              ((and (eq (field-type field) :repeater) (json-array-p value))
                (setf (gethash (field-name field) out)
                      (map 'vector (lambda (row)
                                     (let ((kind (row-kind field row)))
@@ -206,7 +205,7 @@
              (setf (gethash (field-name field) data) t))
             ((and (eq (field-type field) :custom) (hash-table-p value))
              (fill-field-defaults (field-fields field) value))
-            ((and (eq (field-type field) :repeater) (vectorp value) (not (stringp value)))
+            ((and (eq (field-type field) :repeater) (json-array-p value))
              (loop :for row :across value
                    :for kind := (row-kind field row)
                    :when kind :do (fill-field-defaults (custom-field-fields kind) row)))))))
@@ -226,7 +225,7 @@
         (:custom
          (when (hash-table-p value) (fields-to-the-minute (field-fields field) value)))
         (:repeater
-         (when (and (vectorp value) (not (stringp value)))
+         (when (json-array-p value)
            (loop :for row :across value
                  :for kind := (row-kind field row)
                  :when kind :do (fields-to-the-minute (custom-field-fields kind) row))))))))

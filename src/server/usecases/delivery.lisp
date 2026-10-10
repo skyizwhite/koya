@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p
                 #:field-fields #:field-row-kinds #:row-kind #:custom-field-fields)
-  (:import-from #:koya-core/json #:json-null)
+  (:import-from #:koya-core/json #:json-null #:json-array-p #:copy-object)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
   (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data #:slug-value #:only-one)
@@ -26,19 +26,11 @@
 (defstruct (delivered (:constructor make-delivered (content model data)))
   content model data)
 
-(defun copy-object (object)
-  (let ((out (make-hash-table :test 'equal)))
-    (when object (maphash (lambda (k v) (setf (gethash k out) v)) object))
-    out))
-
 (defun expand-reference (space target-model-name value include)
   (let* ((target (find-model space target-model-name))
          (content (and target (stringp value) (find-content space target-model-name value))))
     (and content (content-published content)
          (deliver content target space :include include))))
-
-(defun rows-of (value)
-  (and (vectorp value) (not (stringp value)) value))
 
 (defun next-fields (space field)
   (case (field-type field)
@@ -73,7 +65,7 @@
               (when (hash-table-p value)
                 (setf (gethash name object) (embed-references (copy-object value) (field-fields field) space nested))))
             (:repeater
-              (when (rows-of value)
+              (when (json-array-p value)
                 (setf (gethash name object)
                       (map 'vector (lambda (row)
                                      (let ((kind (row-kind field row)))
@@ -94,7 +86,7 @@
     (let ((value (gethash (field-name field) object)))
       (case (field-type field)
         (:media
-         (cond ((rows-of value)
+         (cond ((json-array-p value)
                 (setf (gethash (field-name field) object)
                       (coerce (remove nil (map 'list (lambda (id) (and (stringp id) (find-media space id))) value)) 'vector)))
                ((and value (not (eq value json-null)))
@@ -105,7 +97,7 @@
            (setf (gethash (field-name field) object)
                  (expand-media (copy-object value) (field-fields field) space))))
         (:repeater
-         (when (rows-of value)
+         (when (json-array-p value)
            (setf (gethash (field-name field) object)
                  (map 'vector (lambda (row)
                                 (let ((kind (row-kind field row)))

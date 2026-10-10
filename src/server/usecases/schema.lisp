@@ -5,7 +5,7 @@
                 #:field-name #:field-option #:field-unique-p #:model-kind #:field-fields #:field-row-kind
                 #:field-path-parts #:custom-field-fields)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
-  (:import-from #:koya-core/json #:jobject)
+  (:import-from #:koya-core/json #:jobject #:json-array-p)
   (:import-from #:koya-server/usecases/ports/contents #:space-contents #:model-contents #:update-content)
   (:import-from #:koya-server/usecases/ports/store #:with-transaction)
   (:import-from #:koya-server/domain/content
@@ -116,7 +116,7 @@
 (defun as-deployed (value gone)
   (cond ((null gone) value)
         ((hash-table-p value) (without-gone value nil gone))
-        ((and (vectorp value) (not (stringp value)))
+        ((json-array-p value)
          (map 'vector (lambda (row)
                         (if (hash-table-p row) (without-gone row (gethash "fieldId" row) gone) row))
               value))
@@ -148,7 +148,7 @@
                         :for value := (as-deployed (gethash key data) gone)
                         :append (cond ((and (null kind) (hash-table-p value))
                                        (object-misfits content version check name value (field-name outer)))
-                                      ((and kind (vectorp value) (not (stringp value)))
+                                      ((and kind (json-array-p value))
                                        (loop :for row :across value
                                              :for index :from 0
                                              :when (and (hash-table-p row) (equal (gethash "fieldId" row) kind))

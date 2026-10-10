@@ -1,5 +1,6 @@
 (defpackage #:koya-server/domain/media
   (:use #:cl)
+  (:import-from #:koya-core/json #:blank-p)
   (:import-from #:koya-server/domain/image
                 #:image-extension)
   (:export #:media #:make-media
@@ -22,4 +23,4 @@
   (let* ((name (or name ""))
          (base (subseq name (1+ (or (position-if (lambda (c) (member c '(#\/ #\\))) name :from-end t) -1))))
          (base (string-trim " " base)))
-    (if (plusp (length base)) base "upload")))
+    (if (blank-p base) "upload" base)))

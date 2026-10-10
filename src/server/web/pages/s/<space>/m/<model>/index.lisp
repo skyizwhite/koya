@@ -5,12 +5,12 @@
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
                 #:webhook-covers-p #:field-fields)
-  (:import-from #:koya-core/json #:json-null)
+  (:import-from #:koya-core/json #:json-null #:json-array-p #:blank-p)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/web/lib/target #:target-model)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-data #:+statuses+ #:content-label)
-  (:import-from #:koya-server/web/lib/http #:path-param #:redirect-to #:param #:form-list #:blank-p)
+  (:import-from #:koya-server/web/lib/http #:path-param #:redirect-to #:param #:form-list)
   (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number)
   (:import-from #:koya-server/web/lib/display #:short-time)
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:webhook-log-url)
@@ -98,12 +98,12 @@
   (let ((value (and data (gethash (field-name field) data))))
     (cond ((eq value json-null) nil)
           ((eq (field-type field) :repeater)
-           (and (vectorp value) (plusp (length value)) (format nil "~a row~:p" (length value))))
+           (and (json-array-p value) (plusp (length value)) (format nil "~a row~:p" (length value))))
           ((eq (field-type field) :boolean)
            (and data (nth-value 1 (gethash (field-name field) data))
                 (scalar-preview field value ref-labels)))
           ((null value) nil)
-          ((and (vectorp value) (not (stringp value)))
+          ((json-array-p value)
            (and (plusp (length value))
                 (truncate-text (format nil "~{~a~^, ~}"
                                        (map 'list (lambda (v) (scalar-preview field v ref-labels)) value)))))
@@ -129,7 +129,7 @@
     (cond
       ((and (eq (field-type field) :media) (stringp value) (plusp (length value)))
         (hsx (~media-cell :field field :id value :media media)))
-      ((and (eq (field-type field) :media) (vectorp value) (plusp (length value)) (stringp (aref value 0)))
+      ((and (eq (field-type field) :media) (json-array-p value) (plusp (length value)) (stringp (aref value 0)))
         (hsx (~media-cell :field field :id (aref value 0) :media media :more (1- (length value)))))
       (t
         (let ((preview (field-preview field data ref-labels)))

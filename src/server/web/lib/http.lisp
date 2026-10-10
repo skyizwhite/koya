@@ -4,7 +4,7 @@
                 #:set-response-header #:set-response-status #:get-request-header #:redirect
                 #:*request* #:process-response #:request-content)
   (:import-from #:koya-core/json
-                #:parse-json #:to-json #:jobject)
+                #:parse-json #:to-json #:jobject #:blank-p)
   (:import-from #:koya-core/schema
                 #:schema-error #:schema-error-message)
   (:import-from #:koya-core/validate
@@ -29,7 +29,6 @@
            #:param
            #:integer-param
            #:integer-text
-           #:blank-p
            #:redirect-to
            #:body-field
            #:form-field
@@ -122,8 +121,6 @@
 
 (defun path-param (params key)
   (cdr (assoc key params)))
-
-(defun blank-p (value) (or (null value) (zerop (length value))))
 
 (defun param (params name)
   (let ((v (cdr (assoc name params :test #'equal))))

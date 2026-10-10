@@ -1,5 +1,6 @@
 (defpackage #:koya-server/domain/html
   (:use #:cl)
+  (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:cl-ppcre #:split)
   (:export #:html-text
            #:data-text))
@@ -60,7 +61,7 @@
       (maphash (lambda (name value)
                  (cond ((stringp value) (setf (gethash name text) (html-text value)))
                        ((hash-table-p value) (setf (gethash name text) (data-text value)))
-                       ((and (vectorp value) (some #'hash-table-p value))
+                       ((and (json-array-p value) (some #'hash-table-p value))
                         (setf (gethash name text)
                               (map 'vector (lambda (row) (if (hash-table-p row) (data-text row) row)) value)))))
                data)
