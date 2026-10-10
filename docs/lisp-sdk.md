@@ -291,6 +291,8 @@ list of list contents; an `:object` model's one content is its object.
 (koya-sdk:get-list 'blog :query '(:include "tags"))                  ; embed referenced contents
 (koya-sdk:get-list-content 'blog "k3x9m2qa7t0b")
 (koya-sdk:get-list-content 'blog "k3x9m2qa7t0b" :query '(:draft-key "…"))    ; preview a draft
+(koya-sdk:get-list-content-by-slug 'blog "hello-world")
+(koya-sdk:get-list-content-by-slug 'blog "hello-again" :query '(:draft-key "…")) ; by its draft's slug
 (koya-sdk:get-object 'about)
 ```
 
@@ -301,7 +303,13 @@ Each takes `:space` to override the default. `get-list` returns a plist:
  :total-count 42 :offset 0 :limit 10)
 ```
 
-`get-list-content` and `get-object` return the content plist itself.
+`get-list-content`, `get-list-content-by-slug` and `get-object` return the
+content plist itself.
+
+`get-list-content-by-slug` finds a content by the value of its model's slug
+field: the published one, or the draft's with that content's `:draft-key`. A
+model without exactly one slug field finds nothing, and neither does a slug two
+contents share.
 
 ### Query options
 
@@ -321,7 +329,7 @@ are the same.
 | `:filters` | see below |
 | `:q` | search the text fields, as the delivery API's `q` |
 | `:include` | reference fields to embed |
-| `:draft-key` | with `get-list-content` / `get-object`, serves that content's draft |
+| `:draft-key` | with `get-list-content`, `get-list-content-by-slug` or `get-object`, serves that content's draft |
 
 `:filters` takes the delivery API's filter syntax as a string:
 
@@ -344,6 +352,7 @@ These use the management key and see drafts as well. Their names start with
 ```lisp
 (koya-sdk:admin-get-list 'blog :query '(:limit 100))   ; every list content, drafts included
 (koya-sdk:admin-get-list-content 'blog "k3x9m2qa7t0b")
+(koya-sdk:admin-get-list-content-by-slug 'blog "hello-world")   ; by its published or draft slug
 (koya-sdk:admin-create-list-content 'blog '(:title "Hello" :content "<p>…</p>"))   ; as a draft
 (koya-sdk:admin-create-list-content 'blog '(:title "Hello") :publish t)
 (koya-sdk:admin-update-list-content 'blog "k3x9m2qa7t0b" '(:title "New title"))            ; save a draft

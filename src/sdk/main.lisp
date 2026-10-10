@@ -6,8 +6,9 @@
   (:import-from #:koya-sdk/client
                 #:*base-url* #:*space* #:*delivery-key* #:*management-key* #:configure
                 #:plan #:deploy #:pull
-                #:get-list #:get-list-content #:get-object
-                #:admin-get-list #:admin-get-list-content #:admin-create-list-content
+                #:get-list #:get-list-content #:get-list-content-by-slug #:get-object
+                #:admin-get-list #:admin-get-list-content #:admin-get-list-content-by-slug
+                #:admin-create-list-content
                 #:admin-update-list-content #:admin-delete-list-content #:admin-publish-list-content
                 #:admin-unpublish-list-content #:admin-discard-list-content-draft #:admin-list-content-draft-key
                 #:admin-get-object #:admin-update-object #:admin-publish-object #:admin-unpublish-object
@@ -20,8 +21,9 @@
   (:export #:defmodel #:defcustomfield #:defwebhooks #:webhook #:current-schema #:clear-schema #:find-model
            #:*base-url* #:*space* #:*delivery-key* #:*management-key* #:configure
            #:plan #:deploy #:pull
-           #:get-list #:get-list-content #:get-object
-           #:admin-get-list #:admin-get-list-content #:admin-create-list-content
+           #:get-list #:get-list-content #:get-list-content-by-slug #:get-object
+           #:admin-get-list #:admin-get-list-content #:admin-get-list-content-by-slug
+           #:admin-create-list-content
            #:admin-update-list-content #:admin-delete-list-content #:admin-publish-list-content
            #:admin-unpublish-list-content #:admin-discard-list-content-draft #:admin-list-content-draft-key
            #:admin-get-object #:admin-update-object #:admin-publish-object #:admin-unpublish-object

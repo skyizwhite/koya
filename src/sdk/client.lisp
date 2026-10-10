@@ -15,8 +15,9 @@
            #:configure
            #:koya-error #:koya-error-status #:koya-error-code #:koya-error-message #:koya-error-details
            #:plan #:deploy #:pull
-           #:get-list #:get-list-content #:get-object
-           #:admin-get-list #:admin-get-list-content #:admin-create-list-content
+           #:get-list #:get-list-content #:get-list-content-by-slug #:get-object
+           #:admin-get-list #:admin-get-list-content #:admin-get-list-content-by-slug
+           #:admin-create-list-content
            #:admin-update-list-content #:admin-publish-list-content #:admin-unpublish-list-content
            #:admin-discard-list-content-draft #:admin-delete-list-content #:admin-list-content-draft-key
            #:admin-get-object #:admin-update-object #:admin-publish-object #:admin-unpublish-object
@@ -157,6 +158,12 @@ names them, e.g. :include \"tags\" or :include '(\"tags\" \"author.avatar\")."
   "Fetch one published content of list model MODEL. Pass :draft-key in QUERY to preview a draft."
   (jvalue->lisp (request :get (delivery-path space "lists" model id) :query query :auth :delivery)))
 
+(defun get-list-content-by-slug (model slug &key space query)
+  "Fetch the published content of list model MODEL whose slug is SLUG. Pass
+:draft-key in QUERY to find it by its draft's slug and preview the draft."
+  (jvalue->lisp (request :get (delivery-path space "lists" model (format nil "slugs/~a" slug))
+                         :query query :auth :delivery)))
+
 (defun get-object (model &key space query)
   "Fetch the published object of object model MODEL. Pass :draft-key in QUERY to preview its draft."
   (jvalue->lisp (request :get (delivery-path space "objects" model) :query query :auth :delivery)))
@@ -177,6 +184,11 @@ names them, e.g. :include \"tags\" or :include '(\"tags\" \"author.avatar\")."
 (defun admin-get-list-content (model id &key space)
   "Content ID of list model MODEL as the admin API has it, draft included."
   (jvalue->lisp (request :get (list-path space model id) :auth :management)))
+
+(defun admin-get-list-content-by-slug (model slug &key space)
+  "The content of list model MODEL whose published or draft slug is SLUG, as the
+admin API has it."
+  (jvalue->lisp (request :get (list-path space model "slugs" slug) :auth :management)))
 
 (defun admin-create-list-content (model data &key space publish created-at updated-at published-at revised-at)
   "Create a content of list model MODEL. DATA is a kebab plist of field values. The
