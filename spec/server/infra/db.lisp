@@ -269,7 +269,13 @@
     (testing "so did the draft"
       (let ((content (get-content "magazine" (content-id drafted))))
         (ok (string= (content-model content) "article"))
-        (ok (string= (jget (content-draft content) "subtitle") "Later words"))))
+        (ok (string= (jget (content-draft content) "subtitle") "Later words"))
+        (ok (string= (jget (parse-json (col (first (fetch "SELECT draft_text FROM contents WHERE space = ? AND id = ?"
+                                                         "magazine" (content-id drafted)))
+                                            "draft_text"))
+                           "subtitle")
+                     "Later words")
+            "and its text")))
     (testing "and the history, so an old version still restores into the field"
       (let ((data (revision-data (first (list-revisions "magazine" (content-id published))))))
         (ok (string= (jget data "subtitle") "First words"))
