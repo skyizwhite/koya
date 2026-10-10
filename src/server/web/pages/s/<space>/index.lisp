@@ -30,18 +30,20 @@
                   (a :href (format nil "~a/keys" (space-url name)) :class "btn" (~icon :name :key) "Keys")
                   (a :href (format nil "~a/export" (space-url name)) :class "btn"
                     (~icon :name :export) "Export")))
-              (if (null (schema-models schema))
-                  (hsx (~empty-state "This space has no models."))
-                  (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
-                         (loop :for model :in (schema-models schema) :collect
-                           (hsx (li (a :href (model-url name (model-name model))
-                                       :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
-                                      (span :class "flex items-center gap-3 font-medium"
-                                        (~model-icon :kind (model-kind model) :class "h-4 w-4 text-muted")
-                                        (model-name model))
-                                      (when (eq (model-kind model) :list)
-                                        (hsx (span :class "text-sm text-muted"
-                                               (format nil "~a content~:p" (count-contents name (model-name model)))))))))))))
+              (section
+                (h2 :class "mb-2 text-sm font-semibold text-muted" "Models")
+                (if (null (schema-models schema))
+                    (hsx (~empty-state "This space has no models."))
+                    (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                           (loop :for model :in (schema-models schema) :collect
+                             (hsx (li (a :href (model-url name (model-name model))
+                                         :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
+                                        (span :class "flex items-center gap-3 font-medium"
+                                          (~model-icon :kind (model-kind model) :class "h-4 w-4 text-muted")
+                                          (model-name model))
+                                        (when (eq (model-kind model) :list)
+                                          (hsx (span :class "text-sm text-muted"
+                                                 (format nil "~a content~:p" (count-contents name (model-name model))))))))))))))
               (let ((hooks (schema-webhooks schema)))
                 (when hooks
                   (hsx (section :class "mt-8"

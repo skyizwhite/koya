@@ -28,7 +28,8 @@
     (ok (find-space "shop"))
     (multiple-value-bind (status body) (request :get "/s/shop")
       (ok (= status 200))
-      (ok (search "This space has no models" body))))
+      (ok (search "This space has no models" body))
+      (ok (search ">Models</h2>" body) "under a heading, as the webhooks are")))
   (testing "a bad or taken name is refused, and says why"
     (ok (search "already exists" (nth-value 1 (call-action :post (create-space-action) :form '(("name" . "shop"))))))
     (ok (search "lowercase letters"
