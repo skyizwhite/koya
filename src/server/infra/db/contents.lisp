@@ -18,21 +18,19 @@
                 #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
                 #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
-  (:export #:json-col #:json-column #:text-column))
+  (:export #:text-column))
 (in-package #:koya-server/infra/db/contents)
 
 (defparameter +columns+
   "id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at")
 
-(defun json-col (row name)
-  (let ((v (col row name))) (and v (parse-json v))))
-
 (defun row->content (row)
-  (make-content :id (col row "id") :space (col row "space") :model (col row "model")
-                :published (json-col row "published") :draft (json-col row "draft")
-                :draft-key (col row "draft_key")
-                :created-at (col row "created_at") :updated-at (col row "updated_at")
-                :published-at (col row "published_at") :revised-at (col row "revised_at")))
+  (flet ((json (name) (let ((v (col row name))) (and v (parse-json v)))))
+    (make-content :id (col row "id") :space (col row "space") :model (col row "model")
+                  :published (json "published") :draft (json "draft")
+                  :draft-key (col row "draft_key")
+                  :created-at (col row "created_at") :updated-at (col row "updated_at")
+                  :published-at (col row "published_at") :revised-at (col row "revised_at"))))
 
 (defun json-column (value) (and value (to-json value)))
 
