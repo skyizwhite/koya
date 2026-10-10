@@ -69,7 +69,7 @@ KOYA_MANAGEMENT_KEY=koya_mgmt_…
 ### 3. Define your models
 
 ```sh
-npm install github:skyizwhite/koya-ts-sdk#v0.5.0
+npm install github:skyizwhite/koya-ts-sdk#v0.6.0
 ```
 
 ```ts
@@ -89,8 +89,8 @@ export default defineConfig({
         name: "blog",
         kind: "list",
         label: "title",
-        publicUrl: "https://example.com/blog/{CONTENT_ID}",
-        previewUrl: "https://example.com/blog/{CONTENT_ID}?draftKey={DRAFT_KEY}",
+        publicUrl: "https://example.com/blog/{CONTENT_SLUG}",
+        previewUrl: "https://example.com/blog/{CONTENT_SLUG}?draftKey={DRAFT_KEY}",
         fields: [
           { name: "title", type: "text", required: true },
           { name: "slug", type: "slug", required: true },
@@ -153,8 +153,9 @@ const { contents, totalCount } = await koya.getList("blog", {
   include: ["tags"], // tags come back as tag contents, not ids
 });
 
-const post = await koya.getListContent("blog", id);                  // one content
-const preview = await koya.getListContent("blog", id, { draftKey }); // its draft, for a preview page
+const post = await koya.getListContentBySlug("blog", slug);                  // one content, by its slug
+const preview = await koya.getListContentBySlug("blog", slug, { draftKey }); // its draft, for a preview page
+const same = await koya.getListContent("blog", post.id);                     // or by its id
 const about = await koya.getObject("about");
 ```
 
