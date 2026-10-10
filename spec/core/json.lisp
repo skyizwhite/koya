@@ -1,10 +1,15 @@
 (defpackage #:koya-spec/core/json
   (:use #:cl #:rove)
-  (:import-from #:koya-core/json #:parse-json #:json-parse-error #:jget #:blank-p #:copy-object))
+  (:import-from #:koya-core/json #:parse-json #:json-parse-error #:jget #:json-array-p #:blank-p #:copy-object))
 (in-package #:koya-spec/core/json)
 
 (deftest text-that-is-not-json
   (ok (signals (parse-json "{x") 'json-parse-error) "is a json-parse-error, whatever parses it"))
+
+(deftest an-array
+  (ok (json-array-p (parse-json "[1, 2]")) "is a vector")
+  (ng (json-array-p "ab") "but a string is not one")
+  (ng (json-array-p nil) "nor is nothing"))
 
 (deftest blank
   (ok (blank-p nil) "nil is blank")

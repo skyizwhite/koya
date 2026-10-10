@@ -1,5 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/keys
   (:use #:cl #:hsx)
+  (:import-from #:koya-core/json #:blank-p)
   (:import-from #:koya-server/usecases/keys
                 #:space-webhook-secret #:rotate-webhook-secret #:create-delivery-key
                 #:list-delivery-keys #:delete-delivery-key #:create-management-key
@@ -48,7 +49,7 @@
                  (loop :for key :in keys :collect
                    (hsx (tr
                           (td :class "py-2 pl-4 pr-4 font-medium"
-                            (if (string= (key-label key) "")
+                            (if (blank-p (key-label key))
                                 (hsx (span :class "text-muted" "(no label)"))
                                 (key-label key)))
                           (td :class "py-2 pr-4 whitespace-nowrap text-muted" (short-time (key-created-at key)))

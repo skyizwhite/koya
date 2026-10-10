@@ -43,13 +43,13 @@
     table))
 
 (defun search-clause (search)
-  (if (not (blank-p search))
+  (if (blank-p search)
+      (values "" '())
       (values " AND filename LIKE ? ESCAPE '\\'"
               (list (format nil "%~a%" (with-output-to-string (out)
                                           (loop :for c :across search
                                                 :do (when (member c '(#\% #\_ #\\)) (write-char #\\ out))
-                                                    (write-char c out))))))
-      (values "" '())))
+                                                    (write-char c out))))))))
 
 (defmethod list-media (space &key search (limit 60) (offset 0))
   (multiple-value-bind (where params) (search-clause search)

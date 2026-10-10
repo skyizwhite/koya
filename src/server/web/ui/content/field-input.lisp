@@ -4,7 +4,7 @@
                 #:field-name #:field-type #:field-option #:field-required-p #:field-many-p
                 #:field-row-kinds #:custom-field-name)
   (:import-from #:koya-core/json
-                #:json-null #:to-json #:jobject #:json-array-p)
+                #:json-null #:to-json #:jobject #:json-array-p #:blank-p)
   (:import-from #:koya-server/web/lib/forms #:field-param-name #:value->string)
   (:import-from #:koya-server/domain/media #:media-filename #:media-alt)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
@@ -75,7 +75,7 @@
   (let ((url (if media (media-url media :absolute nil) ""))
         (alt (if media (media-alt media) ""))
         (label (cond (media (media-filename media))
-                     ((and value (plusp (length value))) (format nil "~a (missing)" value))
+                     ((not (blank-p value)) (format nil "~a (missing)" value))
                      (t "No image"))))
     (hsx
      (div :class "flex items-start gap-4"
