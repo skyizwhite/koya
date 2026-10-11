@@ -37,7 +37,7 @@
            #:merge-data
            #:same-data-p
            #:default-data
-           #:fill-defaults
+           #:initial-data
            #:to-the-minute
            #:slug-value
            #:content-slugs
@@ -185,24 +185,31 @@
       (when (and (eq (field-type field) :boolean) (field-option field :default))
         (setf (gethash (field-name field) data) t)))))
 
-(defun fill-defaults (model data)
+(defun fill-default (field object)
+  (when (and (eq (field-type field) :boolean) (field-option field :default)
+             (not (nth-value 1 (gethash (field-name field) object))))
+    (setf (gethash (field-name field) object) t)))
+
+(defun keep-to-the-minute (field object)
+  (when (eq (field-type field) :datetime)
+    (let* ((value (gethash (field-name field) object))
+           (timestamp (and (datetime-string-p value) (parse-iso value))))
+      (when timestamp
+        (setf (gethash (field-name field) object)
+              (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+)))))))
+
+(defun initial-data (model data)
   (map-data-fields (model-fields model) data
                    (lambda (field object outer)
                      (declare (ignore outer))
-                     (when (and (eq (field-type field) :boolean) (field-option field :default)
-                                (not (nth-value 1 (gethash (field-name field) object))))
-                       (setf (gethash (field-name field) object) t)))))
+                     (fill-default field object)
+                     (keep-to-the-minute field object))))
 
 (defun to-the-minute (model data)
   (map-data-fields (model-fields model) data
                    (lambda (field object outer)
                      (declare (ignore outer))
-                     (when (eq (field-type field) :datetime)
-                       (let* ((value (gethash (field-name field) object))
-                              (timestamp (and (datetime-string-p value) (parse-iso value))))
-                         (when timestamp
-                           (setf (gethash (field-name field) object)
-                                 (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+)))))))))
+                     (keep-to-the-minute field object))))
 
 (defun slug-value (model data)
   (let* ((field (model-slug-field model))

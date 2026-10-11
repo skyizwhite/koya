@@ -17,7 +17,7 @@
                 #:find-contents-by-slug #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
-                #:merge-data #:same-data-p #:fill-defaults #:to-the-minute #:new-content #:drafted #:published
+                #:merge-data #:same-data-p #:initial-data #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one
                 #:new-content-id)
   (:import-from #:koya-server/usecases/delivery #:deliver)
@@ -99,7 +99,7 @@
         (updated-at (check-timestamp "updatedAt" updated-at))
         (published-at (check-published-at published-at))
         (revised-at (check-timestamp "revisedAt" revised-at))
-        (data (to-the-minute model (fill-defaults model data))))
+        (data (initial-data model data)))
     (let ((content
             (with-transaction
               (when (and (eq (model-kind model) :object) (find-object-content space-name model-name))
