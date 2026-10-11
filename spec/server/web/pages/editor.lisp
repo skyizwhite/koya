@@ -752,7 +752,8 @@
 (defun with-cards ()
   (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "blog")
                                                                     (make-field :photo :media)))
-                                    (make-custom-field "frame" (list (make-field :photo :media))))
+                                    (make-custom-field "frame" (list (make-field :photo :media)
+                                                                     (make-field :link :reference :model "blog"))))
                :models (list (blog-model)
                              (make-model "about" :object (list (make-field :body :richtext)))
                              (make-model "topic" :list (list (make-field :name :text)))
@@ -767,7 +768,8 @@
   (exec "DELETE FROM contents")
   (replace-schema "website" (with-cards))
   (unwind-protect
-       (let* ((post (content-id (create "website" (nth-value 1 (resolve-model "website" "blog"))
+       (let* ((rows 20)
+              (post (content-id (create "website" (nth-value 1 (resolve-model "website" "blog"))
                                         (jobject "title" "Linked") :publish t)))
               (other (content-id (create "website" (nth-value 1 (resolve-model "website" "blog"))
                                          (jobject "title" "Unlinked") :publish t)))
@@ -780,7 +782,7 @@
                                         (jobject "title" "Deck" "lead" post
                                                  "frame" (jobject "photo" (third photos))
                                                  "gallery" (vector (fourth photos) "01ARZ3NDEKTSV4RRFFQ69G5ZZZ")
-                                                 "cards" (coerce (loop :for i :below 20
+                                                 "cards" (coerce (loop :for i :below rows
                                                                        :collect (jobject "fieldId" "card" "link" post
                                                                                          "photo" (nth (mod i 2) photos)))
                                                                  'vector))
@@ -789,11 +791,14 @@
               (reads (reads-of (lambda () (setf body (nth-value 1 (request :get (format nil "/s/website/m/deck/~a" deck)))))
                                :of '(:list-contents :find-media :find-media-by-ids))))
          (ok (= (count "(LIST-CONTENTS blog)" reads :test #'string=) 1)
-             "what the lead and twenty cards can link to is listed once")
+             "what the lead, the frame and the cards can link to is listed once")
          (ok (= (count "FIND-MEDIA-BY-IDS" reads :test #'string=) 1) "and their photos are read together")
          (ng (member "FIND-MEDIA" reads :test #'string=) "not one by one")
-         (ok (= (cl-ppcre:count-matches (format nil "<option value=\"~a\"" other) body) 21)
-             "and the lead and every card offer them, a post none of them links to too")
+         (ok (= (cl-ppcre:count-matches (format nil "<option value=\"~a\"" other) body) (+ 2 rows))
+             "and the lead, the frame and every card offer them, a post none of them links to too")
+         (ok (search (format nil "<option value=\"~a\"" other)
+                     (nth-value 1 (call-action :get (repeater-row :space "website" :model "deck" :field "cards" :kind "card"))))
+             "and so does a card added to the form")
          (ok (= (cl-ppcre:count-matches (format nil "<option value=\"~a\"" topic) body) 1)
              "while a field that links to another model offers that model's, not the posts")
          (ok (search (format nil "/media/website/~a.png" (second photos)) body) "each card shows its photo")
