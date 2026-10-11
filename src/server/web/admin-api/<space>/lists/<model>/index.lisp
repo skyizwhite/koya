@@ -1,28 +1,26 @@
 (defpackage #:koya-server/web/admin-api/<space>/lists/<model>/index
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject #:json-null)
-  (:import-from #:koya-server/web/lib/http
-                #:path-param #:read-json-body #:body-field #:fail-api #:ok-status)
+  (:import-from #:koya-server/web/lib/http #:read-json-body #:body-field #:fail-api #:ok-status #:body-data)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
   (:import-from #:koya-server/usecases/contents #:create)
   (:import-from #:koya-server/usecases/listing #:all-contents)
   (:import-from #:koya-server/web/lib/presenters #:admin-content->jobject)
-  (:import-from #:koya-server/usecases/schema #:resolve-list-model)
+  (:import-from #:koya-server/web/lib/route #:with-route-model)
   (:export #:@get #:@post))
 (in-package #:koya-server/web/admin-api/<space>/lists/<model>/index)
 
 (defun @get (params)
-  (multiple-value-bind (space model) (resolve-list-model (path-param params :space) (path-param params :model))
+  (with-route-model (space model :list) params
     (let ((query (parse-query params)))
       (multiple-value-bind (contents total) (all-contents space model query)
         (jobject "contents" (map 'vector #'admin-content->jobject contents)
                  "totalCount" total "offset" (query-offset query) "limit" (query-limit query))))))
 
 (defun @post (params)
-  (multiple-value-bind (space model) (resolve-list-model (path-param params :space) (path-param params :model))
+  (with-route-model (space model :list) params
     (let* ((body (read-json-body))
-           (data (body-field body "data")))
-      (unless (hash-table-p data) (fail-api 400 "bad_request" "\"data\" must be an object"))
+           (data (body-data body)))
       (unless (member (body-field body "publish") (list t nil json-null))
         (fail-api 400 "bad_request" "\"publish\" must be true or false"))
       (unless (eq (body-field body "id" json-null) json-null)

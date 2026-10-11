@@ -23,7 +23,6 @@
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
-  (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:import-from #:koya-server/domain/references #:reference-fields #:refers-p #:referrers)
   (:export #:check-content
            #:create
@@ -233,13 +232,12 @@
           (data (create space model data :publish t :published-at published-at))
           (t (object-content space model)))))
 
-(defun draft-key (space-name model-name id)
-  (let ((model (nth-value 1 (resolve-model space-name model-name))))
-    (with-transaction
-      (let* ((content (resolve-content space-name model-name id))
-             (keyed (keyed content)))
-        (unless (eq keyed content) (apply #'update-content keyed (content-slugs model keyed)))
-        (content-draft-key keyed)))))
+(defun draft-key (space model id)
+  (with-transaction
+    (let* ((content (resolve-content space (model-name model) id))
+           (keyed (keyed content)))
+      (unless (eq keyed content) (apply #'update-content keyed (content-slugs model keyed)))
+      (content-draft-key keyed))))
 
 (defun resolve-content (space-name model-name id)
   (or (find-content space-name model-name id)

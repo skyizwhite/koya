@@ -1,18 +1,14 @@
 (defpackage #:koya-server/web/admin-api/<space>/objects/<model>/publish
   (:use #:cl)
-  (:import-from #:koya-server/web/lib/http #:path-param #:read-json-body #:body-field #:fail-api)
-  (:import-from #:koya-core/json #:json-null)
+  (:import-from #:koya-server/web/lib/http #:read-json-body #:body-field #:body-data)
   (:import-from #:koya-server/usecases/contents #:publish-object)
   (:import-from #:koya-server/web/lib/presenters #:admin-content->jobject)
-  (:import-from #:koya-server/usecases/schema #:resolve-object-model)
+  (:import-from #:koya-server/web/lib/route #:with-route-model)
   (:export #:@post))
 (in-package #:koya-server/web/admin-api/<space>/objects/<model>/publish)
 
 (defun @post (params)
-  (multiple-value-bind (space model) (resolve-object-model (path-param params :space) (path-param params :model))
-    (let* ((body (read-json-body))
-           (data (body-field body "data")))
-      (unless (or (null data) (eq data json-null) (hash-table-p data))
-        (fail-api 400 "bad_request" "\"data\" must be an object or null"))
-      (admin-content->jobject (publish-object space model :data (and (hash-table-p data) data)
+  (with-route-model (space model :object) params
+    (let ((body (read-json-body)))
+      (admin-content->jobject (publish-object space model :data (body-data body :nullable t)
                                               :published-at (body-field body "publishedAt"))))))

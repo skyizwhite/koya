@@ -147,12 +147,12 @@
     (ok (signals (delivered-list-content "site" (model "post") id (query)) 'not-found) "a draft is not there")
     (ok (signals (delivered-list-content "site" (model "post") "nope" (query)) 'not-found))
     (testing "but its draft key opens it, as a preview"
-      (let ((key (draft-key "site" "post" id)))
+      (let ((key (draft-key "site" (model "post") id)))
         (ok (string= (jget (delivered-data (delivered-list-content "site" (model "post") id (query) :draft-key key)) "title") "Draft"))
         (ok (signals (delivered-list-content "site" (model "post") id (query) :draft-key "wrong") 'not-found))
         (testing "and shows the draft of a published content, where the key is the new draft's"
           (update-draft "site" (model "post") (content-id live) (jobject-from (list "title" "Live, edited")))
-          (let ((key (draft-key "site" "post" (content-id live))))
+          (let ((key (draft-key "site" (model "post") (content-id live))))
             (ok (string= (jget (delivered-data (delivered-list-content "site" (model "post") (content-id live) (query) :draft-key key)) "title")
                          "Live, edited"))
             (ok (string= (jget (delivered-data (delivered-list-content "site" (model "post") (content-id live) (query))) "title")
@@ -165,7 +165,7 @@
                                              "tags" (vector (content-id tag) (content-id new-tag))))))
             (update-draft "site" (model "tag") (content-id tag) (jobject-from (list "name" "lisp, edited")))
             (update-draft "site" (model "author") (content-id author) (jobject-from (list "name" "Ann, edited")))
-            (let* ((key (draft-key "site" "post" (content-id preview)))
+            (let* ((key (draft-key "site" (model "post") (content-id preview)))
                    (data (delivered-data (delivered-list-content "site" (model "post") (content-id preview)
                                                         (query "include" "author,tags") :draft-key key)))
                    (tags (jget data "tags")))
@@ -204,15 +204,15 @@
       (ok (signals (title "drafted") 'not-found) "nor a content that is only a draft")
       (ok (signals (title "nope") 'not-found))
       (testing "with its draft key"
-        (let ((key (draft-key "site" "page" live)))
+        (let ((key (draft-key "site" (model "page") live)))
           (ok (string= (title "live-next" :draft-key key) "Live, next") "by its draft's slug, as the draft")
           (ok (string= (title "live" :draft-key key) "Live, next") "and by its published slug, as the draft too"))
-        (ok (string= (title "drafted" :draft-key (draft-key "site" "page" drafted)) "Drafted")
+        (ok (string= (title "drafted" :draft-key (draft-key "site" (model "page") drafted)) "Drafted")
             "a content that is only a draft"))
       (testing "with a key that is not the content's"
         (ok (signals (title "live-next" :draft-key "wrong") 'not-found)
             "its draft's slug finds nothing, so the slug is not given away")
-        (ok (signals (title "live-next" :draft-key (draft-key "site" "page" drafted)) 'not-found)
+        (ok (signals (title "live-next" :draft-key (draft-key "site" (model "page") drafted)) 'not-found)
             "nor does another content's key")
         (ok (string= (title "live" :draft-key "wrong") "Live") "its published slug finds it, as published")))))
 
