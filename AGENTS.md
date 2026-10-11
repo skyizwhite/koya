@@ -91,16 +91,15 @@ A review checks a change, and the code it adds or alters, for these points:
 - **Work done once is not done again.** Removing a repeat that leaves the code
   no longer is done. A change that adds code for speed is made only when it
   shows an effect.
-- **What it changes has a spec.** The code the change adds or alters is covered
-  by `spec/`.
+- **What it changes has a spec.** That code is covered by `spec/`.
 - **The spec covers both the normal and the error cases.**
 - **`docs/` says what the spec now says.**
-- **A defect found is not let pass.** A defect found in the code the change adds
-  or alters is fixed, even when things work as they are now.
+- **A defect found is not let pass.** A defect found in that code is fixed,
+  even when things work as they are now.
 
 ### How a review goes
 
-- What a review finds in code the change did not need to alter is reported,
+- What a review finds in code the change does not add or alter is reported,
   not changed; it is changed only with the user's approval.
 - Whoever says something can or cannot happen runs the code to show it.
 - Reviewing ends when no finding meets the review's points.
