@@ -799,6 +799,8 @@
          (ok (search (format nil "<option value=\"~a\"" other)
                      (nth-value 1 (call-action :get (repeater-row :space "website" :model "deck" :field "cards" :kind "card"))))
              "and so does a card added to the form")
+         (ok (null (reads-of (lambda () (request :get "/s/website/m/deck/new")) :of '(:find-media :find-media-by-ids)))
+             "a form that holds no media reads none")
          (ok (= (cl-ppcre:count-matches (format nil "<option value=\"~a\"" topic) body) 1)
              "while a field that links to another model offers that model's, not the posts")
          (ok (search (format nil "/media/website/~a.png" (second photos)) body) "each card shows its photo")

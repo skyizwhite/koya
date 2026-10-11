@@ -60,10 +60,9 @@
 
 (defun reference-options (space model-name)
   (let ((target (find-model space model-name)))
-    (when target
-      (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target)))
-                    (list-contents space model-name target (make-query :limit nil) :status :all))
-            #'string-lessp :key #'cdr))))
+    (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target)))
+                  (list-contents space model-name target (make-query :limit nil) :status :all))
+          #'string-lessp :key #'cdr)))
 
 (defun referenced-ids (field contents)
   (loop :for content :in contents
