@@ -388,6 +388,24 @@
     (ok (= status 400) "a body that is not UTF-8 is no JSON")
     (ok (string= (jget json "error" "code") "bad_json"))))
 
+(deftest every-write-reads-data-as-an-object
+  (let ((id (jget (nth-value 1 (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Kept"))))
+                  "id")))
+    (loop :for (method path message) :in `((:post "/admin/api/website/lists/blog" "\"data\" must be an object")
+                                           (:patch ,(format nil "/admin/api/website/lists/blog/~a" id) "\"data\" must be an object")
+                                           (:post ,(format nil "/admin/api/website/lists/blog/~a/publish" id) "\"data\" must be an object or null")
+                                           (:patch "/admin/api/website/objects/about" "\"data\" must be an object")
+                                           (:post "/admin/api/website/objects/about/publish" "\"data\" must be an object or null"))
+          :do (multiple-value-bind (status json) (admin method path :body (jobject "data" 5))
+                (ok (= status 400) (format nil "~a ~a refuses a data that is not an object" method path))
+                (ok (string= (jget json "error" "code") "bad_request"))
+                (ok (string= (jget json "error" "message") message) "and says what it takes")))
+    (ok (= 400 (admin :patch (format nil "/admin/api/website/lists/blog/~a" id) :body (jobject "data" json-null)))
+        "a draft is saved from data, never from null")
+    (ok (string= (jget (nth-value 1 (admin :get (format nil "/admin/api/website/lists/blog/~a" id))) "draft" "title") "Kept")
+        "and nothing is written")
+    (admin :delete (format nil "/admin/api/website/lists/blog/~a" id))))
+
 (deftest a-list-query-value-that-is-not-text-is-none
   (multiple-value-bind (status json) (admin :get "/admin/api/website/lists/blog" :body (jobject "orders" 1 "q" 1))
     (ok (= status 200) "a value that is not text, here from a JSON body, is no part of the query")
