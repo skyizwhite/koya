@@ -34,12 +34,15 @@
   (:export #:@get #:bulk-contents #:browse-contents))
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/index)
 
-(defun list-url (space model &key search-text status sort-key (page 1))
+(defun list-query (state &key (search-text (getf state :search-text)) (status (getf state :status))
+                              (sort-key (getf state :sort-key)) (page (getf state :page)))
+  (list :q (or search-text "") :status (or status "") :sort (or sort-key "") :page page))
+
+(defun list-url (space model state &rest overrides)
   (render-uri (make-uri :path (model-url space model)
-                        :query (append (unless (blank-p search-text) `(("q" . ,search-text)))
-                                       (unless (blank-p status) `(("status" . ,status)))
-                                       (unless (blank-p sort-key) `(("sort" . ,sort-key)))
-                                       (when (> page 1) `(("page" . ,page)))))))
+                        :query (loop :for (key value) :on (apply #'list-query state overrides) :by #'cddr
+                                     :unless (if (eq key :page) (<= value 1) (blank-p value))
+                                       :collect (cons (string-downcase key) value)))))
 
 (defparameter +preview-length+ 120)
 
@@ -136,10 +139,9 @@
           (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
                  (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—")))))))))
 
-(defun browse-url (space model state &key (search-text (getf state :search-text)) (status (getf state :status))
-                                             (sort-key (getf state :sort-key)) (page (getf state :page)) clear)
-  (browse-contents :space space :model model :q (or search-text "") :status (or status "")
-                   :sort (or sort-key "") :page page :clear (if clear "1" "")))
+(defun browse-url (space model state &rest overrides &key clear &allow-other-keys)
+  (apply #'browse-contents :space space :model model
+         (append (apply #'list-query state :allow-other-keys t overrides) (list :clear (if clear "1" "")))))
 
 (defcomp ~sort-input (&key sort-key)
   (hsx (input :type "hidden" :id "filter-sort" :name "sort" :value (or sort-key ""))))
@@ -148,7 +150,7 @@
   (hsx
    (span :id "filters-clear" :class "inline-flex min-h-[2.125rem] items-center"
      (when (filtered-p state)
-       (hsx (a :href (list-url space model :sort-key (getf state :sort-key))
+       (hsx (a :href (list-url space model state :search-text nil :status nil :page 1)
                :nm-bind (on-follow (browse-url space model state :search-text "" :status "" :page 1 :clear t))
                :class "btn"
               "Clear"))))))
@@ -182,7 +184,7 @@
     (hsx
      (th :class "py-2 pr-4 font-medium"
          :aria-sort (case direction (:asc "ascending") (:desc "descending"))
-       (a :href (list-url space model :search-text (getf state :search-text) :status (getf state :status) :sort-key next)
+       (a :href (list-url space model state :sort-key next :page 1)
           :nm-bind (on-follow (browse-url space model state :sort-key next :page 1))
           :class (clsx "flex items-center gap-1 hover:text-fg" (column-width field))
          (if direction
@@ -192,9 +194,7 @@
 
 (defcomp ~bulk-bar (&key space model state)
   (labels ((url (op)
-             (bulk-contents :space space :model model :op op
-                            :q (or (getf state :search-text) "") :status (or (getf state :status) "")
-                            :sort (or (getf state :sort-key) "") :page (getf state :page)))
+             (apply #'bulk-contents :space space :model model :op op (list-query state)))
            (action (op class icon label title message &key icon-only-narrow)
              (let ((dialog (format nil "confirm-bulk-~a" op)))
                (hsx (<> (button :type "button" :class class :commandfor dialog :command "show-modal"
@@ -286,8 +286,7 @@
                                      "›"))))))))
                   (~bulk-bar :space space :model model-name :state state))))
        (~pager :page page :pages pages
-               :href (lambda (n) (list-url space model-name :search-text search-text :status status
-                                                            :sort-key (getf state :sort-key) :page n))
+               :href (lambda (n) (list-url space model-name state :page n))
                :browse (lambda (n) (browse-url space model-name state :page n)))))))
 
 (defcomp ~list-page (&key space model state contents total pages)
@@ -313,9 +312,7 @@
       (multiple-value-setq (contents total pages) (fetch-page space model state)))
     (let ((model-name (model-name model)))
       (hsx (<> (~content-list :space space :model model :state state :contents contents :pages pages)
-               (~replace-url :url (list-url space model-name :search-text (getf state :search-text)
-                                                             :status (getf state :status)
-                                                             :sort-key (getf state :sort-key) :page (getf state :page)))
+               (~replace-url :url (list-url space model-name state))
                (~content-count :space space :model model :state state :total total)
                (if clear
                    (hsx (~filters :space space :model model-name :state (list :sort-key (getf state :sort-key))))
@@ -335,10 +332,7 @@
            (let ((state (read-state params model)))
              (multiple-value-bind (contents total pages) (fetch-page space model state)
                (if (> (getf state :page) pages)
-                   (redirect-to (list-url space model-name :search-text (getf state :search-text)
-                                                           :status (getf state :status)
-                                                           :sort-key (getf state :sort-key) :page pages)
-                                302)
+                   (redirect-to (list-url space model-name state :page pages) 302)
                    (hsx (~list-page :space space :model model :state state
                                     :contents contents :total total :pages pages)))))))))
 
