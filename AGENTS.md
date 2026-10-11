@@ -75,3 +75,23 @@ the app rather than by calling handlers.
   docstrings for a site's developer at the REPL. That package names each of
   them, and a symbol exported only for the server or a spec stays in its own
   package.
+
+## Reviews
+
+A review looks at four things in the code a change adds or touches:
+
+- **It does what was asked**: the issue's requirement is met, or the bug is
+  gone.
+- **Nothing is written twice or for nothing.** Code is shared only when it
+  changes for the same reason, not because it looks alike.
+- **Packages stay maintainable**: each holds together, and depends on few
+  others.
+- **Work done once is not done again.** Removing a repeat that leaves the code
+  no longer is done. A change that adds code for speed is made only when it
+  shows an effect.
+
+A change does what was asked and nothing else. What a review finds in code the
+change did not need to touch is reported, not changed; it is changed only with
+the user's approval. Reviewing ends when no finding meets the four points
+above, and a finding a review set aside is not taken up again without a new
+reason.
