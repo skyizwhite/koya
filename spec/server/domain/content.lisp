@@ -1,7 +1,7 @@
 (defpackage #:koya-spec/server/domain/content
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/content
-                #:next-status #:check-transition #:make-content #:+statuses+ #:+operations+)
+                #:next-status #:check-transition #:make-content #:+statuses+ #:+operations+ #:held-ids)
   (:import-from #:koya-server/domain/errors #:conflict #:koya-error-code))
 (in-package #:koya-spec/server/domain/content)
 
@@ -43,3 +43,13 @@
       (ok (equal (refusal "draft" :unpublish) "not_published"))
       (ok (equal (refusal "draft" :discard) "not_published"))
       (ok (equal (refusal "published" :discard) "no_draft")))))
+
+(deftest the-ids-a-reference-or-media-holds
+  (testing "one that holds many"
+    (ok (equal (held-ids (vector "b" "a" "b") t) '("b" "a" "b")) "holds what its list names, in order, as often as named")
+    (ok (equal (held-ids (vector "a" "" 5) t) '("a")) "but not a blank or what is not an id")
+    (ok (null (held-ids "a" t)) "and nothing when it has no list"))
+  (testing "one that holds one"
+    (ok (equal (held-ids "a" nil) '("a")))
+    (ok (null (held-ids "" nil)) "holds nothing when it is blank")
+    (ok (null (held-ids (vector "a") nil)) "or has a list")))

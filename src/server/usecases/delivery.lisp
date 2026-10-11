@@ -3,10 +3,10 @@
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p
                 #:field-fields #:field-row-kinds #:custom-field-fields #:map-data-fields)
-  (:import-from #:koya-core/json #:json-null #:json-array-p)
+  (:import-from #:koya-core/json #:json-null)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
-  (:import-from #:koya-server/domain/content #:content-id #:value-ids #:content-published #:content-draft-key #:content-data #:slug-value #:only-one)
+  (:import-from #:koya-server/domain/content #:content-id #:held-ids #:content-published #:content-draft-key #:content-data #:slug-value #:only-one)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/auth #:secure-string=)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
@@ -52,16 +52,8 @@
         :when (and (>= (length p) (length path)) (every #'string= path p))
           :collect (nthcdr (length path) p)))
 
-(defun held-ids (value many)
-  (if many
-      (and (json-array-p value) (value-ids value))
-      (and (stringp value) (plusp (length value)) (list value))))
-
-(defstruct (slot (:constructor %make-slot))
+(defstruct (slot (:constructor make-slot (object name many value &aux (ids (held-ids value many)))))
   object name many ids)
-
-(defun make-slot (object name many value)
-  (%make-slot :object object :name name :many many :ids (held-ids value many)))
 
 (defun fill-slot (slot found)
   (let ((values (remove nil (mapcar (lambda (id) (gethash id found)) (slot-ids slot)))))

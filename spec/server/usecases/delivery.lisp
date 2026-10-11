@@ -459,6 +459,9 @@
   (make "post" (list "title" "a" "cover" "" "author" "" "tags" (vector)) :publish t)
   (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "author,tags"))))))
     (ok (null reads) "a blank media, a blank reference and no tags, so nothing is read for them"))
+  (exec "UPDATE contents SET published = json_set(published, '$.tags', json_array('')) WHERE model = 'post'")
+  (ok (null (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "author,tags")))))
+      "nor for a list that names only a blank, as data written to the database by hand")
   (testing "nor what a field cannot hold, as data written to the database by hand"
     (let ((tag (content-id (make "tag" (list "name" "one") :publish t))))
       (exec "UPDATE contents SET published = json_set(published, '$.tags', ?) WHERE model = 'post'" tag)

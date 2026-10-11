@@ -3,10 +3,10 @@
   (:import-from #:koya-core/json #:json-array-p #:blank-p)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type
-                #:+system-fields+ #:field-option)
+                #:+system-fields+ #:field-option #:field-many-p)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content #:find-contents-by-ids)
-  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:value-ids)
+  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:held-ids)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/domain/query #:make-query)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
@@ -73,7 +73,7 @@
   (loop :for content :in contents
         :for data := (content-data content :draft t)
         :for value := (and data (gethash (field-name field) data))
-        :append (value-ids value)))
+        :append (held-ids value (field-many-p field))))
 
 (defun reference-labels (space model contents)
   (let ((table (make-hash-table :test 'equal)))
