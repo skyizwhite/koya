@@ -3,7 +3,7 @@
   (:import-from #:koya-core/json #:blank-p)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type
-                #:+system-fields+ #:field-option #:field-many-p)
+                #:+system-fields+ #:field-option #:field-many-p #:map-data-fields)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content #:find-contents-by-ids)
   (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:held-ids)
@@ -13,6 +13,7 @@
   (:export #:parse-sort
            #:content-page
            #:page-media
+           #:data-media
            #:all-contents
            #:count-contents
            #:find-object-content
@@ -54,6 +55,16 @@
                       :for id := (and data (eq (field-type field) :media)
                                       (first (held-ids (gethash (field-name field) data) (field-many-p field))))
                       :when id :collect id))))
+
+(defun data-media (space model data)
+  (let ((ids '()))
+    (when data
+      (map-data-fields (model-fields model) data
+                       (lambda (field object outer)
+                         (declare (ignore outer))
+                         (when (eq (field-type field) :media)
+                           (setf ids (append (held-ids (gethash (field-name field) object) (field-many-p field)) ids))))))
+    (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal))))
 
 (defun all-contents (space model query)
   (list-contents space (model-name model) model query :status :all))

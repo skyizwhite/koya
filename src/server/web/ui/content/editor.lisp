@@ -7,7 +7,7 @@
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url #:field-fields #:field-option
                 #:field-row-kind #:row-kind #:custom-field-name #:custom-field-fields #:model-field
-                #:field-many-p #:map-data-fields)
+                #:field-many-p)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
@@ -23,7 +23,7 @@
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
   (:import-from #:koya-server/web/lib/forms #:form->data #:field-param-name #:row-prefix)
-  (:import-from #:koya-server/usecases/listing #:reference-options #:find-object-content)
+  (:import-from #:koya-server/usecases/listing #:reference-options #:data-media #:find-object-content)
   (:import-from #:koya-server/web/lib/display #:short-time)
   (:import-from #:koya-server/web/lib/urls
                 #:expand-url-template #:content-url #:model-url #:history-url #:webhook-log-url #:editor-url)
@@ -33,7 +33,6 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
-  (:import-from #:koya-server/usecases/media #:find-media-by-ids)
   (:import-from #:koya-server/web/ui/content/field-input #:~field-input #:~field-error #:~custom-input #:~repeater-input)
   (:import-from #:koya-server/usecases/revisions #:restore-data #:find-revision)
   (:import-from #:koya-server/web/ui/media/picker #:~media-picker-dialog)
@@ -44,21 +43,8 @@
 
 (defun new-p (id) (string= id "new"))
 
-(defstruct (choices (:constructor %make-choices (space media)))
+(defstruct (choices (:constructor make-choices (space model data &aux (media (data-media space model data)))))
   space media (references (make-hash-table :test 'equal)))
-
-(defun data-media-ids (model data)
-  (let ((ids '()))
-    (map-data-fields (model-fields model) data
-                     (lambda (field object outer)
-                       (declare (ignore outer))
-                       (when (eq (field-type field) :media)
-                         (setf ids (append (held-ids (gethash (field-name field) object) (field-many-p field)) ids)))))
-    ids))
-
-(defun make-choices (space model data)
-  (let ((ids (and data (data-media-ids model data))))
-    (%make-choices space (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal)))))
 
 (defun references-for (choices field)
   (when (eq (field-type field) :reference)
@@ -119,12 +105,12 @@
                                 :media (media-for choices inner inner-value)
                                 :error (and index (field-error errors (row-path field index inner))))))))))))
 
-(defcomp ~editor-field (&key model field data errors choices)
+(defcomp ~editor-field (&key space model field data errors choices)
   (let ((value (and data (gethash (field-name field) data))))
     (case (field-type field)
       (:repeater
        (hsx (~repeater-input :field field :error (field-error errors (field-name field))
-                             :add-url (repeater-row :space (choices-space choices) :model model :field (field-name field))
+                             :add-url (repeater-row :space space :model model :field (field-name field))
               (when (json-array-p value)
                 (loop :for row :across value
                       :for index :from 0
@@ -267,7 +253,8 @@
            (hsx (input :type "hidden" :name "updated-at" :value (content-updated-at content))))
          (let ((choices (make-choices space-name model data)))
            (loop :for field :in (model-fields model) :collect
-             (hsx (~editor-field :model model-name :field field :data data :errors errors :choices choices)))))
+             (hsx (~editor-field :space space-name :model model-name :field field :data data :errors errors
+                                 :choices choices)))))
        (when (and content (or published (not object-p)))
          (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
                 (div
