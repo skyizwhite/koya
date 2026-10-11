@@ -295,9 +295,10 @@ that no longer fits the field, or a unique value or slug another content has
 taken since, leaves the current value in place, and a reference or media that
 has since been deleted is dropped. A custom field comes back as
 one value: a reference inside it to a content now missing or unpublished, or a
-media that is gone, is dropped, and the banner names the custom field. A
-repeater comes back with its rows the same way, and the banner names the
-repeater. A field removed from the model,
+media that is gone, is dropped, and the banner names the custom field and,
+for each field inside that lost something, what it lost, in the custom field's
+order. A repeater comes back with its rows the same way, and the banner names
+the repeater and what each row's fields lost, row by row. A field removed from the model,
 or given another type, took its old values out of the history with it. A deleted
 content cannot be restored at all: its history went with it.
 

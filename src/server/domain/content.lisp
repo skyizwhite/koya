@@ -180,10 +180,7 @@
   (json-equal (booleans-filled model a) (booleans-filled model b)))
 
 (defun default-data (model)
-  (let ((data (make-hash-table :test 'equal)))
-    (dolist (field (model-fields model) data)
-      (when (and (eq (field-type field) :boolean) (field-option field :default))
-        (setf (gethash (field-name field) data) t)))))
+  (initial-data model (make-hash-table :test 'equal)))
 
 (defun fill-default (field object)
   (when (and (eq (field-type field) :boolean) (field-option field :default)
