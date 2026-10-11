@@ -38,9 +38,9 @@ up to work on koya is in CONTRIBUTING.md.
 just spec
 ```
 
-The spec is the tests in `spec/` (`koya-spec`), and a change starts as a spec
-that fails. The implementation is written to pass it, and `docs/` follows what
-it says; nothing in the spec reads `docs/`.
+The spec is the tests in `spec/` (`koya-spec`), and a change to what the code
+does starts as a spec that fails. The implementation is written to pass it, and
+`docs/` follows what it says; nothing in the spec reads `docs/`.
 
 `spec/` mirrors `src/`: `core/`, `sdk/` and `server/`. Anything touching the
 database uses an in-memory one, and the admin UI and both APIs are driven through
@@ -78,10 +78,11 @@ the app rather than by calling handlers.
 
 ## Reviews
 
-A review looks at nine things in the code a change adds or touches:
+A review checks the code a change adds or touches for these points:
 
-- **It does what was asked**: the issue's requirement is met, or the bug is
-  gone.
+- **It does what was asked, and changes nothing else.** The issue's requirement
+  is met, or the bug is gone. No behaviour it was not asked to change has
+  changed, and shared code behaves as before for each of its callers.
 - **Nothing is written twice or for nothing.** Code is shared only when it
   changes for the same reason, not because it looks alike.
 - **Packages stay maintainable**: each holds together, keeps to its own
@@ -91,22 +92,15 @@ A review looks at nine things in the code a change adds or touches:
   shows an effect.
 - **What it changes has a spec.** The code the change adds or alters is checked
   in `spec/`.
-- **The spec covers what the code must do**: what it accepts and answers, and
-  what it refuses.
-- **The docs are updated.**
-- **Nothing changes that was not meant to.** A behaviour the change means to
-  change is named; every other stays as it was, for each caller of what it
-  shares.
-- **A defect is not let pass.** A defect is what gives a wrong result for some
-  use the code allows. It is fixed even when no caller meets it today, such as
-  a macro that evaluates an argument twice.
+- **The spec covers both the normal and the failing cases.**
+- **`docs/` says what the spec now says.**
+- **A defect found is not let pass.** A defect found in the code the change adds
+  or alters is fixed, even when things work as they are now.
 
 ### How a review goes
 
-- A change does what was asked and nothing else.
 - What a review finds in code the change did not need to touch is reported,
   not changed; it is changed only with the user's approval.
-- A finding that something can or cannot happen shows how: a way to reproduce
-  it, or the code that rules it out.
-- Reviewing ends when no finding meets the nine points above.
+- Whoever says something can or cannot happen runs it to check.
+- Reviewing ends when no finding meets the points above.
 - A finding a review set aside is not taken up again without a new reason.
