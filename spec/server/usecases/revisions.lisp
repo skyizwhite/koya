@@ -128,4 +128,4 @@
     (ok (equal (notes-of notes) '("cards")) "and the note names the repeater")
     (ok (equal (getf (first notes) :note)
                "link lost 1 reference to content that was deleted or is not published; photo lost 1 media that is no longer in the library")
-        "and each field in a row that lost something, row by row")))
+        "and each field in a row that lost something, in row order")))
