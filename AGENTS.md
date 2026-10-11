@@ -89,9 +89,9 @@ adds or alters and what it needs to alter, for these points:
   changes for the same reason, not because it looks alike.
 - **Packages stay maintainable**: each holds together, keeps to its own
   layer's concepts, and depends on few others.
-- **Work is not repeated or done for nothing.** Removing such work is done
-  when it leaves the code no harder to keep right; when it does not, what it
-  saves is weighed against that cost.
+- **Work is not repeated or done for nothing.** Removing such work is done;
+  when that needs something harder to maintain, such as a cache, the work it
+  saves is measured and weighed against it.
 - **What it changes has a spec.** The code under review is covered by `spec/`.
 - **The spec covers both the normal and the error cases.**
 - **`docs/` says what the spec now says.**
