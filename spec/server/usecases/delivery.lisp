@@ -412,7 +412,11 @@
       (ok (media-p (jget (delivered-data post) "cover")) "and each one still gets its media")
       (ok (= (length (jget (delivered-data post) "tags")) 3) "its references")
       (ok (delivered-p (jget (delivered-data (jget (delivered-data post) "author")) "favorite"))
-          "and what they refer to in turn"))))
+          "and what they refer to in turn"))
+    (let ((post (make-post 9)))
+      (ok (equal (reads-of (lambda () (deliver post (model "post") "site" :include '(("tags")))))
+                 '("(FIND-CONTENTS-BY-IDS tag)" "FIND-MEDIA-BY-IDS"))
+          "and one content on its own reads its tags together too"))))
 
 (deftest a-page-embeds-each-content-s-own-references
   (let ((one (content-id (make "tag" (list "name" "one") :publish t)))
@@ -452,9 +456,9 @@
       (ok (string= (media-id (gethash "d" covers)) first-cover) "and one media two contents hold comes to both"))))
 
 (deftest what-is-not-there-is-not-read
-  (make "post" (list "title" "a" "tags" (vector)) :publish t)
-  (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "tags"))))))
-    (ok (null reads) "no media and no tags to embed, so nothing is read for them"))
+  (make "post" (list "title" "a" "cover" "" "author" "" "tags" (vector)) :publish t)
+  (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "author,tags"))))))
+    (ok (null reads) "a blank media, a blank reference and no tags, so nothing is read for them"))
   (testing "nor what a field cannot hold, as data written to the database by hand"
     (let ((tag (content-id (make "tag" (list "name" "one") :publish t))))
       (exec "UPDATE contents SET published = json_set(published, '$.tags', ?) WHERE model = 'post'" tag)

@@ -55,22 +55,24 @@
 (defun held-ids (value many)
   (if many
       (and (json-array-p value) (value-ids value))
-      (and (stringp value) (list value))))
+      (and (stringp value) (plusp (length value)) (list value))))
 
-(defun make-slot (object name many)
-  (list object name many (held-ids (gethash name object) many)))
+(defstruct (slot (:constructor %make-slot))
+  object name many ids)
+
+(defun make-slot (object name many value)
+  (%make-slot :object object :name name :many many :ids (held-ids value many)))
 
 (defun fill-slot (slot found)
-  (destructuring-bind (object name many ids) slot
-    (let ((values (remove nil (mapcar (lambda (id) (gethash id found)) ids))))
-      (setf (gethash name object)
-            (if many (coerce values 'vector) (or (first values) json-null))))))
+  (let ((values (remove nil (mapcar (lambda (id) (gethash id found)) (slot-ids slot)))))
+    (setf (gethash (slot-name slot) (slot-object slot))
+          (if (slot-many slot) (coerce values 'vector) (or (first values) json-null)))))
 
-(defun slot-ids (slots)
-  (loop :for slot :in slots :append (fourth slot)))
+(defun ids-of (slots)
+  (loop :for slot :in slots :append (slot-ids slot)))
 
 (defun fill-media (slots space)
-  (let* ((ids (slot-ids slots))
+  (let* ((ids (ids-of slots))
          (found (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal))))
     (dolist (slot slots) (fill-slot slot found))))
 
@@ -78,7 +80,7 @@
   (maphash (lambda (key slots)
              (destructuring-bind (target-name include) key
                (let ((target (find-model space target-name))
-                     (ids (slot-ids slots))
+                     (ids (ids-of slots))
                      (found (make-hash-table :test 'equal)))
                  (when (and target ids)
                    (let ((contents (loop :for content :being :the :hash-values
@@ -98,11 +100,11 @@
                     (value (gethash name object)))
                (when (and value (not (eq value json-null)))
                  (case (field-type field)
-                   (:media (push (make-slot object name (field-many-p field)) media))
+                   (:media (push (make-slot object name (field-many-p field) value) media))
                    (:reference
                     (let ((nested (and include (include-under include (if outer (list (field-name outer) name) (list name))))))
                       (when nested
-                        (push (make-slot object name (field-many-p field))
+                        (push (make-slot object name (field-many-p field) value)
                               (gethash (list (field-option field :model) (remove nil nested)) references))))))))))
       (let ((data (mapcar (lambda (content)
                             (map-data-fields (model-fields model) (content-data content :draft draft) #'collect))
