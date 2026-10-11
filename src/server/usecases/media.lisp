@@ -7,7 +7,7 @@
                 #:media-id #:media-space #:media-filename #:media-mime #:safe-filename
                 #:+max-upload-bytes+)
   (:import-from #:koya-server/usecases/ports/media
-                #:insert-media #:delete-media #:find-media #:list-media #:count-media #:update-media
+                #:insert-media #:delete-media #:find-media #:find-media-by-ids #:list-media #:count-media #:update-media
                 #:space-media #:write-media-file #:delete-media-file #:delete-space-media-files
                 #:media-file-path #:media-file-exists-p)
   (:import-from #:koya-server/domain/references #:media-fields #:mentioned-ids #:referrers)
@@ -21,6 +21,7 @@
            #:remove-each
            #:remove-space-media
            #:find-media
+           #:find-media-by-ids
            #:list-media
            #:count-media
            #:update-media

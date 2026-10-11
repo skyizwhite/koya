@@ -6,7 +6,8 @@
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url #:field-fields #:field-option
-                #:field-row-kind #:row-kind #:custom-field-name #:custom-field-fields #:model-field)
+                #:field-row-kind #:row-kind #:custom-field-name #:custom-field-fields #:model-field
+                #:field-many-p #:map-data-fields)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
@@ -17,7 +18,7 @@
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-status #:content-published #:content-draft
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
-                #:default-data #:content-label #:slug-value)
+                #:default-data #:content-label #:slug-value #:held-ids)
   (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
@@ -32,7 +33,7 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
-  (:import-from #:koya-server/usecases/media #:find-media)
+  (:import-from #:koya-server/usecases/media #:find-media-by-ids)
   (:import-from #:koya-server/web/ui/content/field-input #:~field-input #:~field-error #:~custom-input #:~repeater-input)
   (:import-from #:koya-server/usecases/revisions #:restore-data #:find-revision)
   (:import-from #:koya-server/web/ui/media/picker #:~media-picker-dialog)
@@ -43,11 +44,38 @@
 
 (defun new-p (id) (string= id "new"))
 
-(defun media-for (space field value)
+(defstruct (choices (:constructor %make-choices (space media)))
+  space media (references (make-hash-table :test 'equal)))
+
+(defun data-media-ids (model data)
+  (let ((ids '()))
+    (map-data-fields (model-fields model) data
+                     (lambda (field object outer)
+                       (declare (ignore outer))
+                       (when (eq (field-type field) :media)
+                         (setf ids (append (held-ids (gethash (field-name field) object) (field-many-p field)) ids)))))
+    ids))
+
+(defun make-choices (space model data)
+  (let ((ids (data-media-ids model data)))
+    (%make-choices space (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal)))))
+
+(defun references-for (choices field)
+  (when (eq (field-type field) :reference)
+    (let ((table (choices-references choices))
+          (target (field-option field :model)))
+      (multiple-value-bind (options found) (gethash target table)
+        (if found
+            options
+            (setf (gethash target table) (reference-options (choices-space choices) field)))))))
+
+(defun media-for (choices field value)
   (when (eq (field-type field) :media)
-    (cond ((and (stringp value) (plusp (length value))) (find-media space value))
-          ((json-array-p value)
-           (loop :for id :across value :when (stringp id) :collect (cons id (find-media space id)))))))
+    (let ((media (choices-media choices))
+          (ids (held-ids value (field-many-p field))))
+      (if (field-many-p field)
+          (mapcar (lambda (id) (cons id (gethash id media))) ids)
+          (and ids (gethash (first ids) media))))))
 
 (defun field-error (errors name)
   (let ((e (find name errors :key (lambda (e) (getf e :field)) :test #'string=)))
@@ -62,7 +90,7 @@
 (defun new-row-key ()
   (string-downcase (make-ulid)))
 
-(defcomp ~repeater-row (&key space field kind key row errors index fresh)
+(defcomp ~repeater-row (&key choices field kind key row errors index fresh)
   (let ((prefix (row-prefix field key))
         (name (field-param-name field)))
     (hsx
@@ -87,11 +115,11 @@
                                   (gethash (field-name inner) row)
                                   (and (eq (field-type inner) :boolean) (field-option inner :default) t))))
              (hsx (~field-input :field inner :parent prefix :value inner-value
-                                :references (reference-options space inner)
-                                :media (media-for space inner inner-value)
+                                :references (references-for choices inner)
+                                :media (media-for choices inner inner-value)
                                 :error (and index (field-error errors (row-path field index inner))))))))))))
 
-(defcomp ~editor-field (&key space model field data errors)
+(defcomp ~editor-field (&key space model field data errors choices)
   (let ((value (and data (gethash (field-name field) data))))
     (case (field-type field)
       (:repeater
@@ -102,7 +130,7 @@
                       :for index :from 0
                       :for kind := (row-kind field row)
                       :when kind
-                        :collect (hsx (~repeater-row :space space :field field :kind kind :key (princ-to-string index)
+                        :collect (hsx (~repeater-row :choices choices :field field :kind kind :key (princ-to-string index)
                                                      :row row :errors errors :index index)))))))
       (:custom
         (hsx (~custom-input :field field :present (hash-table-p value) :error (field-error errors (field-name field))
@@ -111,13 +139,13 @@
                                         (gethash (field-name inner) value)
                                         (and (eq (field-type inner) :boolean) (field-option inner :default) t))))
                    (hsx (~field-input :field inner :parent field :value inner-value
-                                      :references (reference-options space inner)
-                                      :media (media-for space inner inner-value)
+                                      :references (references-for choices inner)
+                                      :media (media-for choices inner inner-value)
                                       :error (field-error errors (inner-path field inner)))))))))
       (t
         (hsx (~field-input :field field :value value
-                           :references (reference-options space field)
-                           :media (media-for space field value)
+                           :references (references-for choices field)
+                           :media (media-for choices field value)
                            :error (field-error errors (field-name field))))))))
 
 (defcomp ~editor-field-errors (&key field errors params)
@@ -145,7 +173,7 @@
                     (field-row-kind field (param params "kind")))))
     (if kind
         (hsx (div :id (format nil "~a-rows" (field-param-name field)) :nm-swap "append"
-               (~repeater-row :space space :field field :kind kind :key (new-row-key) :fresh t)))
+               (~repeater-row :choices (make-choices space model nil) :field field :kind kind :key (new-row-key) :fresh t)))
         (action-refusal "No such row." 404))))
 
 (defcomp ~external-link (&key href children)
@@ -237,8 +265,10 @@
                                  :binds "oninput: () => _track(), onchange: () => _track()")
          (when content
            (hsx (input :type "hidden" :name "updated-at" :value (content-updated-at content))))
-         (loop :for field :in (model-fields model) :collect
-           (hsx (~editor-field :space space :model model-name :field field :data data :errors errors))))
+         (let ((choices (make-choices space-name model data)))
+           (loop :for field :in (model-fields model) :collect
+             (hsx (~editor-field :space space :model model-name :field field :data data :errors errors
+                                 :choices choices)))))
        (when (and content (or published (not object-p)))
          (hsx (div :class "mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm"
                 (div

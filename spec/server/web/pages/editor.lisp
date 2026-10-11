@@ -21,7 +21,8 @@
   (:import-from #:koya-core/json #:jget #:jobject #:json-null)
   (:import-from #:koya-server/usecases/ports/media #:insert-media #:delete-media)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
-  (:import-from #:koya-server/domain/content #:content-updated-at))
+  (:import-from #:koya-server/domain/content #:content-updated-at)
+  (:import-from #:koya-spec/server/reads #:reads-of))
 (in-package #:koya-spec/server/web/pages/editor)
 
 (setup (setup-pages) (log-in))
@@ -745,5 +746,44 @@
                (ok (search "aria-label=\"Remove image\"" editor) "and removable"))
              (ok (search "b.png" (nth-value 1 (request :get (format nil "/s/website/m/album/~a/history" id))))
                  "the history names the files"))))
+    (replace-schema "website" (make-schema :models (list (blog-model)
+                                                         (make-model "about" :object (list (make-field :body :richtext))))))))
+
+(defun with-cards ()
+  (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "blog")
+                                                                    (make-field :photo :media))))
+               :models (list (blog-model)
+                             (make-model "about" :object (list (make-field :body :richtext)))
+                             (make-model "deck" :list (list (make-field :title :text)
+                                                            (make-field :lead :reference :model "blog")
+                                                            (make-field :cards :repeater :custom-fields '(card)))))))
+
+(deftest a-form-reads-what-its-fields-offer-once
+  (exec "DELETE FROM contents")
+  (replace-schema "website" (with-cards))
+  (unwind-protect
+       (let* ((post (content-id (create "website" (nth-value 1 (resolve-model "website" "blog"))
+                                        (jobject "title" "Linked") :publish t)))
+              (photos (loop :for name :in '("a.png" "b.png")
+                            :collect (media-id (insert-media "website" :filename name :mime "image/png" :size 10
+                                                                       :width 1 :height 1))))
+              (deck (content-id (create "website" (nth-value 1 (resolve-model "website" "deck"))
+                                        (jobject "title" "Deck" "lead" post
+                                                 "cards" (coerce (loop :for i :below 20
+                                                                       :collect (jobject "fieldId" "card" "link" post
+                                                                                         "photo" (nth (mod i 2) photos)))
+                                                                 'vector))
+                                        :publish t)))
+              (body nil)
+              (reads (reads-of (lambda () (setf body (nth-value 1 (request :get (format nil "/s/website/m/deck/~a" deck)))))
+                               :of '(:list-contents :find-media :find-media-by-ids))))
+         (ok (= (count "(LIST-CONTENTS blog)" reads :test #'string=) 1)
+             "what the lead and twenty cards can link to is listed once")
+         (ok (= (count "FIND-MEDIA-BY-IDS" reads :test #'string=) 1) "and their photos are read together")
+         (ng (member "FIND-MEDIA" reads :test #'string=) "not one by one")
+         (ok (search "Linked" body) "each one still offers the posts")
+         (ok (search (format nil "/media/website/~a.png" (second photos)) body) "and shows its photo"))
+    (exec "DELETE FROM contents")
+    (exec "DELETE FROM media")
     (replace-schema "website" (make-schema :models (list (blog-model)
                                                          (make-model "about" :object (list (make-field :body :richtext))))))))
