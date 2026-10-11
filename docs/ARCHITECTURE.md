@@ -53,7 +53,7 @@ src/
     web/              ; the way in: app, which mounts the routers below behind the middlewares
       lib/            ;   middlewares, http, auth, presenters, forms, media, paging,
                       ;   display, urls, assets, document, target, binds, health,
-                      ;   list-content, toast
+                      ;   list-content, route, toast, value-text
       pages/          ;   the admin UI (ningle-fbr: the directory is the URL), GET only
       ui/             ;   hsx components shared by pages: layout, icon, toast,
                       ;   elements at the top; content/ and media/ below

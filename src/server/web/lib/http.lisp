@@ -4,7 +4,7 @@
                 #:set-response-header #:set-response-status #:get-request-header #:redirect
                 #:*request* #:process-response #:request-content)
   (:import-from #:koya-core/json
-                #:parse-json #:to-json #:jobject #:blank-p #:json-null-p)
+                #:parse-json #:to-json #:jobject #:blank-p #:json-null #:json-null-p)
   (:import-from #:koya-core/schema
                 #:schema-error #:schema-error-message)
   (:import-from #:koya-core/validate
@@ -141,9 +141,9 @@
     (if found v default)))
 
 (defun body-data (body &key nullable)
-  (let ((data (body-field body "data")))
+  (let ((data (body-field body "data" json-null)))
     (cond ((hash-table-p data) data)
-          ((and nullable (or (null data) (json-null-p data))) nil)
+          ((and nullable (json-null-p data)) nil)
           (nullable (fail-api 400 "bad_request" "\"data\" must be an object or null"))
           (t (fail-api 400 "bad_request" "\"data\" must be an object")))))
 

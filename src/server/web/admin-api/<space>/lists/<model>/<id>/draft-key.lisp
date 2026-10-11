@@ -9,4 +9,4 @@
 
 (defun @post (params)
   (with-route-model (space model :list) params
-    (jobject "draftKey" (draft-key (path-param params :space) (path-param params :model) (path-param params :id)))))
+    (jobject "draftKey" (draft-key space model (path-param params :id)))))
