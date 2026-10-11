@@ -6,12 +6,13 @@
   (:import-from #:koya-core/json #:json-null #:json-array-p)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
-  (:import-from #:koya-server/domain/content #:content-published #:content-draft-key #:content-data #:slug-value #:only-one)
+  (:import-from #:koya-server/domain/content #:content-id #:content-published #:content-draft-key #:content-data #:slug-value #:only-one)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/auth #:secure-string=)
-  (:import-from #:koya-server/usecases/ports/media #:find-media)
+  (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/usecases/ports/contents
-                #:find-content #:find-object-content #:list-contents #:find-contents-by-slug)
+                #:find-content #:find-object-content #:list-contents #:find-contents-by-slug
+                #:find-contents-by-ids)
   (:export #:delivered
            #:delivered-content
            #:delivered-model
@@ -25,12 +26,6 @@
 
 (defstruct (delivered (:constructor make-delivered (content model data)))
   content model data)
-
-(defun expand-reference (space target-model-name value include)
-  (let* ((target (find-model space target-model-name))
-         (content (and target (stringp value) (find-content space target-model-name value))))
-    (and content (content-published content)
-         (deliver content target space :include include))))
 
 (defun next-fields (space field)
   (case (field-type field)
@@ -57,34 +52,68 @@
         :when (and (>= (length p) (length path)) (every #'string= path p))
           :collect (nthcdr (length path) p)))
 
-(defun embed-reference (field object outer space include)
-  (let* ((name (field-name field))
-         (nested (include-under include (if outer (list (field-name outer) name) (list name))))
-         (value (gethash name object)))
-    (when (and nested value (not (eq value json-null)))
-      (let ((nested (remove nil nested))
-            (target (field-option field :model)))
-        (setf (gethash name object)
-              (if (field-many-p field)
-                  (coerce (remove nil (map 'list (lambda (v) (expand-reference space target v nested)) value)) 'vector)
-                  (or (expand-reference space target value nested) json-null)))))))
+(defun value-ids (value)
+  (cond ((stringp value) (list value))
+        ((json-array-p value) (remove-if-not #'stringp (coerce value 'list)))))
 
-(defun expand-media (field object space)
-  (let ((value (gethash (field-name field) object)))
-    (cond ((json-array-p value)
-           (setf (gethash (field-name field) object)
-                 (coerce (remove nil (map 'list (lambda (id) (and (stringp id) (find-media space id))) value)) 'vector)))
-          ((and value (not (eq value json-null)))
-           (let ((media (and (stringp value) (find-media space value))))
-             (setf (gethash (field-name field) object) (or media json-null)))))))
+(defun fill-slot (slot found)
+  (destructuring-bind (object name many) slot
+    (let ((value (gethash name object)))
+      (setf (gethash name object)
+            (if many
+                (coerce (remove nil (map 'list (lambda (id) (gethash id found)) value)) 'vector)
+                (or (gethash value found) json-null))))))
+
+(defun slot-ids (slots)
+  (loop :for (object name) :in slots :append (value-ids (gethash name object))))
+
+(defun fill-media (slots space)
+  (let ((found (find-media-by-ids space (slot-ids slots))))
+    (dolist (slot slots) (fill-slot slot found))))
+
+(defun fill-references (groups space)
+  (maphash (lambda (key slots)
+             (destructuring-bind (target-name include) key
+               (let ((target (find-model space target-name))
+                     (found (make-hash-table :test 'equal)))
+                 (when target
+                   (let ((contents (remove-if-not #'content-published
+                                                  (loop :for content :being :the :hash-values
+                                                          :of (find-contents-by-ids space target-name (slot-ids slots))
+                                                        :collect content))))
+                     (loop :for content :in contents
+                           :for delivered :in (deliver-all contents target space :include include)
+                           :do (setf (gethash (content-id content) found) delivered))))
+                 (dolist (slot slots) (fill-slot slot found)))))
+           groups))
+
+(defun deliver-all (contents model space &key draft include)
+  (let* ((media '())
+         (references (make-hash-table :test 'equal))
+         (data (mapcar (lambda (content)
+                         (map-data-fields (model-fields model) (content-data content :draft draft)
+                                          (lambda (field object outer)
+                                            (let* ((name (field-name field))
+                                                   (value (gethash name object)))
+                                              (when (and value (not (eq value json-null)))
+                                                (case (field-type field)
+                                                  (:media (push (list object name (json-array-p value)) media))
+                                                  (:reference
+                                                   (let ((nested (and include
+                                                                      (include-under include (if outer
+                                                                                                 (list (field-name outer) name)
+                                                                                                 (list name))))))
+                                                     (when nested
+                                                       (push (list object name (field-many-p field))
+                                                             (gethash (list (field-option field :model) (remove nil nested))
+                                                                      references)))))))))))
+                       contents)))
+    (fill-media media space)
+    (fill-references references space)
+    (mapcar (lambda (content data) (make-delivered content model data)) contents data)))
 
 (defun deliver (content model space &key draft include)
-  (make-delivered content model
-                  (map-data-fields (model-fields model) (content-data content :draft draft)
-                                   (lambda (field object outer)
-                                     (case (field-type field)
-                                       (:reference (when include (embed-reference field object outer space include)))
-                                       (:media (expand-media field object space)))))))
+  (first (deliver-all (list content) model space :draft draft :include include)))
 
 (defun draft-key-p (content draft-key)
   (and draft-key (content-draft-key content) (secure-string= draft-key (content-draft-key content))))
@@ -98,7 +127,7 @@
 (defun delivered-list (space model query)
   (check-include space model (query-include query))
   (multiple-value-bind (contents total) (list-contents space (model-name model) model query)
-    (values (mapcar (lambda (c) (deliver c model space :include (query-include query))) contents)
+    (values (deliver-all contents model space :include (query-include query))
             total)))
 
 (defun delivered-list-content (space model id query &key draft-key)
