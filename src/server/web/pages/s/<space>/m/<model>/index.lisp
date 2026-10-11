@@ -4,12 +4,12 @@
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
-                #:webhook-covers-p)
+                #:webhook-covers-p #:field-many-p)
   (:import-from #:koya-core/json #:json-array-p #:blank-p)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/web/lib/target #:target-model)
   (:import-from #:koya-server/domain/content
-                #:content-id #:content-status #:content-data #:+statuses+ #:content-label)
+                #:content-id #:content-status #:content-data #:+statuses+ #:content-label #:held-ids)
   (:import-from #:koya-server/web/lib/http #:path-param #:redirect-to #:param #:form-list)
   (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number)
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:webhook-log-url)
@@ -97,16 +97,13 @@
 
 (defcomp ~preview-cell (&key field content ref-labels media)
   (let* ((data (content-data content :draft t))
-         (value (and data (gethash (field-name field) data))))
-    (cond
-      ((and (eq (field-type field) :media) (stringp value) (plusp (length value)))
-        (hsx (~media-cell :field field :id value :media media)))
-      ((and (eq (field-type field) :media) (json-array-p value) (plusp (length value)) (stringp (aref value 0)))
-        (hsx (~media-cell :field field :id (aref value 0) :media media :more (1- (length value)))))
-      (t
+         (ids (and data (eq (field-type field) :media)
+                   (held-ids (gethash (field-name field) data) (field-many-p field)))))
+    (if ids
+        (hsx (~media-cell :field field :id (first ids) :media media :more (1- (length ids))))
         (let ((preview (field-preview field data ref-labels)))
           (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
-                 (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—")))))))))
+                 (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—"))))))))
 
 (defun browse-url (space model state &rest overrides &key clear &allow-other-keys)
   (apply #'browse-contents :space space :model model

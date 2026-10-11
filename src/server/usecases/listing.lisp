@@ -1,12 +1,12 @@
 (defpackage #:koya-server/usecases/listing
   (:use #:cl)
-  (:import-from #:koya-core/json #:json-array-p #:blank-p)
+  (:import-from #:koya-core/json #:blank-p)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type
-                #:+system-fields+ #:field-option)
+                #:+system-fields+ #:field-option #:field-many-p)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content #:find-contents-by-ids)
-  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label)
+  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:held-ids)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/domain/query #:make-query)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
@@ -51,12 +51,9 @@
    (loop :for content :in contents
          :for data := (content-data content :draft t)
          :nconc (loop :for field :in (model-fields model)
-                      :for value := (and data (gethash (field-name field) data))
-                      :when (and (eq (field-type field) :media) (stringp value) (plusp (length value)))
-                        :collect value
-                      :when (and (eq (field-type field) :media) (json-array-p value) (plusp (length value))
-                                 (stringp (aref value 0)))
-                        :collect (aref value 0)))))
+                      :for id := (and data (eq (field-type field) :media)
+                                      (first (held-ids (gethash (field-name field) data) (field-many-p field))))
+                      :when id :collect id))))
 
 (defun all-contents (space model query)
   (list-contents space (model-name model) model query :status :all))
@@ -73,8 +70,7 @@
   (loop :for content :in contents
         :for data := (content-data content :draft t)
         :for value := (and data (gethash (field-name field) data))
-        :nconc (cond ((stringp value) (list value))
-                     ((json-array-p value) (remove-if-not #'stringp (coerce value 'list))))))
+        :append (held-ids value (field-many-p field))))
 
 (defun reference-labels (space model contents)
   (let ((table (make-hash-table :test 'equal)))
