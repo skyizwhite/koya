@@ -6,7 +6,7 @@
                 #:+system-fields+ #:field-option)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content #:find-contents-by-ids)
-  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label)
+  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:value-ids)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/domain/query #:make-query)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
@@ -73,8 +73,7 @@
   (loop :for content :in contents
         :for data := (content-data content :draft t)
         :for value := (and data (gethash (field-name field) data))
-        :nconc (cond ((stringp value) (list value))
-                     ((json-array-p value) (remove-if-not #'stringp (coerce value 'list))))))
+        :append (value-ids value)))
 
 (defun reference-labels (space model contents)
   (let ((table (make-hash-table :test 'equal)))

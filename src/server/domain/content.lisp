@@ -6,7 +6,7 @@
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
-                #:json-null #:json-equal #:copy-object)
+                #:json-null #:json-equal #:json-array-p #:copy-object)
   (:import-from #:koya-core/time
                 #:now-iso #:parse-iso #:format-iso)
   (:import-from #:local-time
@@ -40,6 +40,7 @@
            #:initial-data
            #:to-the-minute
            #:slug-value
+           #:value-ids
            #:content-slugs
            #:only-one))
 (in-package #:koya-server/domain/content)
@@ -207,6 +208,10 @@
                    (lambda (field object outer)
                      (declare (ignore outer))
                      (keep-to-the-minute field object))))
+
+(defun value-ids (value)
+  (cond ((stringp value) (list value))
+        ((json-array-p value) (remove-if-not #'stringp (coerce value 'list)))))
 
 (defun slug-value (model data)
   (let* ((field (model-slug-field model))
