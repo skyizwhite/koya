@@ -245,6 +245,15 @@
               "a reference reads as the label of what it points at, looked up for the page's rows")))))
   (exec "DELETE FROM contents"))
 
+(deftest list-shows-rich-text-as-its-text
+  (exec "DELETE FROM contents")
+  (multiple-value-bind (space model) (resolve-model "website" "blog")
+    (create space model (jobject "title" "Quoted" "body" "<p>It&#8217;s &#x2014; <b>here</b></p>") :publish t))
+  (multiple-value-bind (status body) (request :get "/s/website/m/blog")
+    (ok (= status 200))
+    (ok (search "It’s — here" body) "as the search and the history read it, every character reference decoded"))
+  (exec "DELETE FROM contents"))
+
 (deftest bulk-actions-on-the-content-list
   (let ((origin '(("origin" . "http://localhost:3000")))
         (query '(("orders" . "-createdAt"))))

@@ -5,9 +5,7 @@
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-follow)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-name #:model-field #:field-type #:field-option
-                #:field-name #:field-fields #:row-kind #:custom-field-name #:custom-field-fields)
-  (:import-from #:koya-core/json #:json-array-p)
+                #:model-kind #:model-name #:model-field #:field-type #:field-option)
   (:import-from #:koya-core/validate #:blank-value-p)
   (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions)
   (:import-from #:koya-server/usecases/contents #:find-content)
@@ -20,7 +18,7 @@
   (:import-from #:koya-server/domain/media #:media-filename)
   (:import-from #:koya-server/web/lib/http #:path-param #:param)
   (:import-from #:koya-server/domain/errors #:not-found)
-  (:import-from #:koya-server/web/lib/forms #:number->string)
+  (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-server/web/lib/assets #:asset-url)
   (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/lib/display #:short-time #:caller-name)
@@ -58,44 +56,6 @@
                      (and target (content-label target target-model))))))
     (if (and label (string/= label id)) (format nil "~a (~a)" label id) id)))
 
-(defun scalar-text (space field value)
-  (case (field-type field)
-    ((:reference :media) (id-text space field value))
-    (:datetime (short-time value))
-    (:boolean (if value "Yes" "No"))
-    (:number (if (realp value) (number->string value) (princ-to-string value)))
-    (t (if (eq value t) "Yes" (princ-to-string value)))))
-
-(defun fields-text (space fields value separator)
-  (format nil (format nil "~~{~~a~~^~a~~}" separator)
-          (loop :for inner :in fields
-                :for (inner-value found) := (multiple-value-list (gethash (field-name inner) value))
-                :for text := (value-text space inner inner-value found)
-                :when text :collect (format nil "~a: ~a" (field-name inner) text))))
-
-(defun custom-text (space field value)
-  (fields-text space (field-fields field) value (string #\Newline)))
-
-(defun rows-text (space field value)
-  (format nil "~{~a~^~%~}"
-          (loop :for row :across value
-                :for kind := (row-kind field row)
-                :when kind
-                  :collect (format nil "~a: ~a" (custom-field-name kind)
-                                   (fields-text space (custom-field-fields kind) row "; ")))))
-
-(defun value-text (space field value found)
-  (cond ((and (eq (field-type field) :custom) (hash-table-p value))
-         (custom-text space field value))
-        ((and (eq (field-type field) :repeater) (json-array-p value))
-         (and (plusp (length value)) (rows-text space field value)))
-        ((eq (field-type field) :boolean)
-         (and found (scalar-text space field value)))
-        ((or (not found) (blank-value-p value)) nil)
-        ((json-array-p value)
-         (format nil "~{~a~^, ~}" (map 'list (lambda (v) (scalar-text space field v)) value)))
-        (t (scalar-text space field value))))
-
 (defun richtext-document (html)
   (format nil "<!doctype html><html class=\"overflow-hidden\"><head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"~a\"></head>~
                <body class=\"prose prose-sm max-w-none bg-transparent\">~a</body></html>"
@@ -106,13 +66,16 @@
                :nm-bind "{ oninit: () => koya.fitContent(this) }" :class "block h-16 w-full")))
 
 (defcomp ~value (&key space field value found class)
-  (let ((text (value-text space field value found)))
+  (let* ((richtext (and (eq (field-type field) :richtext) (stringp value)))
+         (shown (if richtext
+                    (and found (not (blank-value-p value)))
+                    (value-text field value found (lambda (field id) (id-text space field id))))))
     (hsx
      (div :class (clsx "max-h-64 overflow-auto break-words rounded border px-3 py-2"
-                       (if text class "border-line text-muted"))
-       (cond ((null text) "—")
-             ((eq (field-type field) :richtext) (~richtext :html value))
-             (t (hsx (div :class "whitespace-pre-wrap font-mono text-xs leading-5" text))))))))
+                       (if shown class "border-line text-muted"))
+       (cond ((not shown) "—")
+             (richtext (~richtext :html value))
+             (t (hsx (div :class "whitespace-pre-wrap font-mono text-xs leading-5" shown))))))))
 
 (defcomp ~changes (&key space model before after)
   (let ((keys (changed-keys model before after)))

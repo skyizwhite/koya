@@ -123,8 +123,8 @@ opens the delivery log filtered to this model.
 - Every field gets a short preview: rich text as plain text, a reference as the
   referenced content's label, a media as a small thumbnail (the first of a `many`
   one, with how many more), a `many` field as its
-  values comma-separated, a custom field as the previews of the values inside
-  joined by ` · `, a repeater as its number of rows (*2 rows*), an empty field
+  values comma-separated, a custom field as the `name: value` of each field
+  inside on one line, a repeater as its number of rows (*2 rows*), an empty field
   as `—`.
 - A row shows its **draft** when it has one, so the table reflects what is being
   worked on rather than what is live.
@@ -280,7 +280,8 @@ Each revision is badged by what it was — *Draft saved*, *Published*,
 fields it changed, the old value on the left and the new one on the right. The
 oldest one in the view shows every field it had. A custom field shows each field
 inside as a `name: value` line, and a repeater each row as a
-`customField: field: value; field: value` line. Rich text is shown formatted;
+`customField: field: value; field: value` line. Rich text is shown formatted,
+and as plain text inside a custom field or a repeater row;
 references and media carry their label or file name while they still exist.
 
 **Restore** opens the editor with that version in the form, under a banner

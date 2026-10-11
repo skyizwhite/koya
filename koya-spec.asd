@@ -39,6 +39,7 @@
                "koya-spec/server/web/lib/binds"
                "koya-spec/server/web/lib/forms"
                "koya-spec/server/web/lib/health"
+               "koya-spec/server/web/lib/value-text"
                "koya-spec/server/web/ui/elements"
                "koya-spec/server/web/pages/login"
                "koya-spec/server/web/pages/index"
