@@ -417,3 +417,31 @@
         (ok (string= (jget (delivered-data (author "a")) "name") "Ann"))
         (ok (json-null-p (author "b")) "an unpublished one is null for its content only")
         (ok (json-null-p (author "c")) "and so is one that does not exist")))))
+
+(deftest a-page-gives-each-content-its-own-media
+  (let ((first-cover (picture "01ARZ3NDEKTSV4RRFFQ69G5E01"))
+        (second-cover (picture "01ARZ3NDEKTSV4RRFFQ69G5E02")))
+    (make "post" (list "title" "a" "cover" first-cover) :publish t)
+    (make "post" (list "title" "b" "cover" second-cover) :publish t)
+    (make "post" (list "title" "c" "cover" "01ARZ3NDEKTSV4RRFFQ69G5E03") :publish t)
+    (make "post" (list "title" "d" "cover" first-cover) :publish t)
+    (let ((covers (make-hash-table :test 'equal)))
+      (dolist (post (delivered-list "site" (model "post") (query)))
+        (setf (gethash (jget (delivered-data post) "title") covers) (jget (delivered-data post) "cover")))
+      (ok (string= (media-id (gethash "a" covers)) first-cover))
+      (ok (string= (media-id (gethash "b" covers)) second-cover) "each content its own")
+      (ok (json-null-p (gethash "c" covers)) "a media that is gone is null for its content only")
+      (ok (string= (media-id (gethash "d" covers)) first-cover) "and one media two contents hold comes to both"))))
+
+(deftest what-is-not-there-is-not-read
+  (make "post" (list "title" "a" "tags" (vector)) :publish t)
+  (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "tags"))))))
+    (ok (null reads) "no media and no tags to embed, so nothing is read for them"))
+  (testing "nor what a field cannot hold, as data from before a change to the schema"
+    (let ((tag (content-id (make "tag" (list "name" "one") :publish t))))
+      (exec "UPDATE contents SET published = json_set(published, '$.tags', ?) WHERE model = 'post'" tag)
+      (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "tags"))))))
+        (ok (null reads))
+        (ok (equalp (jget (delivered-data (first (delivered-list "site" (model "post") (query "include" "tags")))) "tags")
+                    #())
+            "and the field is delivered as before, empty")))))

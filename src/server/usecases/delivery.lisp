@@ -61,21 +61,25 @@
                 (or (gethash value found) json-null))))))
 
 (defun slot-ids (slots)
-  (loop :for (object name) :in slots :append (value-ids (gethash name object))))
+  (loop :for (object name many) :in slots
+        :for value := (gethash name object)
+        :append (cond ((and many (json-array-p value)) (value-ids value))
+                      ((and (not many) (stringp value)) (list value)))))
 
 (defun fill-media (slots space)
-  (when slots
-    (let ((found (find-media-by-ids space (slot-ids slots))))
-      (dolist (slot slots) (fill-slot slot found)))))
+  (let* ((ids (slot-ids slots))
+         (found (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal))))
+    (dolist (slot slots) (fill-slot slot found))))
 
 (defun fill-references (groups space)
   (maphash (lambda (key slots)
              (destructuring-bind (target-name include) key
                (let ((target (find-model space target-name))
+                     (ids (slot-ids slots))
                      (found (make-hash-table :test 'equal)))
-                 (when target
+                 (when (and target ids)
                    (let ((contents (loop :for content :being :the :hash-values
-                                           :of (find-contents-by-ids space target-name (slot-ids slots))
+                                           :of (find-contents-by-ids space target-name ids)
                                          :when (content-published content) :collect content)))
                      (loop :for content :in contents
                            :for delivered :in (deliver-all contents target space :include include)
