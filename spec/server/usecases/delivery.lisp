@@ -263,6 +263,7 @@
                                                                     (make-field :by :text)
                                                                     (make-field :kind :select :options '("zebra" "other")))))
                :models (list (make-model "story" :list (list (make-field :title :text)
+                                                             (make-field :by :reference :model "author")
                                                              (make-field :blocks :repeater :custom-fields '(byline body))))
                              (make-model "author" :list (list (make-field :name :text))))))
 
@@ -271,7 +272,7 @@
   (unwind-protect
        (let* ((photo (picture "01ARZ3NDEKTSV4RRFFQ69G5FAD"))
               (ann (make "author" (list "name" "Ann") :publish t))
-              (story (make "story" (list "title" "Rows"
+              (story (make "story" (list "title" "Rows" "by" (content-id ann)
                                          "blocks" (vector (jobject "fieldId" "body" "text" "<p>Written <em>slowly</em></p>" "kind" "zebra"
                                                                    "by" "Someone")
                                                           (jobject "fieldId" "byline" "photo" photo "by" (content-id ann))))
@@ -284,6 +285,11 @@
            (ok (delivered-p (jget (aref rows 1) "by")) "until a path names it")
            (ok (equal (jget (aref rows 0) "by") "Someone")
                "and a field of that name in another custom field, which is no reference, is left as it is"))
+         (let ((data (delivered-data (deliver story (model "story") "site" :include '(("blocks" "by"))))))
+           (ok (stringp (jget data "by")) "a reference of that name outside the rows stays an id"))
+         (let ((data (delivered-data (deliver story (model "story") "site" :include '(("by"))))))
+           (ok (delivered-p (jget data "by")) "a path that names only it embeds it")
+           (ok (stringp (jget (aref (jget data "blocks") 1) "by")) "and leaves the one in a row an id"))
          (ok (signals (delivered-list "site" (model "story") (query "include" "blocks.text")) 'query-error)
              "a path names a reference in the rows")
          (flet ((found (&rest kv) (length (delivered-list "site" (model "story") (apply #'query kv)))))
