@@ -78,20 +78,35 @@ the app rather than by calling handlers.
 
 ## Reviews
 
-A review looks at four things in the code a change adds or touches:
+A review looks at nine things in the code a change adds or touches:
 
 - **It does what was asked**: the issue's requirement is met, or the bug is
   gone.
 - **Nothing is written twice or for nothing.** Code is shared only when it
   changes for the same reason, not because it looks alike.
-- **Packages stay maintainable**: each holds together, and depends on few
-  others.
+- **Packages stay maintainable**: each holds together, keeps to its own
+  layer's terms, and depends on few others.
 - **Work done once is not done again.** Removing a repeat that leaves the code
   no longer is done. A change that adds code for speed is made only when it
   shows an effect.
+- **What it changes has a spec.** The code the change adds or alters is checked
+  in `spec/`.
+- **The spec covers what the code must do**: what it accepts and answers, and
+  what it refuses.
+- **The docs are updated.**
+- **Nothing changes that was not meant to.** A behaviour the change means to
+  change is named; every other stays as it was, for each caller of what it
+  shares.
+- **A defect is not let pass.** A defect is what gives a wrong result for some
+  use the code allows. It is fixed even when no caller meets it today, such as
+  a macro that evaluates an argument twice.
 
-A change does what was asked and nothing else. What a review finds in code the
-change did not need to touch is reported, not changed; it is changed only with
-the user's approval. Reviewing ends when no finding meets the four points
-above, and a finding a review set aside is not taken up again without a new
-reason.
+### How a review goes
+
+- A change does what was asked and nothing else.
+- What a review finds in code the change did not need to touch is reported,
+  not changed; it is changed only with the user's approval.
+- A finding that something can or cannot happen shows how: a way to reproduce
+  it, or the code that rules it out.
+- Reviewing ends when no finding meets the nine points above.
+- A finding a review set aside is not taken up again without a new reason.
