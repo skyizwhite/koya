@@ -38,9 +38,9 @@ up to work on koya is in CONTRIBUTING.md.
 just spec
 ```
 
-The spec is the tests in `spec/` (`koya-spec`), and a change starts as a spec
-that fails. The implementation is written to pass it, and `docs/` follows what
-it says; nothing in the spec reads `docs/`.
+The spec is the tests in `spec/` (`koya-spec`), and a change to what the code
+does starts as a spec that fails. The implementation is written to pass it, and
+`docs/` follows what it says; nothing in the spec reads `docs/`.
 
 `spec/` mirrors `src/`: `core/`, `sdk/` and `server/`. Anything touching the
 database uses an in-memory one, and the admin UI and both APIs are driven through
@@ -78,20 +78,37 @@ the app rather than by calling handlers.
 
 ## Reviews
 
-A review looks at four things in the code a change adds or touches:
+A review checks a change and the code under review, which is what the change
+adds or alters and what it needs to alter, for these points:
 
-- **It does what was asked**: the issue's requirement is met, or the bug is
-  gone.
+- **It does what was asked, and changes nothing else.** The issue's requirement
+  is met, or the bug is gone. No behaviour it was not asked to change has
+  changed, other than a defect it fixes and names, and shared code behaves as
+  before for each of its callers.
 - **Nothing is written twice or for nothing.** Code is shared only when it
   changes for the same reason, not because it looks alike.
-- **Packages stay maintainable**: each holds together, and depends on few
-  others.
+- **Packages stay maintainable**: each holds together, keeps to its own
+  layer's concepts, and depends on few others.
 - **Work done once is not done again.** Removing a repeat that leaves the code
   no longer is done. A change that adds code for speed is made only when it
   shows an effect.
+- **What it changes has a spec.** The code under review is covered by `spec/`.
+- **The spec covers both the normal and the error cases.**
+- **`docs/` says what the spec now says.**
+- **A defect found is not let pass.** A defect found in the code under review
+  is fixed, even when things work as they are now.
 
-A change does what was asked and nothing else. What a review finds in code the
-change did not need to touch is reported, not changed; it is changed only with
-the user's approval. Reviewing ends when no finding meets the four points
-above, and a finding a review set aside is not taken up again without a new
-reason.
+### How a review goes
+
+- What a review finds outside the code under review is reported, not changed;
+  it is changed only with the user's approval.
+- Whoever says something can or cannot happen runs the code to show it.
+- A review has no quota: when nothing meets the review's points, it reports
+  nothing.
+- A review after fixes is given the earlier findings and what was done with
+  them. A finding that would undo an earlier fix names that finding and shows
+  what it missed.
+- A fix is checked against the earlier findings before it is made, so that it
+  brings none of them back.
+- Reviewing ends when no finding meets the review's points.
+- A finding a review set aside is not taken up again without a new reason.
