@@ -751,11 +751,14 @@
 
 (defun with-cards ()
   (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "blog")
-                                                                    (make-field :photo :media))))
+                                                                    (make-field :photo :media)))
+                                    (make-custom-field "frame" (list (make-field :photo :media))))
                :models (list (blog-model)
                              (make-model "about" :object (list (make-field :body :richtext)))
                              (make-model "deck" :list (list (make-field :title :text)
                                                             (make-field :lead :reference :model "blog")
+                                                            (make-field :frame :custom :custom-field "frame")
+                                                            (make-field :gallery :media :many t)
                                                             (make-field :cards :repeater :custom-fields '(card)))))))
 
 (deftest a-form-reads-what-its-fields-offer-once
@@ -764,11 +767,15 @@
   (unwind-protect
        (let* ((post (content-id (create "website" (nth-value 1 (resolve-model "website" "blog"))
                                         (jobject "title" "Linked") :publish t)))
-              (photos (loop :for name :in '("a.png" "b.png")
+              (other (content-id (create "website" (nth-value 1 (resolve-model "website" "blog"))
+                                         (jobject "title" "Unlinked") :publish t)))
+              (photos (loop :for name :in '("a.png" "b.png" "framed.png" "hung.png")
                             :collect (media-id (insert-media "website" :filename name :mime "image/png" :size 10
                                                                        :width 1 :height 1))))
               (deck (content-id (create "website" (nth-value 1 (resolve-model "website" "deck"))
                                         (jobject "title" "Deck" "lead" post
+                                                 "frame" (jobject "photo" (third photos))
+                                                 "gallery" (vector (fourth photos) "01ARZ3NDEKTSV4RRFFQ69G5ZZZ")
                                                  "cards" (coerce (loop :for i :below 20
                                                                        :collect (jobject "fieldId" "card" "link" post
                                                                                          "photo" (nth (mod i 2) photos)))
@@ -781,8 +788,12 @@
              "what the lead and twenty cards can link to is listed once")
          (ok (= (count "FIND-MEDIA-BY-IDS" reads :test #'string=) 1) "and their photos are read together")
          (ng (member "FIND-MEDIA" reads :test #'string=) "not one by one")
-         (ok (search "Linked" body) "each one still offers the posts")
-         (ok (search (format nil "/media/website/~a.png" (second photos)) body) "and shows its photo"))
+         (ok (= (cl-ppcre:count-matches (format nil "<option value=\"~a\"" other) body) 21)
+             "and the lead and every card offer them, a post none of them links to too")
+         (ok (search (format nil "/media/website/~a.png" (second photos)) body) "each card shows its photo")
+         (ok (search "framed.png" body) "and so does a custom field")
+         (ok (search "hung.png" body) "a field of many media shows each one")
+         (ok (search "01ARZ3NDEKTSV4RRFFQ69G5ZZZ (missing)" body) "and says which are no longer in the library"))
     (exec "DELETE FROM contents")
     (exec "DELETE FROM media")
     (replace-schema "website" (make-schema :models (list (blog-model)
