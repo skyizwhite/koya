@@ -78,29 +78,30 @@ the app rather than by calling handlers.
 
 ## Reviews
 
-A review checks the code a change adds or touches for these points:
+A review checks a change, and the code it adds or alters, for these points:
 
 - **It does what was asked, and changes nothing else.** The issue's requirement
   is met, or the bug is gone. No behaviour it was not asked to change has
-  changed, and shared code behaves as before for each of its callers.
+  changed, other than a defect it fixes and names, and shared code behaves as
+  before for each of its callers.
 - **Nothing is written twice or for nothing.** Code is shared only when it
   changes for the same reason, not because it looks alike.
 - **Packages stay maintainable**: each holds together, keeps to its own
-  layer's terms, and depends on few others.
+  layer's concepts, and depends on few others.
 - **Work done once is not done again.** Removing a repeat that leaves the code
   no longer is done. A change that adds code for speed is made only when it
   shows an effect.
-- **What it changes has a spec.** The code the change adds or alters is checked
-  in `spec/`.
-- **The spec covers both the normal and the failing cases.**
+- **What it changes has a spec.** The code the change adds or alters is covered
+  by `spec/`.
+- **The spec covers both the normal and the error cases.**
 - **`docs/` says what the spec now says.**
 - **A defect found is not let pass.** A defect found in the code the change adds
   or alters is fixed, even when things work as they are now.
 
 ### How a review goes
 
-- What a review finds in code the change did not need to touch is reported,
+- What a review finds in code the change did not need to alter is reported,
   not changed; it is changed only with the user's approval.
-- Whoever says something can or cannot happen runs it to check.
-- Reviewing ends when no finding meets the points above.
+- Whoever says something can or cannot happen runs the code to show it.
+- Reviewing ends when no finding meets the review's points.
 - A finding a review set aside is not taken up again without a new reason.

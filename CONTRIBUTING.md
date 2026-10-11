@@ -39,7 +39,8 @@ just lint
 just spec
 ```
 
-The spec in `spec/` comes first: a change starts as a spec that fails.
+The spec in `spec/` comes first: a change to what the code does starts as a
+spec that fails.
 
 The pre-commit hook in `.githooks/` runs both and refuses a commit when either
 fails; `just install` points git at it.
