@@ -34,13 +34,17 @@
   (:export #:@get #:bulk-contents #:browse-contents))
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/index)
 
-(defun list-url (space model state &key (search-text (getf state :search-text)) (status (getf state :status))
-                                           (sort-key (getf state :sort-key)) (page (or (getf state :page) 1)))
-  (render-uri (make-uri :path (model-url space model)
-                        :query (append (unless (blank-p search-text) `(("q" . ,search-text)))
-                                       (unless (blank-p status) `(("status" . ,status)))
-                                       (unless (blank-p sort-key) `(("sort" . ,sort-key)))
-                                       (when (> page 1) `(("page" . ,page)))))))
+(defun list-query (state &key (search-text (getf state :search-text)) (status (getf state :status))
+                              (sort-key (getf state :sort-key)) (page (getf state :page)))
+  (list :q (or search-text "") :status (or status "") :sort (or sort-key "") :page page))
+
+(defun list-url (space model state &rest overrides)
+  (destructuring-bind (&key q status sort page) (apply #'list-query state overrides)
+    (render-uri (make-uri :path (model-url space model)
+                          :query (append (unless (blank-p q) `(("q" . ,q)))
+                                         (unless (blank-p status) `(("status" . ,status)))
+                                         (unless (blank-p sort) `(("sort" . ,sort)))
+                                         (when (> page 1) `(("page" . ,page))))))))
 
 (defparameter +preview-length+ 120)
 
@@ -137,10 +141,9 @@
           (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
                  (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—")))))))))
 
-(defun browse-url (space model state &key (search-text (getf state :search-text)) (status (getf state :status))
-                                             (sort-key (getf state :sort-key)) (page (getf state :page)) clear)
-  (browse-contents :space space :model model :q (or search-text "") :status (or status "")
-                   :sort (or sort-key "") :page page :clear (if clear "1" "")))
+(defun browse-url (space model state &rest overrides &key clear &allow-other-keys)
+  (apply #'browse-contents :space space :model model
+         (append (apply #'list-query state :allow-other-keys t overrides) (list :clear (if clear "1" "")))))
 
 (defcomp ~sort-input (&key sort-key)
   (hsx (input :type "hidden" :id "filter-sort" :name "sort" :value (or sort-key ""))))
@@ -193,9 +196,7 @@
 
 (defcomp ~bulk-bar (&key space model state)
   (labels ((url (op)
-             (bulk-contents :space space :model model :op op
-                            :q (or (getf state :search-text) "") :status (or (getf state :status) "")
-                            :sort (or (getf state :sort-key) "") :page (getf state :page)))
+             (apply #'bulk-contents :space space :model model :op op (list-query state)))
            (action (op class icon label title message &key icon-only-narrow)
              (let ((dialog (format nil "confirm-bulk-~a" op)))
                (hsx (<> (button :type "button" :class class :commandfor dialog :command "show-modal"
