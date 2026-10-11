@@ -386,6 +386,9 @@
     (let ((one (reads-of (lambda () (delivered-list "site" (model "post") query)))))
       (ng (member "FIND-CONTENT" one :test #'string=) "no reference is read on its own")
       (ng (member "FIND-MEDIA" one :test #'string=) "nor a media")
+      (ok (equal one '("(FIND-CONTENTS-BY-IDS author)" "(FIND-CONTENTS-BY-IDS tag)" "(FIND-CONTENTS-BY-IDS tag)"
+                       "FIND-MEDIA-BY-IDS" "FIND-MEDIA-BY-IDS"))
+          "each field's targets are read once: the authors, their favorites, the tags, the covers and the avatars")
       (loop :for n :from 1 :to 4 :do (make-post n))
       (let ((five (reads-of (lambda () (delivered-list "site" (model "post") query)))))
         (ok (= (length (delivered-list "site" (model "post") query)) 5))
@@ -437,7 +440,7 @@
   (make "post" (list "title" "a" "tags" (vector)) :publish t)
   (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "tags"))))))
     (ok (null reads) "no media and no tags to embed, so nothing is read for them"))
-  (testing "nor what a field cannot hold, as data from before a change to the schema"
+  (testing "nor what a field cannot hold, as data written to the database by hand"
     (let ((tag (content-id (make "tag" (list "name" "one") :publish t))))
       (exec "UPDATE contents SET published = json_set(published, '$.tags', ?) WHERE model = 'post'" tag)
       (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "tags"))))))

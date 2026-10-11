@@ -52,19 +52,20 @@
         :when (and (>= (length p) (length path)) (every #'string= path p))
           :collect (nthcdr (length path) p)))
 
+(defun held-ids (value many)
+  (if many
+      (and (json-array-p value) (value-ids value))
+      (and (stringp value) (list value))))
+
 (defun fill-slot (slot found)
   (destructuring-bind (object name many) slot
-    (let ((value (gethash name object)))
+    (let ((values (remove nil (mapcar (lambda (id) (gethash id found))
+                                      (held-ids (gethash name object) many)))))
       (setf (gethash name object)
-            (cond ((not many) (or (gethash value found) json-null))
-                  ((json-array-p value) (coerce (remove nil (map 'list (lambda (id) (gethash id found)) value)) 'vector))
-                  (t (vector)))))))
+            (if many (coerce values 'vector) (or (first values) json-null))))))
 
 (defun slot-ids (slots)
-  (loop :for (object name many) :in slots
-        :for value := (gethash name object)
-        :append (cond ((and many (json-array-p value)) (value-ids value))
-                      ((and (not many) (stringp value)) (list value)))))
+  (loop :for (object name many) :in slots :append (held-ids (gethash name object) many)))
 
 (defun fill-media (slots space)
   (let* ((ids (slot-ids slots))
