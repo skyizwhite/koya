@@ -190,7 +190,9 @@
                                                                       (make-field :by :reference :model "author"))))
                :models (list (make-model "story" :list (list (make-field :title :text)
                                                              (make-field :byline :custom :custom-field "byline")))
-                             (make-model "author" :list (list (make-field :name :text))))))
+                             (make-model "author" :list (list (make-field :name :text)
+                                                              (make-field :favorite :reference :model "tag")))
+                             (make-model "tag" :list (list (make-field :name :text))))))
 
 (deftest a-content-is-delivered-by-its-slug
   (flet ((title (slug &key draft-key)
@@ -220,7 +222,8 @@
   (replace-schema "site" (with-byline))
   (unwind-protect
        (let* ((photo (picture "01ARZ3NDEKTSV4RRFFQ69G5FAC"))
-              (ann (make "author" (list "name" "Ann") :publish t))
+              (tag (make "tag" (list "name" "Slow") :publish t))
+              (ann (make "author" (list "name" "Ann" "favorite" (content-id tag)) :publish t))
               (story (make "story" (list "title" "Plain"
                                          "byline" (jobject "note" "<p>Written <em>slowly</em> <img src=\"/media/site/x.png\"></p>"
                                                            "caption" "a <b and c> d" "kind" "zebra"
@@ -232,6 +235,9 @@
          (let ((byline (jget (delivered-data (deliver story (model "story") "site" :include '(("byline" "by")))) "byline")))
            (ok (delivered-p (jget byline "by")) "until a path names it")
            (ok (string= (jget (delivered-data (jget byline "by")) "name") "Ann")))
+         (let ((byline (jget (delivered-data (deliver story (model "story") "site" :include '(("byline" "by" "favorite")))) "byline")))
+           (ok (delivered-p (jget (delivered-data (jget byline "by")) "favorite"))
+               "and a path that goes on past it embeds what that content refers to"))
          (ok (null (handler-case (progn (delivered-list "site" (model "story") (query "include" "byline.by")) nil)
                      (query-error (e) e)))
              "and the path is checked through the custom field")
@@ -263,6 +269,7 @@
                                                                     (make-field :by :text)
                                                                     (make-field :kind :select :options '("zebra" "other")))))
                :models (list (make-model "story" :list (list (make-field :title :text)
+                                                             (make-field :by :reference :model "author")
                                                              (make-field :blocks :repeater :custom-fields '(byline body))))
                              (make-model "author" :list (list (make-field :name :text))))))
 
@@ -271,7 +278,7 @@
   (unwind-protect
        (let* ((photo (picture "01ARZ3NDEKTSV4RRFFQ69G5FAD"))
               (ann (make "author" (list "name" "Ann") :publish t))
-              (story (make "story" (list "title" "Rows"
+              (story (make "story" (list "title" "Rows" "by" (content-id ann)
                                          "blocks" (vector (jobject "fieldId" "body" "text" "<p>Written <em>slowly</em></p>" "kind" "zebra"
                                                                    "by" "Someone")
                                                           (jobject "fieldId" "byline" "photo" photo "by" (content-id ann))))
@@ -284,6 +291,11 @@
            (ok (delivered-p (jget (aref rows 1) "by")) "until a path names it")
            (ok (equal (jget (aref rows 0) "by") "Someone")
                "and a field of that name in another custom field, which is no reference, is left as it is"))
+         (let ((data (delivered-data (deliver story (model "story") "site" :include '(("blocks" "by"))))))
+           (ok (stringp (jget data "by")) "a reference of that name outside the rows stays an id"))
+         (let ((data (delivered-data (deliver story (model "story") "site" :include '(("by"))))))
+           (ok (delivered-p (jget data "by")) "a path that names only it embeds it")
+           (ok (stringp (jget (aref (jget data "blocks") 1) "by")) "and leaves the one in a row an id"))
          (ok (signals (delivered-list "site" (model "story") (query "include" "blocks.text")) 'query-error)
              "a path names a reference in the rows")
          (flet ((found (&rest kv) (length (delivered-list "site" (model "story") (apply #'query kv)))))

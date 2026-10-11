@@ -7,7 +7,8 @@
                 #:jget
                 #:jkeys
                 #:json-array-p
-                #:json-null-p)
+                #:json-null-p
+                #:copy-object)
   (:import-from #:cl-ppcre
                 #:scan #:create-scanner)
   (:export #:+schema-version+
@@ -26,6 +27,7 @@
            #:field-row-kind
            #:field-path-parts
            #:row-kind
+           #:map-data-fields
            #:custom-field
            #:make-custom-field
            #:custom-field-name
@@ -246,6 +248,25 @@
 
 (defun row-kind (field row)
   (and (hash-table-p row) (field-row-kind field (gethash "fieldId" row))))
+
+(defun map-data-fields (fields data fn)
+  (labels ((walk (fields data outer)
+             (let ((out (copy-object data)))
+               (dolist (field fields out)
+                 (let ((value (gethash (field-name field) out)))
+                   (case (field-type field)
+                     (:custom
+                      (when (hash-table-p value)
+                        (setf (gethash (field-name field) out) (walk (field-fields field) value field))))
+                     (:repeater
+                      (when (json-array-p value)
+                        (setf (gethash (field-name field) out)
+                              (map 'vector (lambda (row)
+                                             (let ((kind (row-kind field row)))
+                                               (if kind (walk (custom-field-fields kind) row field) row)))
+                                   value))))
+                     (t (funcall fn field out outer))))))))
+    (walk fields data nil)))
 
 (defun field-path-parts (path)
   (let* ((bracket (position #\[ path))

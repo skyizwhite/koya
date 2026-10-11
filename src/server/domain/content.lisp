@@ -1,12 +1,12 @@
 (defpackage #:koya-server/domain/content
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:model-label #:model-slug-field #:field-name #:field-type #:field-option #:field-fields
-                #:row-kind #:custom-field-fields)
+                #:model-fields #:model-label #:model-slug-field #:field-name #:field-type #:field-option
+                #:map-data-fields)
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
-                #:json-null #:json-equal #:json-array-p #:copy-object)
+                #:json-null #:json-equal #:copy-object)
   (:import-from #:koya-core/time
                 #:now-iso #:parse-iso #:format-iso)
   (:import-from #:local-time
@@ -37,7 +37,7 @@
            #:merge-data
            #:same-data-p
            #:default-data
-           #:fill-defaults
+           #:initial-data
            #:to-the-minute
            #:slug-value
            #:content-slugs
@@ -169,66 +169,44 @@
     out))
 
 (defun booleans-filled (model data)
-  (fields-booleans-filled (model-fields model) data))
-
-(defun fields-booleans-filled (fields data)
-  (let ((out (copy-object data)))
-    (dolist (field fields out)
-      (let ((value (gethash (field-name field) out json-null)))
-        (cond ((and (eq (field-type field) :boolean) (member value (list nil json-null)))
-               (setf (gethash (field-name field) out) nil))
-              ((and (eq (field-type field) :custom) (hash-table-p value))
-               (setf (gethash (field-name field) out) (fields-booleans-filled (field-fields field) value)))
-              ((and (eq (field-type field) :repeater) (json-array-p value))
-               (setf (gethash (field-name field) out)
-                     (map 'vector (lambda (row)
-                                    (let ((kind (row-kind field row)))
-                                      (if kind (fields-booleans-filled (custom-field-fields kind) row) row)))
-                          value))))))))
+  (map-data-fields (model-fields model) data
+                   (lambda (field object outer)
+                     (declare (ignore outer))
+                     (when (and (eq (field-type field) :boolean)
+                                (member (gethash (field-name field) object json-null) (list nil json-null)))
+                       (setf (gethash (field-name field) object) nil)))))
 
 (defun same-data-p (model a b)
   (json-equal (booleans-filled model a) (booleans-filled model b)))
 
 (defun default-data (model)
-  (let ((data (make-hash-table :test 'equal)))
-    (dolist (field (model-fields model) data)
-      (when (and (eq (field-type field) :boolean) (field-option field :default))
-        (setf (gethash (field-name field) data) t)))))
+  (initial-data model (make-hash-table :test 'equal)))
 
-(defun fill-defaults (model data)
-  (fill-field-defaults (model-fields model) data))
+(defun fill-default (field object)
+  (when (and (eq (field-type field) :boolean) (field-option field :default)
+             (not (nth-value 1 (gethash (field-name field) object))))
+    (setf (gethash (field-name field) object) t)))
 
-(defun fill-field-defaults (fields data)
-  (dolist (field fields data)
-    (multiple-value-bind (value found) (gethash (field-name field) data)
-      (cond ((and (eq (field-type field) :boolean) (field-option field :default) (not found))
-             (setf (gethash (field-name field) data) t))
-            ((and (eq (field-type field) :custom) (hash-table-p value))
-             (fill-field-defaults (field-fields field) value))
-            ((and (eq (field-type field) :repeater) (json-array-p value))
-             (loop :for row :across value
-                   :for kind := (row-kind field row)
-                   :when kind :do (fill-field-defaults (custom-field-fields kind) row)))))))
+(defun keep-to-the-minute (field object)
+  (when (eq (field-type field) :datetime)
+    (let* ((value (gethash (field-name field) object))
+           (timestamp (and (datetime-string-p value) (parse-iso value))))
+      (when timestamp
+        (setf (gethash (field-name field) object)
+              (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+)))))))
+
+(defun initial-data (model data)
+  (map-data-fields (model-fields model) data
+                   (lambda (field object outer)
+                     (declare (ignore outer))
+                     (fill-default field object)
+                     (keep-to-the-minute field object))))
 
 (defun to-the-minute (model data)
-  (fields-to-the-minute (model-fields model) data))
-
-(defun fields-to-the-minute (fields data)
-  (dolist (field fields data)
-    (let ((value (gethash (field-name field) data)))
-      (case (field-type field)
-        (:datetime
-         (let ((timestamp (and (datetime-string-p value) (parse-iso value))))
-           (when timestamp
-             (setf (gethash (field-name field) data)
-                   (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+))))))
-        (:custom
-         (when (hash-table-p value) (fields-to-the-minute (field-fields field) value)))
-        (:repeater
-         (when (json-array-p value)
-           (loop :for row :across value
-                 :for kind := (row-kind field row)
-                 :when kind :do (fields-to-the-minute (custom-field-fields kind) row))))))))
+  (map-data-fields (model-fields model) data
+                   (lambda (field object outer)
+                     (declare (ignore outer))
+                     (keep-to-the-minute field object))))
 
 (defun slug-value (model data)
   (let* ((field (model-slug-field model))
