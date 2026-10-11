@@ -56,9 +56,9 @@
   (destructuring-bind (object name many) slot
     (let ((value (gethash name object)))
       (setf (gethash name object)
-            (if many
-                (coerce (remove nil (map 'list (lambda (id) (gethash id found)) value)) 'vector)
-                (or (gethash value found) json-null))))))
+            (cond ((not many) (or (gethash value found) json-null))
+                  ((json-array-p value) (coerce (remove nil (map 'list (lambda (id) (gethash id found)) value)) 'vector))
+                  (t (vector)))))))
 
 (defun slot-ids (slots)
   (loop :for (object name many) :in slots
@@ -95,7 +95,7 @@
                     (value (gethash name object)))
                (when (and value (not (eq value json-null)))
                  (case (field-type field)
-                   (:media (push (list object name (json-array-p value)) media))
+                   (:media (push (list object name (field-many-p field)) media))
                    (:reference
                     (let ((nested (and include (include-under include (if outer (list (field-name outer) name) (list name))))))
                       (when nested
