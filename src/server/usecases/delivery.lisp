@@ -74,7 +74,7 @@
                (let ((target (find-model space target-name))
                      (ids (ids-of slots))
                      (found (make-hash-table :test 'equal)))
-                 (when (and target ids)
+                 (when ids
                    (let ((contents (loop :for content :being :the :hash-values
                                            :of (find-contents-by-ids space target-name ids)
                                          :when (content-published content) :collect content)))
