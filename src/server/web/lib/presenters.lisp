@@ -1,8 +1,7 @@
 (defpackage #:koya-server/web/lib/presenters
   (:use #:cl)
-  (:import-from #:koya-core/json #:jobject #:json-null #:to-json #:json-array-p #:copy-object)
-  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:field-fields
-                #:row-kind #:custom-field-fields)
+  (:import-from #:koya-core/json #:jobject #:json-null #:to-json #:copy-object)
+  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:map-data-fields)
   (:import-from #:koya-core/diff #:change->jobject)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -54,23 +53,14 @@
     (t value)))
 
 (defun absolutize-richtext (object model)
-  (absolutize-fields object (model-fields model) (string-right-trim "/" (public-url))))
-
-(defun absolutize-fields (object fields base)
-  (dolist (field fields object)
-    (let ((value (gethash (field-name field) object)))
-      (case (field-type field)
-        (:richtext
-         (when (stringp value)
-           (setf (gethash (field-name field) object)
-                 (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))
-        (:custom
-         (when (hash-table-p value) (absolutize-fields value (field-fields field) base)))
-        (:repeater
-         (when (json-array-p value)
-           (loop :for row :across value
-                 :for kind := (row-kind field row)
-                 :when kind :do (absolutize-fields row (custom-field-fields kind) base))))))))
+  (let ((base (string-right-trim "/" (public-url))))
+    (map-data-fields (model-fields model) object
+                     (lambda (field object outer)
+                       (declare (ignore outer))
+                       (let ((value (gethash (field-name field) object)))
+                         (when (and (eq (field-type field) :richtext) (stringp value))
+                           (setf (gethash (field-name field) object)
+                                 (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))))))
 
 (defparameter +system-fields+ '("id" "createdAt" "updatedAt" "publishedAt" "revisedAt"))
 
@@ -92,8 +82,7 @@
           (gethash "updatedAt" object) (content-updated-at content)
           (gethash "publishedAt" object) (or (content-published-at content) json-null)
           (gethash "revisedAt" object) (or (content-revised-at content) json-null))
-    (absolutize-richtext object (delivered-model delivered))
-    (select-fields object fields)))
+    (select-fields (absolutize-richtext object (delivered-model delivered)) fields)))
 
 (defmethod webhook-payload (space model id event old new &key changes)
   (let ((payload (jobject "space" space

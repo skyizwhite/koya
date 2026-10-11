@@ -98,9 +98,8 @@
         (created-at (check-timestamp "createdAt" created-at))
         (updated-at (check-timestamp "updatedAt" updated-at))
         (published-at (check-published-at published-at))
-        (revised-at (check-timestamp "revisedAt" revised-at)))
-    (fill-defaults model data)
-    (to-the-minute model data)
+        (revised-at (check-timestamp "revisedAt" revised-at))
+        (data (to-the-minute model (fill-defaults model data))))
     (let ((content
             (with-transaction
               (when (and (eq (model-kind model) :object) (find-object-content space-name model-name))

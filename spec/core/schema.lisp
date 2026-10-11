@@ -8,9 +8,9 @@
                 #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
                 #:model-options #:check-deployable
                 #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields
-                #:field-row-kinds #:field-row-kind)
+                #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields)
   (:import-from #:koya-core/json
-                #:to-json #:parse-json #:jget))
+                #:to-json #:parse-json #:jget #:jobject))
 (in-package #:koya-spec/core/schema)
 
 (defun sample-schema ()
@@ -404,3 +404,57 @@
       (ok (search "{\"name\":\"blocks\",\"type\":\"repeater\",\"customFields\":[\"heading\",\"body\"]}" json))
       (ok (equal (mapcar #'custom-field-name (field-row-kinds (model-field (schema-model back "page") :blocks)))
                  '("heading" "body"))))))
+
+(defun walked-schema ()
+  (make-schema :custom-fields (list (seo)
+                                    (make-custom-field "heading" (list (make-field :text :text)))
+                                    (make-custom-field "body" (list (make-field :text :richtext))))
+               :models (list (make-model "page" :list
+                                         (list (make-field :title :text)
+                                               (make-field :meta :custom :custom-field "seo")
+                                               (make-field :blocks :repeater :custom-fields '(heading body)))))))
+
+(defun upcase-texts (field object outer)
+  (declare (ignore outer))
+  (let ((value (gethash (field-name field) object)))
+    (when (stringp value)
+      (setf (gethash (field-name field) object) (string-upcase value)))))
+
+(deftest walking-a-content-s-data
+  (let ((fields (model-fields (schema-model (walked-schema) "page"))))
+    (testing "every field gets the call, with the object it sits in and the field around it"
+      (let ((seen '()))
+        (map-data-fields fields
+                         (jobject "meta" (jobject "title" "t")
+                                  "blocks" (vector (jobject "fieldId" "heading" "text" "h")
+                                                   (jobject "fieldId" "body" "text" "b")))
+                         (lambda (field object outer)
+                           (push (list (and outer (field-name outer)) (field-name field)
+                                       (gethash (field-name field) object))
+                                 seen)))
+        (ok (equal (reverse seen)
+                   '((nil "title" nil)
+                     ("meta" "title" "t") ("meta" "image" nil) ("meta" "kind" nil)
+                     ("blocks" "text" "h") ("blocks" "text" "b")))
+            "a field with no value too, and none for a custom or a repeater itself")))
+    (testing "what the call does lands in a copy"
+      (let* ((data (jobject "title" "a"
+                            "meta" (jobject "title" "b")
+                            "blocks" (vector (jobject "fieldId" "heading" "text" "c"))))
+             (out (map-data-fields fields data #'upcase-texts)))
+        (ok (string= (jget out "title") "A"))
+        (ok (string= (jget (jget out "meta") "title") "B") "inside a custom value")
+        (ok (string= (jget (aref (jget out "blocks") 0) "text") "C") "inside a repeater row")
+        (ok (string= (jget data "title") "a") "and the data given is left as it was")
+        (ok (string= (jget (jget data "meta") "title") "b"))
+        (ok (string= (jget (aref (jget data "blocks") 0) "text") "c"))))
+    (testing "what is not shaped as its field says is passed over"
+      (let* ((stray (jobject "fieldId" "ghost" "text" "x"))
+             (out (map-data-fields fields
+                                   (jobject "meta" "flat" "blocks" (vector stray "loose"))
+                                   #'upcase-texts)))
+        (ok (string= (jget out "meta") "flat") "a custom value that is not an object")
+        (ok (eq (aref (jget out "blocks") 0) stray) "a row whose fieldId names no custom field of the repeater")
+        (ok (string= (aref (jget out "blocks") 1) "loose") "a row that is not an object")))
+    (testing "a repeater that is not an array is passed over"
+      (ok (string= (jget (map-data-fields fields (jobject "blocks" "flat") #'upcase-texts) "blocks") "flat")))))
