@@ -39,12 +39,10 @@
   (list :q (or search-text "") :status (or status "") :sort (or sort-key "") :page page))
 
 (defun list-url (space model state &rest overrides)
-  (destructuring-bind (&key q status sort page) (apply #'list-query state overrides)
-    (render-uri (make-uri :path (model-url space model)
-                          :query (append (unless (blank-p q) `(("q" . ,q)))
-                                         (unless (blank-p status) `(("status" . ,status)))
-                                         (unless (blank-p sort) `(("sort" . ,sort)))
-                                         (when (> page 1) `(("page" . ,page))))))))
+  (render-uri (make-uri :path (model-url space model)
+                        :query (loop :for (key value) :on (apply #'list-query state overrides) :by #'cddr
+                                     :unless (if (eq key :page) (<= value 1) (blank-p value))
+                                       :collect (cons (string-downcase key) value)))))
 
 (defparameter +preview-length+ 120)
 
