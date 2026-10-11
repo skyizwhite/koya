@@ -57,15 +57,17 @@
       (and (json-array-p value) (value-ids value))
       (and (stringp value) (list value))))
 
+(defun make-slot (object name many)
+  (list object name many (held-ids (gethash name object) many)))
+
 (defun fill-slot (slot found)
-  (destructuring-bind (object name many) slot
-    (let ((values (remove nil (mapcar (lambda (id) (gethash id found))
-                                      (held-ids (gethash name object) many)))))
+  (destructuring-bind (object name many ids) slot
+    (let ((values (remove nil (mapcar (lambda (id) (gethash id found)) ids))))
       (setf (gethash name object)
             (if many (coerce values 'vector) (or (first values) json-null))))))
 
 (defun slot-ids (slots)
-  (loop :for (object name many) :in slots :append (held-ids (gethash name object) many)))
+  (loop :for slot :in slots :append (fourth slot)))
 
 (defun fill-media (slots space)
   (let* ((ids (slot-ids slots))
@@ -96,11 +98,11 @@
                     (value (gethash name object)))
                (when (and value (not (eq value json-null)))
                  (case (field-type field)
-                   (:media (push (list object name (field-many-p field)) media))
+                   (:media (push (make-slot object name (field-many-p field)) media))
                    (:reference
                     (let ((nested (and include (include-under include (if outer (list (field-name outer) name) (list name))))))
                       (when nested
-                        (push (list object name (field-many-p field))
+                        (push (make-slot object name (field-many-p field))
                               (gethash (list (field-option field :model) (remove nil nested)) references))))))))))
       (let ((data (mapcar (lambda (content)
                             (map-data-fields (model-fields model) (content-data content :draft draft) #'collect))
