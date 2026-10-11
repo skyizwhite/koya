@@ -66,13 +66,16 @@
                :nm-bind "{ oninit: () => koya.fitContent(this) }" :class "block h-16 w-full")))
 
 (defcomp ~value (&key space field value found class)
-  (let ((text (value-text field value found (lambda (field id) (id-text space field id)))))
+  (let* ((richtext (and (eq (field-type field) :richtext) (stringp value)))
+         (shown (if richtext
+                    (and found (not (blank-value-p value)))
+                    (value-text field value found (lambda (field id) (id-text space field id))))))
     (hsx
      (div :class (clsx "max-h-64 overflow-auto break-words rounded border px-3 py-2"
-                       (if text class "border-line text-muted"))
-       (cond ((null text) "—")
-             ((eq (field-type field) :richtext) (~richtext :html value))
-             (t (hsx (div :class "whitespace-pre-wrap font-mono text-xs leading-5" text))))))))
+                       (if shown class "border-line text-muted"))
+       (cond ((not shown) "—")
+             (richtext (~richtext :html value))
+             (t (hsx (div :class "whitespace-pre-wrap font-mono text-xs leading-5" shown))))))))
 
 (defcomp ~changes (&key space model before after)
   (let ((keys (changed-keys model before after)))

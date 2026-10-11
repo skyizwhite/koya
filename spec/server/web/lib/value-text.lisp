@@ -25,7 +25,9 @@
 (deftest a-value-reads-as-text
   (testing "rich text reads as its text, every character reference decoded"
     (ok (string= (text (make-field :body :richtext) "<p>It&#8217;s &#x2014; <b>bold</b> &amp; more</p>")
-                 "It’s — bold & more")))
+                 "It’s — bold & more"))
+    (ok (null (text (make-field :body :richtext) "<p></p><img src=\"a.png\">")) "one with no text in it is none")
+    (ok (string= (text (make-field :body :richtext) 42) "42") "and one that is not a string, as an old version may hold, is printed"))
   (testing "a scalar"
     (ok (string= (text (make-field :count :number) 3) "3"))
     (ok (string= (text (make-field :title :text) "Hello") "Hello"))
@@ -52,7 +54,7 @@
     (ok (string= (text card (jobject "title" "Hi" "body" "<p>Rich&#8217;s</p>"))
                  (format nil "title: Hi~%body: Rich’s"))
         "a custom field's fields by name, rich text among them as text")
-    (ok (null (text card (jobject "title" ""))) "one with nothing in it is none")
+    (ok (null (text card (jobject "title" "" "body" "<p></p>"))) "one with nothing in it is none")
     (ok (string= (text blocks (vector (jobject "fieldId" "card" "title" "Hi")
                                       (jobject "fieldId" "flag" "on" t "rank" 2)))
                  (format nil "card: title: Hi~%flag: on: Yes; rank: 2"))
