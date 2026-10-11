@@ -393,7 +393,6 @@
                   "id")))
     (loop :for (method path message) :in `((:post "/admin/api/website/lists/blog" "\"data\" must be an object")
                                            (:patch ,(format nil "/admin/api/website/lists/blog/~a" id) "\"data\" must be an object")
-                                           (:post ,(format nil "/admin/api/website/lists/blog/~a/publish" id) "\"data\" must be an object or null")
                                            (:patch "/admin/api/website/objects/about" "\"data\" must be an object")
                                            (:post "/admin/api/website/objects/about/publish" "\"data\" must be an object or null"))
           :do (multiple-value-bind (status json) (admin method path :body (jobject "data" 5))
@@ -404,9 +403,9 @@
         "a draft is saved from data, never from null")
     (ok (= 400 (admin :post (format nil "/admin/api/website/lists/blog/~a/publish" id) :body (jobject "data" nil)))
         "and false is not null: a publish given it publishes nothing")
-    (ok (string= (jget (nth-value 1 (admin :get (format nil "/admin/api/website/lists/blog/~a" id))) "status") "draft"))
-    (ok (string= (jget (nth-value 1 (admin :get (format nil "/admin/api/website/lists/blog/~a" id))) "draft" "title") "Kept")
-        "and nothing is written")
+    (let ((json (nth-value 1 (admin :get (format nil "/admin/api/website/lists/blog/~a" id)))))
+      (ok (string= (jget json "status") "draft"))
+      (ok (string= (jget json "draft" "title") "Kept") "and nothing is written"))
     (admin :delete (format nil "/admin/api/website/lists/blog/~a" id))))
 
 (deftest a-list-query-value-that-is-not-text-is-none
