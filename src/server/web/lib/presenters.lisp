@@ -52,9 +52,9 @@
                   out))
     (t value)))
 
-(defun absolutize-richtext (object model)
+(defun absolutize-richtext (data model)
   (let ((base (string-right-trim "/" (public-url))))
-    (map-data-fields (model-fields model) object
+    (map-data-fields (model-fields model) data
                      (lambda (field object outer)
                        (declare (ignore outer))
                        (let ((value (gethash (field-name field) object)))

@@ -83,7 +83,7 @@
                   (map-data-fields (model-fields model) (content-data content :draft draft)
                                    (lambda (field object outer)
                                      (case (field-type field)
-                                       (:reference (embed-reference field object outer space include))
+                                       (:reference (when include (embed-reference field object outer space include)))
                                        (:media (expand-media field object space)))))))
 
 (defun draft-key-p (content draft-key)
