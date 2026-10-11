@@ -1,6 +1,6 @@
 (defpackage #:koya-server/usecases/listing
   (:use #:cl)
-  (:import-from #:koya-core/json #:json-array-p #:blank-p)
+  (:import-from #:koya-core/json #:blank-p)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type
                 #:+system-fields+ #:field-option #:field-many-p)
@@ -51,12 +51,9 @@
    (loop :for content :in contents
          :for data := (content-data content :draft t)
          :nconc (loop :for field :in (model-fields model)
-                      :for value := (and data (gethash (field-name field) data))
-                      :when (and (eq (field-type field) :media) (stringp value) (plusp (length value)))
-                        :collect value
-                      :when (and (eq (field-type field) :media) (json-array-p value) (plusp (length value))
-                                 (stringp (aref value 0)))
-                        :collect (aref value 0)))))
+                      :for id := (and data (eq (field-type field) :media)
+                                      (first (held-ids (gethash (field-name field) data) (field-many-p field))))
+                      :when id :collect id))))
 
 (defun all-contents (space model query)
   (list-contents space (model-name model) model query :status :all))
