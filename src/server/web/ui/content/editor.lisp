@@ -43,7 +43,7 @@
 
 (defun new-p (id) (string= id "new"))
 
-(defstruct (choices (:constructor make-choices (space model data &aux (media (data-media space model data)))))
+(defstruct (choices (:constructor make-choices (space &optional (media (make-hash-table :test 'equal)))))
   space media (references (make-hash-table :test 'equal)))
 
 (defun references-for (choices field)
@@ -159,7 +159,7 @@
                     (field-row-kind field (param params "kind")))))
     (if kind
         (hsx (div :id (format nil "~a-rows" (field-param-name field)) :nm-swap "append"
-               (~repeater-row :choices (make-choices space model nil) :field field :kind kind :key (new-row-key) :fresh t)))
+               (~repeater-row :choices (make-choices space) :field field :kind kind :key (new-row-key) :fresh t)))
         (action-refusal "No such row." 404))))
 
 (defcomp ~external-link (&key href children)
@@ -251,7 +251,7 @@
                                  :binds "oninput: () => _track(), onchange: () => _track()")
          (when content
            (hsx (input :type "hidden" :name "updated-at" :value (content-updated-at content))))
-         (let ((choices (make-choices space-name model data)))
+         (let ((choices (make-choices space-name (data-media space-name model data))))
            (loop :for field :in (model-fields model) :collect
              (hsx (~editor-field :space space-name :model model-name :field field :data data :errors errors
                                  :choices choices)))))

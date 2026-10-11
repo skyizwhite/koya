@@ -749,7 +749,7 @@
     (replace-schema "website" (make-schema :models (list (blog-model)
                                                          (make-model "about" :object (list (make-field :body :richtext))))))))
 
-(defun with-cards ()
+(defun with-deck ()
   (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "blog")
                                                                     (make-field :photo :media)))
                                     (make-custom-field "frame" (list (make-field :photo :media)
@@ -769,7 +769,7 @@
 
 (deftest a-form-reads-what-its-fields-offer-once
   (exec "DELETE FROM contents")
-  (replace-schema "website" (with-cards))
+  (replace-schema "website" (with-deck))
   (unwind-protect
        (flet ((post (title)
                 (content-id (create "website" (nth-value 1 (resolve-model "website" "blog")) (jobject "title" title)
@@ -798,11 +798,9 @@
                 (body nil)
                 (reads (reads-of (lambda () (setf body (nth-value 1 (request :get (format nil "/s/website/m/deck/~a" deck)))))
                                  :of '(:list-contents :find-media :find-media-by-ids))))
-           (ok (= (count "(LIST-CONTENTS blog)" reads :test #'string=) 1)
-               "what the lead, the frame and the cards can link to is listed once")
            (ok (equal (remove-if-not (lambda (read) (search "LIST-CONTENTS" read)) reads)
                       '("(LIST-CONTENTS blog)" "(LIST-CONTENTS series)" "(LIST-CONTENTS topic)"))
-               "and nothing is listed for a field that links to nothing")
+               "each model the fields link to is listed once, for every field that links to it, one with no contents yet too")
            (ok (= (count "FIND-MEDIA-BY-IDS" reads :test #'string=) 1) "and their photos are read together")
            (ng (member "FIND-MEDIA" reads :test #'string=) "not one by one")
            (ok (= (cl-ppcre:count-matches (format nil "<option value=\"~a\"" other) body) (+ 2 rows))
@@ -813,8 +811,6 @@
                "whatever their case")
            (ok (every (lambda (filler) (search (format nil "<option value=\"~a\"" filler) body)) fillers)
                "and every post is offered, however many there are")
-           (ok (= (count "(LIST-CONTENTS series)" reads :test #'string=) 1)
-               "a model with no contents yet is listed once too, for both fields that link to it")
            (ok (search (format nil "<option value=\"~a\"" other)
                        (nth-value 1 (call-action :get (repeater-row :space "website" :model "deck" :field "cards" :kind "card"))))
                "and so does a card added to the form")

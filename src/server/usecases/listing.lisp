@@ -58,12 +58,12 @@
 
 (defun data-media (space model data)
   (let ((ids '()))
-    (when data
-      (map-data-fields (model-fields model) data
-                       (lambda (field object outer)
-                         (declare (ignore outer))
-                         (when (eq (field-type field) :media)
-                           (setf ids (append (held-ids (gethash (field-name field) object) (field-many-p field)) ids))))))
+    (map-data-fields (model-fields model) data
+                     (lambda (field object outer)
+                       (declare (ignore outer))
+                       (when (eq (field-type field) :media)
+                         (dolist (id (held-ids (gethash (field-name field) object) (field-many-p field)))
+                           (push id ids)))))
     (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal))))
 
 (defun all-contents (space model query)
