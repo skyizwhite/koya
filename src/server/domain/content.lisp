@@ -37,6 +37,7 @@
            #:next-status
            #:check-transition
            #:content-label
+           #:content-labels
            #:merge-data
            #:comparable-data
            #:default-data
@@ -171,6 +172,11 @@
     (if (and (stringp value) (plusp (length value)))
         value
         (content-id content))))
+
+(defun content-labels (contents model)
+  (let ((labels (make-hash-table :test 'equal)))
+    (maphash (lambda (id content) (setf (gethash id labels) (content-label content model))) contents)
+    labels))
 
 (defun merge-data (base patch)
   (let ((out (copy-list base)))

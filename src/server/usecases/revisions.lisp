@@ -8,7 +8,7 @@
   (:import-from #:koya-server/usecases/ports/contents
                 #:find-contents-by-ids #:list-revisions #:count-revisions
                 #:find-revision)
-  (:import-from #:koya-server/domain/content #:content-published-p #:content-label #:held-ids)
+  (:import-from #:koya-server/domain/content #:content-published-p #:content-labels #:held-ids)
   (:import-from #:koya-server/domain/media #:media-filename)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
@@ -49,11 +49,7 @@
           (content-names (make-hash-table :test 'equal)))
       (maphash (lambda (id media) (setf (gethash id media-names) (media-filename media))) media)
       (maphash (lambda (target found)
-                 (let ((target-model (find-model space target))
-                       (names (make-hash-table :test 'equal)))
-                   (when target-model
-                     (maphash (lambda (id content) (setf (gethash id names) (content-label content target-model))) found))
-                   (setf (gethash target content-names) names)))
+                 (setf (gethash target content-names) (content-labels found (find-model space target))))
                contents)
       (values media-names content-names))))
 

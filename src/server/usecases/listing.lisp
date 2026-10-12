@@ -6,7 +6,7 @@
                 #:+system-fields+ #:field-option #:field-many-p #:map-data-fields #:field-value)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content #:find-contents-by-ids)
-  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:held-ids)
+  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:content-labels #:held-ids)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/domain/query #:make-query)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
@@ -86,9 +86,6 @@
   (let ((table (make-hash-table :test 'equal)))
     (dolist (field (model-fields model) table)
       (when (eq (field-type field) :reference)
-        (let ((target (find-model space (field-option field :model)))
-              (labels (make-hash-table :test 'equal)))
-          (when target
-            (maphash (lambda (id content) (setf (gethash id labels) (content-label content target)))
-                     (find-contents-by-ids space (model-name target) (referenced-ids field contents))))
-          (setf (gethash (field-name field) table) labels))))))
+        (let ((target (find-model space (field-option field :model))))
+          (setf (gethash (field-name field) table)
+                (content-labels (find-contents-by-ids space (model-name target) (referenced-ids field contents)) target)))))))

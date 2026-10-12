@@ -49,9 +49,10 @@
 (defun id-text-for (space model revisions)
   (multiple-value-bind (media-names content-names) (held-names space model (mapcar #'revision-data revisions))
     (lambda (field id)
-      (let ((label (gethash id (if (eq (field-type field) :media)
-                                   media-names
-                                   (gethash (field-option field :model) content-names)))))
+      (let* ((names (if (eq (field-type field) :media)
+                        media-names
+                        (gethash (field-option field :model) content-names)))
+             (label (and names (gethash id names))))
         (if (and label (string/= label id)) (format nil "~a (~a)" label id) id)))))
 
 (defun richtext-document (html)
