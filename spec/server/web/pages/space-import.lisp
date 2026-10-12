@@ -405,24 +405,20 @@
     path))
 
 (defun legacy-archive ()
-  (let ((path (zip-of "space.json"
-                           (string-to-octets
-                            "{\"koyaExport\": 1, \"space\": \"legacy\",
-                              \"schema\": {\"koyaSchema\": 1, \"webhooks\": [],
-                                           \"models\": [{\"name\": \"post\", \"kind\": \"list\",
-                                                         \"fields\": [{\"name\": \"title\", \"type\": \"text\", \"unique\": true},
-                                                                      {\"name\": \"slug\", \"type\": \"slug\", \"from\": \"title\", \"unique\": true}]},
-                                                        {\"name\": \"page\", \"kind\": \"list\",
-                                                         \"fields\": [{\"name\": \"slug\", \"type\": \"slug\", \"from\": \"path\"},
-                                                                      {\"name\": \"path\", \"type\": \"slug\", \"from\": \"slug\"}]}]},
-                              \"contents\": [{\"id\": \"p1\", \"model\": \"post\", \"draft\": {\"title\": \"One\", \"slug\": \"one\"},
-                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
-                                             {\"id\": \"g1\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
-                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
-                                             {\"id\": \"g2\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
-                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}"
-                            :encoding :utf-8))))
-    (prog1 (read-file-bytes path) (delete-file path))))
+  (archive-of "{\"koyaExport\": 1, \"space\": \"legacy\",
+              \"schema\": {\"koyaSchema\": 1, \"webhooks\": [],
+                           \"models\": [{\"name\": \"post\", \"kind\": \"list\",
+                                         \"fields\": [{\"name\": \"title\", \"type\": \"text\", \"unique\": true},
+                                                      {\"name\": \"slug\", \"type\": \"slug\", \"from\": \"title\", \"unique\": true}]},
+                                        {\"name\": \"page\", \"kind\": \"list\",
+                                         \"fields\": [{\"name\": \"slug\", \"type\": \"slug\", \"from\": \"path\"},
+                                                      {\"name\": \"path\", \"type\": \"slug\", \"from\": \"slug\"}]}]},
+              \"contents\": [{\"id\": \"p1\", \"model\": \"post\", \"draft\": {\"title\": \"One\", \"slug\": \"one\"},
+                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
+                             {\"id\": \"g1\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
+                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
+                             {\"id\": \"g2\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
+                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}"))
 
 (defun read-file-bytes (path)
   (with-open-file (in path :element-type '(unsigned-byte 8))
