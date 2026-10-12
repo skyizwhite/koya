@@ -93,11 +93,16 @@
 (defun option-error (field)
   (err field "option" "must be one of ~{~a~^, ~}" (field-option field :options)))
 
+(defun string-type-errors (field value)
+  (unless (stringp value) (list (err field "type" "must be a string"))))
+
 (defun type-errors (field value)
   (ecase (field-type field)
-    ((:text :textarea :richtext :slug)
-     (append (unless (stringp value) (list (err field "type" "must be a string")))
-             (when (and (eq (field-type field) :slug) (not (slug-string-p value)))
+    ((:text :textarea :richtext)
+     (string-type-errors field value))
+    (:slug
+     (append (string-type-errors field value)
+             (unless (slug-string-p value)
                (list (err field "slug" "must be a URL slug (lowercase letters, digits, hyphens)")))))
     (:number
      (unless (realp value) (list (err field "type" "must be a number"))))
