@@ -7,7 +7,7 @@
   (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)
-  (:import-from #:koya-server/domain/deploy #:deploy-changes #:change-op #:change-destructive))
+  (:import-from #:koya-server/domain/deploy #:deploy-changes #:deploy-destructive #:change-op #:change-destructive))
 (in-package #:koya-spec/server/web/admin-api/schema)
 
 (setup (setup-api))
@@ -239,15 +239,14 @@
                  "and is destructive, since the rows of it leave the history")))
       (replace-schema "website" (test-schema)))))
 
-(defun listed-kinds ()
-  (jget (aref (jget (aref (jget (nth-value 1 (admin :get "/admin/api/website/schema")) "models") 0) "fields") 0)
-        "customFields"))
-
 (deftest dropping-a-custom-field-from-a-repeater-needs-force
   (flet ((pages (&rest kinds)
            (make-schema :custom-fields (list (make-custom-field "heading" (list (make-field :text :text)))
                                              (make-custom-field "quote" (list (make-field :text :text))))
-                        :models (list (make-model "note" :list (list (make-field :blocks :repeater :custom-fields kinds)))))))
+                        :models (list (make-model "note" :list (list (make-field :blocks :repeater :custom-fields kinds))))))
+         (listed-kinds ()
+           (jget (aref (jget (aref (jget (nth-value 1 (admin :get "/admin/api/website/schema")) "models") 0) "fields") 0)
+                 "customFields")))
     (replace-schema "website" (pages 'heading 'quote))
     (unwind-protect
          (progn
@@ -265,5 +264,6 @@
            (ok (equal (mapcar (lambda (c) (list (change-op c) (change-destructive c)))
                               (deploy-changes (first (list-deploys "website"))))
                       '(("change_field_options" t)))
-               "and logged as a destructive change"))
+               "and logged as a destructive change")
+           (ok (deploy-destructive (first (list-deploys "website"))) "in a deploy marked destructive"))
       (replace-schema "website" (test-schema)))))

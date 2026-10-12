@@ -77,6 +77,8 @@
              '(("title" . "pattern"))))
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"slug\": \"Not Slug\"}")
              '(("slug" . "slug"))))
+  (ok (member '("slug" . "type") (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"slug\": 42}") :test #'equal)
+      "a slug must be a string")
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"count\": 2.5}")
              '(("count" . "integer"))))
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"count\": 11}")
