@@ -40,12 +40,12 @@
              '(("title" . "required") ("eventAt" . "required")))
       "blank and null count as missing")
   (let ((model (make-model "note" :list (list (make-field :body :richtext :required t)))))
-    (ok (null (validate-content model (list :body "<p><br></p>")))
+    (ok (null (codes (list :body "<p><br></p>") :model model))
         "rich text is blank as any string is: markup is a value")
     (ok (equal (codes (list :body (format nil " ~% ")) :model model) '(("body" . "required"))))
-    (ok (null (validate-content model (list :body "<p>a</p>")))))
+    (ok (null (codes (list :body "<p>a</p>") :model model))))
   (testing "partial skips missing fields"
-    (ok (null (validate-content *model* nil :partial t)))
+    (ok (null (codes nil :partial t)))
     (ok (equal (codes (list :title :null) :partial t) '(("title" . "required"))))))
 
 (deftest false-and-empty-array-are-values

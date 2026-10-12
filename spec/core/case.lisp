@@ -52,10 +52,20 @@
   (ok (data-equal (jvalue->data (parse-json "{\"empty\": {}, \"flag\": false}")) (list :empty nil :flag nil))
       "an empty object and false are one value, nil"))
 
+(defun same-json (a b)
+  (cond ((and (hash-table-p a) (hash-table-p b))
+         (and (= (hash-table-count a) (hash-table-count b))
+              (loop :for key :being :the :hash-keys :of a :using (:hash-value value)
+                    :always (multiple-value-bind (other found) (gethash key b)
+                              (and found (same-json value other))))))
+        ((and (vectorp a) (not (stringp a)) (vectorp b) (not (stringp b)))
+         (and (= (length a) (length b)) (every #'same-json a b)))
+        (t (equal a b))))
+
 (deftest data-becomes-json-values
-  (ok (equalp (data->jvalue (list :published-at "2026" :flag nil :ok t :none :null :tags #("a" "b")
-                                 :meta (list :view-count 3) :page-u-r-l "u"))
-              (parse-json "{\"publishedAt\":\"2026\",\"flag\":false,\"ok\":true,\"none\":null,\"tags\":[\"a\",\"b\"],\"meta\":{\"viewCount\":3},\"pageURL\":\"u\"}"))
+  (ok (same-json (data->jvalue (list :published-at "2026" :flag nil :ok t :none :null :tags #("a" "b")
+                                    :meta (list :view-count 3) :page-u-r-l "u"))
+                 (parse-json "{\"publishedAt\":\"2026\",\"flag\":false,\"ok\":true,\"none\":null,\"tags\":[\"a\",\"b\"],\"meta\":{\"viewCount\":3},\"pageURL\":\"u\"}"))
       "an object with each key as it was named")
   (ok (string= (to-json (data->jvalue (vector (list :field-id "h") #()))) "[{\"fieldId\":\"h\"},[]]"))
   (ok (string= (to-json (data->jvalue nil)) "false") "nil is false, as an empty object and false are one value")
