@@ -1,5 +1,8 @@
 # Use cases return data, and web/presenters makes the JSON
 
+Superseded by adr/2026-10-12-use-cases-return-data-and-web-presenters-make-json.md
+Superseded by adr/2026-10-12-content-data-is-a-plist.md
+
 *2026-09-27, restating a decision of 2026-09-25*
 
 ## Context

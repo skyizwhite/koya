@@ -1,5 +1,8 @@
 # space.json is made by the archive use case
 
+Superseded by adr/2026-10-12-space-json-is-a-format-of-its-own.md
+Superseded by adr/2026-10-12-json-is-converted-at-the-edges.md
+
 *2026-09-27, restating a decision of 2026-09-25*
 
 ## Context
