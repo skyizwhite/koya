@@ -19,13 +19,14 @@
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
                 #:content-published-p
-                #:merge-data #:same-data-p #:initial-data #:to-the-minute #:new-content #:drafted #:published
+                #:merge-data #:comparable-data #:initial-data #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one
                 #:new-content-id)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/references #:reference-fields #:refers-p #:referrers)
+  (:import-from #:koya-core/data #:data-equal)
   (:export #:check-content
            #:create
            #:update-draft
@@ -135,17 +136,18 @@
 (defun update-draft-now (space model id patch replace since)
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
-         (live (content-published content))
-         (data (to-the-minute model (if replace patch (merge-data current patch)))))
+         (live (content-published content)))
     (check-unchanged-since content since)
-    (cond ((same-data-p model data current) (values content :unchanged))
-          ((and (content-published-p content) (same-data-p model data live))
-           (check-transition content :discard)
-           (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
-          (t
-           (check-transition content :save)
-           (check-content space model data :exclude-id id)
-           (values (store model (drafted content data) "draft" data) :saved)))))
+    (let* ((data (to-the-minute model (if replace patch (merge-data current patch))))
+           (comparable (comparable-data model data)))
+      (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
+            ((and (nth-value 1 (next-status (content-status content) :discard))
+                  (data-equal comparable (comparable-data model live)))
+             (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
+            (t
+             (check-transition content :save)
+             (check-content space model data :exclude-id id)
+             (values (store model (drafted content data) "draft" data) :saved))))))
 
 (defun publish (space model id &key (data nil data-p) published-at since)
   (let ((published-at (check-published-at published-at)))
@@ -155,13 +157,13 @@
       live)))
 
 (defun publish-now (space model id data data-p published-at since)
-  (let* ((content (resolve-content space (model-name model) id))
-         (data (to-the-minute model (if data-p data (content-data content :draft t)))))
+  (let ((content (resolve-content space (model-name model) id)))
     (check-unchanged-since content since)
     (check-transition content :publish)
-    (check-content space model data :exclude-id id)
-    (values (store model (published content data :published-at published-at) "publish" data)
-            (published-view space model content))))
+    (let ((data (to-the-minute model (if data-p data (content-data content :draft t)))))
+      (check-content space model data :exclude-id id)
+      (values (store model (published content data :published-at published-at) "publish" data)
+              (published-view space model content)))))
 
 (defun check-unreferenced (space-name model-name id verb)
   (let ((references (length (content-references space-name model-name id))))
