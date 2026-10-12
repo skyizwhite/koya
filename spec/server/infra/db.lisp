@@ -23,6 +23,7 @@
   (:import-from #:koya-core/case #:jvalue->data #:data->jobject)
   (:import-from #:koya-core/data #:data-equal)
   (:import-from #:koya-spec/core/case #:same-json)
+  (:import-from #:koya-spec/server/main #:with-env)
   (:import-from #:access #:access #:accesses)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions #:count-revisions)
@@ -159,16 +160,9 @@
 (defun session-count ()
   (col (fetch-one "SELECT COUNT(*) AS n FROM sessions") "n"))
 
-(defmacro with-secret ((secret) &body body)
-  (let ((saved (gensym)))
-    `(let ((,saved (uiop:getenv "KOYA_SECRET")))
-       (setf (uiop:getenv "KOYA_SECRET") ,secret)
-       (unwind-protect (progn ,@body)
-         (setf (uiop:getenv "KOYA_SECRET") (or ,saved ""))))))
-
 (deftest sessions-outlive-the-store
   (exec "DELETE FROM sessions")
-  (with-secret ("first-secret-long-enough-to-log-in-with")
+  (with-env (("KOYA_SECRET" "first-secret-long-enough-to-log-in-with"))
     (store-session (make-session-store) "sid-1" (owner-session))
     (let ((loaded (fetch-session (make-session-store) "sid-1")))
       (ok (hash-table-p loaded))
@@ -194,16 +188,16 @@
 
 (deftest a-new-secret-ends-every-session
   (exec "DELETE FROM sessions")
-  (with-secret ("first-secret-long-enough-to-log-in-with")
+  (with-env (("KOYA_SECRET" "first-secret-long-enough-to-log-in-with"))
     (store-session (make-session-store) "sid-1" (owner-session)))
-  (with-secret ("second-secret-long-enough-to-log-in-with")
+  (with-env (("KOYA_SECRET" "second-secret-long-enough-to-log-in-with"))
     (ng (fetch-session (make-session-store) "sid-1") "a session made under another secret is no session"))
-  (with-secret ("first-secret-long-enough-to-log-in-with")
+  (with-env (("KOYA_SECRET" "first-secret-long-enough-to-log-in-with"))
     (ok (fetch-session (make-session-store) "sid-1") "and the secret alone decides it")))
 
 (deftest sessions-end-all-but-one
   (exec "DELETE FROM sessions")
-  (with-secret ("first-secret-long-enough-to-log-in-with")
+  (with-env (("KOYA_SECRET" "first-secret-long-enough-to-log-in-with"))
     (dolist (sid '("sid-1" "sid-2" "sid-3"))
       (store-session (make-session-store) sid (owner-session)))
     (delete-sessions :except "sid-2")
@@ -215,7 +209,7 @@
 
 (deftest a-session-ended-during-a-request-stays-ended
   (exec "DELETE FROM sessions")
-  (with-secret ("first-secret-long-enough-to-log-in-with")
+  (with-env (("KOYA_SECRET" "first-secret-long-enough-to-log-in-with"))
     (store-session (make-session-store) "sid-1" (owner-session))
     (let ((session (fetch-session (make-session-store) "sid-1")))
       (delete-sessions)
@@ -558,7 +552,7 @@
 
 (deftest a-session-row-holds-what-it-was-last-given
   (exec "DELETE FROM sessions")
-  (with-secret ("first-secret-long-enough-to-log-in-with")
+  (with-env (("KOYA_SECRET" "first-secret-long-enough-to-log-in-with"))
     (let ((session (owner-session)))
       (store-session (make-session-store) "sid-3" session)
       (testing "a changed one is written"

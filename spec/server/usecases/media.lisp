@@ -22,7 +22,8 @@
                 #:koya-error #:koya-error-code #:conflict #:rejected #:too-large)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:babel #:string-to-octets)
-  (:export #:png-bytes #:*media-root* #:multipart-body))
+  (:export #:png-bytes #:*media-root* #:multipart-body)
+  (:import-from #:koya-spec/server/main #:with-env))
 (in-package #:koya-spec/server/usecases/media)
 
 (defvar *media-root*
@@ -186,12 +187,11 @@
         (blocker (merge-pathnames "blocker" *media-root*)))
     (ensure-directories-exist blocker)
     (with-open-file (out blocker :direction :output :if-exists :supersede) (write-string "x" out))
-    (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring (merge-pathnames "blocker/" *media-root*)))
     (unwind-protect
-         (ok (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
-               (error () t))
-             "the write fails")
-      (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
+         (with-env (("KOYA_MEDIA_DIR" (namestring (merge-pathnames "blocker/" *media-root*))))
+           (ok (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
+                 (error () t))
+               "the write fails"))
       (delete-file blocker))
     (ok (= (count-media "website") before) "and no row names the file it could not write")))
 
