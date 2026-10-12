@@ -14,7 +14,8 @@
                 #:to-json
                 #:parse-json)
   (:import-from #:koya-core/data
-                #:data-equal))
+                #:data-equal)
+  (:export #:same-json))
 (in-package #:koya-spec/core/case)
 
 (deftest keys
