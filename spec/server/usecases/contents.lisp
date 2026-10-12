@@ -397,6 +397,15 @@
     (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :featured t))) :saved)
         "while true is a change")))
 
+(deftest a-draft-emptied-stays-a-draft
+  (let* ((tag (find-model "website" "tag"))
+         (id (content-id (create "website" tag (list :name "x")))))
+    (ok (eq (nth-value 1 (update-draft "website" tag id (list :name :null))) :saved)
+        "a draft saved with no values is saved as one, though it has no published data to match")
+    (let ((content (get-content "website" id)))
+      (ok (string= (content-status content) "draft") "and is not published")
+      (ok (null (content-draft content)) "holding no values"))))
+
 (deftest a-blank-slug-stays-blank
   (let ((id (content-id (create "website" (find-model "website" "page") (list :title "Hello World") :publish t))))
     (ng (nth-value 1 (access (content-published (get-content "website" id)) :slug))
