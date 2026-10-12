@@ -106,10 +106,17 @@ adds or alters and what it needs to alter, for these points:
 - Whoever says something can or cannot happen runs the code to show it.
 - A review has no quota: when nothing meets the review's points, it reports
   nothing.
-- A review after fixes is given the earlier findings and what was done with
-  them. A finding that would undo an earlier fix names that finding and shows
-  what it missed.
+- The first review covers the whole change and reports, in that round,
+  everything it finds, including the same problem elsewhere in the code under
+  review.
+- A review after fixes reviews the fixes: what the commits since the previous
+  review add or alter, and what they need to alter. It is given the earlier
+  findings and what was done with them, and checks that each fix does what its
+  finding asked and meets the review's points. Code outside the fixes is not
+  reviewed again, except for a defect in what it does. A finding that would
+  undo an earlier fix names that finding and shows what it missed. A change
+  that is not a fix is reviewed as a first review is.
 - A fix is checked against the earlier findings before it is made, so that it
   brings none of them back.
-- Reviewing ends when no finding meets the review's points.
+- Reviewing ends when a review finds nothing that meets the review's points.
 - A finding a review set aside is not taken up again without a new reason.
