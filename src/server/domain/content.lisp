@@ -186,10 +186,9 @@
 
 (defun booleans-filled (model data)
   (map-data-fields (model-fields model) data
-                   (lambda (field object outer)
-                     (declare (ignore outer))
-                     (when (and (eq (field-type field) :boolean)
-                                (member (field-value object field) '(nil :null)))
+                   (lambda (field value found object outer)
+                     (declare (ignore found outer))
+                     (when (and (eq (field-type field) :boolean) (member value '(nil :null)))
                        (setf (field-value object field) nil))
                      object)))
 
@@ -199,16 +198,14 @@
 (defun default-data (model)
   (initial-data model nil))
 
-(defun fill-default (field object)
-  (when (and (eq (field-type field) :boolean) (field-option field :default)
-             (not (nth-value 1 (field-value object field))))
+(defun fill-default (field found object)
+  (when (and (eq (field-type field) :boolean) (field-option field :default) (not found))
     (setf (field-value object field) t))
   object)
 
-(defun keep-to-the-minute (field object)
+(defun keep-to-the-minute (field value object)
   (when (eq (field-type field) :datetime)
-    (let* ((value (field-value object field))
-           (timestamp (and (datetime-string-p value) (parse-iso value))))
+    (let ((timestamp (and (datetime-string-p value) (parse-iso value))))
       (when timestamp
         (setf (field-value object field)
               (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+))))))
@@ -216,15 +213,15 @@
 
 (defun initial-data (model data)
   (map-data-fields (model-fields model) (without-nulls data)
-                   (lambda (field object outer)
+                   (lambda (field value found object outer)
                      (declare (ignore outer))
-                     (keep-to-the-minute field (fill-default field object)))))
+                     (keep-to-the-minute field value (fill-default field found object)))))
 
 (defun to-the-minute (model data)
   (map-data-fields (model-fields model) (without-nulls data)
-                   (lambda (field object outer)
-                     (declare (ignore outer))
-                     (keep-to-the-minute field object))))
+                   (lambda (field value found object outer)
+                     (declare (ignore found outer))
+                     (keep-to-the-minute field value object))))
 
 (defun held-ids (value many)
   (remove-if-not (lambda (id) (and (stringp id) (not (blank-p id))))

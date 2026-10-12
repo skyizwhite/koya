@@ -305,30 +305,29 @@
                                                (make-field :meta :custom :custom-field "seo")
                                                (make-field :blocks :repeater :custom-fields '(heading body)))))))
 
-(defun upcase-texts (field object outer)
-  (declare (ignore outer))
-  (let ((value (field-value object field)))
-    (when (stringp value)
-      (setf (field-value object field) (string-upcase value)))
-    object))
+(defun upcase-texts (field value found object outer)
+  (declare (ignore found outer))
+  (when (stringp value)
+    (setf (field-value object field) (string-upcase value)))
+  object)
 
 (deftest walking-a-content-s-data
   (let ((fields (model-fields (schema-model (walked-schema) "page"))))
-    (testing "every field gets the call, with the object it sits in and the field around it"
+    (testing "every field gets the call, with its value, whether it is there, the object it sits in and the field around it"
       (let ((seen '()))
         (map-data-fields fields
-                         (list :meta (list :title "t")
+                         (list :meta (list :title "t" :kind nil)
                                :blocks (vector (list :field-id "heading" :text "h")
                                                (list :field-id "body" :text "b")))
-                         (lambda (field object outer)
-                           (push (list (and outer (field-name outer)) (field-name field)
-                                       (field-value object field))
+                         (lambda (field value found object outer)
+                           (push (list (and outer (field-name outer)) (field-name field) value found
+                                       (eq value (field-value object field)))
                                  seen)
                            object))
         (ok (equal (reverse seen)
-                   '((nil "title" nil)
-                     ("meta" "title" "t") ("meta" "image" nil) ("meta" "kind" nil)
-                     ("blocks" "text" "h") ("blocks" "text" "b")))
+                   '((nil "title" nil nil t)
+                     ("meta" "title" "t" t t) ("meta" "image" nil nil t) ("meta" "kind" nil t t)
+                     ("blocks" "text" "h" t t) ("blocks" "text" "b" t t)))
             "a field with no value too, and none for a custom or a repeater itself")))
     (testing "what the call returns lands in a copy"
       (let* ((data (list :title "a"
@@ -343,7 +342,8 @@
         (ok (string= (accesses data :blocks 0 :text) "c"))))
     (testing "an empty custom value is walked, and an absent one is not made"
       (ok (equal (map-data-fields fields (list :meta nil)
-                                  (lambda (field object outer)
+                                  (lambda (field value found object outer)
+                                    (declare (ignore value found))
                                     (if (and outer (string= (field-name field) "kind"))
                                         (list* (field-key field) "page" object)
                                         object)))

@@ -291,7 +291,7 @@
                                              (let ((kind (row-kind field row)))
                                                (if kind (walk (custom-field-fields kind) row field) row)))
                                    value))))
-                     (t (setf out (funcall fn field out outer)))))))))
+                     (t (setf out (funcall fn field value found out outer)))))))))
     (walk fields data nil)))
 
 (defun field-path-parts (path)
