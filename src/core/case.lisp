@@ -1,16 +1,30 @@
 (defpackage #:koya-core/case
   (:use #:cl)
   (:import-from #:koya-core/json #:json-array-p)
-  (:import-from #:kebab
-                #:to-camel-case
-                #:to-kebab-case)
   (:export #:camel-key
            #:kebab-keyword
+           #:find-kebab-keyword
+           #:jvalue->data
+           #:data->jvalue
            #:plist->object
            #:object->plist
            #:jvalue->lisp
            #:lisp->jvalue))
 (in-package #:koya-core/case)
+
+(defun to-camel-case (kebab)
+  (with-output-to-string (out)
+    (loop :with up := nil
+          :for char :across kebab
+          :do (cond ((char= char #\-) (setf up t))
+                    (up (write-char (char-upcase char) out) (setf up nil))
+                    (t (write-char char out))))))
+
+(defun kebab-name (camel)
+  (with-output-to-string (out)
+    (loop :for char :across camel
+          :do (when (upper-case-p char) (write-char #\- out))
+              (write-char (char-upcase char) out))))
 
 (defun camel-key (key)
   (cond ((symbolp key) (to-camel-case (string-downcase (symbol-name key))))
@@ -18,7 +32,29 @@
         (t key)))
 
 (defun kebab-keyword (key)
-  (intern (string-upcase (to-kebab-case (string key))) :keyword))
+  (intern (kebab-name (string key)) :keyword))
+
+(defun find-kebab-keyword (key)
+  (values (find-symbol (kebab-name key) :keyword)))
+
+(defun jvalue->data (value &key intern)
+  (cond ((eq value 'null) :null)
+        ((hash-table-p value)
+         (loop :for k :being :the :hash-keys :of value :using (:hash-value v)
+               :append (list (if intern (kebab-keyword k) (or (find-kebab-keyword k) k))
+                             (jvalue->data v :intern intern))))
+        ((json-array-p value) (map 'vector (lambda (v) (jvalue->data v :intern intern)) value))
+        (t value)))
+
+(defun data->jvalue (value)
+  (cond ((eq value :null) 'null)
+        ((consp value)
+         (let ((out (make-hash-table :test 'equal)))
+           (loop :for (k v) :on value :by #'cddr
+                 :do (setf (gethash (if (symbolp k) (camel-key k) k) out) (data->jvalue v)))
+           out))
+        ((json-array-p value) (map 'vector #'data->jvalue value))
+        (t value)))
 
 (defun lisp->jvalue (value)
   (cond ((null value) 'null)

@@ -10,7 +10,6 @@ git woo https://github.com/fukamachi/woo.git
 ql cl-dotenv
 ql cl-dbi
 ql jzon
-ql kebab
 ql dexador
 ql quri
 ql ironclad

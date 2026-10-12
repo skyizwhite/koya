@@ -8,7 +8,7 @@
                 #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
                 #:model-options #:check-deployable
                 #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields
-                #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields)
+                #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields #:field-key)
   (:import-from #:koya-core/json
                 #:to-json #:parse-json #:jget #:jobject))
 (in-package #:koya-spec/core/schema)
@@ -458,3 +458,16 @@
         (ok (string= (aref (jget out "blocks") 1) "loose") "a row that is not an object")))
     (testing "a repeater that is not an array is passed over"
       (ok (string= (jget (map-data-fields fields (jobject "blocks" "flat") #'upcase-texts) "blocks") "flat")))))
+
+(deftest a-field-has-its-name-as-a-keyword
+  (ok (eq (field-key (make-field :event-at :text)) :event-at))
+  (ok (eq (field-key (make-field "pageURL" :text)) :page-u-r-l) "as a name with capitals in a row comes back")
+  (let* ((schema (jobject->schema (parse-json "{\"koyaSchema\": 1,
+                                                \"customFields\": [{\"name\": \"card\", \"fields\": [{\"name\": \"cardCaptionQq\", \"type\": \"text\"}]}],
+                                                \"models\": [{\"name\": \"page\", \"kind\": \"list\", \"fields\": [
+                                                  {\"name\": \"pageWidthQq\", \"type\": \"number\"},
+                                                  {\"name\": \"card\", \"type\": \"custom\", \"customField\": \"card\"}]}]}")))
+         (model (schema-model schema "page")))
+    (ok (eq (field-key (model-field model "pageWidthQq")) (find-symbol "PAGE-WIDTH-QQ" :keyword))
+        "a schema read from JSON interns its fields' keywords")
+    (ok (find-symbol "CARD-CAPTION-QQ" :keyword) "and those of the fields inside a custom field")))

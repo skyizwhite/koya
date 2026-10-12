@@ -1,7 +1,7 @@
 (defpackage #:koya-core/schema
   (:use #:cl)
   (:import-from #:koya-core/case
-                #:camel-key)
+                #:camel-key #:kebab-keyword)
   (:import-from #:koya-core/json
                 #:jobject
                 #:jget
@@ -19,6 +19,7 @@
            #:field
            #:make-field
            #:field-name
+           #:field-key
            #:field-type
            #:field-options
            #:field-option
@@ -124,6 +125,7 @@
 
 (defstruct (field (:constructor %make-field))
   name
+  key
   type
   options
   fields)
@@ -198,7 +200,7 @@
       (fail "repeater ~s needs :custom-fields" name))
     (when (equal (getf options :was) name)
       (fail "field ~s: :was must name the field it was renamed from, not itself" name))
-    (%make-field :name name :type type :options options)))
+    (%make-field :name name :key (kebab-keyword name) :type type :options options)))
 
 (defun field-option (field key &optional default)
   (getf (field-options field) key default))
@@ -212,7 +214,7 @@
 
 (defun field-forget-rename (field)
   (if (field-was field)
-      (%make-field :name (field-name field) :type (field-type field)
+      (%make-field :name (field-name field) :key (field-key field) :type (field-type field)
                    :options (forget-rename (field-options field))
                    :fields (field-fields field))
       field))
@@ -416,10 +418,10 @@
              (case (field-type field)
                (:custom
                 (let ((custom (named (field-option field :custom-field))))
-                  (%make-field :name (field-name field) :type :custom :options (field-options field)
+                  (%make-field :name (field-name field) :key (field-key field) :type :custom :options (field-options field)
                                :fields (and custom (custom-field-fields custom)))))
                (:repeater
-                (%make-field :name (field-name field) :type :repeater :options (field-options field)
+                (%make-field :name (field-name field) :key (field-key field) :type :repeater :options (field-options field)
                              :fields (remove nil (mapcar #'named (field-option field :custom-fields)))))
                (t field))))
       (%make-model :name (model-name model) :kind (model-kind model)
