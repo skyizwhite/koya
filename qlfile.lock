@@ -32,8 +32,8 @@
   :version "git-3fa9e3019b7c3af4133e9f44461874e8ca4f8b76"))
 ("okite" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/okite.git" :tag "0.3.0")
-  :version "git-e72e5bc27e9d7921639fe186449e0a78c3cabdbb"))
+  :initargs (:remote-url "https://github.com/skyizwhite/okite.git" :tag "0.4.0")
+  :version "git-05947fd37249c3069d73a76c62cf30881f9b6f70"))
 ("woo" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/fukamachi/woo.git")

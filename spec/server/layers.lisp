@@ -27,7 +27,7 @@
           (:main            :domain :ports :presenter-ports :usecases :infra :web))
   (:isolated :pages :api :admin-api)
   (:libraries ("cl-dbi" :infra) ("zippy" :infra) ("dexador" :infra) ("usocket" :infra) ("cl-dotenv" :infra)
-              ("clack" :main) ("lack" :web :infra) ("lack-mw" :web)
+              ("clack" :main) ("lack" :web) ("lack-middleware-session" :infra) ("lack-mw" :web)
               ("jingle" :web :ui :pages :admin-api)
               ("ningle-actions" :web :ui :pages) ("ningle-fbr" :web) ("smart-buffer" :web)
               ("hsx" :web :ui :pages) ("okite" :main)
