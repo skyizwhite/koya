@@ -2,12 +2,15 @@
   (:use #:cl)
   (:import-from #:koya-server/usecases/media
                 #:stored-file)
+  (:import-from #:koya-server/domain/media
+                #:+media-id-pattern+)
   (:import-from #:cl-ppcre
                 #:scan-to-strings)
   (:export #:media-app))
 (in-package #:koya-server/web/lib/media)
 
-(defparameter +media-path-pattern+ "^([a-z][a-z0-9-]*)/([0-9A-Z]{26})\\.(png|jpg|gif|webp)\\z")
+(defparameter +media-path-pattern+
+  (format nil "^([a-z][a-z0-9-]*)/(~a)\\.(png|jpg|gif|webp)\\z" +media-id-pattern+))
 
 (defun media-file-response (rest)
   (multiple-value-bind (match groups) (scan-to-strings +media-path-pattern+ rest)

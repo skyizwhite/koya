@@ -1,5 +1,7 @@
 # A content id koya makes is twelve letters and digits
 
+Superseded by adr/2026-10-13-an-id-koya-makes-for-a-content-or-a-media-is-twelve-letters-and-digits.md
+
 *2026-10-10*
 
 ## Context

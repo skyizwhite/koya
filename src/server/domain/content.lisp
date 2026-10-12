@@ -14,7 +14,7 @@
   (:import-from #:local-time
                 #:timestamp-minimize-part #:+utc-zone+)
   (:import-from #:ironclad
-                #:random-data #:byte-array-to-hex-string #:strong-random)
+                #:random-data #:byte-array-to-hex-string)
   (:import-from #:koya-server/domain/errors
                 #:fail #:conflict)
   (:export #:content #:make-content #:content-p
@@ -26,7 +26,6 @@
            #:content-draft-p
            #:status-of
            #:new-draft-key
-           #:new-content-id
            #:new-content
            #:drafted
            #:published
@@ -108,9 +107,6 @@
 
 (defun new-draft-key ()
   (byte-array-to-hex-string (random-data 16)))
-
-(defun new-content-id ()
-  (string-downcase (format nil "~36,12,'0R" (strong-random (expt 36 12)))))
 
 (defun touched (content now)
   (setf (content-updated-at content) now)

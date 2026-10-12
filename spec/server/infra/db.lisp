@@ -1,5 +1,6 @@
 (defpackage #:koya-spec/server/infra/db
   (:use #:cl #:rove)
+  (:import-from #:koya-spec/server/stored #:stored-content)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
@@ -26,7 +27,7 @@
   (:import-from #:koya-spec/server/main #:with-env)
   (:import-from #:access #:access #:accesses)
   (:import-from #:koya-server/usecases/ports/contents
-                #:get-content #:list-revisions #:count-revisions)
+                #:list-revisions #:count-revisions)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish #:destroy #:unpublish #:discard
                 #:content-by-slug)
   (:import-from #:koya-server/domain/errors #:not-found)
@@ -258,7 +259,7 @@
       (ng (destructive-changes-p changes) "a rename loses nothing, so it needs no force"))
     (ok (equal (mapcar #'model-name (schema-models (load-schema "magazine"))) '("article")))
     (testing "the published data moved with the model and the field"
-      (let ((content (get-content "magazine" (content-id published))))
+      (let ((content (stored-content "magazine" (content-id published))))
         (ok (string= (content-model content) "article"))
         (ok (string= (access (content-published content) :subtitle) "First words"))
         (ng (access (content-published content) :lede) "the orphaned key is gone")
@@ -266,7 +267,7 @@
         (ok (string= (jget (parse-json (fetch-text "magazine" (content-id published))) "subtitle") "First words")
             "and its text is found under the new name")))
     (testing "so did the draft"
-      (let ((content (get-content "magazine" (content-id drafted))))
+      (let ((content (stored-content "magazine" (content-id drafted))))
         (ok (string= (content-model content) "article"))
         (ok (string= (access (content-draft content) :subtitle) "Later words"))
         (ok (string= (jget (parse-json (fetch-text "magazine" (content-id drafted) "draft_text")) "subtitle") "Later words")
@@ -300,12 +301,12 @@
                                                                              (make-field :rank :number))))))))
       (ok (equal (mapcar (lambda (c) (getf c :op)) changes) '(:remove-field :change-field-type))))
     (testing "the published data loses the removed field and the retyped one"
-      (let ((published (content-published (get-content "trimmed" id))))
+      (let ((published (content-published (stored-content "trimmed" id))))
         (ng (nth-value 1 (access published :summary)))
         (ng (nth-value 1 (access published :rank)))
         (ok (string= (access published :title) "One") "the rest is untouched")))
     (testing "so does the draft"
-      (let ((draft (content-draft (get-content "trimmed" id))))
+      (let ((draft (content-draft (stored-content "trimmed" id))))
         (ng (nth-value 1 (access draft :summary)))
         (ng (nth-value 1 (access draft :rank)))
         (ok (string= (access draft :title) "One, again"))))
@@ -322,7 +323,7 @@
                                                           (list (make-field :title :text)
                                                                 (make-field :rank :number)
                                                                 (make-field :summary :text))))))
-      (ng (nth-value 1 (access (content-published (get-content "trimmed" id)) :summary)))))
+      (ng (nth-value 1 (access (content-published (stored-content "trimmed" id)) :summary)))))
   (delete-space "trimmed"))
 
 (deftest a-reference-pointed-at-another-model-takes-its-values-with-it
@@ -340,12 +341,12 @@
                                      (list :title "One" :tag tag) :publish t))))
       (ok (equal (mapcar (lambda (c) (getf c :op)) (deploy "cat")) '(:change-field-type)))
       (testing "the post no longer names the tag"
-        (let ((published (content-published (get-content "pointed" post))))
+        (let ((published (content-published (stored-content "pointed" post))))
           (ng (nth-value 1 (access published :tag)))
           (ok (string= (access published :title) "One") "the rest is untouched")))
       (testing "so the tag is deleted with nothing left pointing at it"
         (ok (destroy "pointed" (find-model "pointed" "tag") tag))
-        (ng (get-content "pointed" tag)))))
+        (ng (stored-content "pointed" tag)))))
   (delete-space "pointed"))
 
 (deftest stored-values-of-fields-that-are-gone-are-dropped
@@ -362,7 +363,7 @@
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('kept', 'publish', '{\"title\":\"Old\",\"gone\":{\"a\":1}}', '2026-01-01T00:00:00.000Z')")
   (ok (equal (migrate) '(12 13 14 15 16 17)))
-  (let ((content (get-content "leftover" "kept")))
+  (let ((content (stored-content "leftover" "kept")))
     (ng (nth-value 1 (access (content-published content) :gone)))
     (ng (nth-value 1 (access (content-draft content) :gone)))
     (ok (string= (access (content-published content) :title) "Live") "a declared field is kept")
@@ -506,7 +507,7 @@
          VALUES ('about', 'publish', '{\"title\":\"One\"}', '2026-01-01T00:00:00.000Z')")
   (ok (equal (migrate) '(13 14 15 16 17)))
   (testing "what was stored moves into its space, history and all"
-    (ok (string= (access (content-published (get-content "one" "about")) :title) "One"))
+    (ok (string= (access (content-published (stored-content "one" "about")) :title) "One"))
     (ok (equal (mapcar #'revision-event (list-revisions "one" "about")) '("publish"))))
   (testing "another space may hold a content of the same id"
     (create-space "two")
@@ -516,13 +517,13 @@
                    '2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z', '2026-01-02T00:00:00.000Z')")
     (exec "INSERT INTO content_revisions (space, content_id, event, data, created_at)
            VALUES ('two', 'about', 'publish', '{\"title\":\"Two\"}', '2026-01-02T00:00:00.000Z')")
-    (ok (string= (access (content-published (get-content "two" "about")) :title) "Two"))
-    (ok (string= (access (content-published (get-content "one" "about")) :title) "One") "and neither touches the other")
+    (ok (string= (access (content-published (stored-content "two" "about")) :title) "Two"))
+    (ok (string= (access (content-published (stored-content "one" "about")) :title) "One") "and neither touches the other")
     (ok (= (count-revisions "two" "about") 1))
     (ok (= (count-revisions "one" "about") 1))
     (destroy "two" (find-model "two" "post") "about")
-    (ng (get-content "two" "about"))
-    (ok (get-content "one" "about") "deleting one leaves the other")
+    (ng (stored-content "two" "about"))
+    (ok (stored-content "one" "about") "deleting one leaves the other")
     (ok (= (count-revisions "one" "about") 1) "with its history"))
   (testing "within a space an id is still one content"
     (ok (search "UNIQUE constraint failed: contents.space, contents.id"
@@ -532,7 +533,7 @@
                                      "")
                   (dbi.error:dbi-database-error (e) (princ-to-string e))))
         "a second content of the same id is refused by the key")
-    (ok (string= (access (content-published (get-content "one" "about")) :title) "One") "and the first is kept"))
+    (ok (string= (access (content-published (stored-content "one" "about")) :title) "One") "and the first is kept"))
   (migrated-fully))
 
 (deftest a-rolled-back-deploy-leaves-nothing
@@ -590,7 +591,7 @@
         "the text of a custom field is kept with the rest, field by field")
     (let ((changes (replace-schema "inner" (seo-schema (make-field :title :text)))))
       (ok (member :remove-field (mapcar (lambda (c) (getf c :op)) changes))))
-    (let ((meta (access (content-published (get-content "inner" id)) :meta)))
+    (let ((meta (access (content-published (stored-content "inner" id)) :meta)))
       (ng (nth-value 1 (access meta :note)) "the value inside is gone")
       (ok (string= (access meta :title) "Searchable") "and the rest stays"))
     (ok (null (search "Gone soon" (fetch-text "inner" id))) "and so is its text")
@@ -616,7 +617,7 @@
                           :publish t))
          (id (content-id content)))
     (replace-schema "rows" (blocks-schema (make-field :text :text)))
-    (let ((rows (access (content-published (get-content "rows" id)) :blocks)))
+    (let ((rows (access (content-published (stored-content "rows" id)) :blocks)))
       (ng (nth-value 1 (access (aref rows 0) :note)) "the field goes from the rows of its custom field")
       (ok (string= (access (aref rows 1) :note) "Kept") "and stays in rows of another")
       (ok (string= (access (aref rows 0) :text) "Head")))
@@ -642,7 +643,7 @@
       (update-draft "kinds" (find-model "kinds" "post") id
                     (list :blocks (vector (list :field-id "heading" :text "Next"))))
       (replace-schema "kinds" (kinds-schema 'quote))
-      (ok (data-equal (access (content-draft (get-content "kinds" id)) :blocks)
+      (ok (data-equal (access (content-draft (stored-content "kinds" id)) :blocks)
                       (vector (list :field-id "heading" :text "Next")))
           "a draft is left as it is: a deploy refuses a schema its contents do not fit before this")
       (let ((history (list-revisions "kinds" id)))
@@ -651,7 +652,7 @@
                            history)
                    '(() ("quote") ("quote")))
             "holding only the rows of the custom fields the repeater still has"))
-      (ok (data-equal (access (content-published (get-content "kinds" id)) :blocks)
+      (ok (data-equal (access (content-published (stored-content "kinds" id)) :blocks)
                       (vector (list :field-id "quote" :text "Quoted")))
           "and the content as it was")))
   (delete-space "kinds"))
@@ -742,7 +743,7 @@
   (migrated-fully))
 
 (defun content-data-of (id)
-  (let ((content (get-content "older" id)))
+  (let ((content (stored-content "older" id)))
     (or (content-published content) (content-draft content))))
 
 (deftest a-null-stored-before-is-taken-away
@@ -767,7 +768,7 @@
   (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at)
          VALUES ('older', 'nulled', 'draft', '{\"title\":null,\"rows\":[{\"fieldId\":\"h\",\"text\":null}]}', '', '2026-01-01T00:00:00.000Z')")
   (ok (equal (migrate) '(17)))
-  (let ((content (get-content "older" "nulled")))
+  (let ((content (stored-content "older" "nulled")))
     (ok (string= (content-status content) "published+draft") "the content is as it was")
     (ok (equal (content-published content) '(:title "Live")) "less the nulls of its published data")
     (ok (equal (content-draft content) '(:body "<p>b</p>")) "and of its draft"))

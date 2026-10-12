@@ -13,7 +13,7 @@
   (:import-from #:koya-server/domain/references #:media-fields #:mentioned-ids #:referrers)
   (:import-from #:koya-server/usecases/ports/spaces #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents #:contents-mentioning #:space-contents)
-  (:import-from #:koya-core/ulid #:make-ulid)
+  (:import-from #:koya-server/domain/id #:new-id)
   (:export #:store-upload
            #:store-uploads
            #:upload-limit-message
@@ -56,15 +56,16 @@
     (fail 'too-large (upload-limit-message)))
   (multiple-value-bind (mime width height) (sniff-image bytes)
     (unless mime (fail 'rejected "Only PNG, JPEG, GIF and WebP images are accepted" :code "unsupported_type"))
-    (let ((id (make-ulid))
-          (bytes (strip-metadata bytes mime)))
-      (write-media-file space id mime bytes)
-      (handler-case
-          (insert-media space :id id :filename (safe-filename filename) :mime mime :size (length bytes)
-                              :width width :height height :alt alt)
-        (error (e)
-          (handler-case (delete-media-file space id mime) (error () nil))
-          (error e))))))
+    (let ((bytes (strip-metadata bytes mime)))
+      (loop :for id := (new-id)
+            :when (write-media-file space id mime bytes :new t)
+              :do (let ((media nil))
+                    (unwind-protect
+                         (setf media (insert-media space id :filename (safe-filename filename) :mime mime
+                                                            :size (length bytes) :width width :height height :alt alt))
+                      (unless media
+                        (handler-case (delete-media-file space id mime) (error () nil))))
+                    (when media (return media)))))))
 
 (defun store-uploads (space files &key (alt ""))
   (when (> (reduce #'+ files :key (lambda (file) (length (first file)))) +max-upload-bytes+)

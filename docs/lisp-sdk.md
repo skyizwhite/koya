@@ -417,12 +417,12 @@ create another. A key is valid for its space alone.
 
 ```lisp
 (koya-sdk:upload-media #p"cover.png" :alt "Cover")
-;; => (:id "01J…" :url "https://cms.example.com/media/website/01J….png" :filename "cover.png"
+;; => (:id "m7c4v1rb8e2s" :url "https://cms.example.com/media/website/m7c4v1rb8e2s.png" :filename "cover.png"
 ;;     :mime "image/png" :size 12345 :width 1200 :height 630 :alt "Cover" :created-at "…")
 (koya-sdk:list-media :search "cover" :limit 60 :offset 0)   ; (:media (…) :total-count n :offset n :limit n)
-(koya-sdk:get-media "01J…")                                 ; adds :references — how many contents use it
-(koya-sdk:update-media "01J…" :alt "New alt text")
-(koya-sdk:delete-media "01J…")
+(koya-sdk:get-media "m7c4v1rb8e2s")                         ; adds :references — how many contents use it
+(koya-sdk:update-media "m7c4v1rb8e2s" :alt "New alt text")
+(koya-sdk:delete-media "m7c4v1rb8e2s")
 ```
 
 PNG, JPEG, GIF and WebP up to 20 MB each; the type is decided by reading the

@@ -1,5 +1,7 @@
 # An id koya makes for anything but a content is a ULID
 
+Superseded by adr/2026-10-13-an-id-koya-makes-for-a-key-a-deploy-a-delivery-or-an-archive-is-a-ulid.md
+
 *2026-10-10, restating a decision of 2026-09-27*
 
 ## Context

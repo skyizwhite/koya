@@ -2,6 +2,8 @@
   (:use #:cl #:rove)
   (:import-from #:koya-spec/server/web/api-support #:request #:admin #:admin-upload #:delivery #:setup-api #:reset-api)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
+  (:import-from #:koya-server/usecases/ports/media #:write-media-file #:insert-media)
+  (:import-from #:koya-server/usecases/media #:remove-media)
   (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-spec/server/usecases/media #:png-bytes)
@@ -15,6 +17,14 @@
 (teardown (disconnect-db))
 
 (defhook :before (reset-api))
+
+(deftest a-media-id-from-before-is-served
+  (let ((ulid "01ARZ3NDEKTSV4RRFFQ69G5FAV"))
+    (write-media-file "website" ulid "image/png" (png-bytes 3 2))
+    (let ((media (insert-media "website" ulid :filename "old.png" :mime "image/png" :size 1 :width 3 :height 2)))
+      (ok (= 200 (request :get (format nil "/media/website/~a.png" ulid)))
+          "a media whose id is a ULID, made before ids were short, is served as one with a short id is")
+      (remove-media media))))
 
 (deftest media-api
   (let ((id nil))
@@ -39,7 +49,8 @@
         (ok (= (with-open-file (in path :element-type '(unsigned-byte 8)) (file-length in))
                (length (png-bytes 3 2)))))
       (multiple-value-bind (status) (request :get "/media/website/../../etc/passwd")
-        (ok (= status 404) "only space/id.ext shapes are served")))
+        (ok (= status 404) "only space/id.ext shapes are served"))
+      (ok (= 404 (request :get "/media/website/Abcdefghijkl.png")) "nor an id of another shape"))
     (testing "list, search, detail, alt"
       (multiple-value-bind (status json) (admin :get "/admin/api/website/media")
         (ok (= status 200))

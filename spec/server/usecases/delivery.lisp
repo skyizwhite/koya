@@ -50,7 +50,7 @@
   (loop :for (k v) :on pairs :by #'cddr :append (list (kebab-keyword k) v)))
 (defun query (&rest kv) (parse-query (loop :for (k v) :on kv :by #'cddr :collect (cons k v))))
 (defun picture (id)
-  (media-id (insert-media "site" :id id :filename "p.png" :mime "image/png" :size 1 :width 1 :height 1)))
+  (media-id (insert-media "site" id :filename "p.png" :mime "image/png" :size 1 :width 1 :height 1)))
 
 (deftest media-fields-hold-their-media
   (let* ((cover (picture "01ARZ3NDEKTSV4RRFFQ69G5FAA"))

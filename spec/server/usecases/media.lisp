@@ -9,7 +9,7 @@
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/usecases/ports/media
                 #:find-media #:list-media #:count-media #:update-media #:media-file-path
-                #:insert-media #:delete-media-file)
+                #:insert-media #:write-media-file #:delete-media-file)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-spec/server/domain/image #:jpeg #:octets)
   (:import-from #:koya-server/usecases/media
@@ -23,8 +23,14 @@
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-spec/server/main #:with-env)
-  (:export #:png-bytes #:*media-root* #:multipart-body))
+  (:import-from #:koya-spec/server/domain/id #:with-drawn-ids)
+  (:export #:png-bytes #:*media-root* #:multipart-body #:with-space-cleared))
 (in-package #:koya-spec/server/usecases/media)
+
+(defmacro with-space-cleared ((space) &body body)
+  `(unwind-protect (progn ,@body)
+     (remove-space-media ,space)
+     (when (find-space ,space) (delete-space ,space))))
 
 (defvar *media-root*
   (uiop:ensure-directory-pathname
@@ -139,6 +145,32 @@
       (ok (null (find-media "website" (media-id media))))
       (ok (null (probe-file (media-path media))) "file gone"))))
 
+(deftest a-media-id-koya-makes-is-twelve-letters-and-digits
+  (let ((media (store-upload "website" (png-bytes) :filename "short.png")))
+    (ok (cl-ppcre:scan "^[0-9a-z]{12}\\z" (media-id media)))
+    (unwind-protect
+         (with-space-cleared ("elsewhere")
+           (create-space "elsewhere")
+           (ok (string= (media-id (with-drawn-ids (list (media-id media) "zzzzzzzzzzzz")
+                                    (lambda () (store-upload "elsewhere" (png-bytes) :filename "other.png"))))
+                        "zzzzzzzzzzzz")
+               "and one any space holds is drawn again")
+           (ng (probe-file (media-file-path "elsewhere" (media-id media) "image/png"))
+               "without leaving the file it wrote for the id it gave up"))
+      (remove-media media))))
+
+(deftest a-media-id-whose-file-is-there-is-drawn-again
+  (write-media-file "website" "orphanorphan" "image/png" (octets "left behind"))
+  (unwind-protect
+       (let ((media (with-drawn-ids (list "orphanorphan" "zzzzzzzzzzzz")
+                      (lambda () (store-upload "website" (png-bytes) :filename "new.png")))))
+         (ok (string= (media-id media) "zzzzzzzzzzzz"))
+         (ok (equalp (alexandria:read-file-into-byte-vector (media-file-path "website" "orphanorphan" "image/png"))
+                     (octets "left behind"))
+             "the file that was there stays as it was")
+         (remove-media media))
+    (delete-media-file "website" "orphanorphan" "image/png")))
+
 (deftest an-upload-is-stored-without-its-metadata
   (let* ((media (store-upload "website" (jpeg) :filename "phone.jpg"))
          (stored (alexandria:read-file-into-byte-vector (media-path media))))
@@ -197,17 +229,21 @@
 
 (deftest a-failed-insert-is-the-error-told
   (let* ((left nil)
-         (insert (defmethod insert-media :around (space &key &allow-other-keys)
+         (written nil)
+         (insert (defmethod insert-media :around (space id &key &allow-other-keys)
                    (declare (ignore space))
                    (error "The row is not written")))
          (cleanup (defmethod delete-media-file :around (space id mime)
-                    (setf left (list space id mime))
+                    (setf left (list space id mime)
+                          written (probe-file (media-file-path space id mime)))
                     (error "The file will not go"))))
     (unwind-protect
-         (ok (equal (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
-                      (error (e) (princ-to-string e)))
-                    "The row is not written")
-             "the insert's error, not the one taking its file away")
+         (progn
+           (ok (equal (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
+                        (error (e) (princ-to-string e)))
+                      "The row is not written")
+               "the insert's error, not the one taking its file away")
+           (ok written "and the file it wrote is taken away"))
       (remove-method #'insert-media insert)
       (remove-method #'delete-media-file cleanup)
       (when left (apply #'delete-media-file left)))))

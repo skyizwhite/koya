@@ -29,7 +29,7 @@
                 #:purge-stale-archives)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-space #:media-filename #:media-mime #:media-size #:media-width
-                #:media-height #:media-alt #:media-created-at #:+max-upload-bytes+)
+                #:media-height #:media-alt #:media-created-at #:media-id-p #:+max-upload-bytes+)
   (:import-from #:koya-server/domain/image #:sniff-image #:image-extension)
   (:import-from #:koya-server/domain/key
                 #:key-id #:key-hash #:key-label #:key-created-at #:new-webhook-secret)
@@ -50,8 +50,6 @@
            #:archive-file-name
            #:archive-error))
 (in-package #:koya-server/usecases/archive)
-
-(defparameter +media-id-pattern+ "^[0-9A-Z]{26}\\z")
 
 (define-condition archive-error (invalid-input) ())
 
@@ -182,7 +180,7 @@
   (unless (listp object) (fail "Each media must be an object"))
   (let ((id (string-field object :id :required t))
         (mime (string-field object :mime :required t)))
-    (unless (scan +media-id-pattern+ id) (fail "~s is not a media id" id))
+    (unless (media-id-p id) (fail "~s is not a media id" id))
     (unless (image-extension mime) (fail "Media ~a is ~a, which is not an accepted image type" id mime))
     (let* ((entry (media-entry-name id mime))
            (size (or (archive-entry-size archive entry) (fail "The archive has no file for media ~a" id))))
@@ -300,9 +298,10 @@
              (dolist (k delivery-keys) (apply #'insert-delivery-key space k))
              (dolist (k management-keys) (apply #'insert-management-key space k))
              (dolist (m media)
-               (insert-media space :id (getf m :id) :filename (getf m :filename) :mime (getf m :mime)
-                                   :size (getf m :size) :width (getf m :width) :height (getf m :height)
-                                   :alt (getf m :alt) :created-at (getf m :created-at)))
+               (unless (insert-media space (getf m :id) :filename (getf m :filename) :mime (getf m :mime)
+                                                       :size (getf m :size) :width (getf m :width) :height (getf m :height)
+                                                       :alt (getf m :alt) :created-at (getf m :created-at))
+                 (fail "Media ~a is already in another space" (getf m :id))))
              (loop :for (content revisions) :in contents
                    :do (apply #'insert-content content
                               (content-slugs (schema-model schema (content-model content)) content))

@@ -1,5 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/space-import
   (:use #:cl #:rove)
+  (:import-from #:koya-spec/server/stored #:stored-content)
   (:import-from #:koya-server/domain/key #:key-id #:key-label #:hash-key)
   (:import-from #:koya-server/usecases/ports/keys #:insert-delivery-key)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)
@@ -21,7 +22,7 @@
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-space #:media-mime #:media-alt
                 #:+max-upload-bytes+)
-  (:import-from #:koya-spec/server/usecases/media #:png-bytes)
+  (:import-from #:koya-spec/server/usecases/media #:png-bytes #:with-space-cleared)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-core/schema #:make-webhook)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field #:model-field #:model-fields #:field-type #:field-option)
@@ -29,7 +30,7 @@
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-revisions #:count-revisions #:get-content #:insert-content #:record-revision)
+                #:list-revisions #:count-revisions #:insert-content #:record-revision)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
   (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
@@ -161,8 +162,8 @@
         (ok (string= (space-for-management-key management-key) "archive"))
         (ok (equal (mapcar #'key-label (list-delivery-keys "archive")) '("site"))))
       (testing "contents keep their ids, state, draft, timestamps and history"
-        (let ((tag-content (get-content "archive" tag))
-              (post-content (get-content "archive" post)))
+        (let ((tag-content (stored-content "archive" tag))
+              (post-content (stored-content "archive" post)))
           (ok tag-content "an id given before koya made them all is kept too")
           (let ((history (list-revisions "archive" tag)))
             (ok (equal (mapcar #'revision-event history) '("publish")) "with its history")
@@ -207,14 +208,14 @@
         (create-delivery-key "archive")
         (ok (string= (nth-value 1 (import-archive octets)) "/"))
         (ok (search "is not empty" (nth-value 1 (request :get "/"))))
-        (ng (get-content "archive" post)))
+        (ng (stored-content "archive" post)))
       (testing "one that has only webhooks is imported into, and they are replaced"
         (delete-space "archive")
         (remove-space-media "archive")
         (create-space "archive")
         (replace-schema "archive" (make-schema :webhooks (list (make-webhook "old" "https://old.test/hook"))))
         (ok (string= (nth-value 1 (import-archive octets)) "/s/archive"))
-        (ok (get-content "archive" post))
+        (ok (stored-content "archive" post))
         (ok (equal (mapcar #'webhook-url (space-webhooks "archive")) '("https://site.test/hook")))
         (ok (string= (space-webhook-secret "archive") old-secret))))
     (testing "a file that is not an archive changes nothing"
@@ -379,13 +380,13 @@
                                (odd-archive :contents (list (list :id "t1" :draft (tag "lisp")
                                                                   :created-at "2024-01-01T10:00+09:00")))))
                  "/s/odd"))
-    (ok (string= (content-created-at (get-content "odd" "t1")) "2024-01-01T01:00:00.000Z"))
+    (ok (string= (content-created-at (stored-content "odd" "t1")) "2024-01-01T01:00:00.000Z"))
     (delete-space "odd"))
   (testing "a media or a key another space holds is named before anything is written"
     (multiple-value-bind (octets stored) (odd-archive :media t)
       (create-space "elsewhere")
-      (insert-media "elsewhere" :id (media-id stored) :filename "b.png" :mime "image/png" :size 1
-                                :width 1 :height 1 :alt "" :created-at "2024-01-01T00:00:00.000Z")
+      (insert-media "elsewhere" (media-id stored) :filename "b.png" :mime "image/png" :size 1
+                                                  :width 1 :height 1 :alt "" :created-at "2024-01-01T00:00:00.000Z")
       (ok (equal (refusal octets) (format nil "Media ~a is already in another space" (media-id stored))))
       (delete-space "elsewhere"))
     (multiple-value-bind (octets stored key) (odd-archive :key t)
@@ -433,10 +434,10 @@
   (let ((post (find-model "legacy" "post")))
     (ok (eq (field-type (model-field post :slug)) :slug))
     (ok (field-option (model-field post :title) :unique) "a text field keeps its unique"))
-  (ok (string= (access (content-draft (get-content "legacy" "p1")) :slug) "one") "and its contents come with it")
+  (ok (string= (access (content-draft (stored-content "legacy" "p1")) :slug) "one") "and its contents come with it")
   (testing "what the server keeps from before slugs were keys, it takes back from an archive"
     (ok (= (length (model-fields (find-model "legacy" "page"))) 2) "a model with two slug fields")
-    (ok (and (get-content "legacy" "g1") (get-content "legacy" "g2")) "and two contents that share a slug"))
+    (ok (and (stored-content "legacy" "g1") (stored-content "legacy" "g2")) "and two contents that share a slug"))
   (delete-space "legacy"))
 
 (deftest an-import-keeps-of-each-revision-what-fits-its-fields-types
@@ -475,7 +476,7 @@
                                                                   :published-at "2024-01-01T00:00:00.000Z"
                                                                   :revised-at "2024-01-01T00:00:00.000Z")))))
                  "/s/odd"))
-    (ok (string= (content-status (get-content "odd" "t1")) "published")
+    (ok (string= (content-status (stored-content "odd" "t1")) "published")
         "a published version with no values is published still")
     (delete-space "odd")))
 
@@ -497,7 +498,7 @@
                              (tag-archive "falsy" "\"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"published\": false, \"draft\": {\"name\": \"x\"},
                                                                     \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]")))
                "/s/falsy"))
-  (ok (string= (content-status (get-content "falsy" "t1")) "draft") "a published version of false is none, as null is")
+  (ok (string= (content-status (stored-content "falsy" "t1")) "draft") "a published version of false is none, as null is")
   (delete-space "falsy")
   (ok (string= (nth-value 1 (import-archive
                              (one-tag-archive "[{\"event\": \"draft\", \"data\": false, \"createdAt\": \"2024-01-01T00:00:00.000Z\"}]")))
@@ -526,6 +527,26 @@
   (ok (search "The revisions of content t1 must be an array" (nth-value 1 (request :get "/")))
       "and an object is not an array")
   (ng (find-space "falsy")))
+
+(deftest a-media-id-is-short-or-a-ulid
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (with-space-cleared ("odd")
+    (create-space "odd")
+    (let ((ulid "01ARZ3NDEKTSV4RRFFQ69G5FAV"))
+      (write-media-file "odd" ulid "image/png" (png-bytes 2 2))
+      (insert-media "odd" ulid :filename "old.png" :mime "image/png" :size 1 :width 2 :height 2
+                               :created-at "2024-01-01T00:00:00.000Z")
+      (let ((short (media-id (store-upload "odd" (png-bytes 2 2) :filename "new.png")))
+            (octets (nth-value 1 (request :get "/s/odd/export"))))
+        (delete-space "odd")
+        (remove-space-media "odd")
+        (ok (string= (nth-value 1 (import-archive octets)) "/s/odd"))
+        (ok (equal (sort (mapcar #'media-id (list-media "odd")) #'string<) (sort (list ulid short) #'string<))
+            "an archive keeps a short media id and a ULID alike"))))
+  (ok (string= (nth-value 1 (import-archive (tag-archive "odd" "\"media\": [{\"id\": \"Abcdefghijkl\", \"mime\": \"image/png\"}]"))) "/"))
+  (ok (search "&quot;Abcdefghijkl&quot; is not a media id" (nth-value 1 (request :get "/")))
+      "and refuses an id of another shape"))
 
 (deftest what-an-archive-lists-is-an-array
   (setf *cookie* nil)

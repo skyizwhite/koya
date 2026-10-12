@@ -140,8 +140,8 @@ A content is its fields plus the system fields:
   "title": "Hello",
   "slug": "hello",
   "cover": {
-    "id": "01J8Q0Z5X2W3V4U5T6S7R8Q9P1",
-    "url": "https://cms.example.com/media/website/01J8Q0Z5X2W3V4U5T6S7R8Q9P1.png",
+    "id": "m7c4v1rb8e2s",
+    "url": "https://cms.example.com/media/website/m7c4v1rb8e2s.png",
     "filename": "cover.png", "mime": "image/png", "size": 12345,
     "width": 1200, "height": 630, "alt": "Cover", "createdAt": "2026-09-20T05:04:03.123Z"
   },
@@ -287,7 +287,9 @@ with `POST /admin/api/{space}/schema/plan`: see [SCHEMA.md](SCHEMA.md), and
 20 MB together, the type decided by the file's leading bytes. A JPEG, PNG or
 WebP is stored without its metadata (EXIF, XMP, text): the camera, the time and
 the GPS position are gone, and only the orientation and the colour profile stay.
-The pixels are not touched. The answer is `{"media": [...]}`; put a media object's `id` in a `media` field. A media still
+The pixels are not touched. The answer is `{"media": [...]}`; put a media object's `id` in a `media` field. A media's
+id is made by the server: 12 lowercase letters and digits, drawn at random and
+unique across spaces; one from before is a 26-character ULID. A media still
 used by a content, in a `media` or `richtext` field of the current schema (one
 inside a custom field or a repeater's rows too), cannot be deleted (`409 in_use`); a value left in a
 field a deploy removed does not count.

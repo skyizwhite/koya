@@ -16,7 +16,7 @@
            #:delete-space-media-files))
 (in-package #:koya-server/usecases/ports/media)
 
-(defgeneric insert-media (space &key filename mime size width height alt id created-at))
+(defgeneric insert-media (space id &key filename mime size width height alt created-at))
 
 (defgeneric find-media (space id))
 

@@ -16,7 +16,7 @@
                 #:jvalue->data #:data->jobject)
   (:import-from #:koya-server/domain/html #:data-text)
   (:import-from #:koya-server/usecases/ports/contents
-                #:insert-content #:update-content #:delete-content #:get-content #:find-content
+                #:insert-content #:update-content #:delete-content #:find-content
                 #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
                 #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
@@ -47,10 +47,6 @@
           (and published (text-column (content-published content)))
           (and draft (text-column (content-draft content))))))
 
-(defmethod get-content (space id)
-  (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND id = ?" +columns+) space id)))
-    (and row (row->content row))))
-
 (defmethod find-contents-by-ids (space model ids)
   (let ((table (make-hash-table :test 'equal))
         (ids (remove-duplicates ids :test #'equal)))
@@ -67,16 +63,19 @@
 
 (defmethod insert-content (content published-slug draft-slug)
   (destructuring-bind (published draft published-text draft-text) (version-columns content)
-    (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at,
-                                 published_text, draft_text, published_slug, draft_slug)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          (content-id content) (content-space content) (content-model content) (content-status content)
-          published draft
-          (content-draft-key content)
-          (content-created-at content) (content-updated-at content)
-          (content-published-at content) (content-revised-at content)
-          published-text draft-text
-          published-slug draft-slug)))
+    (and (fetch-one "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at,
+                                           published_text, draft_text, published_slug, draft_slug)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT (space, id) DO NOTHING
+                     RETURNING id"
+                    (content-id content) (content-space content) (content-model content) (content-status content)
+                    published draft
+                    (content-draft-key content)
+                    (content-created-at content) (content-updated-at content)
+                    (content-published-at content) (content-revised-at content)
+                    published-text draft-text
+                    published-slug draft-slug)
+         t)))
 
 (defmethod update-content (content published-slug draft-slug)
   (destructuring-bind (published draft published-text draft-text) (version-columns content)
