@@ -33,20 +33,18 @@
    (comes-back-as :initarg :comes-back-as))
   (:report (lambda (c s)
              (with-slots (name becomes comes-back-as) c
-               (let ((*print-case* :downcase))
-                 (format s "~s does not come back as itself: it becomes ~a, which comes back as ~a"
-                         name becomes comes-back-as))))))
-
-(defun shown-keyword (kebab)
-  (format nil ":~(~a~)" kebab))
+               (let ((*print-case* :downcase)
+                     (*print-gensym* nil))
+                 (flet ((shown (x) (if (stringp x) (prin1-to-string x) (format nil ":~s" x))))
+                   (format s "~s does not come back as itself: it becomes ~a, which comes back as ~a"
+                           name (shown becomes) (shown comes-back-as))))))))
 
 (defun camel-key (key)
   (if (or (symbolp key) (find #\- key))
       (let* ((name (if (symbolp key) (symbol-name key) (string-upcase key)))
              (camel (to-camel-case (string-downcase name))))
         (unless (and (string= (kebab-name camel) name) (or (symbolp key) (notany #'upper-case-p key)))
-          (error 'name-does-not-come-back :name key :becomes (format nil "~s" camel)
-                                          :comes-back-as (shown-keyword (kebab-name camel))))
+          (error 'name-does-not-come-back :name key :becomes camel :comes-back-as (make-symbol (kebab-name camel))))
         camel)
       key))
 
@@ -58,7 +56,7 @@
 (defun kebab-keyword (key)
   (multiple-value-bind (name kebab camel) (kebab-round-trip key)
     (unless name
-      (error 'name-does-not-come-back :name key :becomes (shown-keyword kebab) :comes-back-as (format nil "~s" camel)))
+      (error 'name-does-not-come-back :name key :becomes (make-symbol kebab) :comes-back-as camel))
     (intern name :keyword)))
 
 (defun find-kebab-keyword (key)

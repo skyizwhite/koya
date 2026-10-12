@@ -22,9 +22,9 @@ and two fields would share a key.
   become that letter in uppercase.
 - One conversion, in `koya-core`, is used by the server's edges and the SDK.
 - A name or key that would not come back as itself is never taken for another.
-  A symbol such as `item-2`, which becomes `item2` and comes back as `:item2`,
-  is refused. A key such as `blog-post`, which becomes `:blog-post` and comes
-  back as `blogPost`, is refused where it would be made a keyword: in data koya
+  A symbol such as `item-2`, which becomes `"item2"` and comes back as `:item2`,
+  is refused. A key such as `"blog-post"`, which becomes `:blog-post` and comes
+  back as `"blogPost"`, is refused where it would be made a keyword: in data koya
   stored and in an answer the SDK reads. The SDK does not read such a key some
   other way: every key koya sends is camelCase and comes back, so one that would
   not is a fault to show, not a spelling to guess at. In data from outside,
@@ -38,7 +38,7 @@ and two fields would share a key.
   letter, `:page-u-r-l`.
 - A site using the SDK that reads a field such as `pageURL` finds it under
   `:page-u-r-l` where it was `:page-url`.
-- Wherever a schema takes a name as a symbol, a field, a custom field, the name
+- Wherever a schema takes a name as a symbol (a field, a custom field, the name
   in `:was`, `:custom-field` or `:custom-fields`, a label, or a field looked up
-  by name, one that would not come back is refused, and the error says what it
+  by name), one that would not come back is refused, and the error says what it
   would become.
