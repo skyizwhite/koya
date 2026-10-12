@@ -1,8 +1,19 @@
 (defpackage #:koya-spec/core/data
   (:use #:cl #:rove)
   (:import-from #:koya-core/data
-                #:data-equal #:without-nulls))
+                #:array-p #:blank-p #:data-equal #:without-nulls))
 (in-package #:koya-spec/core/data)
+
+(deftest an-array
+  (ok (array-p (vector 1 2)) "is a vector")
+  (ng (array-p "ab") "but a string is not one")
+  (ng (array-p nil) "nor is nothing, which is an empty object")
+  (ng (array-p (list :a 1)) "or an object"))
+
+(deftest blank
+  (ok (blank-p nil) "nil is blank")
+  (ok (blank-p "") "and so is an empty string")
+  (ng (blank-p " ") "a space is not"))
 
 (deftest data-is-equal-whatever-order-its-keys-are-in
   (ok (data-equal (list :a 1 :b "x") (list :b "x" :a 1)))

@@ -5,10 +5,8 @@
                 #:map-data-fields #:field-value)
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
-  (:import-from #:koya-core/json
-                #:json-array-p #:blank-p)
   (:import-from #:koya-core/data
-                #:data-equal #:without-nulls)
+                #:data-equal #:without-nulls #:array-p #:blank-p)
   (:import-from #:access
                 #:access #:rem-plist-val)
   (:import-from #:koya-core/time
@@ -231,7 +229,7 @@
 (defun held-ids (value many)
   (remove-if-not (lambda (id) (and (stringp id) (not (blank-p id))))
                  (if many
-                     (and (json-array-p value) (coerce value 'list))
+                     (and (array-p value) (coerce value 'list))
                      (list value))))
 
 (defun slug-value (model data)

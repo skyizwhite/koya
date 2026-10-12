@@ -19,8 +19,7 @@
                 #:row-field-id
                 #:row-fields
                 #:key-name)
-  (:import-from #:koya-core/json
-                #:json-array-p)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:cl-ppcre
                 #:scan)
   (:import-from #:koya-core/time
@@ -46,12 +45,12 @@
   (or (null value)
       (eq value :null)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
-      (and (json-array-p value) (zerop (length value)))))
+      (and (array-p value) (zerop (length value)))))
 
 (defun blank-for-field-p (field value)
   (or (eq value :null)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
-      (and (or (field-many-p field) (eq (field-type field) :repeater)) (json-array-p value) (zerop (length value)))))
+      (and (or (field-many-p field) (eq (field-type field) :repeater)) (array-p value) (zerop (length value)))))
 
 (defun err (field code fmt &rest args)
   (list :field (field-name field) :code code :message (apply #'format nil fmt args)))
@@ -160,14 +159,14 @@
          (inside (field-name field) (validate-fields (field-fields field) value nil))
          (list (err field "type" "must be an object"))))
     (:repeater
-     (if (json-array-p value)
+     (if (array-p value)
          (loop :for row :across value :for index :from 0 :append (check-row field index row))
          (list (err field "type" "must be an array"))))
     (t (check-many field value))))
 
 (defun check-many (field value)
   (if (field-many-p field)
-      (if (json-array-p value)
+      (if (array-p value)
           (loop :for v :across value :append (check-one field v))
           (list (err field "type" "must be an array")))
       (check-one field value)))
@@ -216,8 +215,8 @@
         ((eq (field-type field) :custom)
          (if (listp value) (values (fitted-fields (field-fields field) value) t) (values nil nil)))
         ((eq (field-type field) :repeater)
-         (if (json-array-p value) (values (fitted-rows field value) t) (values nil nil)))
-        ((json-array-p value)
+         (if (array-p value) (values (fitted-rows field value) t) (values nil nil)))
+        ((array-p value)
          (if (member :many (field-type-options (field-type field)))
              (values (remove-if (lambda (v) (type-errors field v)) value) t)
              (values nil nil)))

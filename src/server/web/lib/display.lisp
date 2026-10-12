@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/lib/display
   (:use #:cl)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-server/domain/timezone #:format-local)
   (:import-from #:koya-server/usecases/settings #:display-timezone)
   (:import-from #:koya-server/usecases/actor #:actor-key-label)

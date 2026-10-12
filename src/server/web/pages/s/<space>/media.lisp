@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/media
   (:use #:cl #:hsx)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-follow #:on-search #:on-pick)

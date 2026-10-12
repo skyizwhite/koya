@@ -36,8 +36,7 @@
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:slug-name-p
                 #:model-name #:model-fields #:field-name #:field-option #:key-name)
-  (:import-from #:koya-core/json #:json-array-p)
-  (:import-from #:koya-core/data #:without-nulls)
+  (:import-from #:koya-core/data #:without-nulls #:array-p)
   (:import-from #:access #:access)
   (:import-from #:koya-core/time #:now-iso)
   (:import-from #:koya-core/validate #:content-id-p #:validate-content #:fitted-shape #:datetime-string-p)
@@ -136,7 +135,7 @@
 (defun array-field (object key &optional (name "~a") &rest args)
   (multiple-value-bind (value found) (value-of object key)
     (cond ((not found) #())
-          ((json-array-p value) value)
+          ((array-p value) value)
           (t (fail "~? must be an array" name (or args (list (key-name key))))))))
 
 (defun timestamp-field (object key id &key required)

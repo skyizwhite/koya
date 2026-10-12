@@ -1,6 +1,6 @@
 (defpackage #:koya-server/usecases/listing
   (:use #:cl)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type
                 #:+system-fields+ #:field-option #:field-many-p #:map-data-fields #:field-value)

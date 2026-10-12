@@ -1,6 +1,6 @@
 (defpackage #:koya-server/domain/html
   (:use #:cl)
-  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:cl-ppcre #:split)
   (:export #:html-text
            #:data-text))
@@ -59,5 +59,5 @@
   (loop :for (name value) :on data :by #'cddr
         :append (cond ((stringp value) (list name (html-text value)))
                       ((consp value) (list name (data-text value)))
-                      ((and (json-array-p value) (some #'consp value))
+                      ((and (array-p value) (some #'consp value))
                        (list name (map 'vector (lambda (row) (if (consp row) (data-text row) row)) value))))))

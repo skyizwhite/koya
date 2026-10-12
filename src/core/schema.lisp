@@ -2,8 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/case
                 #:camel-key #:kebab-keyword #:name-does-not-come-back)
-  (:import-from #:koya-core/json
-                #:json-array-p)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:access
                 #:access #:rem-plist-val)
   (:import-from #:cl-ppcre
@@ -286,7 +285,7 @@
                       (when (and found (listp value))
                         (setf (field-value out field) (walk (field-fields field) value field))))
                      (:repeater
-                      (when (json-array-p value)
+                      (when (array-p value)
                         (setf (field-value out field)
                               (map 'vector (lambda (row)
                                              (let ((kind (row-kind field row)))

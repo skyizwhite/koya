@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/lib/urls
   (:use #:cl)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:cl-ppcre
                 #:regex-replace-all)

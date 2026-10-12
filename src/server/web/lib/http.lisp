@@ -4,7 +4,8 @@
                 #:set-response-header #:set-response-status #:get-request-header #:redirect
                 #:*request* #:process-response #:request-content)
   (:import-from #:koya-core/json
-                #:parse-json #:to-json #:jobject #:blank-p #:json-null #:json-null-p)
+                #:parse-json #:to-json #:jobject #:json-null #:json-null-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-core/schema
                 #:schema-error #:schema-error-message)
   (:import-from #:koya-core/case

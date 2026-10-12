@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/deploys
   (:use #:cl #:hsx)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/usecases/schema #:list-deploys #:count-deploys #:+deploys-kept+)
   (:import-from #:koya-server/usecases/spaces #:find-space)

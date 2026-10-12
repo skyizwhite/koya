@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:field-type #:field-name #:field-fields #:row-kind #:custom-field-name #:custom-field-fields
                 #:field-value)
-  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-core/validate #:blank-value-p)
   (:import-from #:koya-server/domain/html #:html-text)
   (:import-from #:koya-server/web/lib/display #:short-time)
@@ -44,8 +44,8 @@
          (fields-text (field-fields field) value (string #\Newline) label))
         ((or (not found) (blank-value-p value)) nil)
         ((eq (field-type field) :repeater)
-         (and (json-array-p value) (rows-text field value label)))
-        ((json-array-p value)
+         (and (array-p value) (rows-text field value label)))
+        ((array-p value)
          (let ((texts (remove nil (map 'list (lambda (v) (scalar-text field v label)) value))))
            (and texts (format nil "~{~a~^, ~}" texts))))
         (t (scalar-text field value label))))

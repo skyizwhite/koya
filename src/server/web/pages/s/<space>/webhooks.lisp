@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/webhooks
   (:use #:cl #:hsx)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-follow)
   (:import-from #:koya-core/schema

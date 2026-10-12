@@ -1,6 +1,6 @@
 (defpackage #:koya-server/usecases/webhooks
   (:use #:cl)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-core/schema #:model-name #:webhook-covers-p #:webhook-label #:webhook-url)
   (:import-from #:koya-server/usecases/ports/spaces #:space-webhooks)
   (:import-from #:quri #:uri #:uri-host #:uri-error)
