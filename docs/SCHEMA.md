@@ -275,7 +275,7 @@ boolean is `false`. Otherwise:
 | `text` `textarea` `richtext` | string | `maxLength` (`max_length`), `pattern` (`pattern`) |
 | `slug` | string `^[a-z0-9]+(-[a-z0-9]+)*$` (`slug`) | as `text` |
 | `number` | number | `integer` (`integer`), `min` (`min`), `max` (`max`) |
-| `boolean` | `true` / `false` | |
+| `boolean` | `true` / `false`; `{}` is taken as `false` | |
 | `date` | `"YYYY-MM-DD"`, a real calendar date | |
 | `datetime` | ISO 8601 with seconds optional and an explicit zone: `2026-09-20T10:00:00.000Z`, `2026-09-20T19:00+09:00`. Stored to the minute in UTC: seconds are dropped, so the second example is kept as `2026-09-20T10:00:00.000Z` | |
 | `select` | one of `options` (`option`) | |

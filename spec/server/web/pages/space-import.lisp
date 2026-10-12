@@ -483,3 +483,20 @@
     (ok (string= (content-status (get-content "odd" "t1")) "published")
         "a published version with no values is published still")
     (delete-space "odd")))
+
+(defun archive-of (json)
+  (let ((path (zip-of "space.json" (string-to-octets json :encoding :utf-8))))
+    (prog1 (read-file-bytes path) (delete-file path))))
+
+(deftest a-version-written-as-false-is-none
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (ok (string= (nth-value 1 (import-archive
+                             (archive-of "{\"koyaExport\": 1, \"space\": \"falsy\",
+                                           \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
+                                                                                     \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
+                                           \"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"published\": false, \"draft\": {\"name\": \"x\"},
+                                                           \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}")))
+               "/s/falsy"))
+  (ok (string= (content-status (get-content "falsy" "t1")) "draft") "a published version of false is none, as null is")
+  (delete-space "falsy"))

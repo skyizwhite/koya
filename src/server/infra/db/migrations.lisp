@@ -6,7 +6,8 @@
                 #:now-iso)
   (:import-from #:koya-core/json #:parse-json #:to-json)
   (:import-from #:koya-core/schema-json #:forget-slug-options)
-  (:import-from #:koya-core/case #:jvalue->data)
+  (:import-from #:koya-core/case #:jvalue->data #:data->jobject)
+  (:import-from #:koya-core/data #:without-nulls)
   (:import-from #:koya-server/infra/db/contents #:text-column)
   (:export #:migrate
            #:current-version))
@@ -224,7 +225,9 @@
                 FROM models m, json_each(m.definition, '$.fields') f
                WHERE m.kind = 'list' AND json_extract(f.value, '$.type') = 'slug'
                GROUP BY m.space, m.name HAVING COUNT(*) = 1) AS s
-       WHERE contents.space = s.space AND contents.model = s.model")))
+       WHERE contents.space = s.space AND contents.model = s.model")
+    (17
+     drop-stored-nulls)))
 
 (defun drop-slug-options ()
   (dolist (row (fetch "SELECT space, name, definition FROM models"))
@@ -238,6 +241,22 @@
     (dolist (row (fetch "SELECT rowid AS r, published, draft FROM contents"))
       (exec "UPDATE contents SET published_text = ?, draft_text = ? WHERE rowid = ?"
             (text (col row "published")) (text (col row "draft")) (col row "r")))))
+
+(defun without-stored-nulls (json)
+  (and json (to-json (data->jobject (without-nulls (jvalue->data (parse-json json) :intern t))))))
+
+(defun drop-stored-nulls ()
+  (dolist (row (fetch "SELECT rowid AS r, published, draft FROM contents
+                        WHERE published LIKE '%null%' OR draft LIKE '%null%'"))
+    (let ((published (without-stored-nulls (col row "published")))
+          (draft (without-stored-nulls (col row "draft"))))
+      (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE rowid = ?"
+            published draft
+            (and published (text-column (jvalue->data (parse-json published) :intern t)))
+            (and draft (text-column (jvalue->data (parse-json draft) :intern t)))
+            (col row "r"))))
+  (dolist (row (fetch "SELECT id, data FROM content_revisions WHERE data LIKE '%null%'"))
+    (exec "UPDATE content_revisions SET data = ? WHERE id = ?" (without-stored-nulls (col row "data")) (col row "id"))))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

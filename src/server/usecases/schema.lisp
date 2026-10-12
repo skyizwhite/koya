@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
                 #:field-name #:field-option #:field-unique-p #:model-kind #:field-fields #:field-row-kind
-                #:field-path-parts #:custom-field-fields #:field-key #:field-value #:name-key)
+                #:field-path-parts #:custom-field-fields #:field-key #:field-value #:name-key #:row-field-id)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:access #:access)
@@ -120,7 +120,7 @@
         ((listp value) (without-gone value nil gone))
         ((json-array-p value)
          (map 'vector (lambda (row)
-                        (if (listp row) (without-gone row (access row :field-id :test #'eq) gone) row))
+                        (if (listp row) (without-gone row (row-field-id row) gone) row))
               value))
         (t value)))
 
@@ -148,7 +148,7 @@
                                       ((and kind (json-array-p deployed))
                                        (loop :for row :across deployed
                                              :for index :from 0
-                                             :when (and (listp row) (equal (access row :field-id :test #'eq) kind))
+                                             :when (and (listp row) (equal (row-field-id row) kind))
                                                :append (object-misfits content version check inner row
                                                                        (format nil "~a[~a]" (field-name outer) index))))
                                       (t '()))))))

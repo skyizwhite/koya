@@ -35,9 +35,9 @@
                 #:key-id #:key-hash #:key-label #:key-created-at #:new-webhook-secret)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:slug-name-p
-                #:model-name #:model-fields #:field-name #:field-option)
-  (:import-from #:koya-core/case #:camel-key)
-  (:import-from #:koya-core/data #:array-p #:without-nulls)
+                #:model-name #:model-fields #:field-name #:field-option #:key-name)
+  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/data #:without-nulls)
   (:import-from #:access #:access)
   (:import-from #:koya-core/time #:now-iso)
   (:import-from #:koya-core/validate #:content-id-p #:validate-content #:fitted-shape #:datetime-string-p)
@@ -126,18 +126,18 @@
   (let ((value (value-of object key)))
     (cond ((stringp value) value)
           ((and (null value) (not required)) nil)
-          (t (fail "~a must be a string" (camel-key key))))))
+          (t (fail "~a must be a string" (key-name key))))))
 
 (defun data-field (object key)
   (multiple-value-bind (value found) (value-of object key)
-    (unless (listp value) (fail "~a must be an object or null" (camel-key key)))
+    (unless (listp value) (fail "~a must be an object or null" (key-name key)))
     (values (without-nulls value) found)))
 
 (defun timestamp-field (object key id &key required)
   (let ((value (value-of object key)))
     (cond ((and (null value) (not required)) nil)
           ((and (stringp value) (datetime-string-p value)) (format-iso (parse-iso value)))
-          (t (fail "Content ~a: ~a must be an ISO 8601 datetime with a date, a time and a zone" id (camel-key key))))))
+          (t (fail "Content ~a: ~a must be an ISO 8601 datetime with a date, a time and a zone" id (key-name key))))))
 
 (defun check-fits (id model data)
   (let ((error (first (validate-content model data))))
@@ -154,7 +154,7 @@
         (unless (and (content-id-p id) (string/= id "new")) (fail "~s is not a content id" id))
         (unless (schema-model schema model) (fail "Content ~a belongs to ~a, which the schema has no model for" id model))
         (unless (or published-p draft-p) (fail "Content ~a has neither published data nor a draft" id))
-        (unless (array-p revisions) (fail "The revisions of content ~a must be an array" id))
+        (unless (json-array-p revisions) (fail "The revisions of content ~a must be an array" id))
         (when published-p (check-fits id (schema-model schema model) published))
         (when draft-p (check-fits id (schema-model schema model) draft))
         (list
@@ -194,9 +194,9 @@
 
 (defun parse-keys (document key)
   (let ((keys (or (value-of document key) #())))
-    (unless (array-p keys) (fail "~a must be an array" (camel-key key)))
+    (unless (json-array-p keys) (fail "~a must be an array" (key-name key)))
     (map 'list (lambda (k)
-                 (unless (listp k) (fail "Each of ~a must be an object" (camel-key key)))
+                 (unless (listp k) (fail "Each of ~a must be an object" (key-name key)))
                  (let ((hash (string-field k :key-hash :required t)))
                    (unless (scan "^[0-9a-f]{64}\\z" hash) (fail "~s is not a key hash" hash))
                    (list :id (string-field k :id :required t) :hash hash

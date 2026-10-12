@@ -15,13 +15,12 @@
                 #:custom-field-name
                 #:field-row-kinds
                 #:field-row-kind
-                #:custom-field-fields)
+                #:custom-field-fields
+                #:row-field-id
+                #:row-fields
+                #:key-name)
   (:import-from #:koya-core/json
                 #:json-array-p)
-  (:import-from #:koya-core/case
-                #:camel-key)
-  (:import-from #:access
-                #:access #:rem-plist-val)
   (:import-from #:cl-ppcre
                 #:scan)
   (:import-from #:koya-core/time
@@ -143,14 +142,11 @@
   (mapcar (lambda (e) (list* :field (format nil "~a.~a" path (getf e :field)) (rest (rest e))))
           errors))
 
-(defun row-fields (row)
-  (values (rem-plist-val :field-id row :test #'eq)))
-
 (defun check-row (field index row)
   (let ((path (format nil "~a[~a]" (field-name field) index)))
     (if (not (listp row))
         (list (list :field path :code "type" :message "must be an object"))
-        (let ((kind (field-row-kind field (access row :field-id :test #'eq))))
+        (let ((kind (field-row-kind field (row-field-id row))))
           (if (null kind)
               (list (list :field path :code "custom_field"
                           :message (format nil "must name its custom field in fieldId, one of ~{~a~^, ~}"
@@ -178,9 +174,6 @@
 
 (defun validate-content (model data &key partial)
   (validate-fields (model-fields model) data partial))
-
-(defun key-name (key)
-  (if (stringp key) key (camel-key key)))
 
 (defun validate-fields (fields data partial)
   (let ((errors '())
@@ -215,7 +208,7 @@
                 :for kind := (row-kind field row)
                 :when kind
                   :collect (append (fitted-fields (custom-field-fields kind) row)
-                                   (list :field-id (access row :field-id :test #'eq))))
+                                   (list :field-id (row-field-id row))))
           'vector))
 
 (defun fitted-value (field value)

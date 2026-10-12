@@ -57,7 +57,9 @@
 
 (defun document->json (document)
   (let ((out (jobject "koyaExport" +archive-version+)))
-    (maphash (lambda (k v) (setf (gethash k out) v)) (data->jvalue document))
+    (maphash (lambda (k v) (setf (gethash k out) v))
+             (data->jvalue (loop :for (key value) :on document :by #'cddr
+                                 :unless (member key '(:schema :contents)) :append (list key value))))
     (setf (gethash "schema" out) (schema->jobject (access document :schema :test #'eq))
           (gethash "contents" out) (map 'vector #'content->jvalue (access document :contents :test #'eq)))
     (to-json out)))
@@ -68,6 +70,15 @@
       (map nil #'forget-slug-options models)))
   schema)
 
+(defun versions-as-written (contents)
+  (when (json-array-p contents)
+    (loop :for content :across contents
+          :when (hash-table-p content)
+            :do (dolist (key '("published" "draft"))
+                  (multiple-value-bind (value found) (gethash key content)
+                    (when (and found (null value))
+                      (setf (gethash key content) 'null)))))))
+
 (defun json->document (json)
   (let ((document (handler-case (parse-json json)
                     (error () (fail 'invalid-input "space.json is not valid JSON")))))
@@ -77,6 +88,7 @@
                                    (jget document "koyaExport") +archive-version+)))
     (let ((schema (jobject->schema (without-slug-options (jget document "schema")))))
       (remhash "schema" document)
+      (versions-as-written (jget document "contents"))
       (list* :schema schema (jvalue->data document)))))
 
 (defmethod archive-document (archive)

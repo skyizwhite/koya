@@ -9,7 +9,7 @@
                 #:check-deployable
                 #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields
                 #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields #:field-key
-                #:field-value #:without-field #:row-kind)
+                #:field-value #:without-field #:row-kind #:row-field-id #:row-fields #:key-name)
   (:import-from #:access
                 #:access #:accesses)
   (:export #:sample-schema #:with-seo #:blocks-schema))
@@ -380,7 +380,15 @@
       (ok (string= (custom-field-name (row-kind field (list :field-id "body"))) "body"))
       (ok (null (row-kind field (list "field-id" "body"))) "by its keyword alone")
       (ok (null (row-kind field nil)) "and an empty row has none")
-      (ok (null (row-kind field "body")) "nor has what is not a row"))))
+      (ok (null (row-kind field "body")) "nor has what is not a row")))
+  (testing "a row is its fieldId and its fields"
+    (ok (string= (row-field-id (list :text "t" :field-id "body")) "body"))
+    (ok (null (row-field-id (list "field-id" "body"))) "found by its keyword alone")
+    (ok (equal (row-fields (list :text "t" :field-id "body" :note "n")) '(:text "t" :note "n"))
+        "and its fields are what is left without it"))
+  (testing "a key is named as its field is"
+    (ok (string= (key-name :event-at) "eventAt"))
+    (ok (string= (key-name "event-at") "event-at") "and a key that stayed a string, as it came")))
 
 (deftest a-field-has-its-name-as-a-keyword
   (ok (eq (field-key (make-field :event-at :text)) :event-at))

@@ -37,7 +37,7 @@
   (:import-from #:koya-server/usecases/ports/sessions #:make-session-store #:delete-sessions)
   (:import-from #:koya-server/infra/db/sessions #:purge-expired-sessions)
   (:import-from #:koya-server/domain/content
-                #:content-id #:content-model #:content-published #:content-draft)
+                #:content-id #:content-model #:content-published #:content-draft #:content-status)
   (:import-from #:koya-server/domain/revision
                 #:revision-event #:revision-data #:revision-created-at)
   (:import-from #:lack/middleware/session/store
@@ -74,7 +74,7 @@
   (migrate))
 
 (deftest migrations
-  (ok (= (current-version) 16))
+  (ok (= (current-version) 17))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -85,7 +85,7 @@
         "legacy" "about" "object"
         "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
         0)
-  (ok (equal (migrate) '(10 11 12 13 14 15 16)))
+  (ok (equal (migrate) '(10 11 12 13 14 15 16 17)))
   (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
     (ng (search "previewUrl" definition))
     (ok (search "https://x/about" definition) "a web address is kept"))
@@ -96,7 +96,7 @@
   (create-space "legacy")
   (exec "UPDATE spaces SET webhooks = ? WHERE name = 'legacy'"
         "[{\"label\":\"bare\",\"url\":\"example.com/hook\"},{\"label\":\"site\",\"url\":\"https://x/hook\"},{\"label\":\"ftp\",\"url\":\"ftp://x/hook\"}]")
-  (ok (equal (migrate) '(11 12 13 14 15 16)))
+  (ok (equal (migrate) '(11 12 13 14 15 16 17)))
   (ok (equal (mapcar (lambda (hook) (getf hook :label)) (space-webhooks "legacy")) '("site"))
       "the space still reads, with the one hook that can be sent")
   (migrated-fully))
@@ -365,7 +365,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('kept', 'publish', '{\"title\":\"Old\",\"gone\":{\"a\":1}}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(12 13 14 15 16)))
+  (ok (equal (migrate) '(12 13 14 15 16 17)))
   (let ((content (get-content "leftover" "kept")))
     (ng (nth-value 1 (access (content-published content) :gone)))
     (ng (nth-value 1 (access (content-draft content) :gone)))
@@ -438,7 +438,7 @@
     (row "live" "published" "{\"body\":\"<p>live</p>\"}" nil)
     (row "both" "published+draft" "{\"body\":\"<p>old</p>\"}" "{\"body\":\"<p>new</p>\"}")
     (row "bare" "draft" nil "{\"n\":1}"))
-  (ok (equal (migrate) '(14 15 16)))
+  (ok (equal (migrate) '(14 15 16 17)))
   (ok (texts-fit-p "older") "every content gets the text of its data")
   (ok (string= (col (fetch-one "SELECT draft_text FROM contents WHERE id = 'drafted'") "draft_text")
                "{\"body\":\"new & bold\"}"))
@@ -508,7 +508,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('about', 'publish', '{\"title\":\"One\"}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(13 14 15 16)))
+  (ok (equal (migrate) '(13 14 15 16 17)))
   (testing "what was stored moves into its space, history and all"
     (ok (string= (access (content-published (get-content "one" "about")) :title) "One"))
     (ok (equal (mapcar #'revision-event (list-revisions "one" "about")) '("publish"))))
@@ -721,7 +721,7 @@
     (row "second" "page" nil "{\"slug\":\"same\"}")
     (row "only" "page" "{\"slug\":\"only\"}" nil)
     (row "pair" "twin" "{\"a\":\"x\",\"b\":\"y\"}" nil))
-  (ok (equal (migrate) '(16)))
+  (ok (equal (migrate) '(16 17)))
   (testing "the schema loses what a slug no longer takes, and is read"
     (dolist (row (fetch "SELECT definition FROM models WHERE space = 'older'"))
       (ng (search "\"from\"" (col row "definition")))
@@ -748,3 +748,31 @@
 (defun content-data-of (id)
   (let ((content (get-content "older" id)))
     (or (content-published content) (content-draft content))))
+
+(deftest a-null-stored-before-is-taken-away
+  (migrated-to 16)
+  (create-space "older")
+  (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
+        "older" "post" "list"
+        "{\"name\":\"post\",\"kind\":\"list\",\"fields\":[{\"name\":\"title\",\"type\":\"text\"},{\"name\":\"body\",\"type\":\"richtext\"}]}"
+        0)
+  (exec "INSERT INTO contents (id, space, model, status, published, draft, created_at, updated_at)
+         VALUES ('nulled', 'older', 'post', 'published+draft', '{\"title\":\"Live\",\"body\":null}', '{\"title\":null,\"body\":\"<p>b</p>\"}',
+                 '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
+  (exec "INSERT INTO contents (id, space, model, status, published, draft, published_text, created_at, updated_at)
+         VALUES ('clean', 'older', 'post', 'published', '{\"title\":\"Clean\",\"card\":{}}', NULL, '{\"title\":\"Clean\"}',
+                 '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
+  (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at)
+         VALUES ('older', 'nulled', 'draft', '{\"title\":null,\"rows\":[{\"fieldId\":\"h\",\"text\":null}]}', '', '2026-01-01T00:00:00.000Z')")
+  (ok (equal (migrate) '(17)))
+  (let ((content (get-content "older" "nulled")))
+    (ok (string= (content-status content) "published+draft") "the content is as it was")
+    (ok (equal (content-published content) '(:title "Live")) "less the nulls of its published data")
+    (ok (equal (content-draft content) '(:body "<p>b</p>")) "and of its draft"))
+  (ok (equalp (revision-data (first (list-revisions "older" "nulled"))) (list :rows (vector (list :field-id "h"))))
+      "and of its history, inside a row too")
+  (ok (texts-fit-p "older") "and its text follows")
+  (ok (string= (col (fetch-one "SELECT published FROM contents WHERE id = 'clean'") "published")
+               "{\"title\":\"Clean\",\"card\":{}}")
+      "a content that holds no null is left as it is written")
+  (migrated-fully))

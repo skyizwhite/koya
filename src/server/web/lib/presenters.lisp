@@ -1,12 +1,11 @@
 (defpackage #:koya-server/web/lib/presenters
   (:use #:cl)
-  (:import-from #:koya-core/json #:jobject #:json-null #:to-json)
+  (:import-from #:koya-core/json #:jobject #:json-null #:json-array-p #:to-json)
   (:import-from #:koya-core/case #:camel-key #:data->jvalue)
   (:import-from #:koya-core/schema
                 #:model-fields #:field-name #:field-key #:field-type #:field-fields #:custom-field-fields
-                #:map-data-fields #:field-value #:row-kind)
+                #:map-data-fields #:field-value #:row-kind #:row-field-id #:row-fields)
   (:import-from #:koya-core/schema-json #:change->jobject)
-  (:import-from #:access #:access #:rem-plist-val)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
                 #:content-published-p #:content-draft-p
@@ -59,15 +58,15 @@
 (defun present-row (field row)
   (let ((kind (row-kind field row)))
     (if kind
-        (let ((out (present-fields (custom-field-fields kind) (values (rem-plist-val :field-id row :test #'eq)))))
-          (setf (gethash "fieldId" out) (access row :field-id :test #'eq))
+        (let ((out (present-fields (custom-field-fields kind) (row-fields row))))
+          (setf (gethash "fieldId" out) (row-field-id row))
           out)
         (present-value row))))
 
 (defun present-field (field value)
   (case (field-type field)
     (:custom (if (listp value) (present-fields (field-fields field) value) (present-value value)))
-    (:repeater (if (and (vectorp value) (not (stringp value)))
+    (:repeater (if (json-array-p value)
                    (map 'vector (lambda (row) (present-row field row)) value)
                    (present-value value)))
     (t (present-value value))))

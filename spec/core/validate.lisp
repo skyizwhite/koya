@@ -37,7 +37,9 @@
                      \"labels\": [\"a\", \"b\"], \"tags\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"],
                      \"cover\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\", \"body\": \"# hi\"}")))
   (ok (null (codes "{\"title\": \"Hello\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"featured\": false}"))
-      "false boolean is fine"))
+      "false boolean is fine")
+  (ok (null (codes "{\"title\": \"Hello\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"featured\": {}}"))
+      "and an empty object is false, as false and {} are one value"))
 
 (deftest required
   (ok (equal (codes "{}") '(("title" . "required") ("eventAt" . "required"))))

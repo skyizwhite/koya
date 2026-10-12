@@ -1,14 +1,12 @@
 (defpackage #:koya-core/data
   (:use #:cl)
+  (:import-from #:koya-core/json
+                #:json-array-p)
   (:import-from #:access
                 #:access)
-  (:export #:array-p
-           #:data-equal
+  (:export #:data-equal
            #:without-nulls))
 (in-package #:koya-core/data)
-
-(defun array-p (value)
-  (and (vectorp value) (not (stringp value))))
 
 (defun plist-equal (a b)
   (and (= (length a) (length b))
@@ -18,7 +16,7 @@
 
 (defun data-equal (a b)
   (cond ((and (listp a) (listp b)) (plist-equal a b))
-        ((and (array-p a) (array-p b))
+        ((and (json-array-p a) (json-array-p b))
          (and (= (length a) (length b)) (every #'data-equal a b)))
         ((and (numberp a) (numberp b)) (= a b))
         (t (equal a b))))
@@ -27,5 +25,5 @@
   (cond ((consp value)
          (loop :for (key v) :on value :by #'cddr
                :unless (eq v :null) :append (list key (without-nulls v))))
-        ((array-p value) (map 'vector #'without-nulls value))
+        ((json-array-p value) (map 'vector #'without-nulls value))
         (t value)))

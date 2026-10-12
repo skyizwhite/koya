@@ -2,6 +2,8 @@
   (:use #:cl)
   (:import-from #:koya-core/case
                 #:camel-key #:kebab-keyword #:name-does-not-come-back)
+  (:import-from #:koya-core/json
+                #:json-array-p)
   (:import-from #:access
                 #:access #:rem-plist-val)
   (:import-from #:cl-ppcre
@@ -24,10 +26,13 @@
            #:field-row-kind
            #:field-path-parts
            #:row-kind
+           #:row-field-id
+           #:row-fields
            #:map-data-fields
            #:field-value
            #:without-field
            #:name-key
+           #:key-name
            #:custom-field
            #:make-custom-field
            #:custom-field-name
@@ -125,6 +130,9 @@
 
 (defun name-key (name)
   (kebab-keyword name))
+
+(defun key-name (key)
+  (if (stringp key) key (camel-key key)))
 
 (defun camel-name (given)
   (if (symbolp given)
@@ -259,8 +267,14 @@
 (defun without-field (object field)
   (values (rem-plist-val (field-key field) object :test #'eq)))
 
+(defun row-field-id (row)
+  (access row :field-id :test #'eq))
+
+(defun row-fields (row)
+  (values (rem-plist-val :field-id row :test #'eq)))
+
 (defun row-kind (field row)
-  (and (listp row) (field-row-kind field (access row :field-id :test #'eq))))
+  (and (listp row) (field-row-kind field (row-field-id row))))
 
 (defun map-data-fields (fields data fn)
   (labels ((walk (fields data outer)
@@ -272,7 +286,7 @@
                       (when (and found (listp value))
                         (setf (field-value out field) (walk (field-fields field) value field))))
                      (:repeater
-                      (when (and (vectorp value) (not (stringp value)))
+                      (when (json-array-p value)
                         (setf (field-value out field)
                               (map 'vector (lambda (row)
                                              (let ((kind (row-kind field row)))
