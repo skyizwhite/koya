@@ -748,6 +748,46 @@
     (replace-schema "website" (make-schema :models (list (blog-model)
                                                          (make-model "about" :object (list (make-field :body :richtext))))))))
 
+(deftest a-history-names-what-its-versions-hold-together
+  (exec "DELETE FROM contents")
+  (replace-schema "website" (with-deck))
+  (unwind-protect
+       (let ((deck-model (nth-value 1 (resolve-model "website" "deck")))
+             (posts (loop :for title :in '("Linked" "Other")
+                          :collect (content-id (create "website" (nth-value 1 (resolve-model "website" "blog"))
+                                                       (list :title title) :publish t))))
+             (photos (loop :for name :in '("a.png" "b.png" "framed.png")
+                           :collect (media-id (insert-media "website" (new-id) :filename name :mime "image/png" :size 10
+                                                                               :width 1 :height 1)))))
+         (flet ((deck (rows)
+                  (let ((id (content-id (create "website" deck-model
+                                                (list :title "Deck" :lead (first posts)
+                                                      :cards (vector (list :field-id "card" :link (first posts) :photo (first photos))))
+                                                :publish t))))
+                    (update-draft "website" deck-model id
+                                  (list :frame (list :photo (third photos) :link (second posts))
+                                        :gallery (coerce photos 'vector)
+                                        :cards (coerce (loop :for i :below rows
+                                                             :collect (list :field-id "card" :link (nth (mod i 2) posts)
+                                                                            :photo (nth (mod i 2) photos)))
+                                                       'vector)))
+                    id))
+                (history (id)
+                  (let ((body nil))
+                    (values (reads-of (lambda () (setf body (nth-value 1 (request :get (format nil "/s/website/m/deck/~a/history" id))))))
+                            body))))
+           (multiple-value-bind (one body) (history (deck 1))
+             (ok (equal one '("(FIND-CONTENTS-BY-IDS blog)" "(FIND-CONTENTS-BY-IDS series)" "(FIND-CONTENTS-BY-IDS topic)"
+                              "FIND-CONTENT" "FIND-MEDIA-BY-IDS"))
+                 "a history page reads the contents of each model its reference fields name once and their media once, beside the content itself")
+             (ok (equal (history (deck 20)) one) "however many references and media its versions hold")
+             (ok (search "framed.png (" body) "and names a media inside a custom field by its file")
+             (ok (search "Other (" body) "and a reference by its label"))))
+    (exec "DELETE FROM contents")
+    (exec "DELETE FROM media")
+    (replace-schema "website" (make-schema :models (list (blog-model)
+                                                         (make-model "about" :object (list (make-field :body :richtext))))))))
+
 (defun with-deck ()
   (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "blog")
                                                                     (make-field :photo :media)))

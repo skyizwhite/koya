@@ -7,15 +7,13 @@
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-field #:field-type #:field-option #:field-value)
   (:import-from #:koya-core/validate #:blank-value-p)
-  (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions)
+  (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions #:held-names)
   (:import-from #:koya-server/usecases/contents #:find-content)
   (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content #:content-id #:content-label)
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by
                 #:revision-created-at #:changed-keys)
-  (:import-from #:koya-server/usecases/media #:find-media)
-  (:import-from #:koya-server/domain/media #:media-filename)
   (:import-from #:koya-server/web/lib/http #:path-param #:param)
   (:import-from #:koya-server/domain/errors #:not-found)
   (:import-from #:koya-server/web/lib/value-text #:value-text)
@@ -28,7 +26,7 @@
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
-  (:import-from #:koya-server/usecases/schema #:resolve-model #:find-model)
+  (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:export #:@get #:browse-history))
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/<id>/history)
 
@@ -48,13 +46,13 @@
         ((string= event "unpublish") "bg-warn/10 text-warn")
         (t "bg-line text-muted")))
 
-(defun id-text (space field id)
-  (let ((label (if (eq (field-type field) :media)
-                   (let ((media (find-media space id))) (and media (media-filename media)))
-                   (let* ((target-model (find-model space (field-option field :model)))
-                          (target (and target-model (find-content space (model-name target-model) id))))
-                     (and target (content-label target target-model))))))
-    (if (and label (string/= label id)) (format nil "~a (~a)" label id) id)))
+(defun id-text-for (space model revisions)
+  (multiple-value-bind (media-names content-names) (held-names space model (mapcar #'revision-data revisions))
+    (lambda (field id)
+      (let ((label (gethash id (if (eq (field-type field) :media)
+                                   media-names
+                                   (gethash (field-option field :model) content-names)))))
+        (if (and label (string/= label id)) (format nil "~a (~a)" label id) id)))))
 
 (defun richtext-document (html)
   (format nil "<!doctype html><html class=\"overflow-hidden\"><head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"~a\"></head>~
@@ -65,11 +63,11 @@
   (hsx (iframe :sandbox "allow-same-origin" :srcdoc (richtext-document html) :title "rich text"
                :nm-bind "{ oninit: () => koya.fitContent(this) }" :class "block h-16 w-full")))
 
-(defcomp ~value (&key space field value found class)
+(defcomp ~value (&key label field value found class)
   (let* ((richtext (and (eq (field-type field) :richtext) (stringp value)))
          (shown (if richtext
                     (and found (not (blank-value-p value)))
-                    (value-text field value found (lambda (field id) (id-text space field id))))))
+                    (value-text field value found label))))
     (hsx
      (div :class (clsx "max-h-64 overflow-auto break-words rounded border px-3 py-2"
                        (if shown class "border-line text-muted"))
@@ -77,7 +75,7 @@
              (richtext (~richtext :html value))
              (t (hsx (div :class "whitespace-pre-wrap font-mono text-xs leading-5" shown))))))))
 
-(defcomp ~changes (&key space model compared before after)
+(defcomp ~changes (&key label model compared before after)
   (let ((keys (changed-keys model before after)))
     (hsx
      (<> (if (null keys)
@@ -91,14 +89,14 @@
                                    (p :class "mb-1 text-sm font-medium" key)
                                    (if compared
                                        (hsx (div :class "grid gap-2 sm:grid-cols-2"
-                                              (~value :space space :field field :value old :found found-old
+                                              (~value :label label :field field :value old :found found-old
                                                       :class "border-danger/30 bg-danger/5")
-                                              (~value :space space :field field :value new :found found-new
+                                              (~value :label label :field field :value new :found found-new
                                                       :class "border-ok/30 bg-ok/5")))
-                                       (hsx (~value :space space :field field :value new :found found-new
+                                       (hsx (~value :label label :field field :value new :found found-new
                                                     :class "border-line"))))))))))))))))
 
-(defcomp ~revision (&key space model id revision previous)
+(defcomp ~revision (&key space label model id revision previous)
   (hsx
    (li :class "px-4 py-3"
      (div :class "mb-3 flex flex-wrap items-center justify-between gap-2 text-sm"
@@ -111,7 +109,7 @@
           (~icon :name :history) "Restore"))
      (when (null previous)
        (hsx (p :class "mb-2 text-sm text-muted" "The oldest version in this view.")))
-     (~changes :space space :model model
+     (~changes :label label :model model
                :compared (and previous t)
                :before (and previous (revision-data previous))
                :after (revision-data revision)))))
@@ -133,6 +131,7 @@
          (rows (list-revisions space id :published-only published-only
                                   :limit (1+ +page-size+) :offset (page-offset page)))
          (items (subseq rows 0 (min +page-size+ (length rows))))
+         (label (id-text-for space model rows))
          (view (if published-only "published" "")))
     (hsx
      (div :id "revisions"
@@ -151,7 +150,7 @@
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                   (loop :for (revision previous) :on rows
                         :for n :below (length items)
-                        :collect (hsx (~revision :space space :model model :id id
+                        :collect (hsx (~revision :space space :label label :model model :id id
                                                  :revision revision :previous previous))))))
        (~pager :page page :pages pages
                :href (lambda (n) (history-url space model-name id :published-only published-only :page n))
