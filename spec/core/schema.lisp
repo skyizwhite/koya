@@ -484,6 +484,6 @@
   (ok (signals (make-field :hero :custom :custom-field 'item-2) 'schema-error) "nor the custom field a field uses")
   (ok (signals (model-field (make-model "post" :list (list (make-field :ab :text))) 'item-2) 'schema-error)
       "nor a field looked up by name")
-  (ok (search "becomes item2" (handler-case (make-field 'item-2 :number) (schema-error (c) (princ-to-string c))))
+  (ok (search "becomes \"item2\"" (handler-case (make-field 'item-2 :number) (schema-error (c) (princ-to-string c))))
       "and the error says the name it would become")
   (ok (field-key (make-field "item2" :number)) "the name itself, given as a string, is fine"))
