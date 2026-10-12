@@ -14,9 +14,7 @@
                 #:field-fields
                 #:custom-field-name
                 #:field-row-kinds
-                #:field-row-kind
                 #:custom-field-fields
-                #:row-field-id
                 #:row-fields
                 #:key-name)
   (:import-from #:koya-core/data #:array-p)
@@ -145,7 +143,7 @@
   (let ((path (format nil "~a[~a]" (field-name field) index)))
     (if (not (listp row))
         (list (list :field path :code "type" :message "must be an object"))
-        (let ((kind (field-row-kind field (row-field-id row))))
+        (let ((kind (row-kind field row)))
           (if (null kind)
               (list (list :field path :code "custom_field"
                           :message (format nil "must name its custom field in fieldId, one of ~{~a~^, ~}"
@@ -204,10 +202,10 @@
 
 (defun fitted-rows (field rows)
   (coerce (loop :for row :across rows
-                :for kind := (row-kind field row)
+                :for (kind id) := (multiple-value-list (row-kind field row))
                 :when kind
                   :collect (append (fitted-fields (custom-field-fields kind) row)
-                                   (list :field-id (row-field-id row))))
+                                   (list :field-id id)))
           'vector))
 
 (defun fitted-value (field value)

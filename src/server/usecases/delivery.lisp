@@ -85,11 +85,14 @@
         (groups (make-hash-table :test 'equal)))
     (dolist (data datas)
       (map-data-fields (model-fields model) data
-                       (lambda (field object outer)
-                         (let ((kind (slot-kind field outer include))
-                               (ids (held-ids (field-value object field) (field-many-p field))))
-                           (cond ((eq kind :media) (setf media-ids (append ids media-ids)))
-                                 (kind (setf (gethash kind groups) (append ids (gethash kind groups))))))
+                       (lambda (field value found object outer)
+                         (declare (ignore found))
+                         (let ((kind (slot-kind field outer include)))
+                           (when kind
+                             (let ((ids (held-ids value (field-many-p field))))
+                               (if (eq kind :media)
+                                   (setf media-ids (append ids media-ids))
+                                   (setf (gethash kind groups) (append ids (gethash kind groups)))))))
                          object)))
     (let ((media (if media-ids (find-media-by-ids space media-ids) (make-hash-table :test 'equal)))
           (found (make-hash-table :test 'equal)))
@@ -100,13 +103,12 @@
                 (make-delivered
                  content model
                  (map-data-fields (model-fields model) data
-                                  (lambda (field object outer)
+                                  (lambda (field value present object outer)
                                     (let ((kind (slot-kind field outer include)))
-                                      (multiple-value-bind (value present) (field-value object field)
-                                        (when (and kind present value (not (eq value :null)))
-                                          (setf (field-value object field)
-                                                (filled value (field-many-p field)
-                                                        (if (eq kind :media) media (gethash kind found)))))))
+                                      (when (and kind present value (not (eq value :null)))
+                                        (setf (field-value object field)
+                                              (filled value (field-many-p field)
+                                                      (if (eq kind :media) media (gethash kind found))))))
                                     object))))
               contents datas))))
 

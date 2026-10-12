@@ -305,30 +305,29 @@
                                                (make-field :meta :custom :custom-field "seo")
                                                (make-field :blocks :repeater :custom-fields '(heading body)))))))
 
-(defun upcase-texts (field object outer)
-  (declare (ignore outer))
-  (let ((value (field-value object field)))
-    (when (stringp value)
-      (setf (field-value object field) (string-upcase value)))
-    object))
+(defun upcase-texts (field value found object outer)
+  (declare (ignore found outer))
+  (when (stringp value)
+    (setf (field-value object field) (string-upcase value)))
+  object)
 
 (deftest walking-a-content-s-data
   (let ((fields (model-fields (schema-model (walked-schema) "page"))))
-    (testing "every field gets the call, with the object it sits in and the field around it"
+    (testing "every field gets the call, with its value, whether it is there, the object it sits in and the field around it"
       (let ((seen '()))
         (map-data-fields fields
-                         (list :meta (list :title "t")
+                         (list :meta (list :title "t" :kind nil)
                                :blocks (vector (list :field-id "heading" :text "h")
                                                (list :field-id "body" :text "b")))
-                         (lambda (field object outer)
-                           (push (list (and outer (field-name outer)) (field-name field)
-                                       (field-value object field))
+                         (lambda (field value found object outer)
+                           (push (list (and outer (field-name outer)) (field-name field) value found
+                                       (eq value (field-value object field)))
                                  seen)
                            object))
         (ok (equal (reverse seen)
-                   '((nil "title" nil)
-                     ("meta" "title" "t") ("meta" "image" nil) ("meta" "kind" nil)
-                     ("blocks" "text" "h") ("blocks" "text" "b")))
+                   '((nil "title" nil nil t)
+                     ("meta" "title" "t" t t) ("meta" "image" nil nil t) ("meta" "kind" nil t t)
+                     ("blocks" "text" "h" t t) ("blocks" "text" "b" t t)))
             "a field with no value too, and none for a custom or a repeater itself")))
     (testing "what the call returns lands in a copy"
       (let* ((data (list :title "a"
@@ -343,7 +342,8 @@
         (ok (string= (accesses data :blocks 0 :text) "c"))))
     (testing "an empty custom value is walked, and an absent one is not made"
       (ok (equal (map-data-fields fields (list :meta nil)
-                                  (lambda (field object outer)
+                                  (lambda (field value found object outer)
+                                    (declare (ignore value found))
                                     (if (and outer (string= (field-name field) "kind"))
                                         (list* (field-key field) "page" object)
                                         object)))
@@ -378,9 +378,12 @@
   (testing "a row's custom field is found by its fieldId"
     (let ((field (model-field (schema-model (blocks-schema) "page") :blocks)))
       (ok (string= (custom-field-name (row-kind field (list :field-id "body"))) "body"))
+      (ok (string= (nth-value 1 (row-kind field (list :field-id "body"))) "body") "and the name the row gives too")
+      (ok (equal (multiple-value-list (row-kind field (list :field-id "ghost"))) '(nil "ghost"))
+          "which a row naming no custom field of the repeater still gives")
+      (ok (equal (multiple-value-list (row-kind field "body")) '(nil nil)) "and what is not a row gives none")
       (ok (null (row-kind field (list "field-id" "body"))) "by its keyword alone")
-      (ok (null (row-kind field nil)) "and an empty row has none")
-      (ok (null (row-kind field "body")) "nor has what is not a row")))
+      (ok (null (row-kind field nil)) "and an empty row has none")))
   (testing "a row is its fieldId and its fields"
     (ok (string= (row-field-id (list :text "t" :field-id "body")) "body"))
     (ok (null (row-field-id (list "field-id" "body"))) "found by its keyword alone")

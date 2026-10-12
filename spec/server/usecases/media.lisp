@@ -12,7 +12,6 @@
                 #:insert-media #:delete-media-file)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-spec/server/domain/image #:jpeg #:octets)
-  (:import-from #:koya-server/web/lib/presenters #:media-url #:media->jobject)
   (:import-from #:koya-server/usecases/media
                 #:store-upload #:store-uploads #:remove-media #:remove-each #:remove-space-media #:media-references
                 #:media-reference-counts)
@@ -22,8 +21,8 @@
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code #:conflict #:rejected #:too-large)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya-core/json #:jget)
   (:import-from #:babel #:string-to-octets)
+  (:import-from #:koya-spec/server/main #:with-env)
   (:export #:png-bytes #:*media-root* #:multipart-body))
 (in-package #:koya-spec/server/usecases/media)
 
@@ -98,11 +97,7 @@
     (ok (= (media-width media) 10))
     (ok (= (media-height media) 20))
     (ok (probe-file (media-path media)) "file written")
-    (ok (search (format nil "/media/website/~a.png" (media-id media)) (media-url media)))
-    (ok (string= (media-url media :absolute nil) (format nil "/media/website/~a.png" (media-id media))))
-    (let ((obj (media->jobject media)))
-      (ok (string= (jget obj "alt") "A photo"))
-      (ok (= (jget obj "width") 10)))
+    (ok (string= (media-alt media) "A photo"))
     (testing "listing, search and alt"
       (store-upload "website" (png-bytes) :filename "other.png")
       (ok (= (count-media "website") 2))
@@ -113,7 +108,7 @@
       (ok (= (length (media-references "website" (media-id media))) 0))
       (let ((x (create "website" (find-model "website" "blog") (list :title "x" :cover (media-id media))))
             (y (create "website" (find-model "website" "blog")
-                       (list :title "y" :body (format nil "<img src=\"~a\">" (media-url media))))))
+                       (list :title "y" :body (format nil "<img src=\"/media/website/~a.png\">" (media-id media))))))
         (ok (= (length (media-references "website" (media-id media))) 2) "field values and richtext URLs both count")
         (ok (equal (sort (mapcar (lambda (r) (getf r :label)) (media-references "website" (media-id media))) #'string<)
                    (sort (list (content-id x) (content-id y)) #'string<))
@@ -192,12 +187,11 @@
         (blocker (merge-pathnames "blocker" *media-root*)))
     (ensure-directories-exist blocker)
     (with-open-file (out blocker :direction :output :if-exists :supersede) (write-string "x" out))
-    (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring (merge-pathnames "blocker/" *media-root*)))
     (unwind-protect
-         (ok (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
-               (error () t))
-             "the write fails")
-      (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
+         (with-env (("KOYA_MEDIA_DIR" (namestring (merge-pathnames "blocker/" *media-root*))))
+           (ok (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
+                 (error () t))
+               "the write fails"))
       (delete-file blocker))
     (ok (= (count-media "website") before) "and no row names the file it could not write")))
 

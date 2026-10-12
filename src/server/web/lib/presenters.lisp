@@ -5,7 +5,7 @@
   (:import-from #:koya-core/case #:camel-key #:data->jvalue)
   (:import-from #:koya-core/schema
                 #:model-fields #:field-name #:field-key #:field-type #:field-fields #:custom-field-fields
-                #:map-data-fields #:field-value #:row-kind #:row-field-id #:row-fields)
+                #:row-kind #:row-fields)
   (:import-from #:koya-core/schema-json #:change->jobject)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -56,40 +56,33 @@
     (cons (data->jvalue value))
     (t value)))
 
-(defun present-row (field row)
-  (let ((kind (row-kind field row)))
+(defun absolute-richtext (html base)
+  (regex-replace-all "(src|href)=\"/media/" html (format nil "\\1=\"~a/media/" base)))
+
+(defun present-row (field row base)
+  (multiple-value-bind (kind id) (row-kind field row)
     (if kind
-        (let ((out (present-fields (custom-field-fields kind) (row-fields row))))
-          (setf (gethash "fieldId" out) (row-field-id row))
+        (let ((out (present-fields (custom-field-fields kind) (row-fields row) base)))
+          (setf (gethash "fieldId" out) id)
           out)
         (present-value row))))
 
-(defun present-field (field value)
+(defun present-field (field value base)
   (case (field-type field)
-    (:custom (if (listp value) (present-fields (field-fields field) value) (present-value value)))
+    (:custom (if (listp value) (present-fields (field-fields field) value base) (present-value value)))
     (:repeater (if (array-p value)
-                   (map 'vector (lambda (row) (present-row field row)) value)
+                   (map 'vector (lambda (row) (present-row field row base)) value)
                    (present-value value)))
+    (:richtext (if (and base (stringp value)) (absolute-richtext value base) (present-value value)))
     (t (present-value value))))
 
-(defun present-fields (fields data)
+(defun present-fields (fields data base)
   (let ((out (make-hash-table :test 'equal)))
     (loop :for (key value) :on data :by #'cddr
           :for field := (find key fields :key #'field-key)
           :do (setf (gethash (if field (field-name field) (camel-key key)) out)
-                    (if field (present-field field value) (present-value value))))
+                    (if field (present-field field value base) (present-value value))))
     out))
-
-(defun absolutize-richtext (data model)
-  (let ((base (string-right-trim "/" (public-url))))
-    (map-data-fields (model-fields model) data
-                     (lambda (field object outer)
-                       (declare (ignore outer))
-                       (let ((value (field-value object field)))
-                         (when (and (eq (field-type field) :richtext) (stringp value))
-                           (setf (field-value object field)
-                                 (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))
-                       object))))
 
 (defparameter +system-fields+ '("id" "createdAt" "updatedAt" "publishedAt" "revisedAt"))
 
@@ -105,7 +98,8 @@
 (defun delivered->jobject (delivered &key fields)
   (let* ((content (delivered-content delivered))
          (model (delivered-model delivered))
-         (object (present-fields (model-fields model) (absolutize-richtext (delivered-data delivered) model))))
+         (object (present-fields (model-fields model) (delivered-data delivered)
+                                 (string-right-trim "/" (public-url)))))
     (setf (gethash "id" object) (content-id content)
           (gethash "createdAt" object) (content-created-at content)
           (gethash "updatedAt" object) (content-updated-at content)
@@ -125,7 +119,7 @@
     (to-json payload)))
 
 (defun admin-content->jobject (content model)
-  (flet ((data (present data) (if present (present-fields (model-fields model) data) json-null)))
+  (flet ((data (present data) (if present (present-fields (model-fields model) data nil) json-null)))
     (jobject "id" (content-id content)
              "status" (content-status content)
              "published" (data (content-published-p content) (content-published content))

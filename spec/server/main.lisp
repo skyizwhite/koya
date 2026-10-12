@@ -1,7 +1,8 @@
 (defpackage #:koya-spec/server/main
   (:use #:cl #:rove)
   (:import-from #:koya-server #:start #:stop)
-  (:import-from #:koya-server/infra/env #:setting-error))
+  (:import-from #:koya-server/infra/env #:setting-error)
+  (:export #:with-env))
 (in-package #:koya-spec/server/main)
 
 (defmacro with-env ((&rest bindings) &body body)

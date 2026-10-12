@@ -1,5 +1,7 @@
 # Structured data is read and changed through access
 
+Superseded by adr/2026-10-12-structured-data-is-read-through-access-at-its-measured-cost.md
+
 *2026-10-12*
 
 ## Context
