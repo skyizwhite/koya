@@ -4,7 +4,8 @@
                 #:next-status #:check-transition #:make-content #:+statuses+ #:+operations+ #:held-ids
                 #:new-content #:drafted #:published #:unpublished #:discarded #:content-status
                 #:content-published-p #:content-draft-p #:content-data
-                #:merge-data #:same-data-p #:initial-data #:to-the-minute)
+                #:merge-data #:comparable-data #:initial-data #:to-the-minute)
+  (:import-from #:koya-core/data #:data-equal)
   (:import-from #:koya-core/schema #:make-model #:make-field)
   (:import-from #:koya-server/domain/errors #:conflict #:koya-error-code))
 (in-package #:koya-spec/server/domain/content)
@@ -97,6 +98,9 @@
     (ok (equal (to-the-minute model (list :at "2026-10-12T10:20:30Z" :title :null :on nil))
                '(:at "2026-10-12T10:20:00.000Z" :on nil))
         "saved data keeps no null either, and no default is filled in")
-    (ok (same-data-p model (list :title "a") (list :title "a" :off nil)) "a boolean not given is false")
-    (ok (same-data-p model (list :title "a" :at "x") (list :at "x" :title "a")) "in whatever order")
-    (ng (same-data-p model (list :title "a") (list :title "a" "extra" 1)) "and a key more is a change")))
+    (flet ((same-p (a b) (data-equal (comparable-data model a) (comparable-data model b))))
+      (ok (same-p (list :title "a") (list :title "a" :off nil)) "data is compared with a boolean not given as false")
+      (ok (same-p (list :title "a" :at "x") (list :at "x" :title "a")) "in whatever order")
+      (ng (same-p (list :title "a") (list :title "a" "extra" 1)) "and a key more is a change"))
+    (ok (data-equal (comparable-data model (list :title "a" :on :null)) (list :title "a" :on nil :off nil))
+        "every boolean is there to compare, a null one as false")))

@@ -19,13 +19,14 @@
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
                 #:content-published-p
-                #:merge-data #:same-data-p #:initial-data #:to-the-minute #:new-content #:drafted #:published
+                #:merge-data #:comparable-data #:initial-data #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one
                 #:new-content-id)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/references #:reference-fields #:refers-p #:referrers)
+  (:import-from #:koya-core/data #:data-equal)
   (:export #:check-content
            #:create
            #:update-draft
@@ -136,10 +137,11 @@
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
          (live (content-published content))
-         (data (to-the-minute model (if replace patch (merge-data current patch)))))
+         (data (to-the-minute model (if replace patch (merge-data current patch))))
+         (comparable (comparable-data model data)))
     (check-unchanged-since content since)
-    (cond ((same-data-p model data current) (values content :unchanged))
-          ((and (content-published-p content) (same-data-p model data live))
+    (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
+          ((and (content-published-p content) (data-equal comparable (comparable-data model live)))
            (check-transition content :discard)
            (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
           (t

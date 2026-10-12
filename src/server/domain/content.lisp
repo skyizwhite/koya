@@ -6,7 +6,7 @@
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/data
-                #:data-equal #:without-nulls #:array-p #:blank-p)
+                #:without-nulls #:array-p #:blank-p)
   (:import-from #:access
                 #:access #:rem-plist-val)
   (:import-from #:koya-core/time
@@ -39,7 +39,7 @@
            #:check-transition
            #:content-label
            #:merge-data
-           #:same-data-p
+           #:comparable-data
            #:default-data
            #:initial-data
            #:to-the-minute
@@ -184,16 +184,13 @@
                   (setf (access out key :test #'eq) value)))
     out))
 
-(defun booleans-filled (model data)
+(defun comparable-data (model data)
   (map-data-fields (model-fields model) data
                    (lambda (field value found object outer)
                      (declare (ignore found outer))
                      (when (and (eq (field-type field) :boolean) (member value '(nil :null)))
                        (setf (field-value object field) nil))
                      object)))
-
-(defun same-data-p (model a b)
-  (data-equal (booleans-filled model a) (booleans-filled model b)))
 
 (defun default-data (model)
   (initial-data model nil))
