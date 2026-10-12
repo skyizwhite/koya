@@ -140,8 +140,8 @@ A content is its fields plus the system fields:
   "title": "Hello",
   "slug": "hello",
   "cover": {
-    "id": "01J8Q0Z5X2W3V4U5T6S7R8Q9P1",
-    "url": "https://cms.example.com/media/website/01J8Q0Z5X2W3V4U5T6S7R8Q9P1.png",
+    "id": "m7c4v1rb8e2s",
+    "url": "https://cms.example.com/media/website/m7c4v1rb8e2s.png",
     "filename": "cover.png", "mime": "image/png", "size": 12345,
     "width": 1200, "height": 630, "alt": "Cover", "createdAt": "2026-09-20T05:04:03.123Z"
   },

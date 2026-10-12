@@ -1,6 +1,7 @@
 (defpackage #:koya-server/domain/media
   (:use #:cl)
   (:import-from #:koya-core/data #:blank-p)
+  (:import-from #:cl-ppcre #:scan)
   (:import-from #:koya-server/domain/image
                 #:image-extension)
   (:export #:media #:make-media
@@ -8,6 +9,8 @@
            #:media-width #:media-height #:media-alt #:media-created-at
            #:media-file-name
            #:safe-filename
+           #:+media-id-pattern+
+           #:media-id-p
            #:+max-upload-bytes+))
 (in-package #:koya-server/domain/media)
 
@@ -15,6 +18,11 @@
   id space filename mime size width height alt created-at)
 
 (defparameter +max-upload-bytes+ (* 20 1024 1024))
+
+(defparameter +media-id-pattern+ "[0-9a-z]{12}|[0-9A-Z]{26}")
+
+(defun media-id-p (id)
+  (and (stringp id) (scan (format nil "^(?:~a)\\z" +media-id-pattern+) id) t))
 
 (defun media-file-name (media)
   (format nil "~a.~a" (media-id media) (image-extension (media-mime media))))

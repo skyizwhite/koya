@@ -21,7 +21,7 @@
                 #:content-published-p
                 #:merge-data #:comparable-data #:initial-data #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one)
-  (:import-from #:koya-server/domain/id #:new-id)
+  (:import-from #:koya-server/domain/id #:fresh-id)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
@@ -73,10 +73,6 @@
 (defun check-published-at (value)
   (check-timestamp "publishedAt" value))
 
-(defun fresh-id (space)
-  (loop :for id := (new-id)
-        :unless (get-content space id) :return id))
-
 (defun published-view (space model content)
   (and (content-published-p content)
        (deliver content model space)))
@@ -109,7 +105,7 @@
                 (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
                       :code "object_exists"))
               (check-content space-name model data)
-              (let ((content (new-content (fresh-id space-name) space-name model-name data
+              (let ((content (new-content (fresh-id (lambda (id) (get-content space-name id))) space-name model-name data
                                           :publish publish
                                           :created-at created-at :updated-at updated-at
                                           :published-at published-at :revised-at revised-at)))

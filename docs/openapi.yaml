@@ -1599,8 +1599,8 @@ components:
         title: Hello
         slug: hello
         cover:
-          id: 01J8Q0Z5X2W3V4U5T6S7R8Q9P1
-          url: https://cms.example.com/media/website/01J8Q0Z5X2W3V4U5T6S7R8Q9P1.png
+          id: m7c4v1rb8e2s
+          url: https://cms.example.com/media/website/m7c4v1rb8e2s.png
           filename: cover.png
           mime: image/png
           size: 12345

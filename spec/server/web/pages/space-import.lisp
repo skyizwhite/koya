@@ -21,7 +21,7 @@
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-space #:media-mime #:media-alt
                 #:+max-upload-bytes+)
-  (:import-from #:koya-spec/server/usecases/media #:png-bytes)
+  (:import-from #:koya-spec/server/usecases/media #:png-bytes #:with-space-cleared)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-core/schema #:make-webhook)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field #:model-field #:model-fields #:field-type #:field-option)
@@ -384,8 +384,8 @@
   (testing "a media or a key another space holds is named before anything is written"
     (multiple-value-bind (octets stored) (odd-archive :media t)
       (create-space "elsewhere")
-      (insert-media "elsewhere" :id (media-id stored) :filename "b.png" :mime "image/png" :size 1
-                                :width 1 :height 1 :alt "" :created-at "2024-01-01T00:00:00.000Z")
+      (insert-media "elsewhere" (media-id stored) :filename "b.png" :mime "image/png" :size 1
+                                                  :width 1 :height 1 :alt "" :created-at "2024-01-01T00:00:00.000Z")
       (ok (equal (refusal octets) (format nil "Media ~a is already in another space" (media-id stored))))
       (delete-space "elsewhere"))
     (multiple-value-bind (octets stored key) (odd-archive :key t)
@@ -530,20 +530,19 @@
 (deftest a-media-id-is-short-or-a-ulid
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))
-  (create-space "odd")
-  (let ((ulid "01ARZ3NDEKTSV4RRFFQ69G5FAV"))
-    (write-media-file "odd" ulid "image/png" (png-bytes 2 2))
-    (insert-media "odd" :id ulid :filename "old.png" :mime "image/png" :size 1 :width 2 :height 2
-                        :created-at "2024-01-01T00:00:00.000Z")
-    (let ((short (media-id (store-upload "odd" (png-bytes 2 2) :filename "new.png")))
-          (octets (nth-value 1 (request :get "/s/odd/export"))))
-      (delete-space "odd")
-      (remove-space-media "odd")
-      (ok (string= (nth-value 1 (import-archive octets)) "/s/odd"))
-      (ok (equal (sort (mapcar #'media-id (list-media "odd")) #'string<) (sort (list ulid short) #'string<))
-          "an archive keeps a short media id and a ULID alike")
-      (remove-space-media "odd")
-      (delete-space "odd")))
+  (with-space-cleared ("odd")
+    (create-space "odd")
+    (let ((ulid "01ARZ3NDEKTSV4RRFFQ69G5FAV"))
+      (write-media-file "odd" ulid "image/png" (png-bytes 2 2))
+      (insert-media "odd" ulid :filename "old.png" :mime "image/png" :size 1 :width 2 :height 2
+                               :created-at "2024-01-01T00:00:00.000Z")
+      (let ((short (media-id (store-upload "odd" (png-bytes 2 2) :filename "new.png")))
+            (octets (nth-value 1 (request :get "/s/odd/export"))))
+        (delete-space "odd")
+        (remove-space-media "odd")
+        (ok (string= (nth-value 1 (import-archive octets)) "/s/odd"))
+        (ok (equal (sort (mapcar #'media-id (list-media "odd")) #'string<) (sort (list ulid short) #'string<))
+            "an archive keeps a short media id and a ULID alike"))))
   (ok (string= (nth-value 1 (import-archive (tag-archive "odd" "\"media\": [{\"id\": \"Abcdefghijkl\", \"mime\": \"image/png\"}]"))) "/"))
   (ok (search "&quot;Abcdefghijkl&quot; is not a media id" (nth-value 1 (request :get "/")))
       "and refuses an id of another shape"))

@@ -204,8 +204,8 @@
 
 (deftest list-shows-media-as-images
   (let ((origin '(("origin" . "http://localhost:3000")))
-        (media (insert-media "website" :id (new-id) :filename "cover.png" :mime "image/png" :size 10
-                                       :width 1 :height 1 :alt "A red door"))
+        (media (insert-media "website" (new-id) :filename "cover.png" :mime "image/png" :size 10
+                                                :width 1 :height 1 :alt "A red door"))
         (paths '()))
     (flet ((save (title cover)
              (multiple-value-bind (status body)
@@ -237,8 +237,8 @@
   (replace-schema "website" (with-album (make-model "album" :list (list (make-field :title :text)
                                                                        (make-field :photos :media :many t)))))
   (unwind-protect
-       (let ((first-photo (media-id (insert-media "website" :id (new-id) :filename "a.png" :mime "image/png" :size 10 :width 1 :height 1)))
-             (second-photo (media-id (insert-media "website" :id (new-id) :filename "b.png" :mime "image/png" :size 10 :width 1 :height 1))))
+       (let ((first-photo (media-id (insert-media "website" (new-id) :filename "a.png" :mime "image/png" :size 10 :width 1 :height 1)))
+             (second-photo (media-id (insert-media "website" (new-id) :filename "b.png" :mime "image/png" :size 10 :width 1 :height 1))))
          (create "website" (find-model "website" "album")
                  (list :title "Trip" :photos (vector first-photo second-photo second-photo)) :publish t)
          (let ((body (nth-value 1 (request :get "/s/website/m/album"))))

@@ -21,7 +21,7 @@
 (deftest a-media-id-from-before-is-served
   (let ((ulid "01ARZ3NDEKTSV4RRFFQ69G5FAV"))
     (write-media-file "website" ulid "image/png" (png-bytes 3 2))
-    (let ((media (insert-media "website" :id ulid :filename "old.png" :mime "image/png" :size 1 :width 3 :height 2)))
+    (let ((media (insert-media "website" ulid :filename "old.png" :mime "image/png" :size 1 :width 3 :height 2)))
       (ok (= 200 (request :get (format nil "/media/website/~a.png" ulid)))
           "a media whose id is a ULID, made before ids were short, is served as one with a short id is")
       (remove-media media))))
