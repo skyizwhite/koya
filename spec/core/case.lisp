@@ -46,9 +46,9 @@
                                "someUnknownKeyXyz" 1))
         "an object is a plist, an array a vector, null :null, and a key never interned stays a string")
     (ok (null (find-symbol "SOME-UNKNOWN-KEY-XYZ" :keyword))))
-  (ok (equalp (jvalue->data (parse-json "{\"someStoredKeyXyz\": 1}") :intern t) (list :some-stored-key-xyz 1))
+  (ok (data-equal (jvalue->data (parse-json "{\"someStoredKeyXyz\": 1}") :intern t) (list :some-stored-key-xyz 1))
       "data koya stored has its keys interned")
-  (ok (equalp (jvalue->data (parse-json "[{\"fieldId\": \"heading\"}, []]")) (vector (list :field-id "heading") #())))
+  (ok (data-equal (jvalue->data (parse-json "[{\"fieldId\": \"heading\"}, []]")) (vector (list :field-id "heading") #())))
   (ok (data-equal (jvalue->data (parse-json "{\"empty\": {}, \"flag\": false}")) (list :empty nil :flag nil))
       "an empty object and false are one value, nil"))
 

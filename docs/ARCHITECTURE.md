@@ -111,8 +111,9 @@ web  ──▶  usecases  ──▶  domain
 - JSON is parsed and written at the edges alone: `web/` for requests and
   answers, `infra/` for what SQLite and archives hold (`infra/archives` makes
   and reads `space.json`), the SDK's client for what it sends and receives.
-  Inside, a content's data is a plist with kebab-case keyword keys, arrays are
-  vectors, and a field's value is read and set with `field-value` in
+  Inside, a content's data is a plist with kebab-case keyword keys, each held
+  once by every object in it, arrays are vectors, and a field's value is read
+  and set with `field-value` in
   `core/schema`, which finds it by its keyword alone; `core/case` converts
   keys and values, and `core/schema-json` a schema and a deploy's changes.
   A content says which versions it has by its status, so a version with no

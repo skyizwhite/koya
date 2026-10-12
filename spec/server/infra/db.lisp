@@ -20,7 +20,8 @@
                 #:make-custom-field #:schema-custom-fields #:custom-field-name
                 #:field-fields #:field-name)
   (:import-from #:koya-core/schema-json #:schema->jobject)
-  (:import-from #:koya-core/case #:jvalue->data #:data->jobject)
+  (:import-from #:koya-core/case #:jvalue->data)
+  (:import-from #:koya-core/data #:data-equal)
   (:import-from #:access #:access #:accesses)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions #:count-revisions)
@@ -381,7 +382,8 @@
 (defun text-fits-p (data text)
   (if (null data)
       (null text)
-      (and text (equalp (parse-json text) (data->jobject (data-text (jvalue->data (parse-json data) :intern t)))))))
+      (and text (data-equal (jvalue->data (parse-json text) :intern t)
+                            (data-text (jvalue->data (parse-json data) :intern t))))))
 
 (defun texts-fit-p (space)
   (every (lambda (row)
