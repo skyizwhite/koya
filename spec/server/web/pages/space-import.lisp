@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-spec/server/stored #:stored-content)
   (:import-from #:koya-server/domain/key #:key-id #:key-label #:hash-key)
-  (:import-from #:koya-server/usecases/ports/keys #:insert-delivery-key)
+  (:import-from #:koya-server/usecases/ports/keys #:insert-delivery-key #:insert-management-key)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-spec/server/web/pages/support
@@ -290,6 +290,8 @@
       (insert-delivery-key "clash" :id delivery-key-id :hash (hash-key "another key")
                                    :label "" :created-at "2020-01-01T00:00:00.000Z")
       (ok (string= (nth-value 1 (import-archive octets)) "/"))
+      (ok (search "A key in the archive is already a key of another space" (nth-value 1 (request :get "/")))
+          "a key whose id another key has is named")
       (ng (find-space "archive"))
       (ng (probe-file (media-file-path "archive" (media-id media) "image/png")))
       (delete-space "clash"))
@@ -330,7 +332,7 @@
                   (format nil "~s is refused, and the toast names it" id))
               (ng (find-space "odd") "and nothing is imported"))))
 
-(defun odd-archive (&key contents media key revisions
+(defun odd-archive (&key contents media key management-key revisions
                          (schema (make-schema :models (list (make-model "tag" :list (list (make-field :name :text :required t :unique t)))))))
   (create-space "odd")
   (replace-schema "odd" schema)
@@ -344,7 +346,8 @@
   (loop :for (id data) :in revisions
         :do (record-revision "odd" id "draft" data :created-at "2024-01-01T00:00:00.000Z"))
   (let ((stored (and media (store-upload "odd" (png-bytes 2 2) :filename "a.png")))
-        (made (and key (create-delivery-key "odd" :label "site"))))
+        (made (or (and key (create-delivery-key "odd" :label "site"))
+                  (and management-key (create-management-key "odd" :label "repl")))))
     (let ((octets (nth-value 1 (request :get "/s/odd/export"))))
       (delete-space "odd")
       (remove-space-media "odd")
@@ -396,6 +399,13 @@
       (insert-delivery-key "elsewhere" :id "01ARZ3NDEKTSV4RRFFQ69G5FAZ" :hash (hash-key key)
                                        :label "" :created-at "2024-01-01T00:00:00.000Z")
       (ok (equal (refusal octets) "A key in the archive is already a key of another space"))
+      (delete-space "elsewhere"))
+    (multiple-value-bind (octets stored key) (odd-archive :management-key t)
+      (declare (ignore stored))
+      (create-space "elsewhere")
+      (insert-management-key "elsewhere" :id "01ARZ3NDEKTSV4RRFFQ69G5FAY" :hash (hash-key key)
+                                         :label "" :created-at "2024-01-01T00:00:00.000Z")
+      (ok (equal (refusal octets) "A key in the archive is already a key of another space") "a management key too")
       (delete-space "elsewhere"))))
 
 (defun zip-of (name octets)

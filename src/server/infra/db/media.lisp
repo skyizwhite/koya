@@ -18,12 +18,12 @@
               :alt (col row "alt") :created-at (col row "created_at")))
 
 (defmethod insert-media (space id &key filename mime size width height (alt "") created-at)
-  (and (fetch-one "INSERT INTO media (id, space, filename, mime, size, width, height, alt, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT (id) DO NOTHING
-                   RETURNING id"
-                  id space filename mime size width height alt (or created-at (now-iso)))
-       (find-media space id)))
+  (let ((row (fetch-one "INSERT INTO media (id, space, filename, mime, size, width, height, alt, created_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ON CONFLICT (id) DO NOTHING
+                         RETURNING *"
+                        id space filename mime size width height alt (or created-at (now-iso)))))
+    (and row (row->media row))))
 
 (defmethod find-media (space id)
   (let ((row (fetch-one "SELECT * FROM media WHERE space = ? AND id = ?" space id)))

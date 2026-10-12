@@ -10,7 +10,8 @@
 
 (defmethod insert-management-key (space &key id hash label created-at)
   (and (fetch-one "INSERT INTO management_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)
-                   ON CONFLICT DO NOTHING
+                   ON CONFLICT (id) DO NOTHING
+                   ON CONFLICT (key_hash) DO NOTHING
                    RETURNING id"
                   id space hash (or label "") created-at)
        t))

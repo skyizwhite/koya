@@ -5,12 +5,13 @@
 ## Context
 
 The database already refuses what must be unique: a media's id across spaces, a
-content's id within its space, and a key's id and hash. Before writing, an
-import also looked each of its media and keys up to refuse one another space
-held, and an upload or a new content looked its drawn id up before inserting it.
-A look-up made before the insert can be passed by another write between the
-two, so it is the constraint that decides either way, and the look-up repeats
-it with a read for each id or key.
+content's id within its space, and a key's id and hash. An upload and a new
+content insert the id they draw and draw again when it is taken. An import,
+though, looked each of its media and keys up before writing, to refuse one
+another space held, and a new key was inserted without asking whether it was
+kept. A look-up made before the insert can be passed by another write between
+the two, so it is the constraint that decides either way, and the look-up
+repeats it with a read for each media or key.
 
 ## Decision
 
