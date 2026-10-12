@@ -29,6 +29,10 @@
 
 (deftest a-key-is-found-without-being-interned
   (ok (eq (find-kebab-keyword "publishedAt") :published-at) "a keyword already interned is found")
+  (ok (null (find-kebab-keyword "published-at")) "only by the key it converts back to")
+  (ok (null (find-kebab-keyword "PublishedAt")))
+  (ok (equalp (jvalue->data (parse-json "{\"publishedAt\": 1, \"published-at\": 2}")) (list :published-at 1 "published-at" 2))
+      "so another spelling stays a string and never doubles a key")
   (ok (null (find-kebab-keyword "neverSeenBeforeName")) "one that is not stays unfound")
   (ok (null (find-symbol "NEVER-SEEN-BEFORE-NAME" :keyword)) "and is not interned by looking"))
 
@@ -45,10 +49,16 @@
 
 (deftest data-becomes-json-values
   (ok (string= (to-json (data->jvalue (list :published-at "2026" :flag nil :ok t :none :null :tags #("a" "b")
-                                            :meta (list :view-count 3) :page-u-r-l "u" "kept" 1)))
-               "{\"publishedAt\":\"2026\",\"flag\":false,\"ok\":true,\"none\":null,\"tags\":[\"a\",\"b\"],\"meta\":{\"viewCount\":3},\"pageURL\":\"u\",\"kept\":1}")
+                                            :meta (list :view-count 3) :page-u-r-l "u")))
+               "{\"publishedAt\":\"2026\",\"flag\":false,\"ok\":true,\"none\":null,\"tags\":[\"a\",\"b\"],\"meta\":{\"viewCount\":3},\"pageURL\":\"u\"}")
       "in the plist's order, with each key as it was named")
-  (ok (string= (to-json (data->jvalue (vector (list :field-id "h") #()))) "[{\"fieldId\":\"h\"},[]]")))
+  (ok (string= (to-json (data->jvalue (vector (list :field-id "h") #()))) "[{\"fieldId\":\"h\"},[]]"))
+  (ok (signals (data->jvalue (list :tags (list "a" "b")))) "a list that is not a plist is refused, as an array is a vector")
+  (ok (signals (data->jvalue (list :a 1 :b))) "as is one with a key left without a value")
+  (ok (signals (data->jvalue (list "unknown" 1))) "and one whose key is a string, which no field is"))
+
+(deftest a-keyword-is-made-from-a-key-only
+  (ok (signals (kebab-keyword :published-at)) "a symbol is not a key to convert"))
 
 (deftest null-becomes-nil
   (let ((back (jvalue->lisp (parse-json "{\"publishedAt\": null, \"tags\": [null, \"a\"], \"n\": 0}"))))

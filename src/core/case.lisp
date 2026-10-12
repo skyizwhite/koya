@@ -32,10 +32,11 @@
         (t key)))
 
 (defun kebab-keyword (key)
-  (intern (kebab-name (string key)) :keyword))
+  (intern (kebab-name key) :keyword))
 
 (defun find-kebab-keyword (key)
-  (values (find-symbol (kebab-name key) :keyword)))
+  (let ((keyword (find-symbol (kebab-name key) :keyword)))
+    (and keyword (string= (camel-key keyword) key) keyword)))
 
 (defun jvalue->data (value &key intern)
   (cond ((eq value 'null) :null)
@@ -49,9 +50,12 @@
 (defun data->jvalue (value)
   (cond ((eq value :null) 'null)
         ((consp value)
+         (unless (and (evenp (length value))
+                      (loop :for k :in value :by #'cddr :always (keywordp k)))
+           (error "~s is not a plist of data" value))
          (let ((out (make-hash-table :test 'equal)))
            (loop :for (k v) :on value :by #'cddr
-                 :do (setf (gethash (if (symbolp k) (camel-key k) k) out) (data->jvalue v)))
+                 :do (setf (gethash (camel-key k) out) (data->jvalue v)))
            out))
         ((json-array-p value) (map 'vector #'data->jvalue value))
         (t value)))

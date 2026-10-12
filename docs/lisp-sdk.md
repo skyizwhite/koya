@@ -468,7 +468,9 @@ Arguments are converted to JSON and responses back to Lisp by the same rules:
 and coming back, an object becomes a kebab-case keyword plist, an array a list and
 `null` `nil`. A key turns each capital into `-` and its lowercase letter and back,
 so every name comes back as it was: `publishedAt` is `:published-at` and
-`pageURL` is `:page-u-r-l`. So `(getf item :published-at)` is `nil` for a draft, and
+`pageURL` is `:page-u-r-l`. A field declared as a symbol that would not come back
+as itself, such as `item-2` (it becomes `item2`, read back as `:item2`), is
+refused. So `(getf item :published-at)` is `nil` for a draft, and
 `:tags '("k3x9m2qa7t0b" "p8f2w6zc1n4d")` is an array of ids.
 
 There is no Lisp spelling for JSON `false`: the server treats `null` and `false`

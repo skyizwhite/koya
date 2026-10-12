@@ -470,4 +470,11 @@
          (model (schema-model schema "page")))
     (ok (eq (field-key (model-field model "pageWidthQq")) (find-symbol "PAGE-WIDTH-QQ" :keyword))
         "a schema read from JSON interns its fields' keywords")
-    (ok (find-symbol "CARD-CAPTION-QQ" :keyword) "and those of the fields inside a custom field")))
+    (ok (eq (field-key (first (field-fields (model-field model "card")))) :card-caption-qq)
+        "and those of the fields inside a custom field")))
+
+(deftest a-field-declared-as-a-symbol-comes-back-as-that-symbol
+  (ok (eq (field-key (make-field 'image-alt-text :text)) :image-alt-text))
+  (ok (signals (make-field 'item-2 :number) 'schema-error) "item-2 would come back as item2")
+  (ok (signals (make-field :a--b :text) 'schema-error))
+  (ok (field-key (make-field "item2" :number)) "the name itself, given as a string, is fine"))

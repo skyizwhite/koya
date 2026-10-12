@@ -175,13 +175,15 @@
        (when (member value +system-fields+ :test #'string=)
          (fail "field ~s: :was names the system field ~s" field-name value))))))
 
-(defun make-field (name type &rest options)
-  (let ((name (if (stringp name) name (camel-key name)))
+(defun make-field (given type &rest options)
+  (let ((name (if (stringp given) given (camel-key given)))
         (options (loop :for (k v) :on options :by #'cddr
                        :unless (and (eq k :was) (null v))
                          :append (list k (normalize-option k v)))))
     (unless (field-name-p name)
       (fail "field name ~s must be a camelCase identifier" name))
+    (when (and (symbolp given) (string/= (symbol-name (kebab-keyword name)) (symbol-name given)))
+      (fail "field name ~s does not come back as itself; it would be read back as ~(~a~)" given (kebab-keyword name)))
     (when (member name +system-fields+ :test #'string=)
       (fail "field name ~s is reserved for a system field" name))
     (unless (field-type-p type)

@@ -23,11 +23,13 @@ names a site chose, and data from outside may carry any key at all.
 - Stored data has no null: a field without a value has no key. A patch clears a
   field by giving it `:null`, and an edge writes `null` where an answer needs
   one.
-- Converting data from outside never interns a symbol: a key becomes the keyword
-  a schema has already interned for that name, or stays a string, which matches
-  no field and is refused as `unknown_field`. A schema interns its fields'
-  keywords when it is read. Data koya stored itself has only fields as keys and
-  is converted with them interned.
+- Converting data from outside never interns a symbol: a key becomes a keyword
+  only when one already exists that converts back to exactly that key, and
+  otherwise stays a string. A schema interns its fields' keywords when it is
+  read, so every field's key is found. A key that names no field is refused as
+  `unknown_field`, whether it became a keyword that exists for another reason,
+  such as `:name`, or stayed a string. Data koya stored itself has only fields
+  as keys and is converted with them interned.
 
 ## Consequences
 
