@@ -29,34 +29,36 @@
 
 (define-condition name-does-not-come-back (error)
   ((name :initarg :name)
-   (written :initarg :written)
-   (read-back :initarg :read-back))
+   (becomes :initarg :becomes)
+   (comes-back-as :initarg :comes-back-as))
   (:report (lambda (c s)
-             (with-slots (name written read-back) c
-               (format s "~s does not come back as itself: it is written ~a and read back as :~(~a~)"
-                       name written read-back)))))
+             (with-slots (name becomes comes-back-as) c
+               (format s "~s does not come back as itself: it becomes ~a, which comes back as ~a"
+                       name becomes comes-back-as)))))
 
 (defun camel-key (key)
   (if (or (symbolp key) (find #\- key))
       (let* ((name (if (symbolp key) (symbol-name key) (string-upcase key)))
              (camel (to-camel-case (string-downcase name))))
-        (unless (and (string= (kebab-name camel) name) (or (symbolp key) (string= (string-downcase name) key)))
-          (error 'name-does-not-come-back :name key :written camel :read-back (kebab-name camel)))
+        (unless (and (string= (kebab-name camel) name) (or (symbolp key) (notany #'upper-case-p key)))
+          (error 'name-does-not-come-back :name key :becomes camel
+                                          :comes-back-as (format nil ":~(~a~)" (kebab-name camel))))
         camel)
       key))
 
-(defun round-trip-name (key)
-  (let ((name (kebab-name key)))
-    (and (string= (to-camel-case (string-downcase name)) key) name)))
+(defun kebab-round-trip (key)
+  (let* ((name (kebab-name key))
+         (camel (to-camel-case (string-downcase name))))
+    (values (and (string= camel key) name) name camel)))
 
 (defun kebab-keyword (key)
-  (intern (or (round-trip-name key)
-              (error 'name-does-not-come-back :name key :written (to-camel-case (string-downcase (kebab-name key)))
-                                              :read-back (kebab-name key)))
-          :keyword))
+  (multiple-value-bind (name kebab camel) (kebab-round-trip key)
+    (unless name
+      (error 'name-does-not-come-back :name key :becomes (format nil ":~(~a~)" kebab) :comes-back-as camel))
+    (intern name :keyword)))
 
 (defun find-kebab-keyword (key)
-  (let ((name (round-trip-name key)))
+  (let ((name (kebab-round-trip key)))
     (and name (values (find-symbol name :keyword)))))
 
 (defun jvalue->data (value &key intern)
@@ -111,5 +113,4 @@
   (let ((keys '()))
     (maphash (lambda (k v) (declare (ignore v)) (push k keys)) object)
     (loop :for k :in (sort keys #'string<)
-          :append (list (intern (or (round-trip-name k) (string-upcase k)) :keyword)
-                        (jvalue->lisp (gethash k object))))))
+          :append (list (kebab-keyword k) (jvalue->lisp (gethash k object))))))

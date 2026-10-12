@@ -468,10 +468,10 @@ Arguments are converted to JSON and responses back to Lisp by the same rules:
 and coming back, an object becomes a kebab-case keyword plist, an array a list and
 `null` `nil`. So `(getf item :published-at)` is `nil` for a draft, and
 `:tags '("k3x9m2qa7t0b" "p8f2w6zc1n4d")` is an array of ids. A key turns each
-capital into `-` and its lowercase letter and back, so every name comes back as
-it was: `publishedAt` is `:published-at` and `pageURL` is `:page-u-r-l`; a
-keyword that would not come back as itself, such as `:item-2`, is refused. A key
-that is not camelCase, such as `blog-post`, keeps its spelling: `:blog-post`.
+capital into `-` and its lowercase letter and back, so every camelCase key, as
+every key koya sends is, comes back as it was: `publishedAt` is `:published-at`
+and `pageURL` is `:page-u-r-l`. A keyword that would not come back as itself,
+such as `:item-2`, is refused, and so is a key that is not camelCase.
 
 There is no Lisp spelling for JSON `false`: the server treats `null` and `false`
 alike for booleans, so `nil` means "off". On `admin-update-list-content` and
