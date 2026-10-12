@@ -22,9 +22,9 @@
                     (make-field :tags :reference :model "tag" :many t)
                     (make-field :cover :media))))
 
-(defun codes (data &optional (model *model*))
+(defun codes (data &key (model *model*) partial)
   (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
-          (validate-content model data)))
+          (validate-content model data :partial partial)))
 
 (deftest valid-content
   (ok (null (codes (list :title "Hello" :event-at "2026-09-20T00:00:00Z" :slug "hello-world"
@@ -42,15 +42,11 @@
   (let ((model (make-model "note" :list (list (make-field :body :richtext :required t)))))
     (ok (null (validate-content model (list :body "<p><br></p>")))
         "rich text is blank as any string is: markup is a value")
-    (ok (equal (mapcar (lambda (e) (getf e :code))
-                       (validate-content model (list :body (format nil " ~% "))))
-               '("required")))
+    (ok (equal (codes (list :body (format nil " ~% ")) :model model) '(("body" . "required"))))
     (ok (null (validate-content model (list :body "<p>a</p>")))))
   (testing "partial skips missing fields"
     (ok (null (validate-content *model* nil :partial t)))
-    (ok (equal (mapcar (lambda (e) (getf e :code))
-                       (validate-content *model* (list :title :null) :partial t))
-               '("required")))))
+    (ok (equal (codes (list :title :null) :partial t) '(("title" . "required"))))))
 
 (deftest false-and-empty-array-are-values
   (ok (equal (codes (list :title nil :event-at "2026-09-20T00:00:00Z" :count nil))
@@ -124,7 +120,7 @@
    "page"))
 
 (defun seo-codes (data &optional (model *with-seo*))
-  (codes data model))
+  (codes data :model model))
 
 (deftest a-custom-field-is-an-object-of-its-fields
   (ok (null (seo-codes (list :meta (list :title "Hi" :image "01ARZ3NDEKTSV4RRFFQ69G5FAV")))))
@@ -159,7 +155,7 @@
                              (make-model "post" :list (list (make-field :blocks :repeater :custom-fields '(heading) :required t))))))
 
 (defun block-codes (model data)
-  (codes data (schema-model *with-blocks* model)))
+  (codes data :model (schema-model *with-blocks* model)))
 
 (deftest a-repeater-is-a-list-of-rows
   (ok (null (block-codes "page" (list :blocks (vector (list :field-id "heading" :text "Hi")
@@ -178,11 +174,10 @@
 
 (deftest a-media-field-can-hold-several
   (let ((model (make-model "album" :list (list (make-field :photos :media :many t :required t)))))
-    (flet ((codes (data) (codes data model)))
-      (ok (null (codes (list :photos (vector "01ARZ3NDEKTSV4RRFFQ69G5FAV" "01ARZ3NDEKTSV4RRFFQ69G5FAW")))))
-      (ok (equal (codes (list :photos "01ARZ3NDEKTSV4RRFFQ69G5FAV")) '(("photos" . "type"))) "an array of ids")
-      (ok (equal (codes (list :photos (vector "no id"))) '(("photos" . "type"))))
-      (ok (equal (codes (list :photos (vector))) '(("photos" . "required"))) "and none is no value"))))
+    (ok (null (codes (list :photos (vector "01ARZ3NDEKTSV4RRFFQ69G5FAV" "01ARZ3NDEKTSV4RRFFQ69G5FAW")) :model model)))
+    (ok (equal (codes (list :photos "01ARZ3NDEKTSV4RRFFQ69G5FAV") :model model) '(("photos" . "type"))) "an array of ids")
+    (ok (equal (codes (list :photos (vector "no id")) :model model) '(("photos" . "type"))))
+    (ok (equal (codes (list :photos (vector)) :model model) '(("photos" . "required"))) "and none is no value")))
 
 (defun fits (model data fitted)
   (data-equal (fitted-shape model data) fitted))

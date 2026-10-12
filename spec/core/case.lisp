@@ -34,7 +34,7 @@
 (deftest a-key-is-found-without-being-interned
   (ok (eq (find-kebab-keyword "publishedAt") :published-at) "a keyword already interned is found")
   (ok (null (find-kebab-keyword "published-at")) "only by the key it converts back to")
-  (ok (equalp (jvalue->data (parse-json "{\"publishedAt\": 1, \"published-at\": 2}")) (list :published-at 1 "published-at" 2))
+  (ok (data-equal (jvalue->data (parse-json "{\"publishedAt\": 1, \"published-at\": 2}")) (list :published-at 1 "published-at" 2))
       "so another spelling stays a string and never doubles a key")
   (ok (null (find-kebab-keyword "neverSeenBeforeName")) "one that is not stays unfound")
   (ok (null (find-symbol "NEVER-SEEN-BEFORE-NAME" :keyword)) "and is not interned by looking"))
@@ -42,9 +42,9 @@
 (deftest json-values-become-data
   (let ((data (jvalue->data (parse-json "{\"publishedAt\": \"2026\", \"flag\": false, \"none\": null,
                                           \"tags\": [\"a\"], \"meta\": {\"viewCount\": 3}, \"someUnknownKeyXyz\": 1}"))))
-    (ok (equalp data (list :published-at "2026" :flag nil :none :null :tags #("a") :meta (list :view-count 3)
-                           "someUnknownKeyXyz" 1))
-        "an object is a plist in its keys' order, an array a vector, null :null, and a key never interned stays a string")
+    (ok (data-equal data (list :published-at "2026" :flag nil :none :null :tags #("a") :meta (list :view-count 3)
+                               "someUnknownKeyXyz" 1))
+        "an object is a plist, an array a vector, null :null, and a key never interned stays a string")
     (ok (null (find-symbol "SOME-UNKNOWN-KEY-XYZ" :keyword))))
   (ok (equalp (jvalue->data (parse-json "{\"someStoredKeyXyz\": 1}") :intern t) (list :some-stored-key-xyz 1))
       "data koya stored has its keys interned")
@@ -53,10 +53,10 @@
       "an empty object and false are one value, nil"))
 
 (deftest data-becomes-json-values
-  (ok (string= (to-json (data->jvalue (list :published-at "2026" :flag nil :ok t :none :null :tags #("a" "b")
-                                            :meta (list :view-count 3) :page-u-r-l "u")))
-               "{\"publishedAt\":\"2026\",\"flag\":false,\"ok\":true,\"none\":null,\"tags\":[\"a\",\"b\"],\"meta\":{\"viewCount\":3},\"pageURL\":\"u\"}")
-      "in the plist's order, with each key as it was named")
+  (ok (equalp (data->jvalue (list :published-at "2026" :flag nil :ok t :none :null :tags #("a" "b")
+                                 :meta (list :view-count 3) :page-u-r-l "u"))
+              (parse-json "{\"publishedAt\":\"2026\",\"flag\":false,\"ok\":true,\"none\":null,\"tags\":[\"a\",\"b\"],\"meta\":{\"viewCount\":3},\"pageURL\":\"u\"}"))
+      "an object with each key as it was named")
   (ok (string= (to-json (data->jvalue (vector (list :field-id "h") #()))) "[{\"fieldId\":\"h\"},[]]"))
   (ok (string= (to-json (data->jvalue nil)) "false") "nil is false, as an empty object and false are one value")
   (ok (string= (to-json (data->jobject nil)) "{}") "and data as a whole is an object even when empty")

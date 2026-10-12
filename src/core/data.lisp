@@ -14,13 +14,15 @@
 (defun blank-p (value)
   (or (null value) (zerop (length value))))
 
+(defun entries-in-p (a b)
+  (loop :for (key value) :on a :by #'cddr
+        :always (multiple-value-bind (other found) (access b key :test #'equal)
+                  (and found (data-equal value other)))))
+
 (defun plist-equal (a b)
   (and (= (length a) (length b))
-       (loop :for (key value) :on a :by #'cddr
-             :always (multiple-value-bind (other found) (access b key :test #'eq)
-                       (and found (data-equal value other))))
-       (loop :for key :in b :by #'cddr
-             :always (nth-value 1 (access a key :test #'eq)))))
+       (entries-in-p a b)
+       (entries-in-p b a)))
 
 (defun data-equal (a b)
   (cond ((and (listp a) (listp b)) (plist-equal a b))
