@@ -30,7 +30,6 @@
 (deftest a-key-is-found-without-being-interned
   (ok (eq (find-kebab-keyword "publishedAt") :published-at) "a keyword already interned is found")
   (ok (null (find-kebab-keyword "published-at")) "only by the key it converts back to")
-  (ok (null (find-kebab-keyword "PublishedAt")))
   (ok (equalp (jvalue->data (parse-json "{\"publishedAt\": 1, \"published-at\": 2}")) (list :published-at 1 "published-at" 2))
       "so another spelling stays a string and never doubles a key")
   (ok (null (find-kebab-keyword "neverSeenBeforeName")) "one that is not stays unfound")
@@ -59,6 +58,15 @@
 
 (deftest a-keyword-is-made-from-a-key-only
   (ok (signals (kebab-keyword :published-at)) "a symbol is not a key to convert"))
+
+(deftest a-name-that-would-not-come-back-is-refused
+  (ok (signals (kebab-keyword "published-at")) "a key that is not the name of its keyword is not interned")
+  (ok (signals (jvalue->data (parse-json "{\"publishedAt\": 1, \"published-at\": 2}") :intern t))
+      "so stored data never folds two keys into one")
+  (ok (signals (camel-key :item-2)) ":item-2 would come back as :item2")
+  (ok (signals (camel-key :a--b)))
+  (ok (signals (data->jvalue (list :item-2 1))) "and is not written")
+  (ok (signals (lisp->jvalue '(:item-2 1))) "by either conversion"))
 
 (deftest null-becomes-nil
   (let ((back (jvalue->lisp (parse-json "{\"publishedAt\": null, \"tags\": [null, \"a\"], \"n\": 0}"))))

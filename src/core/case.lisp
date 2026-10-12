@@ -2,6 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/json #:json-array-p)
   (:export #:camel-key
+           #:comes-back-p
            #:kebab-keyword
            #:find-kebab-keyword
            #:jvalue->data
@@ -26,17 +27,29 @@
           :do (when (upper-case-p char) (write-char #\- out))
               (write-char (char-upcase char) out))))
 
+(defun symbol-camel (symbol)
+  (to-camel-case (string-downcase (symbol-name symbol))))
+
+(defun comes-back-p (symbol)
+  (string= (kebab-name (symbol-camel symbol)) (symbol-name symbol)))
+
 (defun camel-key (key)
-  (cond ((symbolp key) (to-camel-case (string-downcase (symbol-name key))))
+  (cond ((symbolp key)
+         (unless (comes-back-p key) (error "~s does not come back as itself from ~a" key (symbol-camel key)))
+         (symbol-camel key))
         ((find #\- key) (to-camel-case key))
         (t key)))
 
+(defun round-trip-name (key)
+  (let ((name (kebab-name key)))
+    (and (string= (to-camel-case (string-downcase name)) key) name)))
+
 (defun kebab-keyword (key)
-  (intern (kebab-name key) :keyword))
+  (intern (or (round-trip-name key) (error "~s does not come back as itself from a keyword" key)) :keyword))
 
 (defun find-kebab-keyword (key)
-  (let ((keyword (find-symbol (kebab-name key) :keyword)))
-    (and keyword (string= (camel-key keyword) key) keyword)))
+  (let ((name (round-trip-name key)))
+    (and name (values (find-symbol name :keyword)))))
 
 (defun jvalue->data (value &key intern)
   (cond ((eq value 'null) :null)
@@ -50,12 +63,11 @@
 (defun data->jvalue (value)
   (cond ((eq value :null) 'null)
         ((consp value)
-         (unless (and (evenp (length value))
-                      (loop :for k :in value :by #'cddr :always (keywordp k)))
-           (error "~s is not a plist of data" value))
          (let ((out (make-hash-table :test 'equal)))
-           (loop :for (k v) :on value :by #'cddr
-                 :do (setf (gethash (camel-key k) out) (data->jvalue v)))
+           (loop :for rest :on value :by #'cddr
+                 :do (unless (and (keywordp (first rest)) (rest rest))
+                       (error "~s is not a plist of data" value))
+                     (setf (gethash (camel-key (first rest)) out) (data->jvalue (second rest))))
            out))
         ((json-array-p value) (map 'vector #'data->jvalue value))
         (t value)))

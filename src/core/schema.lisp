@@ -1,7 +1,7 @@
 (defpackage #:koya-core/schema
   (:use #:cl)
   (:import-from #:koya-core/case
-                #:camel-key #:kebab-keyword)
+                #:camel-key #:kebab-keyword #:comes-back-p)
   (:import-from #:koya-core/json
                 #:jobject
                 #:jget
@@ -130,16 +130,21 @@
   options
   fields)
 
+(defun camel-name (given)
+  (cond ((not (symbolp given)) given)
+        ((comes-back-p given) (camel-key given))
+        (t (fail "~s does not come back as itself as a name; give it as the string of the name" given))))
+
 (defun normalize-option (key value)
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
     (case key
       (:model (name-string value))
-      ((:was :custom-field) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
+      ((:was :custom-field) (if (and value (symbolp value) (not (json-null-p value))) (camel-name value) value))
       (:options (if (or (listp value) (json-array-p value))
                     (map 'list #'name-string value)
                     value))
       (:custom-fields (if (or (listp value) (json-array-p value))
-                          (map 'list (lambda (v) (if (and v (symbolp v)) (camel-key v) v)) value)
+                          (map 'list (lambda (v) (if (and v (symbolp v)) (camel-name v) v)) value)
                           value))
       (t value))))
 
@@ -175,15 +180,13 @@
        (when (member value +system-fields+ :test #'string=)
          (fail "field ~s: :was names the system field ~s" field-name value))))))
 
-(defun make-field (given type &rest options)
-  (let ((name (if (stringp given) given (camel-key given)))
+(defun make-field (name type &rest options)
+  (let ((name (camel-name name))
         (options (loop :for (k v) :on options :by #'cddr
                        :unless (and (eq k :was) (null v))
                          :append (list k (normalize-option k v)))))
     (unless (field-name-p name)
       (fail "field name ~s must be a camelCase identifier" name))
-    (when (and (symbolp given) (string/= (symbol-name (kebab-keyword name)) (symbol-name given)))
-      (fail "field name ~s does not come back as itself; it would be read back as ~(~a~)" given (kebab-keyword name)))
     (when (member name +system-fields+ :test #'string=)
       (fail "field name ~s is reserved for a system field" name))
     (unless (field-type-p type)
@@ -226,7 +229,7 @@
   fields)
 
 (defun make-custom-field (name fields)
-  (let ((name (if (stringp name) name (camel-key name))))
+  (let ((name (camel-name name)))
     (unless (field-name-p name)
       (fail "custom field name ~s must be a camelCase identifier" name))
     (when (null fields)
@@ -360,7 +363,7 @@
 (defun make-model (name kind fields &key preview-url public-url label was)
   (let ((name (string-downcase (string name)))
         (was (name-designator was))
-        (label (if (and label (symbolp label) (not (json-null-p label))) (camel-key label) label)))
+        (label (if (and label (symbolp label) (not (json-null-p label))) (camel-name label) label)))
     (dolist (url (list preview-url public-url))
       (unless (or (null url) (stringp url))
         (fail "model ~s: URL templates must be strings" name))

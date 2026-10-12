@@ -36,7 +36,9 @@ names a site chose, and data from outside may carry any key at all.
 - The domain reads and changes data in Lisp terms, without a JSON null or a
   hash table in sight.
 - An empty object and `false` are both `nil`: a custom field given `false` is
-  taken as given an empty object, where it was refused as not an object.
+  taken as given an empty object, where it was refused as not an object. An
+  edge that writes a content's data knows its schema, and writes a custom
+  field's `nil` as `{}`.
 - Each field name has a keyword of its own, so two names that differ only in
   case, `eventAt` and `eventat`, never read each other's value.
 - No request can make the server intern a name a schema has not.

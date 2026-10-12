@@ -477,4 +477,8 @@
   (ok (eq (field-key (make-field 'image-alt-text :text)) :image-alt-text))
   (ok (signals (make-field 'item-2 :number) 'schema-error) "item-2 would come back as item2")
   (ok (signals (make-field :a--b :text) 'schema-error))
+  (ok (signals (make-field :ab :text :was 'item-2) 'schema-error) "nor as the name it was")
+  (ok (signals (make-field :blocks :repeater :custom-fields '(item-2)) 'schema-error) "or a custom field it lists")
+  (ok (signals (make-custom-field 'item-2 (list (make-field :ab :text))) 'schema-error) "nor is a custom field")
+  (ok (signals (make-model "post" :list (list (make-field :ab :text)) :label 'item-2) 'schema-error) "nor a label")
   (ok (field-key (make-field "item2" :number)) "the name itself, given as a string, is fine"))
