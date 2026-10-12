@@ -118,5 +118,12 @@ adds or alters and what it needs to alter, for these points:
   that is not a fix is reviewed as a first review is.
 - A fix is checked against the earlier findings before it is made, so that it
   brings none of them back.
+- Acting on a finding that meets none of the review's points is optional. A
+  matter of taste, such as how a message or a sentence is worded, that leaves
+  what the code does, its speed and its upkeep as they are, may be taken or set
+  aside, and does not keep reviewing going.
+- A spec for a case no caller can reach, an input that neither a request,
+  stored data, an archive nor a site's ordinary use of the SDK can bring, is
+  optional too. A spec for malicious input is recommended, and optional.
 - Reviewing ends when a review finds nothing that meets the review's points.
 - A finding a review set aside is not taken up again without a new reason.
