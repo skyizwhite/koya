@@ -236,10 +236,12 @@
                     (setf left (list space id mime))
                     (error "The file will not go"))))
     (unwind-protect
-         (ok (equal (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
-                      (error (e) (princ-to-string e)))
-                    "The row is not written")
-             "the insert's error, not the one taking its file away")
+         (progn
+           (ok (equal (handler-case (progn (store-upload "website" (png-bytes) :filename "lost.png") nil)
+                        (error (e) (princ-to-string e)))
+                      "The row is not written")
+               "the insert's error, not the one taking its file away")
+           (ok left "and the file it wrote is taken away"))
       (remove-method #'insert-media insert)
       (remove-method #'delete-media-file cleanup)
       (when left (apply #'delete-media-file left)))))
