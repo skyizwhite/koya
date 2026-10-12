@@ -16,7 +16,7 @@
   (:import-from #:koya-server/usecases/ports/settings #:delete-setting)
   (:import-from #:koya-server/domain/query #:parse-query)
   (:import-from #:cl-ppcre #:scan-to-strings)
-  (:import-from #:koya-core/json #:jget))
+  (:import-from #:access #:access))
 (in-package #:koya-spec/server/web/pages/settings)
 
 (setup (setup-pages) (log-in))
@@ -119,7 +119,7 @@
                   (setf id (subseq path (1+ (position #\/ path :from-end t))))))
               (let ((content (find-if (lambda (c) (string= (content-id c) id))
                                       (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))
-                (ok (string= (jget (content-draft content) "when") "2026-09-20T23:30:00.000Z") "stored as UTC"))
+                (ok (string= (access (content-draft content) :when) "2026-09-20T23:30:00.000Z") "stored as UTC"))
               (multiple-value-bind (status body) (request :get (format nil "/s/website/m/blog/~a" id))
                 (ok (= status 200))
                 (ok (search "value=\"2026-09-21T08:30\"" body) "shown back in the zone")

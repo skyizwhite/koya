@@ -4,7 +4,7 @@
                 #:parse-json #:json-parse-error #:to-json #:jobject #:jget)
   (:import-from #:koya-core/case
                 #:camel-key #:jvalue->lisp #:lisp->jvalue)
-  (:import-from #:koya-core/schema
+  (:import-from #:koya-core/schema-json
                 #:schema->jobject #:jobject->schema)
   (:import-from #:koya-sdk/config
                 #:current-schema)

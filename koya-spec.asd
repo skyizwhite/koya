@@ -7,6 +7,8 @@
                "koya-spec/core/ulid"
                "koya-spec/core/case"
                "koya-spec/core/schema"
+               "koya-spec/core/schema-json"
+               "koya-spec/core/data"
                "koya-spec/core/validate"
                "koya-spec/core/diff"
                "koya-spec/core/json"

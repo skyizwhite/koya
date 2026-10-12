@@ -179,7 +179,7 @@ A content is its fields plus the system fields:
 - `publishedAt` is the first publish, `revisedAt` the latest; both are `null`
   while a content is not published. Timestamps are ISO 8601 in UTC with
   milliseconds.
-- A field the content has no value for is absent or `null`. What each type holds
+- A field the content has no value for is absent. What each type holds
   is in [SCHEMA.md, "Content values"](SCHEMA.md#content-values).
 
 ## Managing content
@@ -255,7 +255,10 @@ under `objects/` (`404`).
   When the result is what the content holds already, nothing is written (no
   revision, no webhook); when it is the published data again, the draft is
   dropped, as `discard-draft` would.
-- Publishing takes `data` when given, else the draft, else re-publishes.
+- A `null` in the data a write is given, at the top or inside a custom field or a
+  row, is no value, so it is not kept.
+- Publishing takes `data` when given, `{}` included, else the draft, else
+  re-publishes.
 - A content's id is made by the server: 12 lowercase letters and digits, drawn
   at random. Ids from before stay as they were: 26-character ULIDs, or up to 64
   letters, digits, `-` and `_` when the content was created with its own. A

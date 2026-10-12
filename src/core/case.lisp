@@ -7,6 +7,7 @@
            #:find-kebab-keyword
            #:jvalue->data
            #:data->jvalue
+           #:data->jobject
            #:plist->object
            #:object->plist
            #:jvalue->lisp
@@ -83,6 +84,9 @@
            out))
         ((json-array-p value) (map 'vector #'data->jvalue value))
         (t value)))
+
+(defun data->jobject (data)
+  (if data (data->jvalue data) (make-hash-table :test 'equal)))
 
 (defun lisp->jvalue (value)
   (cond ((null value) 'null)

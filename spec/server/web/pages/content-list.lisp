@@ -8,13 +8,11 @@
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:get-content #:update-content)
   (:import-from #:koya-server/domain/content
-                #:content-status #:content-id #:content-draft-key #:content-published #:drafted)
+                #:content-status #:content-id #:content-draft-key #:content-published-p #:drafted)
   (:import-from #:koya-server/domain/query #:parse-query)
-  (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/usecases/contents #:create)
-  (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-core/schema #:model-fields #:make-schema #:make-model #:make-field)
   (:import-from #:koya-spec/server/web/pages/support #:call-action)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents)
@@ -241,7 +239,7 @@
        (let ((first-photo (media-id (insert-media "website" :filename "a.png" :mime "image/png" :size 10 :width 1 :height 1)))
              (second-photo (media-id (insert-media "website" :filename "b.png" :mime "image/png" :size 10 :width 1 :height 1))))
          (create "website" (find-model "website" "album")
-                 (jobject "title" "Trip" "photos" (vector first-photo second-photo second-photo)) :publish t)
+                 (list :title "Trip" :photos (vector first-photo second-photo second-photo)) :publish t)
          (let ((body (nth-value 1 (request :get "/s/website/m/album"))))
            (ok (search (format nil "src=\"/media/website/~a.png\"" first-photo) body) "a field of many media is its first image")
            (ok (search ">+2<" body) "and how many more it holds"))
@@ -259,10 +257,10 @@
   (exec "DELETE FROM contents")
   (multiple-value-bind (space model) (resolve-model "website" "blog")
     (flet ((make (title &rest data)
-             (content-id (create space model (apply #'jobject "title" title data) :publish t))))
+             (content-id (create space model (list* :title title data) :publish t))))
       (let ((alpha (make "Alpha target"))
             (beta (make "Beta target")))
-        (make "Refers" "related" (vector alpha beta))
+        (make "Refers" :related (vector alpha beta))
         (multiple-value-bind (status body) (request :get "/s/website/m/blog")
           (ok (= status 200))
           (ok (search "Alpha target, Beta target" body)
@@ -272,7 +270,7 @@
 (deftest list-shows-rich-text-as-its-text
   (exec "DELETE FROM contents")
   (multiple-value-bind (space model) (resolve-model "website" "blog")
-    (create space model (jobject "title" "Quoted" "body" "<p>It&#8217;s &#x2014; <b>here</b></p>") :publish t))
+    (create space model (list :title "Quoted" :body "<p>It&#8217;s &#x2014; <b>here</b></p>") :publish t))
   (multiple-value-bind (status body) (request :get "/s/website/m/blog")
     (ok (= status 200))
     (ok (search "It’s — here" body) "as the search and the history read it, every character reference decoded"))
@@ -344,7 +342,7 @@
             (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
 
-          (update-content (drafted (get-content "website" three) (alist-hash-table '(("body" . "<p>no title</p>")) :test 'equal))
+          (update-content (drafted (get-content "website" three) (list :body "<p>no title</p>"))
                           nil nil)
           (let ((body (nth-value 1 (bulk "publish" (list one three)))))
             (ok (search "Published 1 content. 1 could not be: title is required." body)
@@ -364,15 +362,15 @@
   (exec "DELETE FROM contents")
   (multiple-value-bind (space model) (resolve-model "website" "blog")
     (flet ((make (title &rest data)
-             (content-id (create space model (apply #'jobject "title" title data) :publish t))))
+             (content-id (create space model (list* :title title data) :publish t))))
       (let* ((target (make "Target"))
              (other (make "Other"))
-             (referrer (make "Refers" "related" (vector target))))
+             (referrer (make "Refers" :related (vector target))))
         (testing "unpublishing a selection skips the one another refers to"
           (ok (search "Unpublished 1 content. 1 could not be: This content is referenced by 1 other content"
                       (nth-value 1 (bulk "unpublish" (list target other)))))
-          (ok (content-published (get-content "website" target)) "it is still published")
-          (ng (content-published (get-content "website" other)) "the rest of the selection went"))
+          (ok (content-published-p (get-content "website" target)) "it is still published")
+          (ng (content-published-p (get-content "website" other)) "the rest of the selection went"))
         (testing "deleting a selection does the same"
           (bulk "delete" (list target referrer))
           (ok (get-content "website" target) "refused while the referrer was still there")
@@ -384,7 +382,7 @@
   (exec "DELETE FROM contents")
   (multiple-value-bind (space model) (resolve-model "website" "blog")
     (dolist (title '("Apple" "Banana" "Cherry"))
-      (create space model (jobject "title" title) :publish (string= title "Banana"))))
+      (create space model (list :title title) :publish (string= title "Banana"))))
   (flet ((browse (&rest args)
            (call-action :get (apply #'browse-contents :space "website" :model "blog" args))))
     (testing "the page's controls call the action"

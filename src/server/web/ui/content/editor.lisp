@@ -7,7 +7,7 @@
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
                 #:model-name #:model-preview-url #:model-public-url #:field-fields #:field-option
                 #:field-row-kind #:row-kind #:custom-field-name #:custom-field-fields #:model-field
-                #:field-many-p)
+                #:field-many-p #:field-value)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
@@ -17,6 +17,7 @@
   (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-status #:content-published #:content-draft
+                #:content-published-p #:content-draft-p
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
                 #:default-data #:content-label #:slug-value #:held-ids)
   (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list)
@@ -97,8 +98,8 @@
        (input :type "hidden" :name (format nil "~a.~a.fieldId" name key) :value (custom-field-name kind))
        (div :class "space-y-4 p-4"
          (loop :for inner :in (custom-field-fields kind) :collect
-           (let ((inner-value (if (hash-table-p row)
-                                  (gethash (field-name inner) row)
+           (let ((inner-value (if (consp row)
+                                  (field-value row inner)
                                   (and (eq (field-type inner) :boolean) (field-option inner :default) t))))
              (hsx (~field-input :field inner :parent prefix :value inner-value
                                 :references (references-for choices inner)
@@ -106,7 +107,7 @@
                                 :error (and index (field-error errors (row-path field index inner))))))))))))
 
 (defcomp ~editor-field (&key space model field data errors choices)
-  (let ((value (and data (gethash (field-name field) data))))
+  (multiple-value-bind (value found) (field-value data field)
     (case (field-type field)
       (:repeater
        (hsx (~repeater-input :field field :error (field-error errors (field-name field))
@@ -119,10 +120,10 @@
                         :collect (hsx (~repeater-row :choices choices :field field :kind kind :key (princ-to-string index)
                                                      :row row :errors errors :index index)))))))
       (:custom
-        (hsx (~custom-input :field field :present (hash-table-p value) :error (field-error errors (field-name field))
+        (hsx (~custom-input :field field :present (and found (listp value)) :error (field-error errors (field-name field))
                (loop :for inner :in (field-fields field) :collect
-                 (let ((inner-value (if (hash-table-p value)
-                                        (gethash (field-name inner) value)
+                 (let ((inner-value (if (and found (listp value))
+                                        (field-value value inner)
                                         (and (eq (field-type inner) :boolean) (field-option inner :default) t))))
                    (hsx (~field-input :field inner :parent field :value inner-value
                                       :references (references-for choices inner)
@@ -207,14 +208,14 @@
          (model-name (model-name model))
          (id (if content (content-id content) "new"))
          (object-p (eq (model-kind model) :object))
-         (published (and content (content-published content)))
-         (draft (and content (content-draft content)))
+         (published (and content (content-published-p content)))
+         (draft (and content (content-draft-p content)))
          (preview-url (and draft (content-draft-key content)
                            (expand-url-template (model-preview-url model)
                                                 :id id :draft-key (content-draft-key content)
-                                                :slug (slug-value model draft))))
+                                                :slug (slug-value model (content-draft content)))))
          (public-url (and published (expand-url-template (model-public-url model)
-                                                         :id id :slug (slug-value model published)))))
+                                                         :id id :slug (slug-value model (content-published content))))))
     (hsx
      (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring errors))
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"

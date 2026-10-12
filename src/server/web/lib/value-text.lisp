@@ -1,8 +1,9 @@
 (defpackage #:koya-server/web/lib/value-text
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:field-type #:field-name #:field-fields #:row-kind #:custom-field-name #:custom-field-fields)
-  (:import-from #:koya-core/json #:json-array-p #:json-null-p)
+                #:field-type #:field-name #:field-fields #:row-kind #:custom-field-name #:custom-field-fields
+                #:field-value)
+  (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/validate #:blank-value-p)
   (:import-from #:koya-server/domain/html #:html-text)
   (:import-from #:koya-server/web/lib/display #:short-time)
@@ -23,7 +24,7 @@
 
 (defun fields-text (fields value separator label)
   (let ((texts (loop :for inner :in fields
-                     :for (inner-value found) := (multiple-value-list (gethash (field-name inner) value))
+                     :for (inner-value found) := (multiple-value-list (field-value value inner))
                      :for text := (value-text inner inner-value found label)
                      :when text :collect (format nil "~a: ~a" (field-name inner) text))))
     (and texts (format nil (format nil "~~{~~a~~^~a~~}" separator) texts))))
@@ -38,10 +39,10 @@
 
 (defun value-text (field value found label)
   (cond ((eq (field-type field) :boolean)
-         (and found (not (json-null-p value)) (scalar-text field value label)))
-        ((or (not found) (blank-value-p value)) nil)
-        ((and (eq (field-type field) :custom) (hash-table-p value))
+         (and found (not (eq value :null)) (scalar-text field value label)))
+        ((and found (eq (field-type field) :custom) (listp value))
          (fields-text (field-fields field) value (string #\Newline) label))
+        ((or (not found) (blank-value-p value)) nil)
         ((eq (field-type field) :repeater)
          (and (json-array-p value) (rows-text field value label)))
         ((json-array-p value)

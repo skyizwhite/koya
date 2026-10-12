@@ -2,10 +2,11 @@
   (:use #:cl)
   (:import-from #:koya-core/json #:json-array-p)
   (:import-from #:koya-core/schema
-                #:schema-models #:schema-model #:model-name #:model-fields #:field-name #:field-type #:field-option
-                #:field-fields #:field-row-kinds #:custom-field-name #:custom-field-fields)
+                #:schema-models #:schema-model #:model-name #:model-fields #:field-type #:field-option
+                #:field-fields #:field-row-kinds #:custom-field-name #:custom-field-fields #:field-value #:row-kind)
   (:import-from #:koya-server/domain/content
-                #:content-model #:content-published #:content-draft #:content-id #:content-label)
+                #:content-model #:content-published #:content-draft #:content-published-p #:content-draft-p
+                #:content-id #:content-label)
   (:export #:reference-fields
            #:referrers
            #:refers-p
@@ -27,9 +28,9 @@
   (if (eq (field-type field) :repeater)
       (and (json-array-p value)
            (some (lambda (row)
-                   (and (hash-table-p row)
-                        (let ((entries (cdr (assoc (gethash "fieldId" row) inner :test #'equal))))
-                          (and entries (funcall test entries row)))))
+                   (let* ((kind (row-kind field row))
+                          (entries (and kind (cdr (assoc (custom-field-name kind) inner :test #'equal)))))
+                     (and entries (funcall test entries row))))
                  value))
       (funcall test inner value)))
 
@@ -47,10 +48,10 @@
   (fields-by-model schema (lambda (f) (member (field-type f) '(:media :richtext)))))
 
 (defun data-refers-p (fields data id)
-  (and (hash-table-p data)
+  (and (listp data)
        (some (lambda (entry)
                (destructuring-bind (field . inner) entry
-                 (let ((value (gethash (field-name field) data)))
+                 (let ((value (field-value data field)))
                    (if inner
                        (some-inside (lambda (entries v) (data-refers-p entries v id)) field inner value)
                        (typecase value
@@ -61,15 +62,15 @@
 (defun refers-p (content fields id)
   (let ((fields (gethash (content-model content) fields)))
     (and fields
-         (or (data-refers-p fields (content-published content) id)
-             (data-refers-p fields (content-draft content) id))
+         (or (and (content-published-p content) (data-refers-p fields (content-published content) id))
+             (and (content-draft-p content) (data-refers-p fields (content-draft content) id)))
          t)))
 
 (defun mentions-p (fields data id)
-  (and (hash-table-p data)
+  (and (listp data)
        (some (lambda (entry)
                (destructuring-bind (field . inner) entry
-                 (let ((value (gethash (field-name field) data)))
+                 (let ((value (field-value data field)))
                    (if inner
                        (some-inside (lambda (entries v) (mentions-p entries v id)) field inner value)
                        (typecase value
@@ -78,13 +79,13 @@
              fields)))
 
 (defun data-mentioned-ids (fields data ids)
-  (and data (remove-if-not (lambda (id) (mentions-p fields data id)) ids)))
+  (remove-if-not (lambda (id) (mentions-p fields data id)) ids))
 
 (defun mentioned-ids (content fields ids)
   (let ((fields (gethash (content-model content) fields)))
     (and fields
-         (union (data-mentioned-ids fields (content-published content) ids)
-                (data-mentioned-ids fields (content-draft content) ids)
+         (union (and (content-published-p content) (data-mentioned-ids fields (content-published content) ids))
+                (and (content-draft-p content) (data-mentioned-ids fields (content-draft content) ids))
                 :test #'string=))))
 
 (defun referrers (schema contents)

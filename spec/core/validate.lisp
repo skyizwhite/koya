@@ -5,8 +5,13 @@
   (:import-from #:koya-core/validate
                 #:validate-content #:fitted-shape)
   (:import-from #:koya-core/json
-                #:parse-json #:to-json))
+                #:parse-json #:to-json)
+  (:import-from #:koya-core/case
+                #:jvalue->data #:data->jobject))
 (in-package #:koya-spec/core/validate)
+
+(defun data (json)
+  (jvalue->data (parse-json json)))
 
 (defparameter *model*
   (make-model "blog" :list
@@ -24,7 +29,7 @@
 
 (defun codes (json)
   (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
-          (validate-content *model* (parse-json json))))
+          (validate-content *model* (data json))))
 
 (deftest valid-content
   (ok (null (codes "{\"title\": \"Hello\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"slug\": \"hello-world\",
@@ -32,7 +37,9 @@
                      \"labels\": [\"a\", \"b\"], \"tags\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"],
                      \"cover\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\", \"body\": \"# hi\"}")))
   (ok (null (codes "{\"title\": \"Hello\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"featured\": false}"))
-      "false boolean is fine"))
+      "false boolean is fine")
+  (ok (null (codes "{\"title\": \"Hello\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"featured\": {}}"))
+      "and an empty object is false, as false and {} are one value"))
 
 (deftest required
   (ok (equal (codes "{}") '(("title" . "required") ("eventAt" . "required"))))
@@ -40,16 +47,16 @@
              '(("title" . "required") ("eventAt" . "required")))
       "blank and null count as missing")
   (let ((model (make-model "note" :list (list (make-field :body :richtext :required t)))))
-    (ok (null (validate-content model (parse-json "{\"body\": \"<p><br></p>\"}")))
+    (ok (null (validate-content model (data "{\"body\": \"<p><br></p>\"}")))
         "rich text is blank as any string is: markup is a value")
     (ok (equal (mapcar (lambda (e) (getf e :code))
-                       (validate-content model (parse-json "{\"body\": \" \\n \"}")))
+                       (validate-content model (data "{\"body\": \" \\n \"}")))
                '("required")))
-    (ok (null (validate-content model (parse-json "{\"body\": \"<p>a</p>\"}")))))
+    (ok (null (validate-content model (data "{\"body\": \"<p>a</p>\"}")))))
   (testing "partial skips missing fields"
-    (ok (null (validate-content *model* (parse-json "{}") :partial t)))
+    (ok (null (validate-content *model* (data "{}") :partial t)))
     (ok (equal (mapcar (lambda (e) (getf e :code))
-                       (validate-content *model* (parse-json "{\"title\": null}") :partial t))
+                       (validate-content *model* (data "{\"title\": null}") :partial t))
                '("required")))))
 
 (deftest false-and-empty-array-are-values
@@ -105,7 +112,13 @@
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"tags\": [\"bad id!\"]}")
              '(("tags" . "type"))))
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"extra\": 1}")
-             '(("extra" . "unknown_field")))))
+             '(("extra" . "unknown_field"))))
+  (ok (equal (codes "{\"title\": \"Ok\", \"event-at\": \"2026-09-20T00:00:00Z\"}")
+             '(("event-at" . "unknown_field") ("eventAt" . "required")))
+      "a key spelled as a field's keyword is not that field")
+  (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"name\": 1}")
+             '(("name" . "unknown_field")))
+      "nor is one whose keyword exists for another reason"))
 
 (defparameter *with-seo*
   (schema-model
@@ -118,7 +131,7 @@
 
 (defun seo-codes (json &optional (model *with-seo*))
   (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
-          (validate-content model (parse-json json))))
+          (validate-content model (data json))))
 
 (deftest a-custom-field-is-an-object-of-its-fields
   (ok (null (seo-codes "{\"meta\": {\"title\": \"Hi\", \"image\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"}}")))
@@ -154,7 +167,7 @@
 
 (defun block-codes (model json)
   (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
-          (validate-content (schema-model *with-blocks* model) (parse-json json))))
+          (validate-content (schema-model *with-blocks* model) (data json))))
 
 (deftest a-repeater-is-a-list-of-rows
   (ok (null (block-codes "page" "{\"blocks\": [{\"fieldId\": \"heading\", \"text\": \"Hi\"},
@@ -173,22 +186,22 @@
 
 (deftest a-media-field-can-hold-several
   (let ((model (make-model "album" :list (list (make-field :photos :media :many t :required t)))))
-    (flet ((codes (json) (mapcar (lambda (e) (cons (getf e :field) (getf e :code))) (validate-content model (parse-json json)))))
+    (flet ((codes (json) (mapcar (lambda (e) (cons (getf e :field) (getf e :code))) (validate-content model (data json)))))
       (ok (null (codes "{\"photos\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\", \"01ARZ3NDEKTSV4RRFFQ69G5FAW\"]}")))
       (ok (equal (codes "{\"photos\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"}") '(("photos" . "type"))) "an array of ids")
       (ok (equal (codes "{\"photos\": [\"no id\"]}") '(("photos" . "type"))))
       (ok (equal (codes "{\"photos\": []}") '(("photos" . "required"))) "and none is no value"))))
 
 (defun fitted (model json)
-  (to-json (fitted-shape model (parse-json json))))
+  (to-json (data->jobject (fitted-shape model (data json)))))
 
 (deftest a-fitted-shape-keeps-what-fits-its-fields-types
   (ok (string= (fitted *model* "{\"title\": \"lowercase and far too long\", \"count\": 12.5, \"category\": \"sports\", \"labels\": \"a\", \"cover\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"]}")
                "{\"title\":\"lowercase and far too long\",\"count\":12.5,\"category\":\"sports\",\"labels\":\"a\",\"cover\":[\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"]}")
       "a value is kept whatever its field's options say, and one that may be many may be one or several")
   (ok (string= (fitted *model* "{\"title\": [\"One\"], \"body\": 3, \"category\": 1, \"slug\": \"Not Slug\", \"day\": null, \"extra\": 1}")
-               "{\"day\":null}")
-      "a value not of its field's type goes, as do several in a field that holds one and a key that is not a field")
+               "{}")
+      "a value not of its field's type goes, as do several in a field that holds one, a null and a key that is not a field")
   (ok (string= (fitted *model* "{\"tags\": [\"bad id!\", \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"]}")
                "{\"tags\":[\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"]}")
       "of several, only those not of the type go")

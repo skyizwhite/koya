@@ -9,4 +9,4 @@
 
 (defun @post (params)
   (with-route-model (space model :object) params
-    (admin-content->jobject (unpublish space model (content-id (object-content space model))))))
+    (admin-content->jobject (unpublish space model (content-id (object-content space model))) model)))

@@ -10,7 +10,9 @@
   (:import-from #:koya-server/domain/deploy
                 #:make-deploy #:make-change)
   (:import-from #:koya-core/diff
-                #:change->jobject #:destructive-change-p)
+                #:destructive-change-p)
+  (:import-from #:koya-core/schema-json
+                #:change->jobject)
   (:import-from #:koya-server/usecases/ports/deploys
                 #:+deploys-kept+ #:list-deploys #:count-deploys)
   (:export #:record-deploy))

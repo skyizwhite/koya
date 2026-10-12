@@ -1,7 +1,7 @@
 (defpackage #:koya-spec/server/domain/html
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/html #:html-text #:data-text)
-  (:import-from #:koya-core/json #:parse-json #:jget))
+  (:import-from #:access #:access))
 (in-package #:koya-spec/server/domain/html)
 
 (deftest the-text-of-rich-text
@@ -19,11 +19,13 @@
   (ok (string= (html-text "") "")))
 
 (deftest the-text-of-a-contents-data
-  (let ((text (data-text (parse-json "{\"title\":\"A &amp; B\",\"body\":\"<p>one</p><p>two</p>\",\"count\":3,\"tags\":[\"x\"],\"done\":true}"))))
-    (ok (string= (jget text "body") "one two") "each string, as its text")
-    (ok (string= (jget text "title") "A & B") "whatever its field's type")
-    (ng (nth-value 1 (gethash "count" text)) "and nothing that is not a string")
-    (ng (nth-value 1 (gethash "tags" text)))
-    (ng (nth-value 1 (gethash "done" text))))
-  (ok (= (hash-table-count (data-text (parse-json "{\"count\":3}"))) 0) "data without strings has an empty text, not none")
-  (ok (null (data-text nil)) "no data, no text"))
+  (let ((text (data-text (list :title "A &amp; B" :body "<p>one</p><p>two</p>" :count 3 :tags #("x") :done t))))
+    (ok (string= (access text :body) "one two") "each string, as its text")
+    (ok (string= (access text :title) "A & B") "whatever its field's type")
+    (ng (nth-value 1 (access text :count)) "and nothing that is not a string")
+    (ng (nth-value 1 (access text :tags)))
+    (ng (nth-value 1 (access text :done))))
+  (ok (equalp (data-text (list :meta (list :title "<b>t</b>" :n 1) :rows (vector (list :field-id "h" :text "<i>r</i>"))))
+              (list :meta (list :title "t") :rows (vector (list :field-id "h" :text "r"))))
+      "inside a custom field and a row too")
+  (ok (null (data-text (list :count 3))) "data without strings has an empty text"))

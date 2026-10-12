@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/<space>/schema/index
   (:use #:cl)
-  (:import-from #:koya-core/schema #:schema->jobject #:jobject->schema)
+  (:import-from #:koya-core/schema-json #:schema->jobject #:jobject->schema)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/domain/errors
                 #:conflict #:koya-error-code #:koya-error-message #:koya-error-details)

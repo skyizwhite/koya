@@ -1,13 +1,11 @@
 (defpackage #:koya-core/diff
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:schema-webhooks #:schema-models #:schema-custom-fields #:custom-field->jobject #:field-fields
+                #:schema-webhooks #:schema-models #:schema-custom-fields #:field-fields
                 #:custom-field-name #:custom-field-fields #:field-row-kinds #:field-row-kind
                 #:model-name #:model-kind #:model-fields #:model-options #:model-was
                 #:field-name #:field-type #:field-options #:field-was
                 #:forget-rename)
-  (:import-from #:koya-core/json
-                #:jobject #:json-equal)
   (:import-from #:koya-core/case
                 #:camel-key)
   (:export #:diff-schemas
@@ -16,7 +14,7 @@
            #:destructive-changes-p
            #:tightened-change-p
            #:format-change
-           #:change->jobject))
+           #:change-path))
 (in-package #:koya-core/diff)
 
 (defparameter *destructive-ops* '(:remove-model :remove-field :change-kind :change-field-type))
@@ -161,8 +159,20 @@
       (lambda (m) (list (list :op :remove-model :model (model-name m))))
       (lambda (o n) (model-changes o n renames))))))
 
+(defun fields-equal (a b)
+  (and (= (length a) (length b))
+       (every (lambda (x y)
+                (and (string= (field-name x) (field-name y))
+                     (eq (field-type x) (field-type y))
+                     (plist-equal (field-options x) (field-options y))))
+              a b)))
+
 (defun custom-fields-equal (a b)
-  (json-equal (map 'vector #'custom-field->jobject a) (map 'vector #'custom-field->jobject b)))
+  (and (= (length a) (length b))
+       (every (lambda (x y)
+                (and (string= (custom-field-name x) (custom-field-name y))
+                     (fields-equal (custom-field-fields x) (custom-field-fields y))))
+              a b)))
 
 (defun diff-schemas (old new)
   (append (unless (equal (and old (schema-webhooks old)) (schema-webhooks new))
@@ -198,7 +208,7 @@
         (format nil "~a (~{~a~^, ~})" label differences)
         label)))
 
-(defun path (change)
+(defun change-path (change)
   (format nil "~@[~a~]~@[.~a~]"
           (or (getf change :model) (if (eq (getf change :op) :change-custom-fields) "customFields" "webhooks"))
           (getf change :field)))
@@ -215,7 +225,7 @@
               ((:add-model :add-field) "+")
               ((:remove-model :remove-field) "-")
               (t "~"))
-            (path change)
+            (change-path change)
             (case op
               ((:add-model :add-field) (getf change :to))
               ((:remove-field) (getf change :from))
@@ -235,18 +245,3 @@
               ((:change-webhooks :change-custom-fields) "changed")
               (t nil))
             (misfit-note change))))
-
-(defun misfit->jobject (misfit)
-  (jobject "id" (getf misfit :id)
-           "field" (getf misfit :field)
-           "version" (getf misfit :version)
-           "message" (getf misfit :message)))
-
-(defun change->jobject (change)
-  (let ((object (jobject "op" (string-downcase (substitute #\_ #\- (symbol-name (getf change :op))))
-                         "path" (path change)
-                         "destructive" (destructive-change-p change)
-                         "description" (string-trim " " (format-change change)))))
-    (when (getf change :misfits)
-      (setf (gethash "misfits" object) (map 'vector #'misfit->jobject (getf change :misfits))))
-    object))

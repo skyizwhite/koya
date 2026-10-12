@@ -1,7 +1,8 @@
 (defpackage #:koya-server/usecases/contents
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-fields #:field-name #:field-unique-p #:model-name #:model-slug-field)
+                #:model-kind #:model-fields #:field-name #:field-unique-p #:model-name #:model-slug-field
+                #:field-value)
   (:import-from #:koya-core/validate
                 #:validate-content #:validation-error #:blank-value-p #:datetime-string-p
                 #:validation-error-errors)
@@ -17,6 +18,7 @@
                 #:find-contents-by-slug #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
+                #:content-published-p
                 #:merge-data #:same-data-p #:initial-data #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one
                 #:new-content-id)
@@ -53,7 +55,7 @@
   (let ((errors (validate-content model data :partial partial)))
     (dolist (field (model-fields model))
       (when (field-unique-p field)
-        (multiple-value-bind (value found) (gethash (field-name field) data)
+        (multiple-value-bind (value found) (field-value data field)
           (when (and found (not (blank-value-p value))
                      (value-taken-p space-name model field value :exclude-id exclude-id))
             (setf errors (append errors (list (list :field (field-name field) :code "unique"
@@ -75,7 +77,7 @@
         :unless (get-content space id) :return id))
 
 (defun published-view (space model content)
-  (and (content-published content)
+  (and (content-published-p content)
        (deliver content model space)))
 
 (defun draft-view (space model content)
@@ -137,7 +139,7 @@
          (data (to-the-minute model (if replace patch (merge-data current patch)))))
     (check-unchanged-since content since)
     (cond ((same-data-p model data current) (values content :unchanged))
-          ((and live (same-data-p model data live))
+          ((and (content-published-p content) (same-data-p model data live))
            (check-transition content :discard)
            (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
           (t
@@ -145,16 +147,16 @@
            (check-content space model data :exclude-id id)
            (values (store model (drafted content data) "draft" data) :saved)))))
 
-(defun publish (space model id &key data published-at since)
+(defun publish (space model id &key (data nil data-p) published-at since)
   (let ((published-at (check-published-at published-at)))
     (multiple-value-bind (live old)
-        (with-transaction (publish-now space model id data published-at since))
+        (with-transaction (publish-now space model id data data-p published-at since))
       (notify space model id :publish :old old :new (published-view space model live))
       live)))
 
-(defun publish-now (space model id data published-at since)
+(defun publish-now (space model id data data-p published-at since)
   (let* ((content (resolve-content space (model-name model) id))
-         (data (to-the-minute model (or data (content-data content :draft t)))))
+         (data (to-the-minute model (if data-p data (content-data content :draft t)))))
     (check-unchanged-since content since)
     (check-transition content :publish)
     (check-content space model data :exclude-id id)
@@ -225,10 +227,11 @@
         (update-draft space model (content-id content) data :replace replace :since since)
         (create space model data))))
 
-(defun publish-object (space model &key data published-at since)
+(defun publish-object (space model &key (data nil data-p) published-at since)
   (let ((content (find-object-content space (model-name model))))
-    (cond (content (publish space model (content-id content) :data data :published-at published-at :since since))
-          (data (create space model data :publish t :published-at published-at))
+    (cond (content (apply #'publish space model (content-id content) :published-at published-at :since since
+                          (and data-p (list :data data))))
+          (data-p (create space model data :publish t :published-at published-at))
           (t (object-content space model)))))
 
 (defun draft-key (space model id)

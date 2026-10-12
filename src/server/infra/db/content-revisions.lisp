@@ -7,6 +7,8 @@
                 #:now-iso)
   (:import-from #:koya-core/json
                 #:parse-json #:to-json)
+  (:import-from #:koya-core/case
+                #:jvalue->data #:data->jobject)
   (:import-from #:koya-server/usecases/ports/contents
                 #:record-revision #:list-revisions #:count-revisions #:find-revision
                 #:content-history))
@@ -16,13 +18,13 @@
   (make-revision :id (col row "id")
                  :content-id (col row "content_id")
                  :event (col row "event")
-                 :data (parse-json (col row "data"))
+                 :data (jvalue->data (parse-json (col row "data")) :intern t)
                  :by (col row "written_by")
                  :created-at (col row "created_at")))
 
 (defmethod record-revision (space content-id event data &key (by "") created-at)
   (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-        space content-id event (to-json data) (or by "") (or created-at (now-iso))))
+        space content-id event (to-json (data->jobject data)) (or by "") (or created-at (now-iso))))
 
 (defun where (published-only)
   (format nil "space = ? AND content_id = ?~:[~; AND event = 'publish'~]" published-only))

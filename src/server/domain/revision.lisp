@@ -1,9 +1,9 @@
 (defpackage #:koya-server/domain/revision
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:field-name)
-  (:import-from #:koya-core/json
-                #:json-equal)
+                #:model-fields #:field-name #:field-value)
+  (:import-from #:koya-core/data
+                #:data-equal)
   (:export #:revision #:make-revision
            #:revision-id #:revision-content-id #:revision-event #:revision-data
            #:revision-by #:revision-created-at
@@ -14,10 +14,10 @@
   id content-id event data by created-at)
 
 (defun changed-keys (model before after)
-  (let ((fields (mapcar #'field-name (model-fields model))))
-    (remove-if (lambda (key)
-                 (multiple-value-bind (a found-a) (if before (gethash key before) (values nil nil))
-                   (multiple-value-bind (b found-b) (gethash key after)
-                     (or (and (not found-a) (not found-b))
-                         (and found-a found-b (json-equal a b))))))
-               fields)))
+  (mapcar #'field-name
+          (remove-if (lambda (field)
+                       (multiple-value-bind (a found-a) (field-value before field)
+                         (multiple-value-bind (b found-b) (field-value after field)
+                           (or (and (not found-a) (not found-b))
+                               (and found-a found-b (data-equal a b))))))
+                     (model-fields model))))

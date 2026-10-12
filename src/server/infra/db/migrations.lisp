@@ -5,8 +5,10 @@
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-core/json #:parse-json #:to-json)
-  (:import-from #:koya-core/schema #:forget-slug-options)
-  (:import-from #:koya-server/infra/db/contents #:text-column)
+  (:import-from #:koya-core/schema-json #:forget-slug-options)
+  (:import-from #:koya-core/case #:jvalue->data)
+  (:import-from #:koya-core/data #:without-nulls)
+  (:import-from #:koya-server/infra/db/contents #:json-column #:text-column)
   (:export #:migrate
            #:current-version))
 (in-package #:koya-server/infra/db/migrations)
@@ -223,7 +225,9 @@
                 FROM models m, json_each(m.definition, '$.fields') f
                WHERE m.kind = 'list' AND json_extract(f.value, '$.type') = 'slug'
                GROUP BY m.space, m.name HAVING COUNT(*) = 1) AS s
-       WHERE contents.space = s.space AND contents.model = s.model")))
+       WHERE contents.space = s.space AND contents.model = s.model")
+    (17
+     drop-stored-nulls)))
 
 (defun drop-slug-options ()
   (dolist (row (fetch "SELECT space, name, definition FROM models"))
@@ -233,10 +237,31 @@
               (to-json definition) (col row "space") (col row "name"))))))
 
 (defun fill-content-texts ()
-  (flet ((text (json) (and json (text-column (parse-json json)))))
+  (flet ((text (json) (and json (text-column (jvalue->data (parse-json json) :intern t)))))
     (dolist (row (fetch "SELECT rowid AS r, published, draft FROM contents"))
       (exec "UPDATE contents SET published_text = ?, draft_text = ? WHERE rowid = ?"
             (text (col row "published")) (text (col row "draft")) (col row "r")))))
+
+(defun stored-without-nulls (json)
+  (without-nulls (jvalue->data (parse-json json) :intern t)))
+
+(defun holds-a-null (column)
+  (format nil "(~a LIKE '%null%' AND EXISTS (SELECT 1 FROM json_tree(~:*~a) WHERE type = 'null' AND fullkey NOT LIKE '%]'))"
+          column))
+
+(defun drop-stored-nulls ()
+  (dolist (row (fetch (format nil "SELECT rowid AS r, published, draft FROM contents WHERE ~a OR ~a"
+                              (holds-a-null "published") (holds-a-null "draft"))))
+    (flet ((columns (json)
+             (if json
+                 (let ((data (stored-without-nulls json)))
+                   (list (json-column data) (text-column data)))
+                 (list nil nil))))
+      (apply #'exec "UPDATE contents SET published = ?, published_text = ?, draft = ?, draft_text = ? WHERE rowid = ?"
+             (append (columns (col row "published")) (columns (col row "draft")) (list (col row "r"))))))
+  (dolist (row (fetch (format nil "SELECT id, data FROM content_revisions WHERE ~a" (holds-a-null "data"))))
+    (exec "UPDATE content_revisions SET data = ? WHERE id = ?"
+          (json-column (stored-without-nulls (col row "data"))) (col row "id"))))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

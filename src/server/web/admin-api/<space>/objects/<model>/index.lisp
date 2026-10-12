@@ -9,8 +9,8 @@
 
 (defun @get (params)
   (with-route-model (space model :object) params
-    (admin-content->jobject (object-content space model))))
+    (admin-content->jobject (object-content space model) model)))
 
 (defun @patch (params)
   (with-route-model (space model :object) params
-    (admin-content->jobject (update-object space model (body-data (read-json-body))))))
+    (admin-content->jobject (update-object space model (body-data (read-json-body))) model)))

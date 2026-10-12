@@ -14,7 +14,7 @@
                 #:create-delivery-key #:list-delivery-keys #:create-management-key
                 #:space-for-delivery-key #:space-for-management-key)
   (:import-from #:koya-server/domain/content
-                #:make-content #:content-status #:content-published #:content-draft #:content-id
+                #:make-content #:content-status #:content-published #:content-draft #:content-id #:status-of
                 #:content-draft-key #:content-created-at #:content-published-at)
   (:import-from #:koya-server/usecases/ports/media
                 #:list-media #:media-file-path #:write-media-file #:delete-media-file #:insert-media)
@@ -25,7 +25,8 @@
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-core/schema #:make-webhook)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field #:model-field #:model-fields #:field-type #:field-option)
-  (:import-from #:koya-server/usecases/ports/archives #:write-archive)
+  (:import-from #:org.shirakumo.zippy #:zip-file #:zip-entry #:compress-zip)
+  (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-revisions #:count-revisions #:get-content #:insert-content #:record-revision)
@@ -33,8 +34,9 @@
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
   (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
   (:import-from #:koya-server/domain/revision #:revision-event #:revision-created-at #:revision-data)
-  (:import-from #:koya-core/json #:jget #:parse-json #:to-json)
-  (:import-from #:alexandria #:alist-hash-table)
+  (:import-from #:koya-core/json #:to-json)
+  (:import-from #:koya-core/case #:data->jobject)
+  (:import-from #:access #:access)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-server/usecases/media
                 #:store-upload #:remove-space-media)
@@ -106,18 +108,16 @@
   (create-space "archive")
   (replace-schema "archive" (archive-schema))
   (let* ((media (store-upload "archive" (png-bytes 4 5) :filename "cover.png" :alt "A cover"))
-         (tag (progn (insert-content (make-content :id "tag-1" :space "archive" :model "tag"
-                                                   :published (alist-hash-table '(("name" . "lisp")) :test 'equal)
+         (tag (progn (insert-content (make-content :id "tag-1" :space "archive" :model "tag" :status "published"
+                                                   :published (list :name "lisp")
                                                    :created-at "2020-01-01T00:00:00.000Z" :updated-at "2020-01-02T00:00:00.000Z"
                                                    :published-at "2020-01-02T00:00:00.000Z" :revised-at "2020-01-02T00:00:00.000Z")
                                      nil nil)
-                     (record-revision "archive" "tag-1" "publish" (alist-hash-table '(("name" . "lisp")) :test 'equal)
+                     (record-revision "archive" "tag-1" "publish" (list :name "lisp")
                                       :created-at "2020-01-02T00:00:00.000Z")
                      "tag-1"))
          (post (content-id (create "archive" (find-model "archive" "post")
-                                           (alist-hash-table `(("title" . "Old") ("cover" . ,(media-id media))
-                                                               ("tags" . ,(vector tag)))
-                                                             :test 'equal)
+                                           (list :title "Old" :cover (media-id media) :tags (vector tag))
                                            :publish t)))
          (old-secret (space-webhook-secret "archive"))
          (delivery-key (create-delivery-key "archive" :label "site"))
@@ -126,9 +126,8 @@
          (sent 0)
          octets)
     (update-draft "archive" (find-model "archive" "post") post
-                  (alist-hash-table `(("title" . "New")
-                                      ("body" . ,(format nil "<p><img src=\"/media/archive/~a.png\"></p>" (media-id media))))
-                                    :test 'equal)
+                  (list :title "New"
+                        :body (format nil "<p><img src=\"/media/archive/~a.png\"></p>" (media-id media)))
                   :replace t)
     (testing "the space page offers the export"
       (let ((body (nth-value 1 (request :get "/s/archive"))))
@@ -172,9 +171,9 @@
           (ok (string= (content-created-at tag-content) "2020-01-01T00:00:00.000Z"))
           (ok (string= (content-published-at tag-content) "2020-01-02T00:00:00.000Z"))
           (ok (string= (content-status post-content) "published+draft"))
-          (ok (string= (jget (content-published post-content) "title") "Old"))
-          (ok (string= (jget (content-draft post-content) "title") "New"))
-          (ok (equalp (jget (content-published post-content) "tags") (vector tag)))
+          (ok (string= (access (content-published post-content) :title) "Old"))
+          (ok (string= (access (content-draft post-content) :title) "New"))
+          (ok (equalp (access (content-published post-content) :tags) (vector tag)))
           (ok (content-draft-key post-content) "the preview link still works")
           (ok (= (count-revisions "archive" post) 2))
           (ok (equal (mapcar #'revision-event (list-revisions "archive" post)) '("draft" "publish")))))
@@ -319,8 +318,8 @@
   (loop :for (id . shown) :in '(("new" . "&quot;new&quot;") ("a/b" . "&quot;a&#x2F;b&quot;"))
         :do (create-space "odd")
             (replace-schema "odd" (make-schema :models (list (make-model "tag" :list (list (make-field :name :text))))))
-            (insert-content (make-content :id id :space "odd" :model "tag"
-                                          :published (alist-hash-table '(("name" . "x")) :test 'equal)
+            (insert-content (make-content :id id :space "odd" :model "tag" :status "published"
+                                          :published (list :name "x")
                                           :created-at "2024-01-01T00:00:00.000Z" :updated-at "2024-01-01T00:00:00.000Z"
                                           :published-at "2024-01-01T00:00:00.000Z" :revised-at "2024-01-01T00:00:00.000Z")
                             nil nil)
@@ -337,6 +336,8 @@
   (replace-schema "odd" schema)
   (dolist (c contents)
     (insert-content (apply #'make-content (append c (list :space "odd" :model "tag"
+                                                          :status (status-of (and (member :published c) t)
+                                                                             (and (member :draft c) t))
                                                           :created-at "2024-01-01T00:00:00.000Z"
                                                           :updated-at "2024-01-01T00:00:00.000Z")))
                     nil nil))
@@ -349,7 +350,7 @@
       (remove-space-media "odd")
       (values octets stored made))))
 
-(defun tag (name) (alist-hash-table `(("name" . ,name)) :test 'equal))
+(defun tag (name) (list :name name))
 
 (defun refusal (octets)
   (and (string= (nth-value 1 (import-archive octets)) "/")
@@ -362,7 +363,7 @@
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))
   (testing "a content that does not fit its model is refused, named"
-    (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (alist-hash-table '() :test 'equal)))))
+    (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft nil))))
                "Content t1: name is required")))
   (testing "nor two that share a unique value"
     (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (tag "lisp"))
@@ -396,26 +397,28 @@
       (ok (equal (refusal octets) "A key in the archive is already a key of another space"))
       (delete-space "elsewhere"))))
 
+(defun zip-of (name octets)
+  (let ((path (merge-pathnames (format nil "spec-~a.zip" (make-ulid)) (archive-dir))))
+    (ensure-directories-exist path)
+    (compress-zip (make-instance 'zip-file :entries (vector (make-instance 'zip-entry :file-name name :content octets)))
+                  path :if-exists :supersede)
+    path))
+
 (defun legacy-archive ()
-  (let ((path (write-archive
-               (list (cons "space.json"
-                           (string-to-octets
-                            "{\"koyaExport\": 1, \"space\": \"legacy\",
-                              \"schema\": {\"koyaSchema\": 1, \"webhooks\": [],
-                                           \"models\": [{\"name\": \"post\", \"kind\": \"list\",
-                                                         \"fields\": [{\"name\": \"title\", \"type\": \"text\", \"unique\": true},
-                                                                      {\"name\": \"slug\", \"type\": \"slug\", \"from\": \"title\", \"unique\": true}]},
-                                                        {\"name\": \"page\", \"kind\": \"list\",
-                                                         \"fields\": [{\"name\": \"slug\", \"type\": \"slug\", \"from\": \"path\"},
-                                                                      {\"name\": \"path\", \"type\": \"slug\", \"from\": \"slug\"}]}]},
-                              \"contents\": [{\"id\": \"p1\", \"model\": \"post\", \"draft\": {\"title\": \"One\", \"slug\": \"one\"},
-                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
-                                             {\"id\": \"g1\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
-                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
-                                             {\"id\": \"g2\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
-                                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}"
-                            :encoding :utf-8))))))
-    (prog1 (read-file-bytes path) (delete-file path))))
+  (archive-of "{\"koyaExport\": 1, \"space\": \"legacy\",
+              \"schema\": {\"koyaSchema\": 1, \"webhooks\": [],
+                           \"models\": [{\"name\": \"post\", \"kind\": \"list\",
+                                         \"fields\": [{\"name\": \"title\", \"type\": \"text\", \"unique\": true},
+                                                      {\"name\": \"slug\", \"type\": \"slug\", \"from\": \"title\", \"unique\": true}]},
+                                        {\"name\": \"page\", \"kind\": \"list\",
+                                         \"fields\": [{\"name\": \"slug\", \"type\": \"slug\", \"from\": \"path\"},
+                                                      {\"name\": \"path\", \"type\": \"slug\", \"from\": \"slug\"}]}]},
+              \"contents\": [{\"id\": \"p1\", \"model\": \"post\", \"draft\": {\"title\": \"One\", \"slug\": \"one\"},
+                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
+                             {\"id\": \"g1\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
+                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"},
+                             {\"id\": \"g2\", \"model\": \"page\", \"draft\": {\"slug\": \"same\", \"path\": \"a\"},
+                              \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}"))
 
 (defun read-file-bytes (path)
   (with-open-file (in path :element-type '(unsigned-byte 8))
@@ -431,7 +434,7 @@
   (let ((post (find-model "legacy" "post")))
     (ok (eq (field-type (model-field post :slug)) :slug))
     (ok (field-option (model-field post :title) :unique) "a text field keeps its unique"))
-  (ok (string= (jget (content-draft (get-content "legacy" "p1")) "slug") "one") "and its contents come with it")
+  (ok (string= (access (content-draft (get-content "legacy" "p1")) :slug) "one") "and its contents come with it")
   (testing "what the server keeps from before slugs were keys, it takes back from an archive"
     (ok (= (length (model-fields (find-model "legacy" "page"))) 2) "a model with two slug fields")
     (ok (and (get-content "legacy" "g1") (get-content "legacy" "g2")) "and two contents that share a slug"))
@@ -450,15 +453,94 @@
                                (odd-archive :schema schema
                                             :contents (list (list :id "t1" :draft (tag "lisp"))
                                                             (list :id "t2" :draft (tag "lisp2")))
-                                            :revisions (list (list "t1" (parse-json "{\"name\": 3, \"rank\": \"first\", \"gone\": \"x\",
-                                                                                      \"blocks\": [{\"fieldId\": \"quote\", \"text\": \"Q\"},
-                                                                                                 {\"fieldId\": \"heading\", \"text\": \"Long\", \"rank\": 1}]}"))
-                                                             (list "t2" (parse-json "{\"rank\": 2}"))))))
+                                            :revisions (list (list "t1" (list :name 3 :rank "first" :gone "x"
+                                                                              :blocks (vector (list :field-id "quote" :text "Q")
+                                                                                              (list :field-id "heading" :text "Long" :rank 1))))
+                                                             (list "t2" (list :rank 2))))))
                  "/s/odd")
         "a revision that does not fit is imported")
-    (ok (string= (to-json (revision-data (first (list-revisions "odd" "t1"))))
+    (ok (string= (to-json (data->jobject (revision-data (first (list-revisions "odd" "t1")))))
                  "{\"blocks\":[{\"text\":\"Long\",\"fieldId\":\"heading\"}]}")
         "without a value not of its field's type, a key that is not a field, or a row of a custom field its repeater does not list")
-    (ok (string= (to-json (revision-data (first (list-revisions "odd" "t2")))) "{\"rank\":2}")
+    (ok (string= (to-json (data->jobject (revision-data (first (list-revisions "odd" "t2"))))) "{\"rank\":2}")
         "and one that misses what the model asks of its values now is kept as it is")
     (delete-space "odd")))
+
+(deftest an-empty-version-moves-with-its-space
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (let ((schema (make-schema :models (list (make-model "tag" :list (list (make-field :name :text)))))))
+    (ok (string= (nth-value 1 (import-archive
+                               (odd-archive :schema schema
+                                            :contents (list (list :id "t1" :published nil
+                                                                  :published-at "2024-01-01T00:00:00.000Z"
+                                                                  :revised-at "2024-01-01T00:00:00.000Z")))))
+                 "/s/odd"))
+    (ok (string= (content-status (get-content "odd" "t1")) "published")
+        "a published version with no values is published still")
+    (delete-space "odd")))
+
+(defun archive-of (json)
+  (let ((path (zip-of "space.json" (string-to-octets json :encoding :utf-8))))
+    (prog1 (read-file-bytes path) (delete-file path))))
+
+(defun tag-archive (space rest)
+  (archive-of (format nil "{\"koyaExport\": 1, \"space\": \"~a\",
+                            \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
+                                                                      \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
+                            ~a}"
+                      space rest)))
+
+(deftest a-version-written-as-false-is-none
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (ok (string= (nth-value 1 (import-archive
+                             (tag-archive "falsy" "\"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"published\": false, \"draft\": {\"name\": \"x\"},
+                                                                    \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]")))
+               "/s/falsy"))
+  (ok (string= (content-status (get-content "falsy" "t1")) "draft") "a published version of false is none, as null is")
+  (delete-space "falsy")
+  (ok (string= (nth-value 1 (import-archive
+                             (one-tag-archive "[{\"event\": \"draft\", \"data\": false, \"createdAt\": \"2024-01-01T00:00:00.000Z\"}]")))
+               "/"))
+  (ok (search "A revision of content t1 has no data" (nth-value 1 (request :get "/")))
+      "and a revision whose data is false has none")
+  (ng (find-space "falsy")))
+
+(defun one-tag-archive (revisions)
+  (tag-archive "falsy" (format nil "\"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"draft\": {\"name\": \"x\"},
+                                                     \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\",
+                                                     \"revisions\": ~a}]"
+                                   revisions)))
+
+(deftest the-revisions-of-a-content-are-an-array
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (ok (string= (nth-value 1 (import-archive (one-tag-archive "[{\"event\": \"draft\", \"data\": {}, \"createdAt\": \"2024-01-01T00:00:00.000Z\"}]")))
+               "/s/falsy"))
+  (ok (null (revision-data (first (list-revisions "falsy" "t1")))) "a revision with no values is one, as an export writes it")
+  (delete-space "falsy")
+  (ok (string= (nth-value 1 (import-archive (one-tag-archive "false"))) "/s/falsy") "false is no revisions, as null is")
+  (ok (zerop (count-revisions "falsy" "t1")))
+  (delete-space "falsy")
+  (ok (string= (nth-value 1 (import-archive (one-tag-archive "{}"))) "/"))
+  (ok (search "The revisions of content t1 must be an array" (nth-value 1 (request :get "/")))
+      "and an object is not an array")
+  (ng (find-space "falsy")))
+
+(deftest what-an-archive-lists-is-an-array
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (flet ((archive (key value)
+           (tag-archive "lists" (format nil "\"~a\": ~a" key value))))
+    (dolist (key '("contents" "media" "deliveryKeys" "managementKeys"))
+      (ok (string= (nth-value 1 (import-archive (archive key "null"))) "/s/lists")
+          (format nil "~a of null is none" key))
+      (delete-space "lists")
+      (ok (string= (nth-value 1 (import-archive (archive key "false"))) "/s/lists")
+          (format nil "~a of false is none, as null is" key))
+      (delete-space "lists")
+      (ok (string= (nth-value 1 (import-archive (archive key "{}"))) "/"))
+      (ok (search (format nil "~a must be an array" key) (nth-value 1 (request :get "/")))
+          (format nil "and ~a of an object is refused" key))
+      (ng (find-space "lists")))))

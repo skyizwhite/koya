@@ -31,7 +31,7 @@
               ("jingle" :web :ui :pages :admin-api)
               ("ningle-actions" :web :ui :pages) ("ningle-fbr" :web) ("smart-buffer" :web)
               ("hsx" :web :ui :pages) ("okite" :main))
-  (:anywhere "koya-core" "alexandria" "cl-ppcre" "babel" "ironclad" "local-time"
+  (:anywhere "koya-core" "access" "alexandria" "cl-ppcre" "babel" "ironclad" "local-time"
              "bordeaux-threads" "quri")
   (:forbid "koya-sdk" "ningle"))
 

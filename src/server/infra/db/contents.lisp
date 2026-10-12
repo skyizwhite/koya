@@ -9,32 +9,43 @@
                 #:make-content #:content-id #:content-published #:content-draft #:content-draft-key
                 #:content-space #:content-model
                 #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
-                #:content-status)
+                #:content-status #:content-published-p #:content-draft-p)
   (:import-from #:koya-core/json
                 #:parse-json #:to-json)
+  (:import-from #:koya-core/case
+                #:jvalue->data #:data->jobject)
   (:import-from #:koya-server/domain/html #:data-text)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:get-content #:find-content
                 #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
                 #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
-  (:export #:text-column))
+  (:export #:json-column #:text-column))
 (in-package #:koya-server/infra/db/contents)
 
 (defparameter +columns+
   "id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at")
 
 (defun row->content (row)
-  (flet ((json (name) (let ((v (col row name))) (and v (parse-json v)))))
+  (flet ((json (name) (let ((v (col row name))) (and v (jvalue->data (parse-json v) :intern t)))))
     (make-content :id (col row "id") :space (col row "space") :model (col row "model")
+                  :status (col row "status")
                   :published (json "published") :draft (json "draft")
                   :draft-key (col row "draft_key")
                   :created-at (col row "created_at") :updated-at (col row "updated_at")
                   :published-at (col row "published_at") :revised-at (col row "revised_at"))))
 
-(defun json-column (value) (and value (to-json value)))
+(defun json-column (data) (to-json (data->jobject data)))
 
 (defun text-column (data) (json-column (data-text data)))
+
+(defun version-columns (content)
+  (let ((published (content-published-p content))
+        (draft (content-draft-p content)))
+    (list (and published (json-column (content-published content)))
+          (and draft (json-column (content-draft content)))
+          (and published (text-column (content-published content)))
+          (and draft (text-column (content-draft content))))))
 
 (defmethod get-content (space id)
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND id = ?" +columns+) space id)))
@@ -55,28 +66,30 @@
     (and row (row->content row))))
 
 (defmethod insert-content (content published-slug draft-slug)
-  (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at,
-                               published_text, draft_text, published_slug, draft_slug)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        (content-id content) (content-space content) (content-model content) (content-status content)
-        (json-column (content-published content)) (json-column (content-draft content))
-        (content-draft-key content)
-        (content-created-at content) (content-updated-at content)
-        (content-published-at content) (content-revised-at content)
-        (text-column (content-published content)) (text-column (content-draft content))
-        published-slug draft-slug))
+  (destructuring-bind (published draft published-text draft-text) (version-columns content)
+    (exec "INSERT INTO contents (id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at,
+                                 published_text, draft_text, published_slug, draft_slug)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          (content-id content) (content-space content) (content-model content) (content-status content)
+          published draft
+          (content-draft-key content)
+          (content-created-at content) (content-updated-at content)
+          (content-published-at content) (content-revised-at content)
+          published-text draft-text
+          published-slug draft-slug)))
 
 (defmethod update-content (content published-slug draft-slug)
-  (exec "UPDATE contents SET status = ?, published = ?, draft = ?, draft_key = ?, updated_at = ?,
-           published_at = ?, revised_at = ?, published_text = ?, draft_text = ?, published_slug = ?, draft_slug = ?
-         WHERE space = ? AND id = ?"
-        (content-status content)
-        (json-column (content-published content)) (json-column (content-draft content))
-        (content-draft-key content) (content-updated-at content)
-        (content-published-at content) (content-revised-at content)
-        (text-column (content-published content)) (text-column (content-draft content))
-        published-slug draft-slug
-        (content-space content) (content-id content)))
+  (destructuring-bind (published draft published-text draft-text) (version-columns content)
+    (exec "UPDATE contents SET status = ?, published = ?, draft = ?, draft_key = ?, updated_at = ?,
+             published_at = ?, revised_at = ?, published_text = ?, draft_text = ?, published_slug = ?, draft_slug = ?
+           WHERE space = ? AND id = ?"
+          (content-status content)
+          published draft
+          (content-draft-key content) (content-updated-at content)
+          (content-published-at content) (content-revised-at content)
+          published-text draft-text
+          published-slug draft-slug
+          (content-space content) (content-id content))))
 
 (defmethod delete-content (space id)
   (exec "DELETE FROM contents WHERE space = ? AND id = ?" space id))

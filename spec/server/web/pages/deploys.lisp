@@ -11,7 +11,7 @@
   (:import-from #:koya-server/usecases/keys #:create-management-key)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:koya-core/json #:to-json)
-  (:import-from #:koya-core/schema #:schema->jobject)
+  (:import-from #:koya-core/schema-json #:schema->jobject)
   (:import-from #:koya-server/domain/deploy #:deploy-by))
 (in-package #:koya-spec/server/web/pages/deploys)
 
