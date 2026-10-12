@@ -12,6 +12,7 @@
                 #:camel-key)
   (:export #:diff-schemas
            #:destructive-change-p
+           #:dropped-custom-fields
            #:destructive-changes-p
            #:tightened-change-p
            #:format-change
@@ -30,15 +31,21 @@
         (and (n :pattern) (not (equal (n :pattern) (f :pattern))))
         (and (n :min) (or (null (f :min)) (> (n :min) (f :min))))
         (and (n :max) (or (null (f :max)) (< (n :max) (f :max))))
-        (and (f :options) (set-difference (f :options) (n :options) :test #'equal) t)
-        (and (f :custom-fields) (set-difference (f :custom-fields) (n :custom-fields) :test #'equal) t))))
+        (and (f :options) (set-difference (f :options) (n :options) :test #'equal) t))))
+
+(defun dropped-custom-fields (change)
+  (and (eq (getf change :op) :change-field-options)
+       (set-difference (getf (getf change :from) :custom-fields) (getf (getf change :to) :custom-fields)
+                       :test #'equal)))
 
 (defun destructive-change-p (change)
-  (and (member (getf change :op) *destructive-ops*) t))
+  (or (and (member (getf change :op) *destructive-ops*) t)
+      (and (dropped-custom-fields change) t)))
 
 (defun tightened-change-p (change)
   (and (eq (getf change :op) :change-field-options)
-       (options-tightened-p (getf change :from) (getf change :to))))
+       (or (options-tightened-p (getf change :from) (getf change :to))
+           (and (dropped-custom-fields change) t))))
 
 (defun destructive-changes-p (changes)
   (some #'destructive-change-p changes))

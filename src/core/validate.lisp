@@ -7,6 +7,8 @@
                 #:field-option
                 #:field-required-p
                 #:field-many-p
+                #:field-type-options
+                #:row-kind
                 #:field-fields
                 #:custom-field-name
                 #:field-row-kinds
@@ -20,7 +22,7 @@
   (:import-from #:koya-core/time
                 #:parse-iso)
   (:export #:validate-content
-           #:shape-errors
+           #:fitted-shape
            #:validation-error
            #:validation-error-errors
            #:blank-value-p
@@ -68,37 +70,39 @@
 (defun slug-string-p (value)
   (and (stringp value) (scan "^[a-z0-9]+(?:-[a-z0-9]+)*\\z" value) t))
 
-(defun check-string (field value &key (code "type") (what "a string"))
-  (cond ((not (stringp value))
-         (list (err field code "must be ~a" what)))
-        (t
-         (let ((max (field-option field :max-length))
-               (pattern (field-option field :pattern))
-               (errors '()))
-           (when (and max (> (length value) max))
-             (push (err field "max_length" "must be at most ~a characters" max) errors))
-           (when (and pattern (not (scan pattern value)))
-             (push (err field "pattern" "must match ~a" pattern) errors))
-           errors))))
+(defun string-option-errors (field value)
+  (let ((max (field-option field :max-length))
+        (pattern (field-option field :pattern))
+        (errors '()))
+    (when (and max (> (length value) max))
+      (push (err field "max_length" "must be at most ~a characters" max) errors))
+    (when (and pattern (not (scan pattern value)))
+      (push (err field "pattern" "must match ~a" pattern) errors))
+    errors))
 
-(defun check-one (field value)
+(defun number-option-errors (field value)
+  (let ((min (field-option field :min))
+        (max (field-option field :max))
+        (errors '()))
+    (when (and (field-option field :integer) (not (integerp value)))
+      (push (err field "integer" "must be an integer") errors))
+    (when (and min (< value min)) (push (err field "min" "must be at least ~a" min) errors))
+    (when (and max (> value max)) (push (err field "max" "must be at most ~a" max) errors))
+    errors))
+
+(defun option-error (field)
+  (err field "option" "must be one of ~{~a~^, ~}" (field-option field :options)))
+
+(defun type-errors (field value)
   (ecase (field-type field)
     ((:text :textarea :richtext)
-     (check-string field value))
+     (unless (stringp value) (list (err field "type" "must be a string"))))
     (:slug
-     (append (check-string field value)
+     (append (unless (stringp value) (list (err field "type" "must be a string")))
              (unless (slug-string-p value)
                (list (err field "slug" "must be a URL slug (lowercase letters, digits, hyphens)")))))
     (:number
-     (cond ((not (realp value)) (list (err field "type" "must be a number")))
-           (t (let ((min (field-option field :min))
-                    (max (field-option field :max))
-                    (errors '()))
-                (when (and (field-option field :integer) (not (integerp value)))
-                  (push (err field "integer" "must be an integer") errors))
-                (when (and min (< value min)) (push (err field "min" "must be at least ~a" min) errors))
-                (when (and max (> value max)) (push (err field "max" "must be at most ~a" max) errors))
-                errors))))
+     (unless (realp value) (list (err field "type" "must be a number"))))
     (:boolean
      (unless (member value '(t nil))
        (list (err field "type" "must be a boolean"))))
@@ -109,17 +113,29 @@
      (unless (datetime-string-p value)
        (list (err field "type" "must be an ISO 8601 datetime"))))
     (:select
-     (unless (and (stringp value) (member value (field-option field :options) :test #'string=))
-       (list (err field "option" "must be one of ~{~a~^, ~}" (field-option field :options)))))
+     (unless (stringp value) (list (option-error field))))
     ((:media :reference)
      (unless (content-id-p value)
        (list (err field "type" "must be an id"))))))
+
+(defun option-errors (field value)
+  (case (field-type field)
+    ((:text :textarea :richtext :slug)
+     (when (stringp value) (string-option-errors field value)))
+    (:number
+     (when (realp value) (number-option-errors field value)))
+    (:select
+     (when (and (stringp value) (not (member value (field-option field :options) :test #'string=)))
+       (list (option-error field))))))
+
+(defun check-one (field value)
+  (append (option-errors field value) (type-errors field value)))
 
 (defun inside (path errors)
   (mapcar (lambda (e) (list* :field (format nil "~a.~a" path (getf e :field)) (rest (rest e))))
           errors))
 
-(defun check-row (field index row shape)
+(defun check-row (field index row)
   (let ((path (format nil "~a[~a]" (field-name field) index)))
     (if (not (hash-table-p row))
         (list (list :field path :code "type" :message "must be an object"))
@@ -130,30 +146,19 @@
                                            (mapcar #'custom-field-name (field-row-kinds field)))))
               (let ((fields (make-hash-table :test 'equal)))
                 (maphash (lambda (k v) (unless (string= k "fieldId") (setf (gethash k fields) v))) row)
-                (inside path (validate-fields (custom-field-fields kind) fields nil shape))))))))
+                (inside path (validate-fields (custom-field-fields kind) fields nil))))))))
 
-(defun check-value (field value shape)
+(defun check-value (field value)
   (case (field-type field)
     (:custom
      (if (hash-table-p value)
-         (inside (field-name field) (validate-fields (field-fields field) value nil shape))
+         (inside (field-name field) (validate-fields (field-fields field) value nil))
          (list (err field "type" "must be an object"))))
     (:repeater
      (if (json-array-p value)
-         (loop :for row :across value :for index :from 0 :append (check-row field index row shape))
+         (loop :for row :across value :for index :from 0 :append (check-row field index row))
          (list (err field "type" "must be an array"))))
-    (t (if shape (check-shape field value) (check-many field value)))))
-
-(defun shape-one (field value)
-  (if (eq (field-type field) :select)
-      (unless (stringp value) (list (err field "type" "must be a string")))
-      (remove-if-not (lambda (e) (member (getf e :code) '("type" "slug") :test #'string=))
-                     (check-one field value))))
-
-(defun check-shape (field value)
-  (if (json-array-p value)
-      (loop :for v :across value :append (shape-one field v))
-      (shape-one field value)))
+    (t (check-many field value))))
 
 (defun check-many (field value)
   (if (field-many-p field)
@@ -163,12 +168,9 @@
       (check-one field value)))
 
 (defun validate-content (model data &key partial)
-  (validate-fields (model-fields model) data partial nil))
+  (validate-fields (model-fields model) data partial))
 
-(defun shape-errors (model data)
-  (validate-fields (model-fields model) data nil t))
-
-(defun validate-fields (fields data partial shape)
+(defun validate-fields (fields data partial)
   (let ((errors '())
         (known (mapcar #'field-name fields)))
     (maphash (lambda (key value)
@@ -178,12 +180,43 @@
              data)
     (dolist (field fields)
       (multiple-value-bind (value found) (gethash (field-name field) data)
-        (cond ((and (not found) (or partial shape)) nil)
+        (cond ((and (not found) partial) nil)
               ((not found)
                (when (and (field-required-p field) (not (eq (field-type field) :boolean)))
                  (push (err field "required" "is required") errors)))
               ((blank-for-field-p field value)
-               (when (and (field-required-p field) (not (eq (field-type field) :boolean)) (not shape))
+               (when (and (field-required-p field) (not (eq (field-type field) :boolean)))
                  (push (err field "required" "is required") errors)))
-              (t (setf errors (append (reverse (check-value field value shape)) errors))))))
+              (t (setf errors (append (reverse (check-value field value)) errors))))))
     (nreverse errors)))
+
+(defun fitted-shape (model data)
+  (fitted-fields (model-fields model) data))
+
+(defun fitted-fields (fields data)
+  (let ((out (make-hash-table :test 'equal)))
+    (dolist (field fields out)
+      (multiple-value-bind (value found) (gethash (field-name field) data)
+        (when found
+          (multiple-value-bind (fitted fits) (fitted-value field value)
+            (when fits (setf (gethash (field-name field) out) fitted))))))))
+
+(defun fitted-rows (field rows)
+  (map 'vector (lambda (row)
+                 (let ((fitted (fitted-fields (custom-field-fields (row-kind field row)) row)))
+                   (setf (gethash "fieldId" fitted) (gethash "fieldId" row))
+                   fitted))
+       (remove-if-not (lambda (row) (row-kind field row)) rows)))
+
+(defun fitted-value (field value)
+  (cond ((json-null-p value) (values value t))
+        ((eq (field-type field) :custom)
+         (if (hash-table-p value) (values (fitted-fields (field-fields field) value) t) (values nil nil)))
+        ((eq (field-type field) :repeater)
+         (if (json-array-p value) (values (fitted-rows field value) t) (values nil nil)))
+        ((json-array-p value)
+         (if (member :many (field-type-options (field-type field)))
+             (values (remove-if (lambda (v) (type-errors field v)) value) t)
+             (values nil nil)))
+        ((type-errors field value) (values nil nil))
+        (t (values value t))))

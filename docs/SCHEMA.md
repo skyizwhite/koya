@@ -340,7 +340,7 @@ the difference between the space's stored schema and the one sent as a list of
 | `rename_model` `rename_field` | a `was` was matched, see [Renames](#renames) | no |
 | `change_kind` | a model's `kind` changed; its contents are deleted | **yes** |
 | `change_field_type` | a field's `type` changed, the `model` a `reference` points at, or the `customField` a `custom` field uses | **yes** |
-| `change_field_options` | a field's options changed | no; when tightened, refused while stored content does not fit, see below |
+| `change_field_options` | a field's options changed | no, unless a custom field is dropped from a repeater's `customFields`; when tightened, refused while stored content does not fit, see below |
 | `change_model_options` | `previewUrl` / `publicUrl` / `label` changed | no |
 | `change_webhooks` | the space's webhooks changed | no |
 | `change_custom_fields` | the definitions in `customFields` changed | no |
@@ -383,7 +383,8 @@ through the stored content, and takes the values of a removed field, or of one
 whose type or target model changed (inside a custom field or a repeater's rows too), out of every published object, draft and
 revision, in the same transaction. A custom field dropped from a repeater's
 `customFields` takes the rows of it out of every revision the same way, so the
-history holds none of them if it is added back with other fields. Changing a model's `kind` makes it anew: its
+history holds none of them if it is added back with other fields; the published
+objects and drafts hold none already, as above. Changing a model's `kind` makes it anew: its
 contents and their history are deleted, as if the model were removed and added
 again under the same name. A field added later under that name starts
 empty.

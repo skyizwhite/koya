@@ -4,7 +4,7 @@
                 #:make-field #:make-model #:make-schema #:make-webhook #:make-custom-field)
   (:import-from #:koya-core/diff
                 #:diff-schemas
-                #:destructive-changes-p
+                #:destructive-changes-p #:dropped-custom-fields
                 #:tightened-change-p
                 #:format-change
                 #:change->jobject)
@@ -290,10 +290,14 @@
     (let ((change (find :change-field-options (diff-schemas (with-blocks '("heading")) (with-blocks '("heading" "body")))
                         :key (lambda (c) (getf c :op)))))
       (ok change)
-      (ng (tightened-change-p change))))
+      (ng (tightened-change-p change))
+      (ng (destructive-changes-p (list change)))))
   (testing "one taken from it is, since rows of it no longer fit"
-    (ok (tightened-change-p (find :change-field-options (diff-schemas (with-blocks '("heading" "body")) (with-blocks '("heading")))
-                                  :key (lambda (c) (getf c :op))))))
+    (let ((change (find :change-field-options (diff-schemas (with-blocks '("heading" "body")) (with-blocks '("heading")))
+                        :key (lambda (c) (getf c :op)))))
+      (ok (tightened-change-p change))
+      (ok (equal (dropped-custom-fields change) '("body")) "and names what was taken")
+      (ok (destructive-changes-p (list change)) "and is destructive, since its rows leave the history")))
   (testing "a change inside a custom field reaches the repeaters that list it, named by the kind of row"
     (let ((changes (diff-schemas (with-blocks '("heading" "body")) (with-blocks '("heading" "body") (make-field :level :number)))))
       (ok (equal (mapcar (lambda (c) (list (getf c :op) (getf c :field)))
