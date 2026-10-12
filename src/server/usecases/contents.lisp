@@ -20,8 +20,8 @@
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
                 #:content-published-p
                 #:merge-data #:comparable-data #:initial-data #:to-the-minute #:new-content #:drafted #:published
-                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one
-                #:new-content-id)
+                #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one)
+  (:import-from #:koya-server/domain/id #:new-id)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
@@ -74,7 +74,7 @@
   (check-timestamp "publishedAt" value))
 
 (defun fresh-id (space)
-  (loop :for id := (new-content-id)
+  (loop :for id := (new-id)
         :unless (get-content space id) :return id))
 
 (defun published-view (space model content)

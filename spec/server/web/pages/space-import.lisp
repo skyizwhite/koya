@@ -527,6 +527,27 @@
       "and an object is not an array")
   (ng (find-space "falsy")))
 
+(deftest a-media-id-is-short-or-a-ulid
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (create-space "odd")
+  (let ((ulid "01ARZ3NDEKTSV4RRFFQ69G5FAV"))
+    (write-media-file "odd" ulid "image/png" (png-bytes 2 2))
+    (insert-media "odd" :id ulid :filename "old.png" :mime "image/png" :size 1 :width 2 :height 2
+                        :created-at "2024-01-01T00:00:00.000Z")
+    (let ((short (media-id (store-upload "odd" (png-bytes 2 2) :filename "new.png")))
+          (octets (nth-value 1 (request :get "/s/odd/export"))))
+      (delete-space "odd")
+      (remove-space-media "odd")
+      (ok (string= (nth-value 1 (import-archive octets)) "/s/odd"))
+      (ok (equal (sort (mapcar #'media-id (list-media "odd")) #'string<) (sort (list ulid short) #'string<))
+          "an archive keeps a short media id and a ULID alike")
+      (remove-space-media "odd")
+      (delete-space "odd")))
+  (ok (string= (nth-value 1 (import-archive (tag-archive "odd" "\"media\": [{\"id\": \"Abcdefghijkl\", \"mime\": \"image/png\"}]"))) "/"))
+  (ok (search "&quot;Abcdefghijkl&quot; is not a media id" (nth-value 1 (request :get "/")))
+      "and refuses an id of another shape"))
+
 (deftest what-an-archive-lists-is-an-array
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))

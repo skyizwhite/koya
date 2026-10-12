@@ -23,6 +23,7 @@
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-spec/server/main #:with-env)
+  (:import-from #:koya-spec/server/domain/id #:with-drawn-ids)
   (:export #:png-bytes #:*media-root* #:multipart-body))
 (in-package #:koya-spec/server/usecases/media)
 
@@ -138,6 +139,19 @@
       (remove-media media)
       (ok (null (find-media "website" (media-id media))))
       (ok (null (probe-file (media-path media))) "file gone"))))
+
+(deftest a-media-id-koya-makes-is-twelve-letters-and-digits
+  (let ((media (store-upload "website" (png-bytes) :filename "short.png")))
+    (ok (cl-ppcre:scan "^[0-9a-z]{12}\\z" (media-id media)))
+    (create-space "elsewhere")
+    (unwind-protect
+         (ok (string= (media-id (with-drawn-ids (list (media-id media) "zzzzzzzzzzzz")
+                                  (lambda () (store-upload "elsewhere" (png-bytes) :filename "other.png"))))
+                      "zzzzzzzzzzzz")
+             "and one any space holds is drawn again")
+      (remove-space-media "elsewhere")
+      (delete-space "elsewhere"))
+    (remove-media media)))
 
 (deftest an-upload-is-stored-without-its-metadata
   (let* ((media (store-upload "website" (jpeg) :filename "phone.jpg"))

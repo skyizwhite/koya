@@ -23,7 +23,8 @@
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
   (:import-from #:koya-server/domain/content #:content-updated-at)
   (:import-from #:koya-spec/server/reads #:reads-of)
-  (:import-from #:koya-core/data #:data-equal))
+  (:import-from #:koya-core/data #:data-equal)
+  (:import-from #:koya-server/domain/id #:new-id))
 (in-package #:koya-spec/server/web/pages/editor)
 
 (setup (setup-pages) (log-in))
@@ -277,7 +278,7 @@
   (let* ((kept (new-blog '(("action" . "publish") ("f-title" . "Kept"))))
          (unpublished (new-blog '(("action" . "publish") ("f-title" . "Unpublished later"))))
          (deleted (new-blog '(("action" . "publish") ("f-title" . "Deleted later"))))
-         (media (media-id (insert-media "website" :filename "cover.png" :mime "image/png" :size 1)))
+         (media (media-id (insert-media "website" :id (new-id) :filename "cover.png" :mime "image/png" :size 1)))
          (first `(("f-title" . "First") ("f-slug" . "first") ("f-category" . "news") ("f-count" . "3")
                   ("f-body" . "<p>Rich <b>old</b></p><img src=x onerror=\"alert(1)\">")
                   ("f-cover" . ,media)
@@ -725,8 +726,8 @@
                                                        (make-model "album" :list (list (make-field :title :text)
                                                                                        (make-field :photos :media :many t))))))
   (unwind-protect
-       (let ((a (media-id (insert-media "website" :filename "a.png" :mime "image/png" :size 1)))
-             (b (media-id (insert-media "website" :filename "b.png" :mime "image/png" :size 1))))
+       (let ((a (media-id (insert-media "website" :id (new-id) :filename "a.png" :mime "image/png" :size 1)))
+             (b (media-id (insert-media "website" :id (new-id) :filename "b.png" :mime "image/png" :size 1))))
          (let ((body (nth-value 1 (request :get "/s/website/m/album/new"))))
            (ok (search "Add images" body) "images are added several at a time")
            (ok (search "<template" body) "from a template the page carries"))
@@ -781,7 +782,7 @@
                 (topic (content-id (create "website" (nth-value 1 (resolve-model "website" "topic"))
                                            (list :name "Lisp") :publish t)))
                 (photos (loop :for name :in '("a.png" "b.png" "framed.png" "hung.png")
-                              :collect (media-id (insert-media "website" :filename name :mime "image/png" :size 10
+                              :collect (media-id (insert-media "website" :id (new-id) :filename name :mime "image/png" :size 10
                                                                          :width 1 :height 1))))
                 (deck (content-id (create "website" (nth-value 1 (resolve-model "website" "deck"))
                                           (list :title "Deck" :lead post :frame (list :photo (third photos)) :gallery (vector (fourth photos) "01ARZ3NDEKTSV4RRFFQ69G5ZZZ") :cards (coerce (loop :for i :below rows
@@ -826,7 +827,7 @@
              (ok (= status 200) "a media field that holds one and has a list, as data written to the database by hand, still opens")
              (ng (search "framed.png" body) "and shows no image for it"))
            (update-draft "website" (nth-value 1 (resolve-model "website" "deck")) deck
-                         (list :frame (list :photo (media-id (insert-media "website" :filename "fresh.png" :mime "image/png"
+                         (list :frame (list :photo (media-id (insert-media "website" :id (new-id) :filename "fresh.png" :mime "image/png"
                                                                                              :size 10 :width 1 :height 1)))))
            (let ((body (nth-value 1 (request :get (format nil "/s/website/m/deck/~a" deck)
                                              :query (format nil "revision=~a" (revision-id (car (last (list-revisions "website" deck)))))))))

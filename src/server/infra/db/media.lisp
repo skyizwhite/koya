@@ -4,8 +4,6 @@
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/domain/media
                 #:make-media #:media-id)
-  (:import-from #:koya-core/ulid
-                #:make-ulid)
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/media
@@ -19,7 +17,7 @@
               :width (col row "width") :height (col row "height")
               :alt (col row "alt") :created-at (col row "created_at")))
 
-(defmethod insert-media (space &key filename mime size width height (alt "") (id (make-ulid)) created-at)
+(defmethod insert-media (space &key id filename mime size width height (alt "") created-at)
   (exec "INSERT INTO media (id, space, filename, mime, size, width, height, alt, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         id space filename mime size width height alt (or created-at (now-iso)))

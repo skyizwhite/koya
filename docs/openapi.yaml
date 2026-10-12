@@ -1668,7 +1668,7 @@ components:
       type: object
       required: [id, url, filename, mime, size, width, height, alt, createdAt]
       properties:
-        id: { type: string, description: ULID }
+        id: { type: string, description: "12 lowercase letters and digits; a ULID for a media from before" }
         url: { type: string, description: "Absolute: KOYA_BASE_URL + /media/{space}/{id}.{ext}" }
         filename: { type: string, description: The uploaded file's base name }
         mime: { type: string, enum: [image/png, image/jpeg, image/gif, image/webp] }

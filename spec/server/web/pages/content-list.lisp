@@ -16,7 +16,8 @@
   (:import-from #:koya-core/schema #:model-fields #:make-schema #:make-model #:make-field)
   (:import-from #:koya-spec/server/web/pages/support #:call-action)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents)
-  (:import-from #:koya-server/usecases/schema #:resolve-model #:replace-schema #:find-model))
+  (:import-from #:koya-server/usecases/schema #:resolve-model #:replace-schema #:find-model)
+  (:import-from #:koya-server/domain/id #:new-id))
 (in-package #:koya-spec/server/web/pages/content-list)
 
 (defun bulk (op ids &key (q "") (status "") (page 1))
@@ -203,7 +204,7 @@
 
 (deftest list-shows-media-as-images
   (let ((origin '(("origin" . "http://localhost:3000")))
-        (media (insert-media "website" :filename "cover.png" :mime "image/png" :size 10
+        (media (insert-media "website" :id (new-id) :filename "cover.png" :mime "image/png" :size 10
                                        :width 1 :height 1 :alt "A red door"))
         (paths '()))
     (flet ((save (title cover)
@@ -236,8 +237,8 @@
   (replace-schema "website" (with-album (make-model "album" :list (list (make-field :title :text)
                                                                        (make-field :photos :media :many t)))))
   (unwind-protect
-       (let ((first-photo (media-id (insert-media "website" :filename "a.png" :mime "image/png" :size 10 :width 1 :height 1)))
-             (second-photo (media-id (insert-media "website" :filename "b.png" :mime "image/png" :size 10 :width 1 :height 1))))
+       (let ((first-photo (media-id (insert-media "website" :id (new-id) :filename "a.png" :mime "image/png" :size 10 :width 1 :height 1)))
+             (second-photo (media-id (insert-media "website" :id (new-id) :filename "b.png" :mime "image/png" :size 10 :width 1 :height 1))))
          (create "website" (find-model "website" "album")
                  (list :title "Trip" :photos (vector first-photo second-photo second-photo)) :publish t)
          (let ((body (nth-value 1 (request :get "/s/website/m/album"))))

@@ -9,11 +9,11 @@
   (:import-from #:koya-server/usecases/ports/media
                 #:insert-media #:delete-media #:find-media #:list-media #:count-media #:update-media
                 #:space-media #:write-media-file #:delete-media-file #:delete-space-media-files
-                #:media-file-path #:media-file-exists-p)
+                #:media-file-path #:media-file-exists-p #:media-id-taken-p)
   (:import-from #:koya-server/domain/references #:media-fields #:mentioned-ids #:referrers)
   (:import-from #:koya-server/usecases/ports/spaces #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents #:contents-mentioning #:space-contents)
-  (:import-from #:koya-core/ulid #:make-ulid)
+  (:import-from #:koya-server/domain/id #:new-id)
   (:export #:store-upload
            #:store-uploads
            #:upload-limit-message
@@ -56,7 +56,7 @@
     (fail 'too-large (upload-limit-message)))
   (multiple-value-bind (mime width height) (sniff-image bytes)
     (unless mime (fail 'rejected "Only PNG, JPEG, GIF and WebP images are accepted" :code "unsupported_type"))
-    (let ((id (make-ulid))
+    (let ((id (loop :for id := (new-id) :unless (media-id-taken-p id) :return id))
           (bytes (strip-metadata bytes mime)))
       (write-media-file space id mime bytes)
       (handler-case

@@ -31,7 +31,8 @@
                 #:query-filters #:query-fields #:query-include #:query-search #:query-error)
   (:import-from #:koya-core/validate #:validation-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name #:make-custom-field)
-  (:import-from #:access #:access #:accesses))
+  (:import-from #:access #:access #:accesses)
+  (:import-from #:koya-spec/server/domain/id #:with-drawn-ids))
 (in-package #:koya-spec/server/usecases/contents)
 
 (defun blog-model ()
@@ -70,13 +71,6 @@
   (let ((ids (loop :for n :below 20 :collect (content-id (make (list :title (format nil "T~a" n)))))))
     (ok (every (lambda (id) (cl-ppcre:scan "^[a-z0-9]{12}\\z" id)) ids) "lowercase letters and digits, twelve of them")
     (ok (= (length (remove-duplicates ids :test #'string=)) 20) "drawn afresh for each content")))
-
-(defun with-drawn-ids (ids thunk)
-  (let ((original (fdefinition 'koya-server/domain/content:new-content-id)))
-    (unwind-protect
-         (progn (setf (fdefinition 'koya-server/domain/content:new-content-id) (lambda () (pop ids)))
-                (funcall thunk))
-      (setf (fdefinition 'koya-server/domain/content:new-content-id) original))))
 
 (deftest a-taken-id-is-drawn-again
   (let ((taken (content-id (make (list :title "First")))))

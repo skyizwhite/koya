@@ -40,6 +40,7 @@
   (:import-from #:access #:access)
   (:import-from #:koya-core/time #:now-iso)
   (:import-from #:koya-core/validate #:content-id-p #:validate-content #:fitted-shape #:datetime-string-p)
+  (:import-from #:koya-server/domain/id #:+id-pattern+)
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:cl-ppcre #:scan)
   (:import-from #:bordeaux-threads-2 )
@@ -51,7 +52,7 @@
            #:archive-error))
 (in-package #:koya-server/usecases/archive)
 
-(defparameter +media-id-pattern+ "^[0-9A-Z]{26}\\z")
+(defparameter +media-id-pattern+ (format nil "^(?:~a)\\z" +id-pattern+))
 
 (define-condition archive-error (invalid-input) ())
 
