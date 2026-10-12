@@ -133,11 +133,11 @@
     (unless (listp value) (fail "~a must be an object or null" (key-name key)))
     (values (without-nulls value) found)))
 
-(defun array-field (object key &optional (name (key-name key)))
+(defun array-field (object key &optional (name "~a") &rest args)
   (multiple-value-bind (value found) (value-of object key)
     (cond ((not found) #())
           ((json-array-p value) value)
-          (t (fail "~a must be an array" name)))))
+          (t (fail "~? must be an array" name (or args (list (key-name key))))))))
 
 (defun timestamp-field (object key id &key required)
   (let ((value (value-of object key)))
@@ -159,7 +159,7 @@
         (unless (and (content-id-p id) (string/= id "new")) (fail "~s is not a content id" id))
         (unless (schema-model schema model) (fail "Content ~a belongs to ~a, which the schema has no model for" id model))
         (unless (or published-p draft-p) (fail "Content ~a has neither published data nor a draft" id))
-        (let ((revisions (array-field object :revisions (format nil "The revisions of content ~a" id))))
+        (let ((revisions (array-field object :revisions "The revisions of content ~a" id)))
           (when published-p (check-fits id (schema-model schema model) published))
           (when draft-p (check-fits id (schema-model schema model) draft))
           (list

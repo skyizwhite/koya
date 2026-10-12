@@ -488,15 +488,19 @@
   (let ((path (zip-of "space.json" (string-to-octets json :encoding :utf-8))))
     (prog1 (read-file-bytes path) (delete-file path))))
 
+(defun tag-archive (space rest)
+  (archive-of (format nil "{\"koyaExport\": 1, \"space\": \"~a\",
+                            \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
+                                                                      \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
+                            ~a}"
+                      space rest)))
+
 (deftest a-version-written-as-false-is-none
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))
   (ok (string= (nth-value 1 (import-archive
-                             (archive-of "{\"koyaExport\": 1, \"space\": \"falsy\",
-                                           \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
-                                                                                     \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
-                                           \"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"published\": false, \"draft\": {\"name\": \"x\"},
-                                                           \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}")))
+                             (tag-archive "falsy" "\"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"published\": false, \"draft\": {\"name\": \"x\"},
+                                                                    \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]")))
                "/s/falsy"))
   (ok (string= (content-status (get-content "falsy" "t1")) "draft") "a published version of false is none, as null is")
   (delete-space "falsy")
@@ -508,13 +512,10 @@
   (ng (find-space "falsy")))
 
 (defun one-tag-archive (revisions)
-  (archive-of (format nil "{\"koyaExport\": 1, \"space\": \"falsy\",
-                            \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
-                                                                      \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
-                            \"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"draft\": {\"name\": \"x\"},
-                                            \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\",
-                                            \"revisions\": ~a}]}"
-                      revisions)))
+  (tag-archive "falsy" (format nil "\"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"draft\": {\"name\": \"x\"},
+                                                     \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\",
+                                                     \"revisions\": ~a}]"
+                                   revisions)))
 
 (deftest the-revisions-of-a-content-are-an-array
   (setf *cookie* nil)
@@ -535,12 +536,11 @@
   (setf *cookie* nil)
   (post-login :form `(("secret" . ,*secret*)))
   (flet ((archive (key value)
-           (archive-of (format nil "{\"koyaExport\": 1, \"space\": \"lists\",
-                                     \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
-                                                                               \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
-                                     \"~a\": ~a}"
-                               key value))))
+           (tag-archive "lists" (format nil "\"~a\": ~a" key value))))
     (dolist (key '("contents" "media" "deliveryKeys" "managementKeys"))
+      (ok (string= (nth-value 1 (import-archive (archive key "null"))) "/s/lists")
+          (format nil "~a of null is none" key))
+      (delete-space "lists")
       (ok (string= (nth-value 1 (import-archive (archive key "false"))) "/s/lists")
           (format nil "~a of false is none, as null is" key))
       (delete-space "lists")
