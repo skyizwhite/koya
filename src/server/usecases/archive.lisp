@@ -37,7 +37,7 @@
   (:import-from #:koya-core/json
                 #:jobject #:jget #:json-null #:json-null-p #:json-array-p #:parse-json #:to-json)
   (:import-from #:koya-core/time #:now-iso)
-  (:import-from #:koya-core/validate #:content-id-p #:validate-content #:datetime-string-p)
+  (:import-from #:koya-core/validate #:content-id-p #:validate-content #:shape-errors #:datetime-string-p)
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:cl-ppcre #:scan)
   (:import-from #:babel #:string-to-octets #:octets-to-string)
@@ -156,6 +156,11 @@
       (when error
         (fail "Content ~a: ~a ~a" id (getf error :field) (getf error :message))))))
 
+(defun check-shape (id model data)
+  (let ((error (first (shape-errors model data))))
+    (when error
+      (fail "Content ~a: in a revision, ~a ~a" id (getf error :field) (getf error :message)))))
+
 (defun parse-content (object space schema)
   (unless (hash-table-p object) (fail "Each content must be an object"))
   (let ((id (string-field object "id" :required t))
@@ -179,6 +184,7 @@
      (map 'list (lambda (r)
                   (unless (and (hash-table-p r) (hash-table-p (jget r "data")))
                     (fail "A revision of content ~a has no data" id))
+                  (check-shape id (schema-model schema model) (jget r "data"))
                   (list :event (string-field r "event" :required t)
                         :data (jget r "data")
                         :by (or (string-field r "writtenBy") "")

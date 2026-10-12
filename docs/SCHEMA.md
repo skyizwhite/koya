@@ -381,7 +381,9 @@ include a destructive one is refused with `409 destructive_changes` (the changes
 in `details`) unless `?force=true` is given. Applying a schema carries a rename
 through the stored content, and takes the values of a removed field, or of one
 whose type or target model changed (inside a custom field or a repeater's rows too), out of every published object, draft and
-revision, in the same transaction. Changing a model's `kind` makes it anew: its
+revision, in the same transaction. A custom field dropped from a repeater's
+`customFields` takes the rows of it out of every revision the same way, so the
+history holds none of them if it is added back with other fields. Changing a model's `kind` makes it anew: its
 contents and their history are deleted, as if the model were removed and added
 again under the same name. A field added later under that name starts
 empty.

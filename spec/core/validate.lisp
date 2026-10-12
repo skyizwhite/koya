@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:make-custom-field #:schema-model)
   (:import-from #:koya-core/validate
-                #:validate-content)
+                #:validate-content #:shape-errors)
   (:import-from #:koya-core/json
                 #:parse-json))
 (in-package #:koya-spec/core/validate)
@@ -176,3 +176,30 @@
       (ok (equal (codes "{\"photos\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"}") '(("photos" . "type"))) "an array of ids")
       (ok (equal (codes "{\"photos\": [\"no id\"]}") '(("photos" . "type"))))
       (ok (equal (codes "{\"photos\": []}") '(("photos" . "required"))) "and none is no value"))))
+
+(defun shape-codes (model json)
+  (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
+          (shape-errors model (parse-json json))))
+
+(deftest the-shape-of-data-is-its-fields-and-their-types
+  (ok (null (shape-codes *model* "{}")) "a required field may be absent")
+  (ok (null (shape-codes *model* "{\"title\": \"lowercase and far too long\", \"count\": 12.5, \"category\": \"sports\"}"))
+      "and a value need not meet its field's options")
+  (ok (null (shape-codes *model* "{\"labels\": \"a\", \"title\": [\"One\", \"Two\"], \"cover\": []}"))
+      "a field may hold one value or several")
+  (ok (equal (shape-codes *model* "{\"body\": 3, \"tags\": [\"bad id!\"], \"category\": 1, \"slug\": \"Not Slug\", \"labels\": [true]}")
+             '(("slug" . "slug") ("body" . "type") ("category" . "type") ("labels" . "type") ("tags" . "type")))
+      "but each value must be of its field's type")
+  (ok (equal (shape-codes *model* "{\"extra\": 1}") '(("extra" . "unknown_field"))) "and a field of the model")
+  (ok (null (shape-codes *with-seo* "{\"meta\": {\"title\": \"Too long\"}}"))
+      "a custom field's own fields are held to their types only")
+  (ok (equal (shape-codes *with-seo* "{\"meta\": {\"image\": 3, \"extra\": 1}}")
+             '(("meta.extra" . "unknown_field") ("meta.image" . "type"))))
+  (ok (equal (shape-codes *with-seo* "{\"meta\": \"Hi\"}") '(("meta" . "type"))))
+  (ok (null (shape-codes (schema-model *with-blocks* "post") "{\"blocks\": [{\"fieldId\": \"heading\", \"text\": \"Too long\"}]}"))
+      "and so are a row's")
+  (ok (equal (shape-codes (schema-model *with-blocks* "page")
+                          "{\"blocks\": [{\"fieldId\": \"quote\"}, \"Hi\", {\"fieldId\": \"image\", \"wide\": \"yes\"}]}")
+             '(("blocks[0]" . "custom_field") ("blocks[1]" . "type") ("blocks[2].wide" . "type")))
+      "each row naming one of the repeater's custom fields")
+  (ok (equal (shape-codes (schema-model *with-blocks* "page") "{\"blocks\": {}}") '(("blocks" . "type")))))

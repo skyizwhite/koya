@@ -87,7 +87,10 @@ they are made and deleted.
   be — it must fit its model, its ids and unique values must not repeat, and its
   timestamps need a date, a time and a zone (they are kept in UTC) — and a media
   or key that another space already holds is refused; the first problem is named
-  and nothing changes. Slugs are taken as they are: contents that share one are
+  and nothing changes. Each version in a content's history must hold only fields
+  of its model, each value of its field's type; the options a field has now, such
+  as `required` or `maxLength`, are not asked of it, since a deploy that tightens
+  them leaves the history as it was. Slugs are taken as they are: contents that share one are
   imported, and find nothing by that slug until one is changed. Nothing is sent
   to the webhooks. A bar
   shows the upload; the server then makes the space in one step and answers

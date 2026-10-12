@@ -20,6 +20,7 @@
   (:import-from #:koya-core/time
                 #:parse-iso)
   (:export #:validate-content
+           #:shape-errors
            #:validation-error
            #:validation-error-errors
            #:blank-value-p
@@ -118,7 +119,7 @@
   (mapcar (lambda (e) (list* :field (format nil "~a.~a" path (getf e :field)) (rest (rest e))))
           errors))
 
-(defun check-row (field index row)
+(defun check-row (field index row shape)
   (let ((path (format nil "~a[~a]" (field-name field) index)))
     (if (not (hash-table-p row))
         (list (list :field path :code "type" :message "must be an object"))
@@ -129,19 +130,30 @@
                                            (mapcar #'custom-field-name (field-row-kinds field)))))
               (let ((fields (make-hash-table :test 'equal)))
                 (maphash (lambda (k v) (unless (string= k "fieldId") (setf (gethash k fields) v))) row)
-                (inside path (validate-fields (custom-field-fields kind) fields nil))))))))
+                (inside path (validate-fields (custom-field-fields kind) fields nil shape))))))))
 
-(defun check-value (field value)
+(defun check-value (field value shape)
   (case (field-type field)
     (:custom
      (if (hash-table-p value)
-         (inside (field-name field) (validate-fields (field-fields field) value nil))
+         (inside (field-name field) (validate-fields (field-fields field) value nil shape))
          (list (err field "type" "must be an object"))))
     (:repeater
      (if (json-array-p value)
-         (loop :for row :across value :for index :from 0 :append (check-row field index row))
+         (loop :for row :across value :for index :from 0 :append (check-row field index row shape))
          (list (err field "type" "must be an array"))))
-    (t (check-many field value))))
+    (t (if shape (check-shape field value) (check-many field value)))))
+
+(defun shape-one (field value)
+  (if (eq (field-type field) :select)
+      (unless (stringp value) (list (err field "type" "must be a string")))
+      (remove-if-not (lambda (e) (member (getf e :code) '("type" "slug") :test #'string=))
+                     (check-one field value))))
+
+(defun check-shape (field value)
+  (if (json-array-p value)
+      (loop :for v :across value :append (shape-one field v))
+      (shape-one field value)))
 
 (defun check-many (field value)
   (if (field-many-p field)
@@ -151,9 +163,12 @@
       (check-one field value)))
 
 (defun validate-content (model data &key partial)
-  (validate-fields (model-fields model) data partial))
+  (validate-fields (model-fields model) data partial nil))
 
-(defun validate-fields (fields data partial)
+(defun shape-errors (model data)
+  (validate-fields (model-fields model) data nil t))
+
+(defun validate-fields (fields data partial shape)
   (let ((errors '())
         (known (mapcar #'field-name fields)))
     (maphash (lambda (key value)
@@ -163,12 +178,12 @@
              data)
     (dolist (field fields)
       (multiple-value-bind (value found) (gethash (field-name field) data)
-        (cond ((and (not found) partial) nil)
+        (cond ((and (not found) (or partial shape)) nil)
               ((not found)
                (when (and (field-required-p field) (not (eq (field-type field) :boolean)))
                  (push (err field "required" "is required") errors)))
               ((blank-for-field-p field value)
-               (when (and (field-required-p field) (not (eq (field-type field) :boolean)))
+               (when (and (field-required-p field) (not (eq (field-type field) :boolean)) (not shape))
                  (push (err field "required" "is required") errors)))
-              (t (setf errors (append (reverse (check-value field value)) errors))))))
+              (t (setf errors (append (reverse (check-value field value shape)) errors))))))
     (nreverse errors)))

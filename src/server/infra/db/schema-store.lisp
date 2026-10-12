@@ -152,6 +152,15 @@
            WHERE space = ? AND content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
           path space space model)))
 
+(defun drop-row-kinds (space model field kinds)
+  (flet ((gone-p (row) (and (hash-table-p row) (member (gethash "fieldId" row) kinds :test #'equal))))
+    (rewrite-content-data space model
+                          (lambda (data)
+                            (let ((rows (gethash field data)))
+                              (when (and (json-array-p rows) (some #'gone-p rows))
+                                (setf (gethash field data) (remove-if #'gone-p rows))
+                                t))))))
+
 (defun drop-model-contents (space model)
   (exec "DELETE FROM contents WHERE space = ? AND model = ?" space model))
 
@@ -163,6 +172,10 @@
                                            (getf change :from) (getf change :field)))
       ((:remove-field :change-field-type)
        (drop-content-field space-name (getf change :model) (getf change :field)))
+      (:change-field-options
+       (let ((gone (set-difference (getf (getf change :from) :custom-fields) (getf (getf change :to) :custom-fields)
+                                   :test #'equal)))
+         (when gone (drop-row-kinds space-name (getf change :model) (getf change :field) gone))))
       (:change-kind (drop-model-contents space-name (getf change :model))))))
 
 (defmethod save-schema (space-name schema changes &key (by ""))

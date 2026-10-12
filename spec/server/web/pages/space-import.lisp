@@ -331,7 +331,7 @@
                   (format nil "~s is refused, and the toast names it" id))
               (ng (find-space "odd") "and nothing is imported"))))
 
-(defun odd-archive (&key contents media key)
+(defun odd-archive (&key contents media key revisions)
   (create-space "odd")
   (replace-schema "odd" (make-schema :models (list (make-model "tag" :list (list (make-field :name :text :required t :unique t))))))
   (dolist (c contents)
@@ -339,6 +339,8 @@
                                                           :created-at "2024-01-01T00:00:00.000Z"
                                                           :updated-at "2024-01-01T00:00:00.000Z")))
                     nil nil))
+  (loop :for (id data) :in revisions
+        :do (record-revision "odd" id "draft" data :created-at "2024-01-01T00:00:00.000Z"))
   (let ((stored (and media (store-upload "odd" (png-bytes 2 2) :filename "a.png")))
         (made (and key (create-delivery-key "odd" :label "site"))))
     (let ((octets (nth-value 1 (request :get "/s/odd/export"))))
@@ -361,6 +363,23 @@
   (testing "a content that does not fit its model is refused, named"
     (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (alist-hash-table '() :test 'equal)))))
                "Content t1: name is required")))
+  (testing "a revision that does not fit its model is refused, named"
+    (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (tag "lisp")))
+                                     :revisions (list (list "t1" (alist-hash-table '(("name" . 3)) :test 'equal)))))
+               "Content t1: in a revision, name must be a string"))
+    (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (tag "lisp")))
+                                     :revisions (list (list "t1" (alist-hash-table '(("gone" . "x")) :test 'equal)))))
+               "Content t1: in a revision, gone is not a field of this model")))
+  (testing "but one that misses what the model asks of its values now is kept"
+    (ok (string= (nth-value 1 (import-archive
+                               (odd-archive :contents (list (list :id "t1" :draft (tag "lisp"))
+                                                            (list :id "t2" :draft (tag "lisp2")))
+                                            :revisions (list (list "t1" (alist-hash-table '() :test 'equal))
+                                                             (list "t2" (tag "lisp"))))))
+                 "/s/odd"))
+    (ok (= (count-revisions "odd" "t1") 1))
+    (ok (= (count-revisions "odd" "t2") 1))
+    (delete-space "odd"))
   (testing "nor two that share a unique value"
     (ok (equal (refusal (odd-archive :contents (list (list :id "t1" :draft (tag "lisp"))
                                                      (list :id "t2" :draft (tag "lisp")))))
