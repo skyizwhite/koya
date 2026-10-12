@@ -20,6 +20,8 @@
                 #:schema->jobject #:jobject->schema #:forget-slug-options)
   (:import-from #:access
                 #:access)
+  (:import-from #:alexandria
+                #:remove-from-plist)
   (:import-from #:babel
                 #:string-to-octets #:octets-to-string)
   (:import-from #:koya-core/ulid
@@ -44,8 +46,7 @@
   (if (eq data :null) 'null (data->jobject data)))
 
 (defun jvalue-without (data keys)
-  (data->jvalue (loop :for (key value) :on data :by #'cddr
-                      :unless (member key keys) :append (list key value))))
+  (data->jvalue (apply #'remove-from-plist data keys)))
 
 (defun content->jvalue (content)
   (let ((out (jvalue-without content '(:published :draft :revisions))))
@@ -83,7 +84,7 @@
 (defun versions-as-written (contents)
   (when (json-array-p contents)
     (loop :for content :across contents
-          :do (false-as-null content '("published" "draft"))
+          :do (false-as-null content '("published" "draft" "revisions"))
               (let ((revisions (and (hash-table-p content) (gethash "revisions" content))))
                 (when (json-array-p revisions)
                   (loop :for revision :across revisions :do (false-as-null revision '("data"))))))))

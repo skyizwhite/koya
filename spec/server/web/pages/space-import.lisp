@@ -512,3 +512,27 @@
   (ok (search "A revision of content t1 has no data" (nth-value 1 (request :get "/")))
       "and a revision whose data is false has none")
   (ng (find-space "falsy")))
+
+(defun one-tag-archive (revisions)
+  (archive-of (format nil "{\"koyaExport\": 1, \"space\": \"falsy\",
+                            \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
+                                                                      \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
+                            \"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"draft\": {\"name\": \"x\"},
+                                            \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\",
+                                            \"revisions\": ~a}]}"
+                      revisions)))
+
+(deftest the-revisions-of-a-content-are-an-array
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (ok (string= (nth-value 1 (import-archive (one-tag-archive "[{\"event\": \"draft\", \"data\": {}, \"createdAt\": \"2024-01-01T00:00:00.000Z\"}]")))
+               "/s/falsy"))
+  (ok (null (revision-data (first (list-revisions "falsy" "t1")))) "a revision with no values is one, as an export writes it")
+  (delete-space "falsy")
+  (ok (string= (nth-value 1 (import-archive (one-tag-archive "false"))) "/s/falsy") "false is no revisions, as null is")
+  (ok (zerop (count-revisions "falsy" "t1")))
+  (delete-space "falsy")
+  (ok (string= (nth-value 1 (import-archive (one-tag-archive "{}"))) "/"))
+  (ok (search "The revisions of content t1 must be an array" (nth-value 1 (request :get "/")))
+      "and an object is not an array")
+  (ng (find-space "falsy")))

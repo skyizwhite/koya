@@ -765,6 +765,9 @@
   (exec "INSERT INTO contents (id, space, model, status, published, draft, published_text, created_at, updated_at)
          VALUES ('worded', 'older', 'post', 'published', '{\"title\":\"Null checks\",\"card\":{}}', NULL, '{\"title\":\"Null checks\"}',
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
+  (exec "INSERT INTO contents (id, space, model, status, published, draft, published_text, created_at, updated_at)
+         VALUES ('listed', 'older', 'post', 'published', '{\"title\":\"Listed\",\"card\":{},\"tags\":[null]}', NULL, '{\"title\":\"Listed\"}',
+                 '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at)
          VALUES ('older', 'nulled', 'draft', '{\"title\":null,\"rows\":[{\"fieldId\":\"h\",\"text\":null}]}', '', '2026-01-01T00:00:00.000Z')")
   (ok (equal (migrate) '(17)))
@@ -781,4 +784,7 @@
   (ok (string= (col (fetch-one "SELECT published FROM contents WHERE id = 'worded'") "published")
                "{\"title\":\"Null checks\",\"card\":{}}")
       "even when its text says null")
+  (ok (string= (col (fetch-one "SELECT published FROM contents WHERE id = 'listed'") "published")
+               "{\"title\":\"Listed\",\"card\":{},\"tags\":[null]}")
+      "and a null in an array, which is not a field without a value, is not taken")
   (migrated-fully))

@@ -245,21 +245,21 @@
 (defun stored-without-nulls (json)
   (without-nulls (jvalue->data (parse-json json) :intern t)))
 
+(defun holds-a-null (column)
+  (format nil "(~a LIKE '%null%' AND EXISTS (SELECT 1 FROM json_tree(~:*~a) WHERE type = 'null' AND fullkey NOT LIKE '%]'))"
+          column))
+
 (defun drop-stored-nulls ()
-  (dolist (row (fetch "SELECT rowid AS r, published, draft FROM contents
-                        WHERE EXISTS (SELECT 1 FROM json_tree(published) WHERE type = 'null')
-                           OR EXISTS (SELECT 1 FROM json_tree(draft) WHERE type = 'null')"))
+  (dolist (row (fetch (format nil "SELECT rowid AS r, published, draft FROM contents WHERE ~a OR ~a"
+                              (holds-a-null "published") (holds-a-null "draft"))))
     (flet ((columns (json)
              (if json
                  (let ((data (stored-without-nulls json)))
                    (list (json-column data) (text-column data)))
                  (list nil nil))))
-      (destructuring-bind ((published published-text) (draft draft-text))
-          (list (columns (col row "published")) (columns (col row "draft")))
-        (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE rowid = ?"
-              published draft published-text draft-text (col row "r")))))
-  (dolist (row (fetch "SELECT id, data FROM content_revisions
-                        WHERE EXISTS (SELECT 1 FROM json_tree(data) WHERE type = 'null')"))
+      (apply #'exec "UPDATE contents SET published = ?, published_text = ?, draft = ?, draft_text = ? WHERE rowid = ?"
+             (append (columns (col row "published")) (columns (col row "draft")) (list (col row "r"))))))
+  (dolist (row (fetch (format nil "SELECT id, data FROM content_revisions WHERE ~a" (holds-a-null "data"))))
     (exec "UPDATE content_revisions SET data = ? WHERE id = ?"
           (json-column (stored-without-nulls (col row "data"))) (col row "id"))))
 
