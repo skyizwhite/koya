@@ -21,8 +21,12 @@ cannot tell a key that is absent from one whose value is `nil`.
 
 ## Decision
 
-- Structured data is read with `access` and `accesses`, and changed with `setf`
-  on them, in `src/` and `spec/`, whether the path has one level or several.
+- A content's data is read with `access` and `accesses`, and changed with
+  `setf` on them, in `src/` and `spec/`, whether the path has one level or
+  several. A struct holding it is read with its accessors.
+- A plist whose keys the code making it fixes, made where it is used, such as a
+  deploy's change, a validation error or a media about to be stored, is a
+  record rather than data, and is read with `getf`.
 - A container is made before anything is put into it. `setf` through a level
   that is not there is not used, since `access` makes a list there, which is
   not the shape the data must have.
@@ -31,10 +35,13 @@ cannot tell a key that is absent from one whose value is `nil`.
 
 ## Consequences
 
-- A path reads as one call, whatever the levels are made of, and there is one
-  way to read data.
-- Reading data costs what is measured above. A content's fields are read and set
-  through `field-value` and a row's custom field through `row-field-id`, so if
-  that cost ever matters, those two are where reading changes.
+- A path reads as one call, whatever the levels are made of, and a content's
+  data is read one way.
+- Reading data costs what is measured above. If that cost ever matters, these
+  are where reading changes: a content's fields are read and set through
+  `field-value` and a row's custom field through `row-field-id`; a patch is
+  merged key by key (`merge-data`) and a stored value is found by the key a
+  field had before a rename (`stored-value`), both with `access`; and the
+  presenters walk a plist in its own order.
 - `koya-core`, and so every site using the SDK, depends on `access`, which is
   BSD licensed.

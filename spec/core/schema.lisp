@@ -378,6 +378,7 @@
   (testing "a row's custom field is found by its fieldId"
     (let ((field (model-field (schema-model (blocks-schema) "page") :blocks)))
       (ok (string= (custom-field-name (row-kind field (list :field-id "body"))) "body"))
+      (ok (string= (nth-value 1 (row-kind field (list :field-id "body"))) "body") "and the name the row gives too")
       (ok (null (row-kind field (list "field-id" "body"))) "by its keyword alone")
       (ok (null (row-kind field nil)) "and an empty row has none")
       (ok (null (row-kind field "body")) "nor has what is not a row")))

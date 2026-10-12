@@ -5,7 +5,7 @@
   (:import-from #:koya-core/case #:camel-key #:data->jvalue)
   (:import-from #:koya-core/schema
                 #:model-fields #:field-name #:field-key #:field-type #:field-fields #:custom-field-fields
-                #:field-row-kind #:row-field-id #:row-fields)
+                #:row-kind #:row-fields)
   (:import-from #:koya-core/schema-json #:change->jobject)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -60,8 +60,7 @@
   (regex-replace-all "(src|href)=\"/media/" html (format nil "\\1=\"~a/media/" base)))
 
 (defun present-row (field row base)
-  (let* ((id (and (listp row) (row-field-id row)))
-         (kind (and id (field-row-kind field id))))
+  (multiple-value-bind (kind id) (row-kind field row)
     (if kind
         (let ((out (present-fields (custom-field-fields kind) (row-fields row) base)))
           (setf (gethash "fieldId" out) id)

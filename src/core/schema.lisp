@@ -273,7 +273,8 @@
   (values (rem-plist-val :field-id row :test #'eq)))
 
 (defun row-kind (field row)
-  (and (listp row) (field-row-kind field (row-field-id row))))
+  (let ((id (and (listp row) (row-field-id row))))
+    (values (field-row-kind field id) id)))
 
 (defun map-data-fields (fields data fn)
   (labels ((walk (fields data outer)
