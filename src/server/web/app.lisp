@@ -66,6 +66,18 @@
                      :expires +session-seconds+
                      :secure (and (>= (length (public-url)) 8) (string-equal "https://" (public-url) :end2 8))))
 
+(defun delivery-api-app ()
+  (lack:builder *mw-delivery-cors* *mw-trim-trailing-slash* *mw-delivery-auth* *api-app*))
+
+(defun admin-api-app ()
+  (lack:builder *mw-trim-trailing-slash* *mw-admin-auth* *admin-api-app*))
+
+(defun actions-app (session)
+  (lack:builder *mw-trim-trailing-slash* session *mw-session-cookie-renewal* *mw-actions-auth* *actions-app*))
+
+(defun pages-app (session)
+  (lack:builder *mw-trim-trailing-slash* session *mw-session-cookie-renewal* *mw-pages-auth* *page-app*))
+
 (defun build-app ()
   (setf smart-buffer:*default-disk-limit* +max-body-bytes+)
   (let ((session (with-args *mw-session*
@@ -79,15 +91,12 @@
      *mw-default-cache-control*
      (with-args *mw-recovery* :dev-mode (dev-mode-p))
      *mw-max-body*
-     (with-args *mw-mount* "/api"
-       (lack:builder *mw-delivery-cors* *mw-trim-trailing-slash* *mw-delivery-auth* *api-app*))
      (with-args *mw-mount* "/assets" (make-instance 'lack-app-file :root #p"assets/"))
      (with-args *mw-mount* "/media" #'media-app)
-     (with-args *mw-mount* "/admin/api"
-       (lack:builder *mw-trim-trailing-slash* *mw-admin-auth* *admin-api-app*))
-     (with-args *mw-mount* "/actions"
-       (lack:builder session *mw-session-cookie-renewal* *mw-actions-auth* *actions-app*))
-     (lack:builder *mw-trim-trailing-slash* session *mw-session-cookie-renewal* *mw-pages-auth* *page-app*))))
+     (with-args *mw-mount* "/api" (delivery-api-app))
+     (with-args *mw-mount* "/admin/api" (admin-api-app))
+     (with-args *mw-mount* "/actions" (actions-app session))
+     (pages-app session))))
 
 (defvar *app* nil)
 
