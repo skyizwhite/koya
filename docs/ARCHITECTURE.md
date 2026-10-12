@@ -215,6 +215,9 @@ the access log, Cache-Control, the error page, the body limit), then to the app
 mounted at its path, which carries the middlewares it needs: CORS and a guard
 for the delivery API, a guard for the admin API, the session for the actions and
 the pages; the assets and the media need none.
+A GET to the two APIs, the actions or the pages that finds nothing at a path
+ending in a slash is sent with a 301 to the path without it, the query kept; a
+request the guard refuses is refused first.
 The two APIs, the actions and the pages are each guarded where they are mounted
 (`*mw-delivery-auth*`, `*mw-admin-auth*`, `*mw-actions-auth*`, `*mw-pages-auth*`),
 so a route added later is covered without checking for itself. A page asked for
