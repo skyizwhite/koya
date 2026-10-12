@@ -47,7 +47,8 @@
   (:import-from #:lack/middleware/session/store
                 #:fetch-session #:store-session #:remove-session)
   (:import-from #:koya-core/json
-                #:to-json #:jget))
+                #:to-json #:jget)
+  (:import-from #:koya-server/usecases/ports/keys #:insert-delivery-key #:insert-management-key))
 (in-package #:koya-spec/server/infra/db)
 
 (setup
@@ -785,3 +786,17 @@
                "{\"title\":\"Listed\",\"card\":{},\"tags\":[null]}")
       "and a null in an array, which is not a field without a value, is not taken")
   (migrated-fully))
+
+(deftest a-key-whose-id-or-hash-is-taken-is-not-written
+  (create-space "keyed")
+  (create-space "other")
+  (flet ((key (insert space id hash)
+           (funcall insert space :id id :hash hash :label "" :created-at "2024-01-01T00:00:00.000Z")))
+    (dolist (insert (list #'insert-delivery-key #'insert-management-key))
+      (ok (key insert "keyed" "01ARZ3NDEKTSV4RRFFQ69G5FA1" "aaaa") "a key is written")
+      (ng (key insert "other" "01ARZ3NDEKTSV4RRFFQ69G5FA2" "aaaa") "not one whose hash another key has")
+      (ng (key insert "other" "01ARZ3NDEKTSV4RRFFQ69G5FA1" "bbbb") "nor one whose id another key has")))
+  (ok (= 2 (col (fetch-one "SELECT (SELECT count(*) FROM delivery_keys) + (SELECT count(*) FROM management_keys) AS n") "n"))
+      "and nothing is written for them")
+  (delete-space "keyed")
+  (delete-space "other"))

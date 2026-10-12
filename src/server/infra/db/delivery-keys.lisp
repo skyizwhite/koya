@@ -8,8 +8,12 @@
 (in-package #:koya-server/infra/db/delivery-keys)
 
 (defmethod insert-delivery-key (space &key id hash label created-at)
-  (exec "INSERT INTO delivery_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
-        id space hash (or label "") created-at))
+  (and (fetch-one "INSERT INTO delivery_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (id) DO NOTHING
+                   ON CONFLICT (key_hash) DO NOTHING
+                   RETURNING id"
+                  id space hash (or label "") created-at)
+       t))
 
 (defmethod list-delivery-keys (space)
   (mapcar (lambda (row) (make-key :id (col row "id") :label (col row "label") :created-at (col row "created_at")))
