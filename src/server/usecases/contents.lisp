@@ -18,7 +18,7 @@
                 #:find-contents-by-slug #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
-                #:content-published-p #:content-draft-p
+                #:content-published-p
                 #:merge-data #:comparable-data #:initial-data #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one
                 #:new-content-id)
@@ -136,14 +136,13 @@
 (defun update-draft-now (space model id patch replace since)
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
-         (live (content-published content))
-         (data (to-the-minute model (if replace patch (merge-data current patch)))))
+         (live (content-published content)))
     (check-unchanged-since content since)
-    (let ((comparable (comparable-data model data)))
+    (let* ((data (to-the-minute model (if replace patch (merge-data current patch))))
+           (comparable (comparable-data model data)))
       (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
-            ((and (content-published-p content) (content-draft-p content)
+            ((and (nth-value 1 (next-status (content-status content) :discard))
                   (data-equal comparable (comparable-data model live)))
-             (check-transition content :discard)
              (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
             (t
              (check-transition content :save)
@@ -158,13 +157,13 @@
       live)))
 
 (defun publish-now (space model id data data-p published-at since)
-  (let* ((content (resolve-content space (model-name model) id))
-         (data (to-the-minute model (if data-p data (content-data content :draft t)))))
+  (let ((content (resolve-content space (model-name model) id)))
     (check-unchanged-since content since)
     (check-transition content :publish)
-    (check-content space model data :exclude-id id)
-    (values (store model (published content data :published-at published-at) "publish" data)
-            (published-view space model content))))
+    (let ((data (to-the-minute model (if data-p data (content-data content :draft t)))))
+      (check-content space model data :exclude-id id)
+      (values (store model (published content data :published-at published-at) "publish" data)
+              (published-view space model content)))))
 
 (defun check-unreferenced (space-name model-name id verb)
   (let ((references (length (content-references space-name model-name id))))
