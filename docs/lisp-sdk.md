@@ -142,7 +142,7 @@ Naming rules, checked as the schema is built:
 | Name | Shape | Notes |
 |---|---|---|
 | model | `^[a-z][a-z0-9-]*` | it appears in URLs |
-| field | `^[a-z][a-zA-Z0-9]*` | a kebab-case symbol is camelised: `(published-at :datetime)` becomes `publishedAt` |
+| field | `^[a-z][a-zA-Z0-9]*` | a kebab-case symbol is camelised: `(published-at :datetime)` becomes `publishedAt`; a symbol that would not come back as itself, such as `item-2` (it becomes `item2`, read back as `:item2`), is refused, here and wherever a name is given as a symbol |
 
 `id`, `createdAt`, `updatedAt`, `publishedAt` and `revisedAt` are system fields
 that every content already has; declaring one is an error.
@@ -467,7 +467,12 @@ Arguments are converted to JSON and responses back to Lisp by the same rules:
 
 and coming back, an object becomes a kebab-case keyword plist, an array a list and
 `null` `nil`. So `(getf item :published-at)` is `nil` for a draft, and
-`:tags '("k3x9m2qa7t0b" "p8f2w6zc1n4d")` is an array of ids.
+`:tags '("k3x9m2qa7t0b" "p8f2w6zc1n4d")` is an array of ids. A key turns each
+capital into `-` and its lowercase letter and back, so every camelCase key, as
+every key koya sends is, comes back as it was: `publishedAt` is `:published-at`
+and `pageURL` is `:page-u-r-l`. A keyword that would not come back as itself,
+such as `:item-2`, is refused, and so is a key that would not, such as
+`blog-post`.
 
 There is no Lisp spelling for JSON `false`: the server treats `null` and `false`
 alike for booleans, so `nil` means "off". On `admin-update-list-content` and

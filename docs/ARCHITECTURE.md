@@ -185,7 +185,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Templates | hsx; ningle-actions for everything done on a page |
 | Browser | Nomini (requests, swaps and a page's state), `koya.js` (what a page holds) |
 | DB | cl-dbi + dbd-sqlite3 |
-| JSON | jzon, with kebab/camel conversion in `core/case` |
+| JSON | jzon, with kebab/camel conversion and Lisp data conversion in `core/case` |
 | Client | dexador |
 | Archives | zippy (a space's export and import) |
 | Other | ironclad, local-time, cl-dotenv, Tailwind CSS v4 (standalone) |

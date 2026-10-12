@@ -10,7 +10,6 @@ git woo https://github.com/fukamachi/woo.git
 ql cl-dotenv
 ql cl-dbi
 ql jzon
-ql kebab
 ql dexador
 ql quri
 ql ironclad
@@ -19,3 +18,4 @@ ql cl-ppcre
 ql alexandria
 ql zippy
 git rove https://github.com/fukamachi/rove
+ql access

@@ -50,10 +50,6 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2024-10-12"))
-("kebab" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2015-06-08"))
 ("dexador" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
@@ -86,3 +82,7 @@
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/fukamachi/rove")
   :version "git-52b04eaa4a079d753fdf49e793a52d5fe1f61836"))
+("access" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2025-06-22"))

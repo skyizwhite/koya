@@ -8,7 +8,7 @@
                 #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
                 #:model-options #:check-deployable
                 #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields
-                #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields)
+                #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields #:field-key)
   (:import-from #:koya-core/json
                 #:to-json #:parse-json #:jget #:jobject))
 (in-package #:koya-spec/core/schema)
@@ -458,3 +458,34 @@
         (ok (string= (aref (jget out "blocks") 1) "loose") "a row that is not an object")))
     (testing "a repeater that is not an array is passed over"
       (ok (string= (jget (map-data-fields fields (jobject "blocks" "flat") #'upcase-texts) "blocks") "flat")))))
+
+(deftest a-field-has-its-name-as-a-keyword
+  (ok (eq (field-key (make-field :event-at :text)) :event-at))
+  (ok (eq (field-key (make-field "pageURL" :text)) :page-u-r-l) "as a name with capitals in a row comes back")
+  (let* ((schema (jobject->schema (parse-json "{\"koyaSchema\": 1,
+                                                \"customFields\": [{\"name\": \"card\", \"fields\": [{\"name\": \"cardCaptionQq\", \"type\": \"text\"}]}],
+                                                \"models\": [{\"name\": \"page\", \"kind\": \"list\", \"fields\": [
+                                                  {\"name\": \"pageWidthQq\", \"type\": \"number\"},
+                                                  {\"name\": \"card\", \"type\": \"custom\", \"customField\": \"card\"}]}]}")))
+         (model (schema-model schema "page")))
+    (ok (eq (field-key (model-field model "pageWidthQq")) (find-symbol "PAGE-WIDTH-QQ" :keyword))
+        "a schema read from JSON interns its fields' keywords")
+    (ok (eq (field-key (first (field-fields (model-field model "card")))) :card-caption-qq)
+        "and those of the fields inside a custom field")))
+
+(deftest a-field-declared-as-a-symbol-comes-back-as-that-symbol
+  (ok (eq (field-key (make-field 'image-alt-text :text)) :image-alt-text))
+  (ok (signals (make-field 'item-2 :number) 'schema-error) "item-2 would come back as item2")
+  (ok (signals (make-field :a--b :text) 'schema-error))
+  (ok (signals (make-field :ab :text :was 'item-2) 'schema-error) "nor as the name it was")
+  (ok (signals (make-field :blocks :repeater :custom-fields '(item-2)) 'schema-error) "or a custom field it lists")
+  (ok (signals (make-custom-field 'item-2 (list (make-field :ab :text))) 'schema-error) "nor is a custom field")
+  (ok (signals (make-model "post" :list (list (make-field :ab :text)) :label 'item-2) 'schema-error) "nor a label")
+  (ok (signals (make-field :hero :custom :custom-field 'item-2) 'schema-error) "nor the custom field a field uses")
+  (ok (signals (model-field (make-model "post" :list (list (make-field :ab :text))) 'item-2) 'schema-error)
+      "nor a field looked up by name")
+  (ok (equal (let ((*package* (find-package :koya-spec/core/schema)))
+               (handler-case (make-field 'item-2 :number) (schema-error (c) (princ-to-string c))))
+             "Invalid schema: item-2 does not come back as itself: it becomes \"item2\", which comes back as :item2")
+      "and the error says the name it would become")
+  (ok (field-key (make-field "item2" :number)) "the name itself, given as a string, is fine"))

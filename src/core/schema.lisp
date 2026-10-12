@@ -1,7 +1,7 @@
 (defpackage #:koya-core/schema
   (:use #:cl)
   (:import-from #:koya-core/case
-                #:camel-key)
+                #:camel-key #:kebab-keyword #:name-does-not-come-back)
   (:import-from #:koya-core/json
                 #:jobject
                 #:jget
@@ -19,6 +19,7 @@
            #:field
            #:make-field
            #:field-name
+           #:field-key
            #:field-type
            #:field-options
            #:field-option
@@ -124,20 +125,27 @@
 
 (defstruct (field (:constructor %make-field))
   name
+  key
   type
   options
   fields)
+
+(defun camel-name (given)
+  (if (symbolp given)
+      (handler-case (camel-key given)
+        (name-does-not-come-back (c) (fail "~a" c)))
+      given))
 
 (defun normalize-option (key value)
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
     (case key
       (:model (name-string value))
-      ((:was :custom-field) (if (and value (symbolp value) (not (json-null-p value))) (camel-key value) value))
+      ((:was :custom-field) (if (and value (symbolp value) (not (json-null-p value))) (camel-name value) value))
       (:options (if (or (listp value) (json-array-p value))
                     (map 'list #'name-string value)
                     value))
       (:custom-fields (if (or (listp value) (json-array-p value))
-                          (map 'list (lambda (v) (if (and v (symbolp v)) (camel-key v) v)) value)
+                          (map 'list (lambda (v) (if (and v (symbolp v)) (camel-name v) v)) value)
                           value))
       (t value))))
 
@@ -174,7 +182,7 @@
          (fail "field ~s: :was names the system field ~s" field-name value))))))
 
 (defun make-field (name type &rest options)
-  (let ((name (if (stringp name) name (camel-key name)))
+  (let ((name (camel-name name))
         (options (loop :for (k v) :on options :by #'cddr
                        :unless (and (eq k :was) (null v))
                          :append (list k (normalize-option k v)))))
@@ -198,7 +206,7 @@
       (fail "repeater ~s needs :custom-fields" name))
     (when (equal (getf options :was) name)
       (fail "field ~s: :was must name the field it was renamed from, not itself" name))
-    (%make-field :name name :type type :options options)))
+    (%make-field :name name :key (kebab-keyword name) :type type :options options)))
 
 (defun field-option (field key &optional default)
   (getf (field-options field) key default))
@@ -212,7 +220,7 @@
 
 (defun field-forget-rename (field)
   (if (field-was field)
-      (%make-field :name (field-name field) :type (field-type field)
+      (%make-field :name (field-name field) :key (field-key field) :type (field-type field)
                    :options (forget-rename (field-options field))
                    :fields (field-fields field))
       field))
@@ -222,7 +230,7 @@
   fields)
 
 (defun make-custom-field (name fields)
-  (let ((name (if (stringp name) name (camel-key name))))
+  (let ((name (camel-name name)))
     (unless (field-name-p name)
       (fail "custom field name ~s must be a camelCase identifier" name))
     (when (null fields)
@@ -356,7 +364,7 @@
 (defun make-model (name kind fields &key preview-url public-url label was)
   (let ((name (string-downcase (string name)))
         (was (name-designator was))
-        (label (if (and label (symbolp label) (not (json-null-p label))) (camel-key label) label)))
+        (label (if (and label (symbolp label) (not (json-null-p label))) (camel-name label) label)))
     (dolist (url (list preview-url public-url))
       (unless (or (null url) (stringp url))
         (fail "model ~s: URL templates must be strings" name))
@@ -402,7 +410,7 @@
     (and (eq (model-kind model) :list) (= (length slugs) 1) (first slugs))))
 
 (defun model-field (model name)
-  (find (if (stringp name) name (camel-key name)) (model-fields model)
+  (find (camel-name name) (model-fields model)
         :key #'field-name :test #'string=))
 
 (defstruct (schema (:constructor %make-schema))
@@ -416,10 +424,10 @@
              (case (field-type field)
                (:custom
                 (let ((custom (named (field-option field :custom-field))))
-                  (%make-field :name (field-name field) :type :custom :options (field-options field)
+                  (%make-field :name (field-name field) :key (field-key field) :type :custom :options (field-options field)
                                :fields (and custom (custom-field-fields custom)))))
                (:repeater
-                (%make-field :name (field-name field) :type :repeater :options (field-options field)
+                (%make-field :name (field-name field) :key (field-key field) :type :repeater :options (field-options field)
                              :fields (remove nil (mapcar #'named (field-option field :custom-fields)))))
                (t field))))
       (%make-model :name (model-name model) :kind (model-kind model)
