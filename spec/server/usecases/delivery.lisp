@@ -9,8 +9,8 @@
                 #:deliver #:delivered-data #:delivered-p #:delivered-content
                 #:delivered-list-content #:delivered-list #:delivered-object
                 #:delivered-list-content-by-slug)
-  (:import-from #:koya-server/usecases/ports/media #:insert-media #:find-media #:find-media-by-ids)
-  (:import-from #:koya-server/usecases/ports/contents #:find-content #:find-contents-by-ids)
+  (:import-from #:koya-server/usecases/ports/media #:insert-media)
+  (:import-from #:koya-spec/server/reads #:reads-of)
   (:import-from #:koya-server/domain/media #:media-p #:media-id)
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/domain/errors #:not-found)
@@ -354,33 +354,6 @@
                                                                                       (make-field :favorite :reference :model "tag")))
                                                       (make-model "tag" :list (list (make-field :name :text)))
                                                       (make-model "about" :object (list (make-field "body" :text))))))))
-
-(defvar *reads* nil)
-
-(defmethod find-content :around (space model id)
-  (declare (ignore space model id))
-  (when *reads* (push 'find-content (car *reads*)))
-  (call-next-method))
-
-(defmethod find-media :around (space id)
-  (declare (ignore space id))
-  (when *reads* (push 'find-media (car *reads*)))
-  (call-next-method))
-
-(defmethod find-contents-by-ids :around (space model ids)
-  (declare (ignore space ids))
-  (when *reads* (push (list 'find-contents-by-ids model) (car *reads*)))
-  (call-next-method))
-
-(defmethod find-media-by-ids :around (space ids)
-  (declare (ignore space ids))
-  (when *reads* (push 'find-media-by-ids (car *reads*)))
-  (call-next-method))
-
-(defun reads-of (thunk)
-  (let ((*reads* (list '())))
-    (funcall thunk)
-    (sort (mapcar #'princ-to-string (car *reads*)) #'string<)))
 
 (defun make-post (n)
   (let* ((favorite (make "tag" (list "name" (format nil "fav~a" n)) :publish t))
