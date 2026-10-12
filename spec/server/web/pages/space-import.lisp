@@ -382,12 +382,13 @@
                  "/s/odd"))
     (ok (string= (content-created-at (stored-content "odd" "t1")) "2024-01-01T01:00:00.000Z"))
     (delete-space "odd"))
-  (testing "a media or a key another space holds is named before anything is written"
+  (testing "a media or a key another space holds is named, and nothing the import wrote is left"
     (multiple-value-bind (octets stored) (odd-archive :media t)
       (create-space "elsewhere")
       (insert-media "elsewhere" (media-id stored) :filename "b.png" :mime "image/png" :size 1
                                                   :width 1 :height 1 :alt "" :created-at "2024-01-01T00:00:00.000Z")
       (ok (equal (refusal octets) (format nil "Media ~a is already in another space" (media-id stored))))
+      (ng (probe-file (media-file-path "odd" (media-id stored) "image/png")) "not its file either")
       (delete-space "elsewhere"))
     (multiple-value-bind (octets stored key) (odd-archive :key t)
       (declare (ignore stored))

@@ -9,8 +9,11 @@
 (in-package #:koya-server/infra/db/management-keys)
 
 (defmethod insert-management-key (space &key id hash label created-at)
-  (exec "INSERT INTO management_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)"
-        id space hash (or label "") created-at))
+  (and (fetch-one "INSERT INTO management_keys (id, space, key_hash, label, created_at) VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT DO NOTHING
+                   RETURNING id"
+                  id space hash (or label "") created-at)
+       t))
 
 (defmethod list-management-keys (space)
   (mapcar (lambda (row) (make-key :id (col row "id") :label (col row "label") :created-at (col row "created_at")))

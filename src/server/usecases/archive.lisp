@@ -9,7 +9,7 @@
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/usecases/ports/keys
                 #:stored-delivery-keys #:insert-delivery-key #:stored-management-keys
-                #:insert-management-key #:space-by-delivery-key-hash #:space-by-management-key-hash)
+                #:insert-management-key)
   (:import-from #:koya-server/usecases/schema #:unique-misfits)
   (:import-from #:koya-server/usecases/ports/contents
                 #:space-contents #:insert-content #:content-history #:record-revision)
@@ -22,7 +22,7 @@
                 #:revision-event #:revision-data #:revision-by #:revision-created-at)
   (:import-from #:koya-server/usecases/ports/media
                 #:space-media #:insert-media #:count-media #:media-file-exists-p #:write-media-file
-                #:delete-media-file #:media-id-taken-p)
+                #:delete-media-file)
   (:import-from #:koya-server/usecases/ports/archives
                 #:write-archive #:create-upload #:upload-size #:append-to-upload #:delete-upload
                 #:call-with-upload #:archive-document #:archive-entry-size #:archive-entry-bytes
@@ -257,7 +257,6 @@
           (delivery-keys (parse-keys document :delivery-keys))
           (management-keys (parse-keys document :management-keys)))
       (check-contents-together schema (mapcar #'first contents))
-      (check-unclaimed media delivery-keys management-keys)
       (import-into space archive schema contents media
                    :secret (string-field document :webhook-secret)
                    :delivery-keys delivery-keys
@@ -276,14 +275,6 @@
             (when misfit
               (fail "Content ~a: ~a ~a" (getf misfit :id) (getf misfit :field) (getf misfit :message)))))))))
 
-(defun check-unclaimed (media delivery-keys management-keys)
-  (dolist (m media)
-    (when (media-id-taken-p (getf m :id))
-      (fail "Media ~a is already in another space" (getf m :id))))
-  (when (or (some (lambda (k) (space-by-delivery-key-hash (getf k :hash))) delivery-keys)
-            (some (lambda (k) (space-by-management-key-hash (getf k :hash))) management-keys))
-    (fail "A key in the archive is already a key of another space")))
-
 (defun import-into (space archive schema contents media &key secret delivery-keys management-keys by)
   (let ((written (list '()))
         (done nil))
@@ -295,8 +286,9 @@
              (unless (find-space space) (insert-space space (new-webhook-secret)))
              (replace-schema space schema :by by)
              (when secret (set-webhook-secret space secret))
-             (dolist (k delivery-keys) (apply #'insert-delivery-key space k))
-             (dolist (k management-keys) (apply #'insert-management-key space k))
+             (unless (and (every (lambda (k) (apply #'insert-delivery-key space k)) delivery-keys)
+                          (every (lambda (k) (apply #'insert-management-key space k)) management-keys))
+               (fail "A key in the archive is already a key of another space"))
              (dolist (m media)
                (unless (insert-media space (getf m :id) :filename (getf m :filename) :mime (getf m :mime)
                                                        :size (getf m :size) :width (getf m :width) :height (getf m :height)
