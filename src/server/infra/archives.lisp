@@ -98,6 +98,7 @@
                                    (jget document "koyaExport") +archive-version+)))
     (let ((schema (jobject->schema (without-slug-options (jget document "schema")))))
       (remhash "schema" document)
+      (false-as-null document '("contents" "media" "deliveryKeys" "managementKeys"))
       (versions-as-written (jget document "contents"))
       (list* :schema schema (jvalue->data document)))))
 
