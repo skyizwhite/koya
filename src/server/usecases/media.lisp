@@ -59,15 +59,13 @@
     (let ((bytes (strip-metadata bytes mime)))
       (loop :for id := (new-id)
             :when (write-media-file space id mime bytes :new t)
-              :do (let ((media (handler-case
-                                   (insert-media space id :filename (safe-filename filename) :mime mime
-                                                          :size (length bytes) :width width :height height :alt alt)
-                                 (error (e)
-                                   (handler-case (delete-media-file space id mime) (error () nil))
-                                   (error e)))))
-                    (if media
-                        (return media)
-                        (delete-media-file space id mime)))))))
+              :do (let ((media nil))
+                    (unwind-protect
+                         (setf media (insert-media space id :filename (safe-filename filename) :mime mime
+                                                            :size (length bytes) :width width :height height :alt alt))
+                      (unless media
+                        (handler-case (delete-media-file space id mime) (error () nil))))
+                    (when media (return media)))))))
 
 (defun store-uploads (space files &key (alt ""))
   (when (> (reduce #'+ files :key (lambda (file) (length (first file)))) +max-upload-bytes+)

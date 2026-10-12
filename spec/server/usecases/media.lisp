@@ -154,7 +154,9 @@
            (ok (string= (media-id (with-drawn-ids (list (media-id media) "zzzzzzzzzzzz")
                                     (lambda () (store-upload "elsewhere" (png-bytes) :filename "other.png"))))
                         "zzzzzzzzzzzz")
-               "and one any space holds is drawn again"))
+               "and one any space holds is drawn again")
+           (ng (probe-file (media-file-path "elsewhere" (media-id media) "image/png"))
+               "without leaving the file it wrote for the id it gave up"))
       (remove-media media))))
 
 (deftest a-media-id-whose-file-is-there-is-drawn-again
