@@ -14,14 +14,14 @@
                 #:space-webhook-secret #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:record-revision
-                #:find-object-content #:unique-value-taken-p #:slug-taken-p #:get-content #:find-content
+                #:find-object-content #:unique-value-taken-p #:slug-taken-p #:find-content
                 #:find-contents-by-slug #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
                 #:content-published-p
                 #:merge-data #:comparable-data #:initial-data #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one)
-  (:import-from #:koya-server/domain/id #:fresh-id)
+  (:import-from #:koya-server/domain/id #:new-id)
   (:import-from #:koya-server/usecases/delivery #:deliver)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
@@ -105,11 +105,12 @@
                 (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
                       :code "object_exists"))
               (check-content space-name model data)
-              (let ((content (new-content (fresh-id (lambda (id) (get-content space-name id))) space-name model-name data
-                                          :publish publish
-                                          :created-at created-at :updated-at updated-at
-                                          :published-at published-at :revised-at revised-at)))
-                (apply #'insert-content content (content-slugs model content))
+              (let ((content (loop :for content := (new-content (new-id) space-name model-name data
+                                                                :publish publish
+                                                                :created-at created-at :updated-at updated-at
+                                                                :published-at published-at :revised-at revised-at)
+                                   :when (apply #'insert-content content (content-slugs model content))
+                                     :return content)))
                 (record-revision space-name (content-id content) (if publish "publish" "draft") data :by *actor*)
                 content))))
       (if publish

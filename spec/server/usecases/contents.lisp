@@ -1,5 +1,6 @@
 (defpackage #:koya-spec/server/usecases/contents
   (:use #:cl #:rove)
+  (:import-from #:koya-spec/server/stored #:stored-content)
   (:import-from #:koya-server/domain/errors #:conflict #:invalid-input #:not-found #:koya-error-code)
   (:import-from #:koya-server/domain/key #:key-label)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
@@ -9,7 +10,7 @@
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-server/usecases/ports/contents
-                #:get-content #:list-contents #:model-contents #:space-contents
+                #:list-contents #:model-contents #:space-contents
                 #:find-object-content #:unique-value-taken-p #:list-revisions
                 #:count-revisions #:find-revision)
   (:import-from #:koya-server/usecases/contents
@@ -76,7 +77,7 @@
   (let ((taken (content-id (make (list :title "First")))))
     (ok (string= (content-id (with-drawn-ids (list taken "zzzzzzzzzzzz") (lambda () (make (list :title "Second")))))
                  "zzzzzzzzzzzz"))
-    (ok (string= (access (content-draft (get-content "website" taken)) :title) "First") "and the content that holds it is untouched")))
+    (ok (string= (access (content-draft (stored-content "website" taken)) :title) "First") "and the content that holds it is untouched")))
 
 (deftest contents-made-at-once-are-written-out-in-the-order-they-were-made
   (with-drawn-ids (list "zzzzzzzzzzzz" "aaaaaaaaaaaa")
@@ -112,9 +113,9 @@
             (ok (null (content-published-at u)) "an unpublished content has no publish date")
             (ok (null (content-revised-at u)) "nor a revision date")
             (ok (string= (access (content-draft u) :title) "Edited") "unpublish keeps the data as draft")
-            (ok (string= (content-status (get-content "website" (content-id c))) "draft") "and that is what is stored"))))
+            (ok (string= (content-status (stored-content "website" (content-id c))) "draft") "and that is what is stored"))))
       (destroy "website" (blog) (content-id c))
-      (ng (get-content "website" (content-id c))))))
+      (ng (stored-content "website" (content-id c))))))
 
 (deftest every-write-leaves-a-revision
   (let* ((c (let ((*actor* "owner")) (make (list :title "One"))))
@@ -167,7 +168,7 @@
       (ok (null (content-draft-key p)) "published content has no key")
       (let ((made (draft-key "website" (blog) (content-id p))))
         (ok (= (length made) 32) "but one can be made on demand")
-        (ok (string= made (content-draft-key (get-content "website" (content-id p)))) "and is kept")))))
+        (ok (string= made (content-draft-key (stored-content "website" (content-id p)))) "and is kept")))))
 
 (deftest object-content
   (ng (find-object-content "website" "about"))
@@ -365,9 +366,9 @@
         (ok (= (count-revisions "website" id) 1)))
       (testing "a change and a publish keep it to the minute too"
         (update-draft "website" model id (list :at "2024-03-01T08:30:15+01:00"))
-        (ok (string= (access (content-draft (get-content "website" id)) :at) "2024-03-01T07:30:00.000Z"))
+        (ok (string= (access (content-draft (stored-content "website" id)) :at) "2024-03-01T07:30:00.000Z"))
         (publish "website" model id :data (list :at "2024-04-01T00:00:01Z"))
-        (ok (string= (access (content-published (get-content "website" id)) :at) "2024-04-01T00:00:00.000Z"))))))
+        (ok (string= (access (content-published (stored-content "website" id)) :at) "2024-04-01T00:00:00.000Z"))))))
 
 (deftest a-missing-boolean-and-false-are-the-same-draft
   (let ((id (content-id (make (list :title "Flag") :publish t))))
@@ -377,14 +378,14 @@
                                        :replace t))
             :unchanged)
         "nor does the editor's save, which always sends the key")
-    (ok (string= (content-status (get-content "website" id)) "published"))
+    (ok (string= (content-status (stored-content "website" id)) "published"))
     (ok (= (count-revisions "website" id) 1))
     (testing "and a draft that comes back to the published data with false is dropped"
       (update-draft "website" (blog) id (list :title "Changed"))
       (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :title "Flag" :featured nil)
                                          :replace t))
               :published))
-      (ok (string= (content-status (get-content "website" id)) "published"))))
+      (ok (string= (content-status (stored-content "website" id)) "published"))))
   (let ((id (content-id (make (list :title "Off" :featured nil) :publish t))))
     (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :featured :null))) :unchanged)
         "and null over false changes nothing either")
@@ -396,13 +397,13 @@
          (id (content-id (create "website" tag (list :name "x")))))
     (ok (eq (nth-value 1 (update-draft "website" tag id (list :name :null))) :saved)
         "a draft saved with no values is saved as one, though it has no published data to match")
-    (let ((content (get-content "website" id)))
+    (let ((content (stored-content "website" id)))
       (ok (string= (content-status content) "draft") "and is not published")
       (ok (null (content-draft content)) "holding no values"))))
 
 (deftest a-blank-slug-stays-blank
   (let ((id (content-id (create "website" (find-model "website" "page") (list :title "Hello World") :publish t))))
-    (ng (nth-value 1 (access (content-published (get-content "website" id)) :slug))
+    (ng (nth-value 1 (access (content-published (stored-content "website" id)) :slug))
         "nothing makes a slug from the title")))
 
 (deftest a-slug-is-unique-without-saying-so
@@ -440,7 +441,7 @@
     (ok (string= (content-updated-at c) "2024-01-02T02:04:05.500Z") "with milliseconds, as the server writes")
     (ok (string= (content-published-at c) "2024-01-01T00:00:00.000Z"))
     (ok (string= (content-revised-at c) "2024-01-03T00:00:00.000Z"))
-    (ok (string= (content-created-at (get-content "website" (content-id c))) "2024-01-01T01:00:00.000Z")
+    (ok (string= (content-created-at (stored-content "website" (content-id c))) "2024-01-01T01:00:00.000Z")
         "and that is what is stored"))
   (testing "a timestamp needs a date, a time and a zone"
     (dolist (value '("10:00" "2024-01-01" "2024-01-01T10:00:00"))

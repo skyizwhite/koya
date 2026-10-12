@@ -1,7 +1,6 @@
 (defpackage #:koya-server/usecases/ports/contents
   (:use #:cl)
-  (:export #:get-content
-           #:find-content
+  (:export #:find-content
            #:find-contents-by-ids
            #:find-contents-by-slug
            #:find-object-content
@@ -21,8 +20,6 @@
            #:find-revision
            #:content-history))
 (in-package #:koya-server/usecases/ports/contents)
-
-(defgeneric get-content (space id))
 
 (defgeneric find-content (space model id))
 

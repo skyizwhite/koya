@@ -1,12 +1,13 @@
 (defpackage #:koya-spec/server/web/pages/content-list
   (:use #:cl #:rove)
+  (:import-from #:koya-spec/server/stored #:stored-content)
   (:import-from #:koya-server/web/lib/binds #:on-search)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:setup-pages #:log-in #:asked-first)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-contents #:get-content #:update-content)
+                #:list-contents #:update-content)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-id #:content-draft-key #:content-published-p #:drafted)
   (:import-from #:koya-server/domain/query #:parse-query)
@@ -343,7 +344,7 @@
             (ok (search "Nothing matches this search." body) "which now matches nothing")))
         (testing "one that cannot be done leaves the others done, and says so"
 
-          (update-content (drafted (get-content "website" three) (list :body "<p>no title</p>"))
+          (update-content (drafted (stored-content "website" three) (list :body "<p>no title</p>"))
                           nil nil)
           (let ((body (nth-value 1 (bulk "publish" (list one three)))))
             (ok (search "Published 1 content. 1 could not be: title is required." body)
@@ -370,14 +371,14 @@
         (testing "unpublishing a selection skips the one another refers to"
           (ok (search "Unpublished 1 content. 1 could not be: This content is referenced by 1 other content"
                       (nth-value 1 (bulk "unpublish" (list target other)))))
-          (ok (content-published-p (get-content "website" target)) "it is still published")
-          (ng (content-published-p (get-content "website" other)) "the rest of the selection went"))
+          (ok (content-published-p (stored-content "website" target)) "it is still published")
+          (ng (content-published-p (stored-content "website" other)) "the rest of the selection went"))
         (testing "deleting a selection does the same"
           (bulk "delete" (list target referrer))
-          (ok (get-content "website" target) "refused while the referrer was still there")
-          (ng (get-content "website" referrer))
+          (ok (stored-content "website" target) "refused while the referrer was still there")
+          (ng (stored-content "website" referrer))
           (bulk "delete" (list target))
-          (ng (get-content "website" target) "and it goes once nothing refers to it"))))))
+          (ng (stored-content "website" target) "and it goes once nothing refers to it"))))))
 
 (deftest the-list-is-read-in-place
   (exec "DELETE FROM contents")

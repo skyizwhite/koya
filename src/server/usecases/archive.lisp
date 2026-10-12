@@ -298,12 +298,14 @@
              (dolist (k delivery-keys) (apply #'insert-delivery-key space k))
              (dolist (k management-keys) (apply #'insert-management-key space k))
              (dolist (m media)
-               (insert-media space (getf m :id) :filename (getf m :filename) :mime (getf m :mime)
-                                           :size (getf m :size) :width (getf m :width) :height (getf m :height)
-                                           :alt (getf m :alt) :created-at (getf m :created-at)))
+               (unless (insert-media space (getf m :id) :filename (getf m :filename) :mime (getf m :mime)
+                                                       :size (getf m :size) :width (getf m :width) :height (getf m :height)
+                                                       :alt (getf m :alt) :created-at (getf m :created-at))
+                 (fail "Media ~a is already in another space" (getf m :id))))
              (loop :for (content revisions) :in contents
-                   :do (apply #'insert-content content
-                              (content-slugs (schema-model schema (content-model content)) content))
+                   :do (unless (apply #'insert-content content
+                                      (content-slugs (schema-model schema (content-model content)) content))
+                         (fail "Content ~a appears twice in the archive" (content-id content)))
                        (dolist (r revisions)
                          (record-revision space (content-id content) (getf r :event) (getf r :data)
                                           :by (getf r :by) :created-at (getf r :created-at)))))

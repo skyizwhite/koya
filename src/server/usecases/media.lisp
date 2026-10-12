@@ -9,11 +9,11 @@
   (:import-from #:koya-server/usecases/ports/media
                 #:insert-media #:delete-media #:find-media #:list-media #:count-media #:update-media
                 #:space-media #:write-media-file #:delete-media-file #:delete-space-media-files
-                #:media-file-path #:media-file-exists-p #:media-id-taken-p)
+                #:media-file-path #:media-file-exists-p)
   (:import-from #:koya-server/domain/references #:media-fields #:mentioned-ids #:referrers)
   (:import-from #:koya-server/usecases/ports/spaces #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents #:contents-mentioning #:space-contents)
-  (:import-from #:koya-server/domain/id #:fresh-id)
+  (:import-from #:koya-server/domain/id #:new-id)
   (:export #:store-upload
            #:store-uploads
            #:upload-limit-message
@@ -56,15 +56,18 @@
     (fail 'too-large (upload-limit-message)))
   (multiple-value-bind (mime width height) (sniff-image bytes)
     (unless mime (fail 'rejected "Only PNG, JPEG, GIF and WebP images are accepted" :code "unsupported_type"))
-    (let* ((bytes (strip-metadata bytes mime))
-           (id (loop :for id := (fresh-id #'media-id-taken-p)
-                     :when (write-media-file space id mime bytes :new t) :return id)))
-      (handler-case
-          (insert-media space id :filename (safe-filename filename) :mime mime :size (length bytes)
-                                 :width width :height height :alt alt)
-        (error (e)
-          (handler-case (delete-media-file space id mime) (error () nil))
-          (error e))))))
+    (let ((bytes (strip-metadata bytes mime)))
+      (loop :for id := (new-id)
+            :when (write-media-file space id mime bytes :new t)
+              :do (let ((media (handler-case
+                                   (insert-media space id :filename (safe-filename filename) :mime mime
+                                                          :size (length bytes) :width width :height height :alt alt)
+                                 (error (e)
+                                   (handler-case (delete-media-file space id mime) (error () nil))
+                                   (error e)))))
+                    (if media
+                        (return media)
+                        (delete-media-file space id mime)))))))
 
 (defun store-uploads (space files &key (alt ""))
   (when (> (reduce #'+ files :key (lambda (file) (length (first file)))) +max-upload-bytes+)

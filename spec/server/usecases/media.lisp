@@ -9,7 +9,7 @@
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/usecases/ports/media
                 #:find-media #:list-media #:count-media #:update-media #:media-file-path
-                #:insert-media #:delete-media-file)
+                #:insert-media #:write-media-file #:delete-media-file)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-spec/server/domain/image #:jpeg #:octets)
   (:import-from #:koya-server/usecases/media
@@ -156,6 +156,18 @@
                         "zzzzzzzzzzzz")
                "and one any space holds is drawn again"))
       (remove-media media))))
+
+(deftest a-media-id-whose-file-is-there-is-drawn-again
+  (write-media-file "website" "orphanorphan" "image/png" (octets "left behind"))
+  (unwind-protect
+       (let ((media (with-drawn-ids (list "orphanorphan" "zzzzzzzzzzzz")
+                      (lambda () (store-upload "website" (png-bytes) :filename "new.png")))))
+         (ok (string= (media-id media) "zzzzzzzzzzzz"))
+         (ok (equalp (alexandria:read-file-into-byte-vector (media-file-path "website" "orphanorphan" "image/png"))
+                     (octets "left behind"))
+             "the file that was there stays as it was")
+         (remove-media media))
+    (delete-media-file "website" "orphanorphan" "image/png")))
 
 (deftest an-upload-is-stored-without-its-metadata
   (let* ((media (store-upload "website" (jpeg) :filename "phone.jpg"))

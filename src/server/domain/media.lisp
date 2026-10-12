@@ -1,7 +1,7 @@
 (defpackage #:koya-server/domain/media
   (:use #:cl)
   (:import-from #:koya-core/data #:blank-p)
-  (:import-from #:cl-ppcre #:scan)
+  (:import-from #:cl-ppcre #:scan #:create-scanner)
   (:import-from #:koya-server/domain/image
                 #:image-extension)
   (:export #:media #:make-media
@@ -21,8 +21,10 @@
 
 (defparameter +media-id-pattern+ "[0-9a-z]{12}|[0-9A-Z]{26}")
 
+(defparameter +media-id-scanner+ (create-scanner (format nil "^(?:~a)\\z" +media-id-pattern+)))
+
 (defun media-id-p (id)
-  (and (stringp id) (scan (format nil "^(?:~a)\\z" +media-id-pattern+) id) t))
+  (and (stringp id) (scan +media-id-scanner+ id) t))
 
 (defun media-file-name (media)
   (format nil "~a.~a" (media-id media) (image-extension (media-mime media))))

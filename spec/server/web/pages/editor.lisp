@@ -1,5 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/editor
   (:use #:cl #:rove)
+  (:import-from #:koya-spec/server/stored #:stored-content)
   (:import-from #:koya-server/usecases/schema #:replace-schema #:resolve-model)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id>/history #:browse-history)
   (:import-from #:koya-server/web/lib/binds #:on-click)
@@ -9,7 +10,7 @@
   (:import-from #:koya-server/web/ui/content/editor #:editor-action #:repeater-row)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-contents #:list-revisions #:count-revisions #:get-content #:count-contents
+                #:list-contents #:list-revisions #:count-revisions #:count-contents
                 #:update-content #:delete-content)
   (:import-from #:koya-server/domain/content
                 #:content-status #:content-published #:content-draft #:content-id #:unpublished #:drafted)
@@ -192,9 +193,9 @@
       (setf id (content-id (first (list-contents "website" "about" (nth-value 1 (resolve-model "website" "about")) (parse-query nil) :status :all)))))
     (testing "a later save changes that content"
       (edit "/s/website/m/about" :form `(("action" . "save") ("f-body" . "second")
-                                         ("updated-at" . ,(content-updated-at (get-content "website" id)))))
+                                         ("updated-at" . ,(content-updated-at (stored-content "website" id)))))
       (ok (= 1 (count-contents "website" "about")))
-      (ok (string= (access (content-draft (get-content "website" id)) :body) "second")))
+      (ok (string= (access (content-draft (stored-content "website" id)) :body) "second")))
     (testing "its id and new do not reach it"
       (dolist (path (list (format nil "/s/website/m/about/~a" id) "/s/website/m/about/new"))
         (ok (= (request :get path) 404) path)))
@@ -205,7 +206,7 @@
         (ok (search "Unpublish" body) "unpublishing is what takes it off the site")
         (ng (search "Delete" body)))
       (ok (<= 400 (edit "/s/website/m/about" :form '(("action" . "delete"))) 499))
-      (ok (get-content "website" id) "and the action does not delete it either"))
+      (ok (stored-content "website" id) "and the action does not delete it either"))
     (testing "its history restores at the model"
       (multiple-value-bind (status body) (request :get (format nil "/s/website/m/about/~a/history" id))
         (ok (= status 200))
@@ -232,14 +233,14 @@
     (testing "an untouched field comes back as it was, less the CRLF of the form"
       (edit path :form `(("action" . "save") ("f-title" . "Renamed")
                                   ("f-body" . ,(format nil "<h2 id=\"intro\">Intro</h2><p>a</p>~c~%<p>b</p>" #\Return))))
-      (ok (string= (access (content-draft (get-content "website" id)) :body) html)))
+      (ok (string= (access (content-draft (stored-content "website" id)) :body) html)))
     (testing "the whitespace around it is kept too"
       (let ((spaced (format nil "~%<p>a</p>~%")))
         (edit path :form `(("action" . "save") ("f-title" . "Renamed") ("f-body" . ,spaced)))
-        (ok (string= (access (content-draft (get-content "website" id)) :body) spaced))))
+        (ok (string= (access (content-draft (stored-content "website" id)) :body) spaced))))
     (testing "an edited one is stored as the editor wrote it"
       (edit path :form '(("action" . "save") ("f-title" . "Renamed") ("f-body" . "<p>c</p><p>d</p>")))
-      (ok (string= (access (content-draft (get-content "website" id)) :body) "<p>c</p><p>d</p>")))))
+      (ok (string= (access (content-draft (stored-content "website" id)) :body) "<p>c</p><p>d</p>")))))
 
 (deftest url-templates-fill-in-the-slug
   (flet ((deploy (&rest templates)
@@ -320,7 +321,7 @@
         (ng (search "Draft saved" body))
         (ok (search "Published" body))))
 
-    (update-content (unpublished (get-content "website" unpublished)) nil nil)
+    (update-content (unpublished (stored-content "website" unpublished)) nil nil)
     (delete-content "website" deleted)
     (delete-media "website" media)
     (replace-schema "website"
@@ -356,13 +357,13 @@
           (ng (search "NIL" body))))
       (testing "and writes nothing until it is saved"
         (ok (= (count-revisions "website" id) before))
-        (ok (string= (access (content-draft (get-content "website" id)) :title) "Second")))
+        (ok (string= (access (content-draft (stored-content "website" id)) :title) "Second")))
       (testing "saving it is an ordinary draft save"
         (edit url  :form `(("action" . "save") ("f-title" . "First") ("f-slug" . "first")
                                    ("f-category" . "tech") ("f-related" . ,kept)))
         (ok (= (count-revisions "website" id) (1+ before)))
-        (ok (string= (access (content-draft (get-content "website" id)) :title) "First"))
-        (ok (string= (content-status (get-content "website" id)) "published+draft") "what is live is untouched")))
+        (ok (string= (access (content-draft (stored-content "website" id)) :title) "First"))
+        (ok (string= (content-status (stored-content "website" id)) "published+draft") "what is live is untouched")))
     (testing "a revision this content does not have"
       (multiple-value-bind (status body) (request :get url :query "revision=999999")
         (ok (= status 200))
@@ -420,7 +421,7 @@
         (ng (search "id=\"editor\"" body) "the editor stays as it is")
         (ok (null (moved-to body)) "and on this content, not the list")
         (ok (search "referenced by 1 other content" body) "the toast says why")
-        (ok (get-content "website" target) "it is still there")))))
+        (ok (stored-content "website" target) "it is still there")))))
 
 (deftest the-editor-asks-before-it-acts
   (exec "DELETE FROM contents")
@@ -476,14 +477,14 @@
           (ok (= status 200))
           (ok (search "Nothing to save." body)))
         (ok (= (count-revisions "website" id) before) "no revision")
-        (ok (string= (content-status (get-content "website" id)) "published") "and no draft")))
+        (ok (string= (content-status (stored-content "website" id)) "published") "and no draft")))
     (testing "a draft taken back to the published data is dropped, and the history says so"
       (edit path :form '(("action" . "save") ("f-title" . "Changed") ("f-slug" . "live")))
-      (ok (string= (content-status (get-content "website" id)) "published+draft"))
+      (ok (string= (content-status (stored-content "website" id)) "published+draft"))
       (multiple-value-bind (status body) (edit path :form (cons '("action" . "save") form))
         (ok (= status 200))
         (ok (search "Back to the published version" body)))
-      (ok (string= (content-status (get-content "website" id)) "published") "the draft is gone")
+      (ok (string= (content-status (stored-content "website" id)) "published") "the draft is gone")
       (ok (string= (revision-event (first (list-revisions "website" id))) "discard")
           "and it went as a discard, which has something to show"))
     (testing "a restore is marked unsaved"
@@ -497,7 +498,7 @@
            (path (format nil "/s/website/m/blog/~a" id)))
       (ok (= 404 (edit path :form '(("action" . "foo") ("title" . "Changed"))))
           "an op the editor does not know answers 404")
-      (ok (string= (access (content-draft (get-content "website" id)) :title) "Kept") "and saves nothing")
+      (ok (string= (access (content-draft (stored-content "website" id)) :title) "Kept") "and saves nothing")
       (ok (= 1 (count-revisions "website" id)) "nor records anything")
       (ok (= 404 (edit "/s/website/m/blog/new" :form '(("action" . "foo") ("title" . "Made"))))
           "on the new-content form too")
@@ -542,11 +543,11 @@
         (ok (search "changed elsewhere" body) "and says why")
         (ok (search (format nil "href=\"~a\"" path) body) "with a way to see the change")
         (ng (search "editor-form" body) "while the form, with what was typed, is left as it is")))
-    (ok (string= (access (content-draft (get-content "website" id)) :title) "Changed elsewhere")
+    (ok (string= (access (content-draft (stored-content "website" id)) :title) "Changed elsewhere")
         "and the change made elsewhere stays")
     (multiple-value-bind (status)
         (edit path :form `(("action" . "save") ("f-title" . "Typed here") ("f-slug" . "opened")
-                           ("updated-at" . ,(content-updated-at (get-content "website" id)))))
+                           ("updated-at" . ,(content-updated-at (stored-content "website" id)))))
       (ok (= status 200) "once the editor has seen it, it saves"))))
 
 (deftest discarding-a-draft-made-elsewhere-is-refused
@@ -560,9 +561,9 @@
         (edit path :form '(("action" . "discard") ("updated-at" . "2024-01-01T00:00:00.000Z")))
       (ok (= status 409) "a draft the editor never saw is not thrown away from it")
       (ok (search "changed elsewhere" body)))
-    (ok (string= (access (content-draft (get-content "website" id)) :title) "Drafted elsewhere"))
+    (ok (string= (access (content-draft (stored-content "website" id)) :title) "Drafted elsewhere"))
     (multiple-value-bind (status)
-        (edit path :form `(("action" . "discard") ("updated-at" . ,(content-updated-at (get-content "website" id)))))
+        (edit path :form `(("action" . "discard") ("updated-at" . ,(content-updated-at (stored-content "website" id)))))
       (ok (= status 200) "while one it has seen is"))))
 
 (deftest a-field-tells-the-editor-what-it-expects
@@ -631,7 +632,7 @@
              (edit "/s/website/m/page/new" :form '(("action" . "save") ("f-title" . "Absent") ("f-card.heading" . "Ignored")))
            (ok (= status 200) "without the form saying the custom field is there, what is inside is none")
            (let* ((loc (moved-to body)) (id (subseq loc (1+ (position #\/ loc :from-end t)))))
-             (ok (null (nth-value 1 (access (content-draft (get-content "website" id)) :card))))))
+             (ok (null (nth-value 1 (access (content-draft (stored-content "website" id)) :card))))))
          (multiple-value-bind (status body)
              (edit "/s/website/m/page/new" :form '(("action" . "save") ("f-title" . "P") ("f-card" . "on") ("f-card.heading" . "Too long")))
            (ok (= status 422))
@@ -646,7 +647,7 @@
                (ok (search "value=\"Hi\"" editor) "and what was saved comes back in it")
                (ok (search "class=\"btn\" nm-bind=\"{ hidden: () => !_on, onclick: () => _remove() }\"" editor)
                    "open, with a button to remove it"))
-             (ok (equal (accesses (content-draft (get-content "website" id)) :card :link) "01ARZ3NDEKTSV4RRFFQ69G5FAV")
+             (ok (equal (accesses (content-draft (stored-content "website" id)) :card :link) "01ARZ3NDEKTSV4RRFFQ69G5FAV")
                  "the reference picked inside is saved")
              (ok (search "Hi" (nth-value 1 (request :get "/s/website/m/page"))) "the list previews it")
              (edit (format nil "/s/website/m/page/~a" id) :form '(("action" . "save") ("f-title" . "P") ("f-card" . "on") ("f-card.heading" . "Bye")))
@@ -697,14 +698,14 @@
                                                   ("f-blocks.b.fieldId" . "heading") ("f-blocks.b.text" . "Head")))
            (ok (= status 200))
            (let* ((loc (moved-to body)) (id (subseq loc (1+ (position #\/ loc :from-end t)))))
-             (let ((rows (access (content-draft (get-content "website" id)) :blocks)))
+             (let ((rows (access (content-draft (stored-content "website" id)) :blocks)))
                (ok (equal (map 'list (lambda (r) (access r :field-id)) rows) '("body" "heading")) "the rows are saved in order"))
              (let ((editor (nth-value 1 (request :get (format nil "/s/website/m/doc/~a" id)))))
                (ok (search "value=\"Head\"" editor) "and drawn again")
                (ok (search "aria-label=\"Move row up\"" editor) "each one movable")
                (ok (search "aria-label=\"Remove row\"" editor) "and removable"))
              (ok (search "2 rows" (nth-value 1 (request :get "/s/website/m/doc"))) "the list counts them")
-             (update-content (drafted (get-content "website" id) (list :title "D" :blocks "abc")) nil nil)
+             (update-content (drafted (stored-content "website" id) (list :title "D" :blocks "abc")) nil nil)
              (multiple-value-bind (status body) (request :get "/s/website/m/doc")
                (ok (= status 200) "a text in a repeater does not stop the list")
                (ok (search (format nil "aria-label=\"Open ~a\"" id) body) "which draws that content")
@@ -735,7 +736,7 @@
              (edit "/s/website/m/album/new" :form `(("action" . "save") ("f-title" . "A") ("f-photos" . ,(format nil "~a,~a" b a))))
            (ok (= status 200))
            (let* ((loc (moved-to body)) (id (subseq loc (1+ (position #\/ loc :from-end t)))))
-             (ok (data-equal (access (content-draft (get-content "website" id)) :photos) (vector b a)) "saved in the order sent")
+             (ok (data-equal (access (content-draft (stored-content "website" id)) :photos) (vector b a)) "saved in the order sent")
              (let ((editor (nth-value 1 (request :get (format nil "/s/website/m/album/~a" id)))))
                (ok (< (search (format nil "name=\"f-photos\" value=\"~a\"" b) editor)
                       (search (format nil "name=\"f-photos\" value=\"~a\"" a) editor))
