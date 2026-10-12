@@ -1,7 +1,8 @@
 (defpackage #:koya-spec/server/domain/html
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/html #:html-text #:data-text)
-  (:import-from #:access #:access))
+  (:import-from #:access #:access)
+  (:import-from #:koya-core/data #:data-equal))
 (in-package #:koya-spec/server/domain/html)
 
 (deftest the-text-of-rich-text
@@ -25,7 +26,7 @@
     (ng (nth-value 1 (access text :count)) "and nothing that is not a string")
     (ng (nth-value 1 (access text :tags)))
     (ng (nth-value 1 (access text :done))))
-  (ok (equalp (data-text (list :meta (list :title "<b>t</b>" :n 1) :rows (vector (list :field-id "h" :text "<i>r</i>"))))
-              (list :meta (list :title "t") :rows (vector (list :field-id "h" :text "r"))))
+  (ok (data-equal (data-text (list :meta (list :title "<b>t</b>" :n 1) :rows (vector (list :field-id "h" :text "<i>r</i>"))))
+                  (list :meta (list :title "t") :rows (vector (list :field-id "h" :text "r"))))
       "inside a custom field and a row too")
   (ok (null (data-text (list :count 3))) "data without strings has an empty text"))

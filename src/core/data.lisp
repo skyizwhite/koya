@@ -17,7 +17,7 @@
 (defun plist-equal (a b)
   (and (= (length a) (length b))
        (loop :for (key value) :on a :by #'cddr
-             :always (multiple-value-bind (other found) (access b key :test #'eq)
+             :always (multiple-value-bind (other found) (access b key :test #'equal)
                        (and found (data-equal value other))))))
 
 (defun data-equal (a b)

@@ -195,7 +195,8 @@
                    (ok (string= (delivery-response d) "") "the status is kept, the body is not"))))
              (testing "a public address is sent to, and its answer is kept"
                (let ((d (deliver-to "https://example.com/hook")))
-                 (ok (equalp sent '(("https://example.com/hook" #(93 184 216 34)))))
+                 (ok (equal (mapcar #'first sent) '("https://example.com/hook")))
+                 (ok (equalp (mapcar #'second sent) '(#(93 184 216 34))))
                  (ok (string= (delivery-response d) "what the receiver said"))))
              (testing "a redirect is logged with where it pointed, unless the receiver is internal"
                (let ((*redirect* "https://www.example.com/hook"))
@@ -210,7 +211,8 @@
                    (ng (search "internal-sso" (delivery-error d)) "an internal answer's Location is not kept"))))
              (testing "the call is handed the address that was checked"
                (deliver-to "http://[::1]:3000/hook")
-               (ok (equalp sent '(("http://[::1]:3000/hook" #(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)))))))
+               (ok (equal (mapcar #'first sent) '("http://[::1]:3000/hook")))
+               (ok (equalp (mapcar #'second sent) '(#(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1))))))
         (replace-schema "website" (test-schema))))))
 
 (deftest a-webhook-is-sent-once-the-write-is-done

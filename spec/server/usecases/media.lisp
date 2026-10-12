@@ -22,13 +22,10 @@
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code #:conflict #:rejected #:too-large)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
-  (:import-from #:koya-core/json #:jget #:parse-json)
-  (:import-from #:koya-core/case #:jvalue->data)
+  (:import-from #:koya-core/json #:jget)
   (:import-from #:babel #:string-to-octets)
   (:export #:png-bytes #:*media-root* #:multipart-body))
 (in-package #:koya-spec/server/usecases/media)
-
-(defun data (json) (jvalue->data (parse-json json)))
 
 (defvar *media-root*
   (uiop:ensure-directory-pathname
@@ -114,8 +111,9 @@
       (ok (string= (media-alt (update-media "website" (media-id media) :alt "Changed")) "Changed")))
     (testing "references"
       (ok (= (length (media-references "website" (media-id media))) 0))
-      (let ((x (create "website" (find-model "website" "blog") (data (format nil "{\"title\": \"x\", \"cover\": \"~a\"}" (media-id media)))))
-            (y (create "website" (find-model "website" "blog") (data (format nil "{\"title\": \"y\", \"body\": \"<img src=\\\"~a\\\">\"}" (media-url media))))))
+      (let ((x (create "website" (find-model "website" "blog") (list :title "x" :cover (media-id media))))
+            (y (create "website" (find-model "website" "blog")
+                       (list :title "y" :body (format nil "<img src=\"~a\">" (media-url media))))))
         (ok (= (length (media-references "website" (media-id media))) 2) "field values and richtext URLs both count")
         (ok (equal (sort (mapcar (lambda (r) (getf r :label)) (media-references "website" (media-id media))) #'string<)
                    (sort (list (content-id x) (content-id y)) #'string<))
@@ -124,9 +122,9 @@
           "the library's counts agree"))
     (testing "only the fields in the schema count"
       (exec "DELETE FROM contents")
-      (create "website" (find-model "website" "blog") (data (format nil "{\"title\": \"~a\"}" (media-id media))))
+      (create "website" (find-model "website" "blog") (list :title (media-id media)))
       (ok (= (length (media-references "website" (media-id media))) 0) "a text field mentioning the id is not a use")
-      (create "website" (find-model "website" "blog") (data (format nil "{\"title\": \"z\", \"cover\": \"~a\"}" (media-id media))))
+      (create "website" (find-model "website" "blog") (list :title "z" :cover (media-id media)))
       (ok (= (length (media-references "website" (media-id media))) 1))
       (replace-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text)
                                                                                          (make-field :body :richtext))))))
@@ -137,7 +135,7 @@
                                                                                          (make-field :body :richtext))))))
       (ok (= (length (media-references "website" (media-id media))) 0) "and the field back is empty"))
     (testing "remove"
-      (create "website" (find-model "website" "blog") (data (format nil "{\"title\": \"z\", \"cover\": \"~a\"}" (media-id media))))
+      (create "website" (find-model "website" "blog") (list :title "z" :cover (media-id media)))
       (ok (equal "in_use" (handler-case (progn (remove-media media) nil) (conflict (e) (koya-error-code e))))
           "a file in use stays")
       (ok (find-media "website" (media-id media)))
@@ -249,7 +247,7 @@
   (unwind-protect
        (let ((a (store-upload "website" (png-bytes) :filename "a.png"))
              (b (store-upload "website" (png-bytes) :filename "b.png")))
-         (create "website" (find-model "website" "blog") (data (format nil "{\"title\": \"x\", \"photos\": [\"~a\", \"~a\"]}" (media-id a) (media-id b))))
+         (create "website" (find-model "website" "blog") (list :title "x" :photos (vector (media-id a) (media-id b))))
          (ok (= (length (media-references "website" (media-id b))) 1) "each one of them is a use")
          (ok (= (gethash (media-id a) (media-reference-counts "website" (list (media-id a)))) 1) "and the library counts it")
          (ok (equal "in_use" (handler-case (progn (remove-media b) nil) (conflict (e) (koya-error-code e))))))

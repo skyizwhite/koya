@@ -21,6 +21,8 @@
                 #:field-fields #:field-name)
   (:import-from #:koya-core/schema-json #:schema->jobject)
   (:import-from #:koya-core/case #:jvalue->data #:data->jobject)
+  (:import-from #:koya-core/data #:data-equal)
+  (:import-from #:koya-spec/core/case #:same-json)
   (:import-from #:access #:access #:accesses)
   (:import-from #:koya-server/usecases/ports/contents
                 #:get-content #:list-revisions #:count-revisions)
@@ -381,7 +383,7 @@
 (defun text-fits-p (data text)
   (if (null data)
       (null text)
-      (and text (equalp (parse-json text) (data->jobject (data-text (jvalue->data (parse-json data) :intern t)))))))
+      (and text (same-json (parse-json text) (data->jobject (data-text (jvalue->data (parse-json data) :intern t)))))))
 
 (defun texts-fit-p (space)
   (every (lambda (row)
@@ -646,8 +648,8 @@
       (update-draft "kinds" (find-model "kinds" "post") id
                     (list :blocks (vector (list :field-id "heading" :text "Next"))))
       (replace-schema "kinds" (kinds-schema 'quote))
-      (ok (equalp (access (content-draft (get-content "kinds" id)) :blocks)
-                  (vector (list :field-id "heading" :text "Next")))
+      (ok (data-equal (access (content-draft (get-content "kinds" id)) :blocks)
+                      (vector (list :field-id "heading" :text "Next")))
           "a draft is left as it is: a deploy refuses a schema its contents do not fit before this")
       (let ((history (list-revisions "kinds" id)))
         (ok (= (length history) 3) "every version stays")
@@ -655,8 +657,8 @@
                            history)
                    '(() ("quote") ("quote")))
             "holding only the rows of the custom fields the repeater still has"))
-      (ok (equalp (access (content-published (get-content "kinds" id)) :blocks)
-                  (vector (list :field-id "quote" :text "Quoted")))
+      (ok (data-equal (access (content-published (get-content "kinds" id)) :blocks)
+                      (vector (list :field-id "quote" :text "Quoted")))
           "and the content as it was")))
   (delete-space "kinds"))
 
@@ -775,7 +777,7 @@
     (ok (string= (content-status content) "published+draft") "the content is as it was")
     (ok (equal (content-published content) '(:title "Live")) "less the nulls of its published data")
     (ok (equal (content-draft content) '(:body "<p>b</p>")) "and of its draft"))
-  (ok (equalp (revision-data (first (list-revisions "older" "nulled"))) (list :rows (vector (list :field-id "h"))))
+  (ok (data-equal (revision-data (first (list-revisions "older" "nulled"))) (list :rows (vector (list :field-id "h"))))
       "and of its history, inside a row too")
   (ok (texts-fit-p "older") "and its text follows")
   (ok (string= (col (fetch-one "SELECT published FROM contents WHERE id = 'clean'") "published")

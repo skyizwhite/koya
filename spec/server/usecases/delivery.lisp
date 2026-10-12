@@ -17,7 +17,8 @@
   (:import-from #:koya-server/domain/query #:parse-query #:query-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field)
   (:import-from #:koya-core/case #:kebab-keyword)
-  (:import-from #:access #:access))
+  (:import-from #:access #:access)
+  (:import-from #:koya-core/data #:data-equal))
 (in-package #:koya-spec/server/usecases/delivery)
 
 (setup
@@ -433,14 +434,14 @@
       (exec "UPDATE contents SET published = json_set(published, '$.tags', ?) WHERE model = 'post'" tag)
       (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "tags"))))))
         (ok (null reads))
-        (ok (equalp (access (delivered-data (first (delivered-list "site" (model "post") (query "include" "tags")))) :tags)
-                    #())
+        (ok (data-equal (access (delivered-data (first (delivered-list "site" (model "post") (query "include" "tags")))) :tags)
+                        #())
             "and the field is delivered as before, empty"))
       (exec "UPDATE contents SET published = json_set(published, '$.tags', 5, '$.author', json_array(?), '$.cover', json_array(?)) WHERE model = 'post'"
             tag (picture "01ARZ3NDEKTSV4RRFFQ69G5E04"))
       (let ((reads (reads-of (lambda () (delivered-list "site" (model "post") (query "include" "author,tags"))))))
         (ok (null reads) "a list in a field that holds one is not read either")
         (let ((data (delivered-data (first (delivered-list "site" (model "post") (query "include" "author,tags"))))))
-          (ok (equalp (access data :tags) #()) "a field that holds a list and has something else is empty")
+          (ok (data-equal (access data :tags) #()) "a field that holds a list and has something else is empty")
           (ok (eq :null (access data :author)) "a reference that holds one and has a list is null")
           (ok (eq :null (access data :cover)) "and so is a media"))))))
