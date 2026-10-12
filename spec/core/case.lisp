@@ -4,6 +4,7 @@
                 #:camel-key
                 #:kebab-keyword
                 #:find-kebab-keyword
+                #:name-does-not-come-back
                 #:lisp->jvalue
                 #:jvalue->lisp
                 #:jvalue->data
@@ -65,8 +66,17 @@
       "so stored data never folds two keys into one")
   (ok (signals (camel-key :item-2)) ":item-2 would come back as :item2")
   (ok (signals (camel-key :a--b)))
+  (ok (signals (camel-key "item-2")) "given as a string too")
+  (ok (search "written item2 and read back as :item2"
+              (handler-case (camel-key :item-2) (name-does-not-come-back (c) (princ-to-string c))))
+      "and says what it would become")
   (ok (signals (data->jvalue (list :item-2 1))) "and is not written")
   (ok (signals (lisp->jvalue '(:item-2 1))) "by either conversion"))
+
+(deftest a-site-reads-any-key
+  (ok (equal (jvalue->lisp (parse-json "{\"blog-post\": {\"x-y\": 1}, \"pageURL\": 2}"))
+             '(:blog-post (:x-y 1) :page-u-r-l 2))
+      "a key that is not camelCase keeps its spelling, where a site's data must not fail"))
 
 (deftest null-becomes-nil
   (let ((back (jvalue->lisp (parse-json "{\"publishedAt\": null, \"tags\": [null, \"a\"], \"n\": 0}"))))

@@ -1,7 +1,7 @@
 (defpackage #:koya-core/schema
   (:use #:cl)
   (:import-from #:koya-core/case
-                #:camel-key #:kebab-keyword #:comes-back-p)
+                #:camel-key #:kebab-keyword #:name-does-not-come-back)
   (:import-from #:koya-core/json
                 #:jobject
                 #:jget
@@ -131,9 +131,10 @@
   fields)
 
 (defun camel-name (given)
-  (cond ((not (symbolp given)) given)
-        ((comes-back-p given) (camel-key given))
-        (t (fail "~s does not come back as itself as a name; give it as the string of the name" given))))
+  (if (symbolp given)
+      (handler-case (camel-key given)
+        (name-does-not-come-back (c) (fail "~a" c)))
+      given))
 
 (defun normalize-option (key value)
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
@@ -409,7 +410,7 @@
     (and (eq (model-kind model) :list) (= (length slugs) 1) (first slugs))))
 
 (defun model-field (model name)
-  (find (if (stringp name) name (camel-key name)) (model-fields model)
+  (find (camel-name name) (model-fields model)
         :key #'field-name :test #'string=))
 
 (defstruct (schema (:constructor %make-schema))

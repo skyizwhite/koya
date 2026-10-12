@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/json #:json-array-p)
   (:export #:camel-key
-           #:comes-back-p
+           #:name-does-not-come-back
            #:kebab-keyword
            #:find-kebab-keyword
            #:jvalue->data
@@ -27,25 +27,33 @@
           :do (when (upper-case-p char) (write-char #\- out))
               (write-char (char-upcase char) out))))
 
-(defun symbol-camel (symbol)
-  (to-camel-case (string-downcase (symbol-name symbol))))
-
-(defun comes-back-p (symbol)
-  (string= (kebab-name (symbol-camel symbol)) (symbol-name symbol)))
+(define-condition name-does-not-come-back (error)
+  ((name :initarg :name)
+   (written :initarg :written)
+   (read-back :initarg :read-back))
+  (:report (lambda (c s)
+             (with-slots (name written read-back) c
+               (format s "~s does not come back as itself: it is written ~a and read back as :~(~a~)"
+                       name written read-back)))))
 
 (defun camel-key (key)
-  (cond ((symbolp key)
-         (unless (comes-back-p key) (error "~s does not come back as itself from ~a" key (symbol-camel key)))
-         (symbol-camel key))
-        ((find #\- key) (to-camel-case key))
-        (t key)))
+  (if (or (symbolp key) (find #\- key))
+      (let* ((name (if (symbolp key) (symbol-name key) (string-upcase key)))
+             (camel (to-camel-case (string-downcase name))))
+        (unless (and (string= (kebab-name camel) name) (or (symbolp key) (string= (string-downcase name) key)))
+          (error 'name-does-not-come-back :name key :written camel :read-back (kebab-name camel)))
+        camel)
+      key))
 
 (defun round-trip-name (key)
   (let ((name (kebab-name key)))
     (and (string= (to-camel-case (string-downcase name)) key) name)))
 
 (defun kebab-keyword (key)
-  (intern (or (round-trip-name key) (error "~s does not come back as itself from a keyword" key)) :keyword))
+  (intern (or (round-trip-name key)
+              (error 'name-does-not-come-back :name key :written (to-camel-case (string-downcase (kebab-name key)))
+                                              :read-back (kebab-name key)))
+          :keyword))
 
 (defun find-kebab-keyword (key)
   (let ((name (round-trip-name key)))
@@ -103,4 +111,5 @@
   (let ((keys '()))
     (maphash (lambda (k v) (declare (ignore v)) (push k keys)) object)
     (loop :for k :in (sort keys #'string<)
-          :append (list (kebab-keyword k) (jvalue->lisp (gethash k object))))))
+          :append (list (intern (or (round-trip-name k) (string-upcase k)) :keyword)
+                        (jvalue->lisp (gethash k object))))))
