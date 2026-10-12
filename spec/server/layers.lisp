@@ -34,7 +34,8 @@
               ("koya-core/json" :web :ui :pages :api :admin-api :infra)
               ("koya-core/case" :web :ui :pages :api :admin-api :infra)
               ("koya-core/schema-json" :web :ui :pages :api :admin-api :infra))
-  (:anywhere "koya-core" "access" "alexandria" "cl-ppcre" "babel" "ironclad" "local-time"
+  (:anywhere "koya-core/schema" "koya-core/validate" "koya-core/data" "koya-core/diff" "koya-core/time"
+             "koya-core/ulid" "access" "alexandria" "cl-ppcre" "babel" "ironclad" "local-time"
              "bordeaux-threads" "quri")
   (:forbid "koya-sdk" "ningle"))
 

@@ -12,8 +12,7 @@
            #:json-array
            #:jget
            #:jobject
-           #:jkeys
-           #:json-equal))
+           #:jkeys))
 (in-package #:koya-core/json)
 
 (defconstant json-null 'null)

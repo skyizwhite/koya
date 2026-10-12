@@ -141,8 +141,9 @@ that belongs to another layer (`cl-dbi` outside `infra/`, `jingle` outside
 well as the web's, since the session store infra keeps in the database speaks
 its protocol. What no layer owns — koya-core, alexandria and the like — is
 listed as usable anywhere, except koya-core's JSON and its conversions
-(`core/json`, `core/case`, `core/schema-json`), which only the web and infra
-use. `main` checks with okite,
+(`core/json`, `core/case`, `core/schema-json`): of the server's layers, only the
+web and infra import them, and no layer imports the `koya-core` package that
+re-exports them all. `main` checks with okite,
 as it loads, that every generic function of `usecases/ports/` has a method.
 See `adr/2026-09-27-the-server-is-layered-and-depends-inward.md`.
 

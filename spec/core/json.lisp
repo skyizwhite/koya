@@ -5,3 +5,8 @@
 
 (deftest text-that-is-not-json
   (ok (signals (parse-json "{x") 'json-parse-error) "is a json-parse-error, whatever parses it"))
+
+(deftest what-it-exports-is-there
+  (do-external-symbols (symbol :koya-core/json)
+    (ok (or (fboundp symbol) (boundp symbol) (find-class symbol nil))
+        (format nil "~(~a~) names a function, a value or a condition" symbol))))
