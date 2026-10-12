@@ -31,6 +31,6 @@
 (deftest nulls-are-taken-away
   (ok (equal (without-nulls (list :a :null :b 1)) '(:b 1)))
   (ok (equal (without-nulls (list :meta (list :title :null :image "x"))) '(:meta (:image "x"))) "inside an object")
-  (ok (equalp (without-nulls (list :rows (vector (list :field-id "h" :text :null)))) (list :rows (vector (list :field-id "h"))))
+  (ok (data-equal (without-nulls (list :rows (vector (list :field-id "h" :text :null)))) (list :rows (vector (list :field-id "h"))))
       "and inside a row")
   (ok (equal (without-nulls (list :a nil)) '(:a nil)) "a false or an empty object stays"))

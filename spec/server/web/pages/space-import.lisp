@@ -172,7 +172,7 @@
           (ok (string= (content-status post-content) "published+draft"))
           (ok (string= (access (content-published post-content) :title) "Old"))
           (ok (string= (access (content-draft post-content) :title) "New"))
-          (ok (equalp (access (content-published post-content) :tags) (vector tag)))
+          (ok (data-equal (access (content-published post-content) :tags) (vector tag)))
           (ok (content-draft-key post-content) "the preview link still works")
           (ok (= (count-revisions "archive" post) 2))
           (ok (equal (mapcar #'revision-event (list-revisions "archive" post)) '("draft" "publish")))))

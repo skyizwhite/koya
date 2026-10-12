@@ -11,7 +11,8 @@
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field)
   (:import-from #:koya-core/case #:kebab-keyword)
-  (:import-from #:access #:access))
+  (:import-from #:access #:access)
+  (:import-from #:koya-core/data #:data-equal))
 (in-package #:koya-spec/server/usecases/revisions)
 
 (defun schema (&rest post-fields)
@@ -70,7 +71,7 @@
           (restore-data "site" (post) "x"
                         (object "title" "Old" "tags" (vector (content-id live) (content-id drafted) "gone"))
                         (object))
-        (ok (equalp (access data :tags) (vector (content-id live))))
+        (ok (data-equal (access data :tags) (vector (content-id live))))
         (ok (equal (notes-of notes) '("tags")))
         (ok (search "2 references" (getf (first notes) :note)))))
     (testing "a media that is still in the library comes back; one that is not is dropped"
