@@ -18,7 +18,7 @@
                 #:find-contents-by-slug #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
-                #:content-published-p
+                #:content-published-p #:content-draft-p
                 #:merge-data #:comparable-data #:initial-data #:to-the-minute #:new-content #:drafted #:published
                 #:unpublished #:discarded #:keyed #:content-status #:next-status #:check-transition #:content-slugs #:only-one
                 #:new-content-id)
@@ -137,17 +137,18 @@
   (let* ((content (resolve-content space (model-name model) id))
          (current (content-data content :draft t))
          (live (content-published content))
-         (data (to-the-minute model (if replace patch (merge-data current patch))))
-         (comparable (comparable-data model data)))
+         (data (to-the-minute model (if replace patch (merge-data current patch)))))
     (check-unchanged-since content since)
-    (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
-          ((and (content-published-p content) (data-equal comparable (comparable-data model live)))
-           (check-transition content :discard)
-           (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
-          (t
-           (check-transition content :save)
-           (check-content space model data :exclude-id id)
-           (values (store model (drafted content data) "draft" data) :saved)))))
+    (let ((comparable (comparable-data model data)))
+      (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
+            ((and (content-published-p content) (content-draft-p content)
+                  (data-equal comparable (comparable-data model live)))
+             (check-transition content :discard)
+             (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
+            (t
+             (check-transition content :save)
+             (check-content space model data :exclude-id id)
+             (values (store model (drafted content data) "draft" data) :saved))))))
 
 (defun publish (space model id &key (data nil data-p) published-at since)
   (let ((published-at (check-published-at published-at)))
