@@ -95,11 +95,9 @@
 
 (defun type-errors (field value)
   (ecase (field-type field)
-    ((:text :textarea :richtext)
-     (unless (stringp value) (list (err field "type" "must be a string"))))
-    (:slug
+    ((:text :textarea :richtext :slug)
      (append (unless (stringp value) (list (err field "type" "must be a string")))
-             (unless (slug-string-p value)
+             (when (and (eq (field-type field) :slug) (not (slug-string-p value)))
                (list (err field "slug" "must be a URL slug (lowercase letters, digits, hyphens)")))))
     (:number
      (unless (realp value) (list (err field "type" "must be a number"))))
@@ -202,11 +200,13 @@
             (when fits (setf (gethash (field-name field) out) fitted))))))))
 
 (defun fitted-rows (field rows)
-  (map 'vector (lambda (row)
-                 (let ((fitted (fitted-fields (custom-field-fields (row-kind field row)) row)))
-                   (setf (gethash "fieldId" fitted) (gethash "fieldId" row))
-                   fitted))
-       (remove-if-not (lambda (row) (row-kind field row)) rows)))
+  (coerce (loop :for row :across rows
+                :for kind := (row-kind field row)
+                :when kind
+                  :collect (let ((fitted (fitted-fields (custom-field-fields kind) row)))
+                             (setf (gethash "fieldId" fitted) (gethash "fieldId" row))
+                             fitted))
+          'vector))
 
 (defun fitted-value (field value)
   (cond ((json-null-p value) (values value t))

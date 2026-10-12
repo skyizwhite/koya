@@ -275,7 +275,8 @@ a custom field dropped from a repeater takes its rows out of every revision;
 changing a model's kind deletes its contents, as removing it would.
 
 Tightening a field's options, or adding a `:required` field to a model that has
-contents, is not destructive but is checked: `plan` lists under the change every
+contents, is not destructive (except dropping a custom field from a repeater, as
+above) but is checked: `plan` lists under the change every
 content whose stored value does not fit, and `deploy` is refused with
 `contents_do_not_fit`, `:force` or not, until they are changed to fit.
 

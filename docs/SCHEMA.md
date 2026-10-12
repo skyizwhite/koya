@@ -371,7 +371,9 @@ with any is refused with `409 contents_do_not_fit`, `force` or not and before
 `destructive_changes` is, and the
 changes in `details`: change those contents under the schema as it is, then
 deploy again. Stored content always fits the schema it is stored under. A
-tightened option that every stored value fits is applied without `force`.
+tightened option that every stored value fits is applied without `force`, except
+a custom field dropped from a repeater's `customFields`, which is destructive as
+well.
 
 `path` is `webhooks` (the space's own), `customFields`, `model`, `model.field`
 or, inside a custom field, `model.field.subfield` (`model.field[customField].subfield`

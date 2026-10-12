@@ -5,7 +5,9 @@
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema->jobject
                 #:make-custom-field)
   (:import-from #:koya-core/json #:jobject #:jget)
-  (:import-from #:koya-server/usecases/schema #:replace-schema))
+  (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)
+  (:import-from #:koya-server/domain/deploy #:deploy-destructive))
 (in-package #:koya-spec/server/web/admin-api/schema)
 
 (setup (setup-api))
@@ -235,4 +237,28 @@
                            "destructive")
                      t)
                  "and is destructive, since the rows of it leave the history")))
+      (replace-schema "website" (test-schema)))))
+
+(deftest dropping-a-custom-field-from-a-repeater-needs-force
+  (flet ((pages (&rest kinds)
+           (make-schema :custom-fields (list (make-custom-field "heading" (list (make-field :text :text)))
+                                             (make-custom-field "quote" (list (make-field :text :text))))
+                        :models (list (make-model "note" :list (list (make-field :blocks :repeater :custom-fields kinds)))))))
+    (replace-schema "website" (pages 'heading 'quote))
+    (unwind-protect
+         (progn
+           (admin :post "/admin/api/website/lists/note"
+                  :body (jobject "data" (jobject "blocks" (vector (jobject "fieldId" "heading" "text" "H")))))
+           (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject (pages 'heading)))
+             (ok (= status 409) "even when no content holds a row of it")
+             (ok (string= (jget json "error" "code") "destructive_changes")))
+           (ok (= (length (jget (aref (jget (aref (jget (nth-value 1 (admin :get "/admin/api/website/schema")) "models") 0) "fields") 0)
+                                       "customFields"))
+                  2)
+               "and nothing is applied")
+           (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject (pages 'heading))
+                                                                                     :query "force=true")
+             (ok (= status 200) "it is applied with force")
+             (ng (jget json "error")))
+           (ok (deploy-destructive (first (list-deploys "website"))) "and the deploy is logged as destructive"))
       (replace-schema "website" (test-schema)))))
