@@ -23,11 +23,12 @@
     (map-data-fields (model-fields model) revision
                      (lambda (field value found object outer)
                        (declare (ignore found outer))
-                       (case (field-type field)
-                         (:media (setf media (append (held-ids value (array-p value)) media)))
-                         (:reference (let ((target (field-option field :model)))
-                                       (setf (gethash target references)
-                                             (append (held-ids value (array-p value)) (gethash target references))))))
+                       (when (member (field-type field) '(:media :reference))
+                         (let ((ids (held-ids value (array-p value))))
+                           (if (eq (field-type field) :media)
+                               (setf media (append ids media))
+                               (let ((target (field-option field :model)))
+                                 (setf (gethash target references) (append ids (gethash target references)))))))
                        object))
     (values media references)))
 
