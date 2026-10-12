@@ -137,9 +137,9 @@ of its own, isolated, outside `ui/` outside the rest -- and fails when a file
 imports from a layer further out or a route from another route, from a library
 that belongs to another layer (`cl-dbi` outside `infra/`, `jingle` outside
 `web/`), from a library it does not list at all, or from `koya-sdk` or `ningle`
--- ningle is reached through jingle, which re-exports it. `lack` is infra's as
-well as the web's, since the session store infra keeps in the database speaks
-its protocol. What no layer owns — koya-core, alexandria and the like — is
+-- ningle is reached through jingle, which re-exports it. `lack` is the web's,
+and its session middleware, `lack-middleware-session`, infra's, since the
+session store infra keeps in the database speaks its protocol. What no layer owns — koya-core, alexandria and the like — is
 listed as usable anywhere, except koya-core's JSON and its conversions
 (`core/json`, `core/case`, `core/schema-json`): of the server's layers, only the
 web and infra import them, and no layer imports the `koya-core` package that
