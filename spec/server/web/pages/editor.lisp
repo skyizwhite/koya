@@ -800,7 +800,7 @@
                                  :of '(:list-contents :find-media :find-media-by-ids))))
            (ok (equal (remove-if-not (lambda (read) (search "LIST-CONTENTS" read)) reads)
                       '("(LIST-CONTENTS blog)" "(LIST-CONTENTS series)" "(LIST-CONTENTS topic)"))
-               "each model the fields link to is listed once, for every field that links to it, one with no contents yet too")
+               "each model the fields link to is listed once, for every field that links to it, one with no contents yet too, and nothing else")
            (ok (= (count "FIND-MEDIA-BY-IDS" reads :test #'string=) 1) "and their photos are read together")
            (ng (member "FIND-MEDIA" reads :test #'string=) "not one by one")
            (ok (= (cl-ppcre:count-matches (format nil "<option value=\"~a\"" other) body) (+ 2 rows))
