@@ -43,13 +43,17 @@
 (defun version->jvalue (data)
   (if (eq data :null) 'null (data->jobject data)))
 
+(defun jvalue-without (data keys)
+  (data->jvalue (loop :for (key value) :on data :by #'cddr
+                      :unless (member key keys) :append (list key value))))
+
 (defun content->jvalue (content)
-  (let ((out (data->jvalue content)))
+  (let ((out (jvalue-without content '(:published :draft :revisions))))
     (setf (gethash "published" out) (version->jvalue (access content :published :test #'eq))
           (gethash "draft" out) (version->jvalue (access content :draft :test #'eq))
           (gethash "revisions" out)
           (map 'vector (lambda (revision)
-                         (let ((r (data->jvalue revision)))
+                         (let ((r (jvalue-without revision '(:data))))
                            (setf (gethash "data" r) (data->jobject (access revision :data :test #'eq)))
                            r))
                (access content :revisions :test #'eq)))
@@ -58,8 +62,7 @@
 (defun document->json (document)
   (let ((out (jobject "koyaExport" +archive-version+)))
     (maphash (lambda (k v) (setf (gethash k out) v))
-             (data->jvalue (loop :for (key value) :on document :by #'cddr
-                                 :unless (member key '(:schema :contents)) :append (list key value))))
+             (jvalue-without document '(:schema :contents)))
     (setf (gethash "schema" out) (schema->jobject (access document :schema :test #'eq))
           (gethash "contents" out) (map 'vector #'content->jvalue (access document :contents :test #'eq)))
     (to-json out)))
@@ -70,14 +73,20 @@
       (map nil #'forget-slug-options models)))
   schema)
 
+(defun false-as-null (object keys)
+  (when (hash-table-p object)
+    (dolist (key keys)
+      (multiple-value-bind (value found) (gethash key object)
+        (when (and found (null value))
+          (setf (gethash key object) 'null))))))
+
 (defun versions-as-written (contents)
   (when (json-array-p contents)
     (loop :for content :across contents
-          :when (hash-table-p content)
-            :do (dolist (key '("published" "draft"))
-                  (multiple-value-bind (value found) (gethash key content)
-                    (when (and found (null value))
-                      (setf (gethash key content) 'null)))))))
+          :do (false-as-null content '("published" "draft"))
+              (let ((revisions (and (hash-table-p content) (gethash "revisions" content))))
+                (when (json-array-p revisions)
+                  (loop :for revision :across revisions :do (false-as-null revision '("data"))))))))
 
 (defun json->document (json)
   (let ((document (handler-case (parse-json json)

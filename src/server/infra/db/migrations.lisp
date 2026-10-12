@@ -6,9 +6,9 @@
                 #:now-iso)
   (:import-from #:koya-core/json #:parse-json #:to-json)
   (:import-from #:koya-core/schema-json #:forget-slug-options)
-  (:import-from #:koya-core/case #:jvalue->data #:data->jobject)
+  (:import-from #:koya-core/case #:jvalue->data)
   (:import-from #:koya-core/data #:without-nulls)
-  (:import-from #:koya-server/infra/db/contents #:text-column)
+  (:import-from #:koya-server/infra/db/contents #:json-column #:text-column)
   (:export #:migrate
            #:current-version))
 (in-package #:koya-server/infra/db/migrations)
@@ -242,21 +242,26 @@
       (exec "UPDATE contents SET published_text = ?, draft_text = ? WHERE rowid = ?"
             (text (col row "published")) (text (col row "draft")) (col row "r")))))
 
-(defun without-stored-nulls (json)
-  (and json (to-json (data->jobject (without-nulls (jvalue->data (parse-json json) :intern t))))))
+(defun stored-without-nulls (json)
+  (without-nulls (jvalue->data (parse-json json) :intern t)))
 
 (defun drop-stored-nulls ()
   (dolist (row (fetch "SELECT rowid AS r, published, draft FROM contents
-                        WHERE published LIKE '%null%' OR draft LIKE '%null%'"))
-    (let ((published (without-stored-nulls (col row "published")))
-          (draft (without-stored-nulls (col row "draft"))))
-      (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE rowid = ?"
-            published draft
-            (and published (text-column (jvalue->data (parse-json published) :intern t)))
-            (and draft (text-column (jvalue->data (parse-json draft) :intern t)))
-            (col row "r"))))
-  (dolist (row (fetch "SELECT id, data FROM content_revisions WHERE data LIKE '%null%'"))
-    (exec "UPDATE content_revisions SET data = ? WHERE id = ?" (without-stored-nulls (col row "data")) (col row "id"))))
+                        WHERE EXISTS (SELECT 1 FROM json_tree(published) WHERE type = 'null')
+                           OR EXISTS (SELECT 1 FROM json_tree(draft) WHERE type = 'null')"))
+    (flet ((columns (json)
+             (if json
+                 (let ((data (stored-without-nulls json)))
+                   (list (json-column data) (text-column data)))
+                 (list nil nil))))
+      (destructuring-bind ((published published-text) (draft draft-text))
+          (list (columns (col row "published")) (columns (col row "draft")))
+        (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE rowid = ?"
+              published draft published-text draft-text (col row "r")))))
+  (dolist (row (fetch "SELECT id, data FROM content_revisions
+                        WHERE EXISTS (SELECT 1 FROM json_tree(data) WHERE type = 'null')"))
+    (exec "UPDATE content_revisions SET data = ? WHERE id = ?"
+          (json-column (stored-without-nulls (col row "data"))) (col row "id"))))
 
 (defun ensure-version-table ()
   (exec "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"))

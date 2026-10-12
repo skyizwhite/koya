@@ -51,7 +51,7 @@
     (media (media->jobject value))
     (delivered (delivered->jobject value))
     ((eql :null) json-null)
-    ((and vector (not string)) (map 'vector #'present-value value))
+    ((satisfies json-array-p) (map 'vector #'present-value value))
     (cons (data->jvalue value))
     (t value)))
 

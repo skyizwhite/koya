@@ -499,4 +499,16 @@
                                                            \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\"}]}")))
                "/s/falsy"))
   (ok (string= (content-status (get-content "falsy" "t1")) "draft") "a published version of false is none, as null is")
-  (delete-space "falsy"))
+  (delete-space "falsy")
+  (ok (string= (nth-value 1 (import-archive
+                             (archive-of "{\"koyaExport\": 1, \"space\": \"falsy\",
+                                           \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
+                                                                                     \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
+                                           \"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"draft\": {\"name\": \"x\"},
+                                                           \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\",
+                                                           \"revisions\": [{\"event\": \"draft\", \"data\": false,
+                                                                            \"createdAt\": \"2024-01-01T00:00:00.000Z\"}]}]}")))
+               "/"))
+  (ok (search "A revision of content t1 has no data" (nth-value 1 (request :get "/")))
+      "and a revision whose data is false has none")
+  (ng (find-space "falsy")))

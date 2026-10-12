@@ -20,7 +20,7 @@
                 #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
                 #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
-  (:export #:text-column))
+  (:export #:json-column #:text-column))
 (in-package #:koya-server/infra/db/contents)
 
 (defparameter +columns+
