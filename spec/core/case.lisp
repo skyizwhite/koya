@@ -12,7 +12,9 @@
                 #:data->jobject)
   (:import-from #:koya-core/json
                 #:to-json
-                #:parse-json))
+                #:parse-json)
+  (:import-from #:koya-core/data
+                #:data-equal))
 (in-package #:koya-spec/core/case)
 
 (deftest keys
@@ -47,7 +49,7 @@
   (ok (equalp (jvalue->data (parse-json "{\"someStoredKeyXyz\": 1}") :intern t) (list :some-stored-key-xyz 1))
       "data koya stored has its keys interned")
   (ok (equalp (jvalue->data (parse-json "[{\"fieldId\": \"heading\"}, []]")) (vector (list :field-id "heading") #())))
-  (ok (equal (jvalue->data (parse-json "{\"empty\": {}, \"flag\": false}")) (list :empty nil :flag nil))
+  (ok (data-equal (jvalue->data (parse-json "{\"empty\": {}, \"flag\": false}")) (list :empty nil :flag nil))
       "an empty object and false are one value, nil"))
 
 (deftest data-becomes-json-values

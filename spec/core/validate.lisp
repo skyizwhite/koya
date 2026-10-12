@@ -22,9 +22,9 @@
                     (make-field :tags :reference :model "tag" :many t)
                     (make-field :cover :media))))
 
-(defun codes (data)
+(defun codes (data &optional (model *model*))
   (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
-          (validate-content *model* data)))
+          (validate-content model data)))
 
 (deftest valid-content
   (ok (null (codes (list :title "Hello" :event-at "2026-09-20T00:00:00Z" :slug "hello-world"
@@ -124,8 +124,7 @@
    "page"))
 
 (defun seo-codes (data &optional (model *with-seo*))
-  (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
-          (validate-content model data)))
+  (codes data model))
 
 (deftest a-custom-field-is-an-object-of-its-fields
   (ok (null (seo-codes (list :meta (list :title "Hi" :image "01ARZ3NDEKTSV4RRFFQ69G5FAV")))))
@@ -160,8 +159,7 @@
                              (make-model "post" :list (list (make-field :blocks :repeater :custom-fields '(heading) :required t))))))
 
 (defun block-codes (model data)
-  (mapcar (lambda (e) (cons (getf e :field) (getf e :code)))
-          (validate-content (schema-model *with-blocks* model) data)))
+  (codes data (schema-model *with-blocks* model)))
 
 (deftest a-repeater-is-a-list-of-rows
   (ok (null (block-codes "page" (list :blocks (vector (list :field-id "heading" :text "Hi")
@@ -180,7 +178,7 @@
 
 (deftest a-media-field-can-hold-several
   (let ((model (make-model "album" :list (list (make-field :photos :media :many t :required t)))))
-    (flet ((codes (data) (mapcar (lambda (e) (cons (getf e :field) (getf e :code))) (validate-content model data))))
+    (flet ((codes (data) (codes data model)))
       (ok (null (codes (list :photos (vector "01ARZ3NDEKTSV4RRFFQ69G5FAV" "01ARZ3NDEKTSV4RRFFQ69G5FAW")))))
       (ok (equal (codes (list :photos "01ARZ3NDEKTSV4RRFFQ69G5FAV")) '(("photos" . "type"))) "an array of ids")
       (ok (equal (codes (list :photos (vector "no id"))) '(("photos" . "type"))))
@@ -190,12 +188,10 @@
   (data-equal (fitted-shape model data) fitted))
 
 (deftest a-fitted-shape-keeps-what-fits-its-fields-types
-  (ok (fits *model*
-            (list :title "lowercase and far too long" :count 12.5 :category "sports" :labels "a"
-                  :cover (vector "01ARZ3NDEKTSV4RRFFQ69G5FAV"))
-            (list :title "lowercase and far too long" :count 12.5 :category "sports" :labels "a"
-                  :cover (vector "01ARZ3NDEKTSV4RRFFQ69G5FAV")))
-      "a value is kept whatever its field's options say, and one that may be many may be one or several")
+  (let ((data (list :title "lowercase and far too long" :count 12.5 :category "sports" :labels "a"
+                    :cover (vector "01ARZ3NDEKTSV4RRFFQ69G5FAV"))))
+    (ok (fits *model* data data)
+        "a value is kept whatever its field's options say, and one that may be many may be one or several"))
   (ok (fits *model* (list :title (vector "One") :body 3 :category 1 :slug "Not Slug" :day :null :extra 1) nil)
       "a value not of its field's type goes, as do several in a field that holds one, a null and a key that is not a field")
   (ok (fits *model* (list :tags (vector "bad id!" "01ARZ3NDEKTSV4RRFFQ69G5FAV"))
@@ -212,4 +208,7 @@
             (list :blocks (vector (list :photo "01ARZ3NDEKTSV4RRFFQ69G5FAV" :field-id "image")
                                   (list :text "Too long" :field-id "heading"))))
       "a row of a custom field its repeater does not list goes, and the others are fitted")
-  (ok (fits (schema-model *with-blocks* "page") (list :blocks "flat") nil)))
+  (ok (fits (schema-model *with-blocks* "page") (list :blocks nil) nil)
+      "a repeater given an empty object goes")
+  (ok (fits (schema-model *with-blocks* "page") (list :blocks "flat") nil)
+      "as does one given anything else that is not an array"))

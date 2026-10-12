@@ -27,7 +27,6 @@
   (:export #:png-bytes #:*media-root* #:multipart-body))
 (in-package #:koya-spec/server/usecases/media)
 
-
 (defvar *media-root*
   (uiop:ensure-directory-pathname
    (format nil "~a/koya-test-media-~a/" (or (uiop:getenv "TMPDIR") "/tmp") (get-universal-time))))

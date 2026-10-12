@@ -18,7 +18,9 @@
   (and (= (length a) (length b))
        (loop :for (key value) :on a :by #'cddr
              :always (multiple-value-bind (other found) (access b key :test #'eq)
-                       (and found (data-equal value other))))))
+                       (and found (data-equal value other))))
+       (loop :for key :in b :by #'cddr
+             :always (nth-value 1 (access a key :test #'eq)))))
 
 (defun data-equal (a b)
   (cond ((and (listp a) (listp b)) (plist-equal a b))

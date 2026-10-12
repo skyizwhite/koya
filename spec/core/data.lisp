@@ -22,6 +22,7 @@
   (ok (data-equal (list :n 1) (list :n 1.0)) "a number is equal to the same number of another type")
   (ok (data-equal nil nil) "two empty objects are equal")
   (ng (data-equal (list :a 1) (list :a 1 :b 2)) "a key more is a difference")
+  (ng (data-equal (list :a 1 :a 1) (list :a 1 :b 2)) "and a key given twice is not another key")
   (ng (data-equal (list :a nil) nil) "as is a key with nil against none")
   (ng (data-equal (list :a 1) (list "a" 1)) "a string key is not the keyword")
   (ng (data-equal (list :tags #("a" "b")) (list :tags #("b" "a"))) "the order of an array is its own")
