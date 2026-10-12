@@ -31,8 +31,6 @@
                 #:query-filters #:query-fields #:query-include #:query-search #:query-error)
   (:import-from #:koya-core/validate #:validation-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name #:make-custom-field)
-  (:import-from #:koya-core/json #:parse-json)
-  (:import-from #:koya-core/case #:jvalue->data)
   (:import-from #:access #:access #:accesses))
 (in-package #:koya-spec/server/usecases/contents)
 
@@ -62,15 +60,14 @@
 
 (defvar *read-eval-probe* nil)
 
-(defun data (json) (jvalue->data (parse-json json)))
 (defun blog () (find-model "website" "blog"))
-(defun make (json &rest args)
-  (apply #'create "website" (blog) (data json) args))
+(defun make (data &rest args)
+  (apply #'create "website" (blog) data args))
 (defun q (&rest kv) (parse-query (loop :for (k v) :on kv :by #'cddr :collect (cons k v))))
 (defun titles (contents) (mapcar (lambda (c) (access (content-published c) :title)) contents))
 
 (deftest an-id-koya-makes-is-twelve-letters-and-digits
-  (let ((ids (loop :for n :below 20 :collect (content-id (make (format nil "{\"title\": \"T~a\"}" n))))))
+  (let ((ids (loop :for n :below 20 :collect (content-id (make (list :title (format nil "T~a" n)))))))
     (ok (every (lambda (id) (cl-ppcre:scan "^[a-z0-9]{12}\\z" id)) ids) "lowercase letters and digits, twelve of them")
     (ok (= (length (remove-duplicates ids :test #'string=)) 20) "drawn afresh for each content")))
 
@@ -82,22 +79,22 @@
       (setf (fdefinition 'koya-server/domain/content:new-content-id) original))))
 
 (deftest a-taken-id-is-drawn-again
-  (let ((taken (content-id (make "{\"title\": \"First\"}"))))
-    (ok (string= (content-id (with-drawn-ids (list taken "zzzzzzzzzzzz") (lambda () (make "{\"title\": \"Second\"}"))))
+  (let ((taken (content-id (make (list :title "First")))))
+    (ok (string= (content-id (with-drawn-ids (list taken "zzzzzzzzzzzz") (lambda () (make (list :title "Second")))))
                  "zzzzzzzzzzzz"))
     (ok (string= (access (content-draft (get-content "website" taken)) :title) "First") "and the content that holds it is untouched")))
 
 (deftest contents-made-at-once-are-written-out-in-the-order-they-were-made
   (with-drawn-ids (list "zzzzzzzzzzzz" "aaaaaaaaaaaa")
     (lambda ()
-      (make "{\"title\": \"Earlier\"}" :created-at "2026-01-01T00:00:00.000Z")
-      (make "{\"title\": \"Later\"}" :created-at "2026-01-01T00:00:00.000Z")))
+      (make (list :title "Earlier") :created-at "2026-01-01T00:00:00.000Z")
+      (make (list :title "Later") :created-at "2026-01-01T00:00:00.000Z")))
   (ok (equal (mapcar #'content-id (model-contents "website" "blog")) '("zzzzzzzzzzzz" "aaaaaaaaaaaa")))
   (ok (equal (mapcar #'content-id (space-contents "website")) '("zzzzzzzzzzzz" "aaaaaaaaaaaa"))
       "not in the order of their ids"))
 
 (deftest lifecycle
-  (let ((c (make "{\"title\": \"Draft one\"}")))
+  (let ((c (make (list :title "Draft one"))))
     (ok (string= (content-status c) "draft"))
     (ng (content-published-p c))
     (ok (string= (access (content-draft c) :title) "Draft one"))
@@ -107,7 +104,7 @@
       (ok (string= (access (content-published p) :title) "Draft one"))
       (ng (content-draft-p p))
       (ok (content-published-at p))
-      (let ((d (update-draft "website" (blog) (content-id c) (data "{\"title\": \"Edited\"}"))))
+      (let ((d (update-draft "website" (blog) (content-id c) (list :title "Edited"))))
         (ok (string= (content-status d) "published+draft"))
         (ok (string= (access (content-published d) :title) "Draft one") "published untouched by a draft save")
         (ok (string= (access (content-draft d) :title) "Edited"))
@@ -126,12 +123,12 @@
       (ng (get-content "website" (content-id c))))))
 
 (deftest every-write-leaves-a-revision
-  (let* ((c (let ((*actor* "owner")) (make "{\"title\": \"One\"}")))
+  (let* ((c (let ((*actor* "owner")) (make (list :title "One"))))
          (id (content-id c)))
-    (let ((*actor* "key:ci")) (update-draft "website" (blog) id (data "{\"title\": \"Two\"}")))
-    (update-draft "website" (blog) id (data "{\"title\": \"Two\"}"))
+    (let ((*actor* "key:ci")) (update-draft "website" (blog) id (list :title "Two")))
+    (update-draft "website" (blog) id (list :title "Two"))
     (publish "website" (blog) id)
-    (update-draft "website" (blog) id (data "{\"title\": \"Three\"}"))
+    (update-draft "website" (blog) id (list :title "Three"))
     (discard "website" (blog) id)
     (unpublish "website" (blog) id)
     (let ((revisions (list-revisions "website" id)))
@@ -146,8 +143,8 @@
       (ok (= (count-revisions "website" id :published-only t) 1))
       (ok (equal (mapcar #'revision-event (list-revisions "website" id :published-only t)) '("publish"))))
     (testing "what changes nothing that was live is not an event"
-      (let ((draft (make "{\"title\": \"Never live\"}"))
-            (live (make "{\"title\": \"Live\"}" :publish t)))
+      (let ((draft (make (list :title "Never live")))
+            (live (make (list :title "Live") :publish t)))
         (ok (signals (unpublish "website" (blog) (content-id draft)) 'conflict)
             "a content that was never published cannot be unpublished")
         (ok (equal (mapcar #'revision-event (list-revisions "website" (content-id draft))) '("draft")) "and nothing is kept")
@@ -157,22 +154,22 @@
             "a published content with no draft has none to discard")
         (ok (equal (mapcar #'revision-event (list-revisions "website" (content-id live))) '("publish")) "and nothing is kept")))
     (testing "a revision belongs to its content"
-      (let ((other (make "{\"title\": \"Other\"}")))
+      (let ((other (make (list :title "Other"))))
         (ng (find-revision "website" (content-id other) (revision-id (first (list-revisions "website" id)))))))
     (testing "deleting the content deletes its history"
       (destroy "website" (blog) id)
       (ok (zerop (col (fetch-one "SELECT COUNT(*) AS n FROM content_revisions WHERE content_id = ?" id) "n"))))))
 
 (deftest draft-keys
-  (let* ((c (make "{\"title\": \"x\"}"))
+  (let* ((c (make (list :title "x")))
          (key (content-draft-key c)))
     (ok (= (length key) 32) "a draft gets a key on creation")
     (ok (string= key (draft-key "website" (blog) (content-id c))) "asking for it returns the current key")
-    (let ((saved (update-draft "website" (blog) (content-id c) (data "{\"title\": \"y\"}"))))
+    (let ((saved (update-draft "website" (blog) (content-id c) (list :title "y"))))
       (ok (string/= (content-draft-key saved) key) "every draft save rotates the key")
       (ok (null (content-draft-key (publish "website" (blog) (content-id c)))) "publishing clears it")
       (ok (content-draft-key (unpublish "website" (blog) (content-id c))) "unpublishing issues a new one"))
-    (let ((p (make "{\"title\": \"pub\"}" :publish t)))
+    (let ((p (make (list :title "pub") :publish t)))
       (ok (null (content-draft-key p)) "published content has no key")
       (let ((made (draft-key "website" (blog) (content-id p))))
         (ok (= (length made) 32) "but one can be made on demand")
@@ -180,7 +177,7 @@
 
 (deftest object-content
   (ng (find-object-content "website" "about"))
-  (create "website" (find-model "website" "about") (data "{\"body\": \"hi\"}") :publish t)
+  (create "website" (find-model "website" "about") (list :body "hi") :publish t)
   (ok (string= (access (content-published (find-object-content "website" "about")) :body) "hi")))
 
 (deftest an-object-is-written-through-its-model
@@ -188,36 +185,36 @@
     (testing "before its first write it has no content to read"
       (ok (signals (object-content "website" about) 'not-found)))
     (testing "the first save makes its content, as a draft"
-      (let ((saved (update-object "website" about (data "{\"body\": \"draft\"}"))))
+      (let ((saved (update-object "website" about (list :body "draft"))))
         (ok (string= (content-status saved) "draft"))
         (ok (string= (content-id saved) (content-id (object-content "website" about))))))
     (testing "a later save merges onto that content"
       (let ((id (content-id (object-content "website" about))))
-        (update-object "website" about (data "{}"))
+        (update-object "website" about nil)
         (ok (string= (access (content-draft (object-content "website" about)) :body) "draft"))
         (ok (string= (content-id (object-content "website" about)) id) "and makes no second")))
     (testing "publishing publishes the draft, or the data given"
       (ok (string= (access (content-published (publish-object "website" about)) :body) "draft"))
-      (ok (string= (access (content-published (publish-object "website" about :data (data "{\"body\": \"given\"}"))) :body)
+      (ok (string= (access (content-published (publish-object "website" about :data (list :body "given"))) :body)
                    "given"))))
   (testing "a first write can publish at once"
     (exec "DELETE FROM contents")
     (let ((about (find-model "website" "about")))
       (ok (signals (publish-object "website" about) 'not-found) "though not with no data at all")
-      (ok (string= (content-status (publish-object "website" about :data (data "{\"body\": \"live\"}"))) "published")))))
+      (ok (string= (content-status (publish-object "website" about :data (list :body "live"))) "published")))))
 
 (deftest an-object-content-is-not-deleted
   (let* ((about (find-model "website" "about"))
-         (content (update-object "website" about (data "{\"body\": \"stays\"}")))
+         (content (update-object "website" about (list :body "stays")))
          (e (handler-case (destroy "website" about (content-id content)) (conflict (e) e))))
     (ok (string= (koya-error-code e) "object_stays") "it goes only with its model")
     (ok (object-content "website" about))))
 
 (deftest a-content-knows-what-refers-to-it
-  (let* ((tag (content-id (create "website" (find-model "website" "tag") (data "{\"name\": \"lisp\"}"))))
-         (a (content-id (make (format nil "{\"title\": \"A\", \"tags\": [\"~a\"]}" tag))))
-         (b (content-id (make (format nil "{\"title\": \"B\", \"tags\": [\"~a\"]}" tag) :publish t))))
-    (make "{\"title\": \"C\"}")
+  (let* ((tag (content-id (create "website" (find-model "website" "tag") (list :name "lisp"))))
+         (a (content-id (make (list :title "A" :tags (vector tag)))))
+         (b (content-id (make (list :title "B" :tags (vector tag)) :publish t))))
+    (make (list :title "C"))
     (let ((references (content-references "website" "tag" tag)))
       (ok (equal (sort (mapcar (lambda (r) (getf r :id)) references) #'string<) (sort (list a b) #'string<))
           "the contents that refer to it, draft or published, and no other")
@@ -227,18 +224,18 @@
     (ok (null (content-references "website" "blog" a)) "nothing refers to a content no field can point at")))
 
 (deftest uniqueness
-  (let ((c (make "{\"title\": \"Taken\"}" :publish t)))
+  (let ((c (make (list :title "Taken") :publish t)))
     (ok (unique-value-taken-p "website" "blog" "title" "Taken"))
     (ng (unique-value-taken-p "website" "blog" "title" "Taken" :exclude-id (content-id c)) "the content itself does not count")
     (ng (unique-value-taken-p "website" "blog" "title" "Free"))
-    (update-draft "website" (blog) (content-id (make "{\"title\": \"z\"}")) (data "{\"title\": \"In draft\"}"))
+    (update-draft "website" (blog) (content-id (make (list :title "z"))) (list :title "In draft"))
     (ok (unique-value-taken-p "website" "blog" "title" "In draft") "drafts count too")))
 
 (deftest listing
-  (make "{\"title\": \"Alpha\", \"count\": 1, \"featured\": true, \"tags\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"], \"day\": \"2026-01-01\"}" :publish t)
-  (make "{\"title\": \"Beta\", \"count\": 5, \"featured\": false, \"tags\": [], \"day\": \"2026-02-01\"}" :publish t)
-  (make "{\"title\": \"Gamma\", \"count\": 10, \"day\": \"2026-03-01\"}" :publish t)
-  (make "{\"title\": \"Hidden draft\"}")
+  (make (list :title "Alpha" :count 1 :featured t :tags (vector "01ARZ3NDEKTSV4RRFFQ69G5FAV") :day "2026-01-01") :publish t)
+  (make (list :title "Beta" :count 5 :featured nil :tags (vector) :day "2026-02-01") :publish t)
+  (make (list :title "Gamma" :count 10 :day "2026-03-01") :publish t)
+  (make (list :title "Hidden draft"))
   (let ((model (find-model "website" "blog")))
     (testing "published only, newest first, total count"
       (multiple-value-bind (contents total) (list-contents "website" "blog" model (q))
@@ -298,7 +295,7 @@
 
 (deftest listing-without-a-limit
   (dotimes (i 12)
-    (make (format nil "{\"title\": \"Post ~a\"}" i)))
+    (make (list :title (format nil "Post ~a" i))))
   (let ((model (find-model "website" "blog")))
     (multiple-value-bind (contents total) (list-contents "website" "blog" model (make-query :limit nil) :status :all)
       (ok (= total 12))
@@ -307,10 +304,10 @@
         "one made without a limit keeps the default")))
 
 (deftest listing-by-status
-  (make "{\"title\": \"Live\"}" :publish t)
-  (let ((both (make "{\"title\": \"Live with a draft\"}" :publish t)))
-    (update-draft "website" (blog) (content-id both) (data "{\"title\": \"Live with a draft\", \"count\": 1}")))
-  (make "{\"title\": \"Only a draft\"}")
+  (make (list :title "Live") :publish t)
+  (let ((both (make (list :title "Live with a draft") :publish t)))
+    (update-draft "website" (blog) (content-id both) (list :title "Live with a draft" :count 1)))
+  (make (list :title "Only a draft"))
   (let ((model (find-model "website" "blog")))
     (flet ((titles-with (status)
              (sort (mapcar (lambda (c) (access (or (content-draft c) (content-published c)) :title))
@@ -334,10 +331,10 @@
              1)))))
 
 (deftest filters-read-blank-and-false-as-the-schema-does
-  (make "{\"title\": \"True\", \"featured\": true, \"body\": \"<p>x</p>\", \"tags\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"], \"count\": 0}" :publish t)
-  (make "{\"title\": \"False\", \"featured\": false, \"body\": \" \\t\\n \", \"tags\": []}" :publish t)
-  (make "{\"title\": \"Missing\"}" :publish t)
-  (make "{\"title\": \"Null\", \"featured\": null, \"body\": null, \"tags\": null, \"count\": null}" :publish t)
+  (make (list :title "True" :featured t :body "<p>x</p>" :tags (vector "01ARZ3NDEKTSV4RRFFQ69G5FAV") :count 0) :publish t)
+  (make (list :title "False" :featured nil :body (format nil " ~c~% " #\Tab) :tags (vector)) :publish t)
+  (make (list :title "Missing") :publish t)
+  (make (list :title "Null" :featured :null :body :null :tags :null :count :null) :publish t)
   (flet ((found (filters)
            (sort (titles (list-contents "website" "blog" (blog) (q "filters" filters))) #'string<)))
     (testing "a missing or null boolean is false"
@@ -357,73 +354,73 @@
 
 (deftest a-datetime-is-kept-to-the-minute-in-utc
   (let ((model (find-model "website" "event")))
-    (flet ((at (json) (access (content-draft (create "website" model (data json))) :at)))
-      (ok (string= (at "{\"at\": \"2024-01-01T10:00:30.500Z\"}") "2024-01-01T10:00:00.000Z")
+    (flet ((at (data) (access (content-draft (create "website" model data)) :at)))
+      (ok (string= (at (list :at "2024-01-01T10:00:30.500Z")) "2024-01-01T10:00:00.000Z")
           "the seconds are dropped, as the editor gives none")
-      (ok (string= (at "{\"at\": \"2024-01-01T19:05+09:00\"}") "2024-01-01T10:05:00.000Z")
+      (ok (string= (at (list :at "2024-01-01T19:05+09:00")) "2024-01-01T10:05:00.000Z")
           "and the zone it was given in becomes UTC")
-      (ok (string= (at "{\"at\": \"2024-01-01T10:05:00.000Z\"}") "2024-01-01T10:05:00.000Z"))
+      (ok (string= (at (list :at "2024-01-01T10:05:00.000Z")) "2024-01-01T10:05:00.000Z"))
       (dolist (value '("2024-01-01" "2024-01-01T10:00:00" "10:00:00"))
-        (ok (signals (at (format nil "{\"at\": ~s}" value)) 'validation-error)
+        (ok (signals (at (list :at value)) 'validation-error)
             (format nil "~s is no datetime, and is not made one" value))))
-    (let* ((content (create "website" model (data "{\"at\": \"2024-01-01T10:05:00.000Z\"}")))
+    (let* ((content (create "website" model (list :at "2024-01-01T10:05:00.000Z")))
            (id (content-id content)))
       (testing "a change to the same minute is no change"
-        (ok (eq (nth-value 1 (update-draft "website" model id (data "{\"at\": \"2024-01-01T10:05:59Z\"}")))
+        (ok (eq (nth-value 1 (update-draft "website" model id (list :at "2024-01-01T10:05:59Z")))
                 :unchanged))
         (ok (= (count-revisions "website" id) 1)))
       (testing "a change and a publish keep it to the minute too"
-        (update-draft "website" model id (data "{\"at\": \"2024-03-01T08:30:15+01:00\"}"))
+        (update-draft "website" model id (list :at "2024-03-01T08:30:15+01:00"))
         (ok (string= (access (content-draft (get-content "website" id)) :at) "2024-03-01T07:30:00.000Z"))
-        (publish "website" model id :data (data "{\"at\": \"2024-04-01T00:00:01Z\"}"))
+        (publish "website" model id :data (list :at "2024-04-01T00:00:01Z"))
         (ok (string= (access (content-published (get-content "website" id)) :at) "2024-04-01T00:00:00.000Z"))))))
 
 (deftest a-missing-boolean-and-false-are-the-same-draft
-  (let ((id (content-id (make "{\"title\": \"Flag\"}" :publish t))))
-    (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": false}"))) :unchanged)
+  (let ((id (content-id (make (list :title "Flag") :publish t))))
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :featured nil))) :unchanged)
         "false over a missing boolean changes nothing")
-    (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"title\": \"Flag\", \"featured\": false}")
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :title "Flag" :featured nil)
                                        :replace t))
             :unchanged)
         "nor does the editor's save, which always sends the key")
     (ok (string= (content-status (get-content "website" id)) "published"))
     (ok (= (count-revisions "website" id) 1))
     (testing "and a draft that comes back to the published data with false is dropped"
-      (update-draft "website" (blog) id (data "{\"title\": \"Changed\"}"))
-      (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"title\": \"Flag\", \"featured\": false}")
+      (update-draft "website" (blog) id (list :title "Changed"))
+      (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :title "Flag" :featured nil)
                                          :replace t))
               :published))
       (ok (string= (content-status (get-content "website" id)) "published"))))
-  (let ((id (content-id (make "{\"title\": \"Off\", \"featured\": false}" :publish t))))
-    (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": null}"))) :unchanged)
+  (let ((id (content-id (make (list :title "Off" :featured nil) :publish t))))
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :featured :null))) :unchanged)
         "and null over false changes nothing either")
-    (ok (eq (nth-value 1 (update-draft "website" (blog) id (data "{\"featured\": true}"))) :saved)
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :featured t))) :saved)
         "while true is a change")))
 
 (deftest a-blank-slug-stays-blank
-  (let ((id (content-id (create "website" (find-model "website" "page") (data "{\"title\": \"Hello World\"}") :publish t))))
+  (let ((id (content-id (create "website" (find-model "website" "page") (list :title "Hello World") :publish t))))
     (ng (nth-value 1 (access (content-published (get-content "website" id)) :slug))
         "nothing makes a slug from the title")))
 
 (deftest a-slug-is-unique-without-saying-so
   (let* ((model (find-model "website" "page"))
-         (live (content-id (create "website" model (data "{\"title\": \"Live\", \"slug\": \"live\"}") :publish t)))
-         (drafted (content-id (create "website" model (data "{\"title\": \"Drafted\", \"slug\": \"drafted\"}")))))
-    (ok (signals (create "website" model (data "{\"slug\": \"live\"}")) 'validation-error)
+         (live (content-id (create "website" model (list :title "Live" :slug "live") :publish t)))
+         (drafted (content-id (create "website" model (list :title "Drafted" :slug "drafted")))))
+    (ok (signals (create "website" model (list :slug "live")) 'validation-error)
         "against another content's published slug")
-    (ok (signals (create "website" model (data "{\"slug\": \"drafted\"}")) 'validation-error)
+    (ok (signals (create "website" model (list :slug "drafted")) 'validation-error)
         "and against its draft's")
-    (update-draft "website" model live (data "{\"slug\": \"live-next\"}"))
-    (ok (signals (update-draft "website" model drafted (data "{\"slug\": \"live\"}")) 'validation-error)
+    (update-draft "website" model live (list :slug "live-next"))
+    (ok (signals (update-draft "website" model drafted (list :slug "live")) 'validation-error)
         "a published slug a draft moves away from is still taken until the move is published")
-    (ok (create "website" model (data "{\"title\": \"One\"}")) "a blank slug is not a value")
-    (ok (create "website" model (data "{\"title\": \"Two\"}")) "so two blanks are no clash")))
+    (ok (create "website" model (list :title "One")) "a blank slug is not a value")
+    (ok (create "website" model (list :title "Two")) "so two blanks are no clash")))
 
 (deftest a-content-is-found-by-its-slug
   (let* ((model (find-model "website" "page"))
-         (live (content-id (create "website" model (data "{\"title\": \"Live\", \"slug\": \"live\"}") :publish t)))
-         (drafted (content-id (create "website" model (data "{\"title\": \"Drafted\", \"slug\": \"drafted\"}")))))
-    (update-draft "website" model live (data "{\"slug\": \"live-next\"}"))
+         (live (content-id (create "website" model (list :title "Live" :slug "live") :publish t)))
+         (drafted (content-id (create "website" model (list :title "Drafted" :slug "drafted")))))
+    (update-draft "website" model live (list :slug "live-next"))
     (ok (string= (content-id (content-by-slug "website" "page" "live")) live) "by its published slug")
     (ok (string= (content-id (content-by-slug "website" "page" "live-next")) live) "by its draft's")
     (ok (string= (content-id (content-by-slug "website" "page" "drafted")) drafted) "a content that is only a draft too")
@@ -431,7 +428,7 @@
     (ok (signals (content-by-slug "website" "tag" "live") 'not-found) "only in its own model")))
 
 (deftest system-timestamps-given-on-create-are-kept-in-utc
-  (let ((c (make "{\"title\": \"Dated\"}" :publish t
+  (let ((c (make (list :title "Dated") :publish t
                  :created-at "2024-01-01T10:00+09:00"
                  :updated-at "2024-01-02T03:04:05.5+01:00"
                  :published-at "2024-01-01T00:00:00Z"
@@ -444,11 +441,11 @@
         "and that is what is stored"))
   (testing "a timestamp needs a date, a time and a zone"
     (dolist (value '("10:00" "2024-01-01" "2024-01-01T10:00:00"))
-      (ok (signals (make "{\"title\": \"Undated\"}" :created-at value) 'invalid-input)
+      (ok (signals (make (list :title "Undated") :created-at value) 'invalid-input)
           (format nil "~s is no point in time, and is not made one" value))))
   (testing "so the default order is the order in time"
-    (make "{\"title\": \"Tokyo\"}" :publish t :published-at "2024-06-01T08:00:00+09:00")
-    (make "{\"title\": \"UTC\"}" :publish t :published-at "2024-05-31T23:30:00Z")
+    (make (list :title "Tokyo") :publish t :published-at "2024-06-01T08:00:00+09:00")
+    (make (list :title "UTC") :publish t :published-at "2024-05-31T23:30:00Z")
     (ok (equal (titles (list-contents "website" "blog" (blog) (q)))
                '("UTC" "Tokyo" "Dated"))
         "half past eleven UTC is after eight in Tokyo the next morning")))
@@ -500,9 +497,9 @@
                                              (make-model "about" :object (list (make-field :body :richtext))))))
   (unwind-protect
        (let* ((page (find-model "website" "page"))
-              (tag (content-id (create "website" (find-model "website" "tag") (data "{\"name\": \"x\"}") :publish t)))
+              (tag (content-id (create "website" (find-model "website" "tag") (list :name "x") :publish t)))
               (content (create "website" page
-                               (data (format nil "{\"title\": \"P\", \"card\": {\"link\": \"~a\", \"at\": \"2026-09-20T10:00:59+09:00\"}}" tag))
+                               (list :title "P" :card (list :link tag :at "2026-09-20T10:00:59+09:00"))
                                :publish t)))
          (testing "a datetime inside is kept to the minute in UTC"
            (ok (string= (accesses (content-published content) :card :at) "2026-09-20T01:00:00.000Z")))
@@ -513,7 +510,8 @@
            (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
          (testing "a boolean missing inside and one that is false are the same"
            (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
-                                                         (data (format nil "{\"title\": \"P\", \"card\": {\"link\": \"~a\", \"at\": \"2026-09-20T01:00:00.000Z\", \"shown\": false, \"pinned\": true}}" tag))
+                                                         (list :title "P" :card (list :link tag :at "2026-09-20T01:00:00.000Z"
+                                                                                      :shown nil :pinned t))
                                                          :replace t))))))
     (replace-schema "website"
                     (make-schema :models (list (blog-model)
@@ -537,9 +535,9 @@
                                              (make-model "about" :object (list (make-field :body :richtext))))))
   (unwind-protect
        (let* ((page (find-model "website" "page"))
-              (tag (content-id (create "website" (find-model "website" "tag") (data "{\"name\": \"x\"}") :publish t)))
+              (tag (content-id (create "website" (find-model "website" "tag") (list :name "x") :publish t)))
               (content (create "website" page
-                               (data (format nil "{\"title\": \"P\", \"cards\": [{\"fieldId\": \"card\", \"link\": \"~a\", \"at\": \"2026-09-20T10:00:59+09:00\"}]}" tag))
+                               (list :title "P" :cards (vector (list :field-id "card" :link tag :at "2026-09-20T10:00:59+09:00")))
                                :publish t)))
          (testing "a datetime in a row is kept to the minute in UTC"
            (ok (string= (access (aref (access (content-published content) :cards) 0) :at) "2026-09-20T01:00:00.000Z")))
@@ -550,7 +548,9 @@
            (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
          (testing "a boolean missing in a row and one that is false are the same"
            (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
-                                                         (data (format nil "{\"title\": \"P\", \"cards\": [{\"fieldId\": \"card\", \"link\": \"~a\", \"at\": \"2026-09-20T01:00:00.000Z\", \"shown\": false, \"pinned\": true}]}" tag))
+                                                         (list :title "P" :cards (vector (list :field-id "card" :link tag
+                                                                                               :at "2026-09-20T01:00:00.000Z"
+                                                                                               :shown nil :pinned t)))
                                                          :replace t))))))
     (replace-schema "website"
                     (make-schema :models (list (blog-model)

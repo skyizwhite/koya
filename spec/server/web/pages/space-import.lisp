@@ -34,8 +34,7 @@
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
   (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
   (:import-from #:koya-server/domain/revision #:revision-event #:revision-created-at #:revision-data)
-  (:import-from #:koya-core/json #:to-json)
-  (:import-from #:koya-core/case #:data->jobject)
+  (:import-from #:koya-core/data #:data-equal)
   (:import-from #:access #:access)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-server/usecases/media
@@ -459,10 +458,10 @@
                                                              (list "t2" (list :rank 2))))))
                  "/s/odd")
         "a revision that does not fit is imported")
-    (ok (string= (to-json (data->jobject (revision-data (first (list-revisions "odd" "t1")))))
-                 "{\"blocks\":[{\"text\":\"Long\",\"fieldId\":\"heading\"}]}")
+    (ok (data-equal (revision-data (first (list-revisions "odd" "t1")))
+                    (list :blocks (vector (list :text "Long" :field-id "heading"))))
         "without a value not of its field's type, a key that is not a field, or a row of a custom field its repeater does not list")
-    (ok (string= (to-json (data->jobject (revision-data (first (list-revisions "odd" "t2"))))) "{\"rank\":2}")
+    (ok (data-equal (revision-data (first (list-revisions "odd" "t2"))) (list :rank 2))
         "and one that misses what the model asks of its values now is kept as it is")
     (delete-space "odd")))
 

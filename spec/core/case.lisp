@@ -46,7 +46,9 @@
     (ok (null (find-symbol "SOME-UNKNOWN-KEY-XYZ" :keyword))))
   (ok (equalp (jvalue->data (parse-json "{\"someStoredKeyXyz\": 1}") :intern t) (list :some-stored-key-xyz 1))
       "data koya stored has its keys interned")
-  (ok (equalp (jvalue->data (parse-json "[{\"fieldId\": \"heading\"}, []]")) (vector (list :field-id "heading") #()))))
+  (ok (equalp (jvalue->data (parse-json "[{\"fieldId\": \"heading\"}, []]")) (vector (list :field-id "heading") #())))
+  (ok (equal (jvalue->data (parse-json "{\"empty\": {}, \"flag\": false}")) (list :empty nil :flag nil))
+      "an empty object and false are one value, nil"))
 
 (deftest data-becomes-json-values
   (ok (string= (to-json (data->jvalue (list :published-at "2026" :flag nil :ok t :none :null :tags #("a" "b")
