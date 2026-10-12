@@ -3,9 +3,9 @@
   (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:make-custom-field #:schema-model)
   (:import-from #:koya-core/validate
-                #:validate-content)
+                #:validate-content #:fitted-shape)
   (:import-from #:koya-core/json
-                #:parse-json))
+                #:parse-json #:to-json))
 (in-package #:koya-spec/core/validate)
 
 (defparameter *model*
@@ -77,6 +77,8 @@
              '(("title" . "pattern"))))
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"slug\": \"Not Slug\"}")
              '(("slug" . "slug"))))
+  (ok (member '("slug" . "type") (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"slug\": 42}") :test #'equal)
+      "a slug must be a string")
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"count\": 2.5}")
              '(("count" . "integer"))))
   (ok (equal (codes "{\"title\": \"Ok\", \"eventAt\": \"2026-09-20T00:00:00Z\", \"count\": 11}")
@@ -176,3 +178,26 @@
       (ok (equal (codes "{\"photos\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"}") '(("photos" . "type"))) "an array of ids")
       (ok (equal (codes "{\"photos\": [\"no id\"]}") '(("photos" . "type"))))
       (ok (equal (codes "{\"photos\": []}") '(("photos" . "required"))) "and none is no value"))))
+
+(defun fitted (model json)
+  (to-json (fitted-shape model (parse-json json))))
+
+(deftest a-fitted-shape-keeps-what-fits-its-fields-types
+  (ok (string= (fitted *model* "{\"title\": \"lowercase and far too long\", \"count\": 12.5, \"category\": \"sports\", \"labels\": \"a\", \"cover\": [\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"]}")
+               "{\"title\":\"lowercase and far too long\",\"count\":12.5,\"category\":\"sports\",\"labels\":\"a\",\"cover\":[\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"]}")
+      "a value is kept whatever its field's options say, and one that may be many may be one or several")
+  (ok (string= (fitted *model* "{\"title\": [\"One\"], \"body\": 3, \"category\": 1, \"slug\": \"Not Slug\", \"day\": null, \"extra\": 1}")
+               "{\"day\":null}")
+      "a value not of its field's type goes, as do several in a field that holds one and a key that is not a field")
+  (ok (string= (fitted *model* "{\"tags\": [\"bad id!\", \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"]}")
+               "{\"tags\":[\"01ARZ3NDEKTSV4RRFFQ69G5FAV\"]}")
+      "of several, only those not of the type go")
+  (ok (string= (fitted *with-seo* "{\"meta\": {\"title\": \"Too long\", \"image\": 3, \"extra\": 1}}")
+               "{\"meta\":{\"title\":\"Too long\"}}")
+      "a custom field's own fields are fitted the same way")
+  (ok (string= (fitted *with-seo* "{\"meta\": \"Hi\"}") "{}"))
+  (ok (string= (fitted (schema-model *with-blocks* "page")
+                       "{\"blocks\": [{\"fieldId\": \"quote\"}, \"Hi\", {\"fieldId\": \"image\", \"wide\": \"yes\", \"photo\": \"01ARZ3NDEKTSV4RRFFQ69G5FAV\"}, {\"fieldId\": \"heading\", \"text\": \"Too long\"}]}")
+               "{\"blocks\":[{\"photo\":\"01ARZ3NDEKTSV4RRFFQ69G5FAV\",\"fieldId\":\"image\"},{\"text\":\"Too long\",\"fieldId\":\"heading\"}]}")
+      "a row of a custom field its repeater does not list goes, and the others are fitted")
+  (ok (string= (fitted (schema-model *with-blocks* "page") "{\"blocks\": {}}") "{}")))

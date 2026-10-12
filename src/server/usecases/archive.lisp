@@ -37,7 +37,7 @@
   (:import-from #:koya-core/json
                 #:jobject #:jget #:json-null #:json-null-p #:json-array-p #:parse-json #:to-json)
   (:import-from #:koya-core/time #:now-iso)
-  (:import-from #:koya-core/validate #:content-id-p #:validate-content #:datetime-string-p)
+  (:import-from #:koya-core/validate #:content-id-p #:validate-content #:fitted-shape #:datetime-string-p)
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:cl-ppcre #:scan)
   (:import-from #:babel #:string-to-octets #:octets-to-string)
@@ -180,7 +180,7 @@
                   (unless (and (hash-table-p r) (hash-table-p (jget r "data")))
                     (fail "A revision of content ~a has no data" id))
                   (list :event (string-field r "event" :required t)
-                        :data (jget r "data")
+                        :data (fitted-shape (schema-model schema model) (jget r "data"))
                         :by (or (string-field r "writtenBy") "")
                         :created-at (timestamp-field r "createdAt" id :required t)))
           revisions))))

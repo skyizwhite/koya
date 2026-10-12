@@ -9,6 +9,7 @@
                 #:custom-field->jobject #:jobject->custom-field #:field-path-parts)
   (:import-from #:koya-core/json
                 #:parse-json #:to-json #:json-array-p)
+  (:import-from #:koya-core/diff #:dropped-custom-fields)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
   (:import-from #:koya-server/infra/db/contents #:text-column)
   (:import-from #:koya-core/time
@@ -104,6 +105,9 @@
         (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
               (and published (to-json published)) (and draft (to-json draft))
               (text-column published) (text-column draft) space (col row "id")))))
+  (rewrite-revision-data space model fn))
+
+(defun rewrite-revision-data (space model fn)
   (dolist (row (fetch "SELECT r.id, r.data FROM content_revisions r
                         JOIN contents c ON c.space = r.space AND c.id = r.content_id
                         WHERE c.space = ? AND c.model = ?"
@@ -152,6 +156,15 @@
            WHERE space = ? AND content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
           path space space model)))
 
+(defun drop-row-kinds (space model field kinds)
+  (flet ((gone-p (row) (and (hash-table-p row) (member (gethash "fieldId" row) kinds :test #'equal))))
+    (rewrite-revision-data space model
+                           (lambda (data)
+                             (let ((rows (gethash field data)))
+                               (when (and (json-array-p rows) (some #'gone-p rows))
+                                 (setf (gethash field data) (remove-if #'gone-p rows))
+                                 t))))))
+
 (defun drop-model-contents (space model)
   (exec "DELETE FROM contents WHERE space = ? AND model = ?" space model))
 
@@ -163,6 +176,9 @@
                                            (getf change :from) (getf change :field)))
       ((:remove-field :change-field-type)
        (drop-content-field space-name (getf change :model) (getf change :field)))
+      (:change-field-options
+       (let ((gone (dropped-custom-fields change)))
+         (when gone (drop-row-kinds space-name (getf change :model) (getf change :field) gone))))
       (:change-kind (drop-model-contents space-name (getf change :model))))))
 
 (defmethod save-schema (space-name schema changes &key (by ""))

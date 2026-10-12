@@ -24,7 +24,7 @@
   (:import-from #:koya-spec/server/usecases/media #:png-bytes)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender*)
   (:import-from #:koya-core/schema #:make-webhook)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-field #:model-fields #:field-type #:field-option)
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field #:model-field #:model-fields #:field-type #:field-option)
   (:import-from #:koya-server/usecases/ports/archives #:write-archive)
   (:import-from #:koya-server/domain/deploy #:deploy-by)
   (:import-from #:koya-server/usecases/ports/contents
@@ -32,8 +32,8 @@
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft)
   (:import-from #:koya-server/usecases/webhooks #:*webhook-async*)
-  (:import-from #:koya-server/domain/revision #:revision-event #:revision-created-at)
-  (:import-from #:koya-core/json #:jget)
+  (:import-from #:koya-server/domain/revision #:revision-event #:revision-created-at #:revision-data)
+  (:import-from #:koya-core/json #:jget #:parse-json #:to-json)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-server/usecases/media
@@ -331,14 +331,17 @@
                   (format nil "~s is refused, and the toast names it" id))
               (ng (find-space "odd") "and nothing is imported"))))
 
-(defun odd-archive (&key contents media key)
+(defun odd-archive (&key contents media key revisions
+                         (schema (make-schema :models (list (make-model "tag" :list (list (make-field :name :text :required t :unique t)))))))
   (create-space "odd")
-  (replace-schema "odd" (make-schema :models (list (make-model "tag" :list (list (make-field :name :text :required t :unique t))))))
+  (replace-schema "odd" schema)
   (dolist (c contents)
     (insert-content (apply #'make-content (append c (list :space "odd" :model "tag"
                                                           :created-at "2024-01-01T00:00:00.000Z"
                                                           :updated-at "2024-01-01T00:00:00.000Z")))
                     nil nil))
+  (loop :for (id data) :in revisions
+        :do (record-revision "odd" id "draft" data :created-at "2024-01-01T00:00:00.000Z"))
   (let ((stored (and media (store-upload "odd" (png-bytes 2 2) :filename "a.png")))
         (made (and key (create-delivery-key "odd" :label "site"))))
     (let ((octets (nth-value 1 (request :get "/s/odd/export"))))
@@ -433,3 +436,29 @@
     (ok (= (length (model-fields (find-model "legacy" "page"))) 2) "a model with two slug fields")
     (ok (and (get-content "legacy" "g1") (get-content "legacy" "g2")) "and two contents that share a slug"))
   (delete-space "legacy"))
+
+(deftest an-import-keeps-of-each-revision-what-fits-its-fields-types
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (let ((schema (make-schema :custom-fields (list (make-custom-field "heading" (list (make-field :text :text :max-length 3)))
+                                                  (make-custom-field "quote" (list (make-field :text :text))))
+                             :models (list (make-model "tag" :list
+                                                       (list (make-field :name :text :required t :unique t)
+                                                             (make-field :rank :number)
+                                                             (make-field :blocks :repeater :custom-fields '(heading))))))))
+    (ok (string= (nth-value 1 (import-archive
+                               (odd-archive :schema schema
+                                            :contents (list (list :id "t1" :draft (tag "lisp"))
+                                                            (list :id "t2" :draft (tag "lisp2")))
+                                            :revisions (list (list "t1" (parse-json "{\"name\": 3, \"rank\": \"first\", \"gone\": \"x\",
+                                                                                      \"blocks\": [{\"fieldId\": \"quote\", \"text\": \"Q\"},
+                                                                                                 {\"fieldId\": \"heading\", \"text\": \"Long\", \"rank\": 1}]}"))
+                                                             (list "t2" (parse-json "{\"rank\": 2}"))))))
+                 "/s/odd")
+        "a revision that does not fit is imported")
+    (ok (string= (to-json (revision-data (first (list-revisions "odd" "t1"))))
+                 "{\"blocks\":[{\"text\":\"Long\",\"fieldId\":\"heading\"}]}")
+        "without a value not of its field's type, a key that is not a field, or a row of a custom field its repeater does not list")
+    (ok (string= (to-json (revision-data (first (list-revisions "odd" "t2")))) "{\"rank\":2}")
+        "and one that misses what the model asks of its values now is kept as it is")
+    (delete-space "odd")))
