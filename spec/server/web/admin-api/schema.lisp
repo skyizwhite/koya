@@ -2,8 +2,9 @@
   (:use #:cl #:rove)
   (:import-from #:koya-spec/server/web/api-support #:*management-key* #:test-schema #:request #:admin #:setup-api #:reset-api)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
-  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema->jobject
+  (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook
                 #:make-custom-field)
+  (:import-from #:koya-core/schema-json #:schema->jobject)
   (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)

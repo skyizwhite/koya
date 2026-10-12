@@ -6,6 +6,8 @@
                  #:koya-core/case
                  #:koya-core/json
                  #:koya-core/schema
+                 #:koya-core/schema-json
+                 #:koya-core/data
                  #:koya-core/validate
                  #:koya-core/diff))
 (in-package #:koya-core)

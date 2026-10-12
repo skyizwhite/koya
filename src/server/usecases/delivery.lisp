@@ -2,11 +2,11 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:field-name #:field-type #:field-option #:field-many-p
-                #:field-fields #:field-row-kinds #:custom-field-fields #:map-data-fields)
-  (:import-from #:koya-core/json #:json-null)
+                #:field-fields #:field-row-kinds #:custom-field-fields #:map-data-fields #:field-value)
   (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/query #:bad-query #:query-include)
-  (:import-from #:koya-server/domain/content #:content-id #:held-ids #:content-published #:content-draft-key #:content-data #:slug-value #:only-one)
+  (:import-from #:koya-server/domain/content #:content-id #:held-ids #:content-published #:content-published-p
+                #:content-draft-key #:content-data #:slug-value #:only-one)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:import-from #:koya-server/usecases/auth #:secure-string=)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
@@ -52,58 +52,63 @@
         :when (and (>= (length p) (length path)) (every #'string= path p))
           :collect (nthcdr (length path) p)))
 
-(defstruct (slot (:constructor make-slot (object name many value &aux (ids (held-ids value many)))))
-  object name many ids)
+(defun reference-group (field outer include)
+  (let ((nested (and include (include-under include (if outer
+                                                        (list (field-name outer) (field-name field))
+                                                        (list (field-name field)))))))
+    (and nested (list (field-option field :model) (remove nil nested)))))
 
-(defun fill-slot (slot found)
-  (let ((values (remove nil (mapcar (lambda (id) (gethash id found)) (slot-ids slot)))))
-    (setf (gethash (slot-name slot) (slot-object slot))
-          (if (slot-many slot) (coerce values 'vector) (or (first values) json-null)))))
+(defun slot-kind (field outer include)
+  (case (field-type field)
+    (:media :media)
+    (:reference (reference-group field outer include))))
 
-(defun ids-of (slots)
-  (loop :for slot :in slots :append (slot-ids slot)))
+(defun filled (value many found)
+  (let ((values (remove nil (mapcar (lambda (id) (gethash id found)) (held-ids value many)))))
+    (if many (coerce values 'vector) (or (first values) :null))))
 
-(defun fill-media (slots space)
-  (let* ((ids (ids-of slots))
-         (found (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal))))
-    (dolist (slot slots) (fill-slot slot found))))
-
-(defun fill-references (groups space)
-  (maphash (lambda (key slots)
-             (destructuring-bind (target-name include) key
-               (let ((target (find-model space target-name))
-                     (ids (ids-of slots))
-                     (found (make-hash-table :test 'equal)))
-                 (when ids
-                   (let ((contents (loop :for content :being :the :hash-values
-                                           :of (find-contents-by-ids space target-name ids)
-                                         :when (content-published content) :collect content)))
-                     (loop :for content :in contents
-                           :for delivered :in (deliver-all contents target space :include include)
-                           :do (setf (gethash (content-id content) found) delivered))))
-                 (dolist (slot slots) (fill-slot slot found)))))
-           groups))
+(defun delivered-references (space group ids)
+  (destructuring-bind (target-name include) group
+    (let ((target (find-model space target-name))
+          (found (make-hash-table :test 'equal)))
+      (let ((contents (loop :for content :being :the :hash-values
+                              :of (find-contents-by-ids space target-name ids)
+                            :when (content-published-p content) :collect content)))
+        (loop :for content :in contents
+              :for delivered :in (deliver-all contents target space :include include)
+              :do (setf (gethash (content-id content) found) delivered)))
+      found)))
 
 (defun deliver-all (contents model space &key draft include)
-  (let ((media '())
-        (references (make-hash-table :test 'equal)))
-    (flet ((collect (field object outer)
-             (let* ((name (field-name field))
-                    (value (gethash name object)))
-               (when (and value (not (eq value json-null)))
-                 (case (field-type field)
-                   (:media (push (make-slot object name (field-many-p field) value) media))
-                   (:reference
-                    (let ((nested (and include (include-under include (if outer (list (field-name outer) name) (list name))))))
-                      (when nested
-                        (push (make-slot object name (field-many-p field) value)
-                              (gethash (list (field-option field :model) (remove nil nested)) references))))))))))
-      (let ((data (mapcar (lambda (content)
-                            (map-data-fields (model-fields model) (content-data content :draft draft) #'collect))
-                          contents)))
-        (fill-media media space)
-        (fill-references references space)
-        (mapcar (lambda (content data) (make-delivered content model data)) contents data)))))
+  (let ((datas (mapcar (lambda (content) (content-data content :draft draft)) contents))
+        (media-ids '())
+        (groups (make-hash-table :test 'equal)))
+    (dolist (data datas)
+      (map-data-fields (model-fields model) data
+                       (lambda (field object outer)
+                         (let ((kind (slot-kind field outer include))
+                               (ids (held-ids (field-value object field) (field-many-p field))))
+                           (cond ((eq kind :media) (setf media-ids (append ids media-ids)))
+                                 (kind (setf (gethash kind groups) (append ids (gethash kind groups))))))
+                         object)))
+    (let ((media (if media-ids (find-media-by-ids space media-ids) (make-hash-table :test 'equal)))
+          (found (make-hash-table :test 'equal)))
+      (maphash (lambda (group ids)
+                 (setf (gethash group found) (if ids (delivered-references space group ids) (make-hash-table :test 'equal))))
+               groups)
+      (mapcar (lambda (content data)
+                (make-delivered
+                 content model
+                 (map-data-fields (model-fields model) data
+                                  (lambda (field object outer)
+                                    (let ((kind (slot-kind field outer include)))
+                                      (multiple-value-bind (value present) (field-value object field)
+                                        (when (and kind present value (not (eq value :null)))
+                                          (setf (field-value object field)
+                                                (filled value (field-many-p field)
+                                                        (if (eq kind :media) media (gethash kind found)))))))
+                                    object))))
+              contents datas))))
 
 (defun deliver (content model space &key draft include)
   (first (deliver-all (list content) model space :draft draft :include include)))
@@ -113,7 +118,7 @@
 
 (defun deliver-if-allowed (space model content query draft-key)
   (let ((draft (draft-key-p content draft-key)))
-    (unless (or draft (content-published content))
+    (unless (or draft (content-published-p content))
       (fail 'not-found "Content does not exist"))
     (deliver content model space :draft draft :include (query-include query))))
 

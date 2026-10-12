@@ -3,7 +3,7 @@
   (:import-from #:koya-core/json #:blank-p)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-name #:field-type
-                #:+system-fields+ #:field-option #:field-many-p #:map-data-fields)
+                #:+system-fields+ #:field-option #:field-many-p #:map-data-fields #:field-value)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content #:find-contents-by-ids)
   (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:held-ids)
@@ -52,8 +52,8 @@
    (loop :for content :in contents
          :for data := (content-data content :draft t)
          :nconc (loop :for field :in (model-fields model)
-                      :for id := (and data (eq (field-type field) :media)
-                                      (first (held-ids (gethash (field-name field) data) (field-many-p field))))
+                      :for id := (and (eq (field-type field) :media)
+                                      (first (held-ids (field-value data field) (field-many-p field))))
                       :when id :collect id))))
 
 (defun data-media (space model data)
@@ -62,8 +62,9 @@
                      (lambda (field object outer)
                        (declare (ignore outer))
                        (when (eq (field-type field) :media)
-                         (dolist (id (held-ids (gethash (field-name field) object) (field-many-p field)))
-                           (push id ids)))))
+                         (dolist (id (held-ids (field-value object field) (field-many-p field)))
+                           (push id ids)))
+                       object))
     (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal))))
 
 (defun all-contents (space model query)
@@ -78,7 +79,7 @@
 (defun referenced-ids (field contents)
   (loop :for content :in contents
         :for data := (content-data content :draft t)
-        :for value := (and data (gethash (field-name field) data))
+        :for value := (field-value data field)
         :append (held-ids value (field-many-p field))))
 
 (defun reference-labels (space model contents)

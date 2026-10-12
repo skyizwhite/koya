@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/admin-api/<space>/schema/plan
   (:use #:cl)
-  (:import-from #:koya-core/schema #:jobject->schema)
+  (:import-from #:koya-core/schema-json #:jobject->schema)
   (:import-from #:koya-core/diff #:destructive-changes-p)
   (:import-from #:koya-server/web/lib/presenters #:changes->jarray)
   (:import-from #:koya-core/json #:jobject)

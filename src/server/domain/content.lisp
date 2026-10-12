@@ -1,12 +1,16 @@
 (defpackage #:koya-server/domain/content
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:model-label #:model-slug-field #:field-name #:field-type #:field-option
-                #:map-data-fields)
+                #:model-fields #:model-label #:model-slug-field #:model-field #:field-type #:field-option
+                #:map-data-fields #:field-value)
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/json
-                #:json-null #:json-equal #:json-array-p #:blank-p #:copy-object)
+                #:json-array-p #:blank-p)
+  (:import-from #:koya-core/data
+                #:data-equal #:without-nulls)
+  (:import-from #:access
+                #:access #:rem-plist-val)
   (:import-from #:koya-core/time
                 #:now-iso #:parse-iso #:format-iso)
   (:import-from #:local-time
@@ -20,6 +24,8 @@
            #:content-published #:content-draft #:content-draft-key
            #:content-created-at #:content-updated-at #:content-published-at #:content-revised-at
            #:content-data
+           #:content-published-p
+           #:content-draft-p
            #:status-of
            #:new-draft-key
            #:new-content-id
@@ -46,15 +52,7 @@
 (in-package #:koya-server/domain/content)
 
 (defstruct content
-  id space model published draft draft-key created-at updated-at published-at revised-at)
-
-(defun content-status (content)
-  (status-of (content-published content) (content-draft content)))
-
-(defun content-data (content &key draft)
-  (if draft
-      (or (content-draft content) (content-published content))
-      (content-published content)))
+  id space model status published draft draft-key created-at updated-at published-at revised-at)
 
 (defparameter +statuses+ '("draft" "published" "published+draft"))
 
@@ -62,6 +60,17 @@
   (cond ((and published draft) "published+draft")
         (published "published")
         (t "draft")))
+
+(defun content-published-p (content)
+  (and (member (content-status content) '("published" "published+draft") :test #'string=) t))
+
+(defun content-draft-p (content)
+  (and (member (content-status content) '("draft" "published+draft") :test #'string=) t))
+
+(defun content-data (content &key draft)
+  (if (and draft (content-draft-p content))
+      (content-draft content)
+      (content-published content)))
 
 (defparameter +operations+ '(:save :publish :unpublish :discard :delete))
 
@@ -111,6 +120,7 @@
 
 (defun new-content (id space model data &key publish (now (now-iso)) created-at updated-at published-at revised-at)
   (touched (make-content :id id :space space :model model
+                         :status (status-of publish (not publish))
                          :published (and publish data)
                          :draft (and (not publish) data)
                          :draft-key (and (not publish) (new-draft-key))
@@ -121,13 +131,15 @@
 
 (defun drafted (content data &key (now (now-iso)))
   (let ((next (copy-content content)))
-    (setf (content-draft next) data
+    (setf (content-status next) (next-status (content-status content) :save)
+          (content-draft next) data
           (content-draft-key next) (new-draft-key))
     (touched next now)))
 
 (defun published (content data &key (now (now-iso)) published-at)
   (let ((next (copy-content content)))
-    (setf (content-published next) data
+    (setf (content-status next) "published"
+          (content-published next) data
           (content-draft next) nil
           (content-draft-key next) nil
           (content-published-at next) (or published-at (content-published-at content) now)
@@ -136,7 +148,8 @@
 
 (defun unpublished (content &key (now (now-iso)))
   (let ((next (copy-content content)))
-    (setf (content-draft next) (content-data content :draft t)
+    (setf (content-status next) "draft"
+          (content-draft next) (content-data content :draft t)
           (content-draft-key next) (new-draft-key)
           (content-published next) nil
           (content-published-at next) nil
@@ -145,7 +158,8 @@
 
 (defun discarded (content &key (now (now-iso)))
   (let ((next (copy-content content)))
-    (setf (content-draft next) nil
+    (setf (content-status next) "published"
+          (content-draft next) nil
           (content-draft-key next) nil)
     (touched next now)))
 
@@ -158,15 +172,18 @@
 
 (defun content-label (content model)
   (let* ((label (model-label model))
-         (data (and label (content-data content :draft t)))
-         (value (and data (gethash label data))))
+         (field (and label (model-field model label)))
+         (value (and field (field-value (content-data content :draft t) field))))
     (if (and (stringp value) (plusp (length value)))
         value
         (content-id content))))
 
 (defun merge-data (base patch)
-  (let ((out (copy-object base)))
-    (maphash (lambda (k v) (if (eq v json-null) (remhash k out) (setf (gethash k out) v))) patch)
+  (let ((out (copy-list base)))
+    (loop :for (key value) :on patch :by #'cddr
+          :do (if (eq value :null)
+                  (setf out (values (rem-plist-val key out :test #'eq)))
+                  (setf (access out key :test #'eq) value)))
     out))
 
 (defun booleans-filled (model data)
@@ -174,37 +191,39 @@
                    (lambda (field object outer)
                      (declare (ignore outer))
                      (when (and (eq (field-type field) :boolean)
-                                (member (gethash (field-name field) object json-null) (list nil json-null)))
-                       (setf (gethash (field-name field) object) nil)))))
+                                (member (field-value object field) '(nil :null)))
+                       (setf (field-value object field) nil))
+                     object)))
 
 (defun same-data-p (model a b)
-  (json-equal (booleans-filled model a) (booleans-filled model b)))
+  (data-equal (booleans-filled model a) (booleans-filled model b)))
 
 (defun default-data (model)
-  (initial-data model (make-hash-table :test 'equal)))
+  (initial-data model nil))
 
 (defun fill-default (field object)
   (when (and (eq (field-type field) :boolean) (field-option field :default)
-             (not (nth-value 1 (gethash (field-name field) object))))
-    (setf (gethash (field-name field) object) t)))
+             (not (nth-value 1 (field-value object field))))
+    (setf (field-value object field) t))
+  object)
 
 (defun keep-to-the-minute (field object)
   (when (eq (field-type field) :datetime)
-    (let* ((value (gethash (field-name field) object))
+    (let* ((value (field-value object field))
            (timestamp (and (datetime-string-p value) (parse-iso value))))
       (when timestamp
-        (setf (gethash (field-name field) object)
-              (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+)))))))
+        (setf (field-value object field)
+              (format-iso (timestamp-minimize-part timestamp :sec :timezone +utc-zone+))))))
+  object)
 
 (defun initial-data (model data)
-  (map-data-fields (model-fields model) data
+  (map-data-fields (model-fields model) (without-nulls data)
                    (lambda (field object outer)
                      (declare (ignore outer))
-                     (fill-default field object)
-                     (keep-to-the-minute field object))))
+                     (keep-to-the-minute field (fill-default field object)))))
 
 (defun to-the-minute (model data)
-  (map-data-fields (model-fields model) data
+  (map-data-fields (model-fields model) (without-nulls data)
                    (lambda (field object outer)
                      (declare (ignore outer))
                      (keep-to-the-minute field object))))
@@ -217,7 +236,7 @@
 
 (defun slug-value (model data)
   (let* ((field (model-slug-field model))
-         (value (and field data (gethash (field-name field) data))))
+         (value (and field (field-value data field))))
     (and (stringp value) (not (blank-value-p value)) value)))
 
 (defun content-slugs (model content)

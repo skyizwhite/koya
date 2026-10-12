@@ -3,6 +3,8 @@
   (:import-from #:koya-core/schema
                 #:model-fields
                 #:field-name
+                #:field-key
+                #:field-value
                 #:field-type
                 #:field-option
                 #:field-required-p
@@ -15,8 +17,11 @@
                 #:field-row-kind
                 #:custom-field-fields)
   (:import-from #:koya-core/json
-                #:json-null-p
                 #:json-array-p)
+  (:import-from #:koya-core/case
+                #:camel-key)
+  (:import-from #:access
+                #:access #:rem-plist-val)
   (:import-from #:cl-ppcre
                 #:scan)
   (:import-from #:koya-core/time
@@ -40,12 +45,12 @@
 
 (defun blank-value-p (value)
   (or (null value)
-      (json-null-p value)
+      (eq value :null)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
       (and (json-array-p value) (zerop (length value)))))
 
 (defun blank-for-field-p (field value)
-  (or (json-null-p value)
+  (or (eq value :null)
       (and (stringp value) (zerop (length (string-trim '(#\Space #\Tab #\Newline #\Return) value))))
       (and (or (field-many-p field) (eq (field-type field) :repeater)) (json-array-p value) (zerop (length value)))))
 
@@ -138,23 +143,24 @@
   (mapcar (lambda (e) (list* :field (format nil "~a.~a" path (getf e :field)) (rest (rest e))))
           errors))
 
+(defun row-fields (row)
+  (values (rem-plist-val :field-id row :test #'eq)))
+
 (defun check-row (field index row)
   (let ((path (format nil "~a[~a]" (field-name field) index)))
-    (if (not (hash-table-p row))
+    (if (not (listp row))
         (list (list :field path :code "type" :message "must be an object"))
-        (let ((kind (field-row-kind field (gethash "fieldId" row))))
+        (let ((kind (field-row-kind field (access row :field-id :test #'eq))))
           (if (null kind)
               (list (list :field path :code "custom_field"
                           :message (format nil "must name its custom field in fieldId, one of ~{~a~^, ~}"
                                            (mapcar #'custom-field-name (field-row-kinds field)))))
-              (let ((fields (make-hash-table :test 'equal)))
-                (maphash (lambda (k v) (unless (string= k "fieldId") (setf (gethash k fields) v))) row)
-                (inside path (validate-fields (custom-field-fields kind) fields nil))))))))
+              (inside path (validate-fields (custom-field-fields kind) (row-fields row) nil)))))))
 
 (defun check-value (field value)
   (case (field-type field)
     (:custom
-     (if (hash-table-p value)
+     (if (listp value)
          (inside (field-name field) (validate-fields (field-fields field) value nil))
          (list (err field "type" "must be an object"))))
     (:repeater
@@ -173,16 +179,17 @@
 (defun validate-content (model data &key partial)
   (validate-fields (model-fields model) data partial))
 
+(defun key-name (key)
+  (if (stringp key) key (camel-key key)))
+
 (defun validate-fields (fields data partial)
   (let ((errors '())
-        (known (mapcar #'field-name fields)))
-    (maphash (lambda (key value)
-               (declare (ignore value))
-               (unless (member key known :test #'string=)
-                 (push (list :field key :code "unknown_field" :message "is not a field of this model") errors)))
-             data)
+        (known (mapcar #'field-key fields)))
+    (loop :for key :in data :by #'cddr
+          :unless (member key known :test #'eq)
+            :do (push (list :field (key-name key) :code "unknown_field" :message "is not a field of this model") errors))
     (dolist (field fields)
-      (multiple-value-bind (value found) (gethash (field-name field) data)
+      (multiple-value-bind (value found) (field-value data field)
         (cond ((and (not found) partial) nil)
               ((not found)
                (when (and (field-required-p field) (not (eq (field-type field) :boolean)))
@@ -197,26 +204,24 @@
   (fitted-fields (model-fields model) data))
 
 (defun fitted-fields (fields data)
-  (let ((out (make-hash-table :test 'equal)))
-    (dolist (field fields out)
-      (multiple-value-bind (value found) (gethash (field-name field) data)
-        (when found
-          (multiple-value-bind (fitted fits) (fitted-value field value)
-            (when fits (setf (gethash (field-name field) out) fitted))))))))
+  (loop :for field :in fields
+        :append (multiple-value-bind (value found) (field-value data field)
+                  (when found
+                    (multiple-value-bind (fitted fits) (fitted-value field value)
+                      (when fits (list (field-key field) fitted)))))))
 
 (defun fitted-rows (field rows)
   (coerce (loop :for row :across rows
                 :for kind := (row-kind field row)
                 :when kind
-                  :collect (let ((fitted (fitted-fields (custom-field-fields kind) row)))
-                             (setf (gethash "fieldId" fitted) (gethash "fieldId" row))
-                             fitted))
+                  :collect (append (fitted-fields (custom-field-fields kind) row)
+                                   (list :field-id (access row :field-id :test #'eq))))
           'vector))
 
 (defun fitted-value (field value)
-  (cond ((json-null-p value) (values value t))
+  (cond ((eq value :null) (values nil nil))
         ((eq (field-type field) :custom)
-         (if (hash-table-p value) (values (fitted-fields (field-fields field) value) t) (values nil nil)))
+         (if (listp value) (values (fitted-fields (field-fields field) value) t) (values nil nil)))
         ((eq (field-type field) :repeater)
          (if (json-array-p value) (values (fitted-rows field value) t) (values nil nil)))
         ((json-array-p value)

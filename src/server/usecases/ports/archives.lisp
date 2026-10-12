@@ -6,12 +6,13 @@
            #:append-to-upload
            #:delete-upload
            #:call-with-upload
+           #:archive-document
            #:archive-entry-size
            #:archive-entry-bytes
            #:purge-stale-archives))
 (in-package #:koya-server/usecases/ports/archives)
 
-(defgeneric write-archive (files))
+(defgeneric write-archive (document media))
 
 (defgeneric create-upload ())
 
@@ -22,6 +23,8 @@
 (defgeneric delete-upload (id))
 
 (defgeneric call-with-upload (id function))
+
+(defgeneric archive-document (archive))
 
 (defgeneric archive-entry-size (archive name))
 

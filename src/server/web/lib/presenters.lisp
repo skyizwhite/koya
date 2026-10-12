@@ -1,10 +1,15 @@
 (defpackage #:koya-server/web/lib/presenters
   (:use #:cl)
-  (:import-from #:koya-core/json #:jobject #:json-null #:to-json #:copy-object)
-  (:import-from #:koya-core/schema #:model-fields #:field-name #:field-type #:map-data-fields)
-  (:import-from #:koya-core/diff #:change->jobject)
+  (:import-from #:koya-core/json #:jobject #:json-null #:to-json)
+  (:import-from #:koya-core/case #:camel-key #:data->jvalue)
+  (:import-from #:koya-core/schema
+                #:model-fields #:field-name #:field-key #:field-type #:field-fields #:custom-field-fields
+                #:map-data-fields #:field-value #:row-kind)
+  (:import-from #:koya-core/schema-json #:change->jobject)
+  (:import-from #:access #:access #:rem-plist-val)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
+                #:content-published-p #:content-draft-p
                 #:content-draft-key #:content-created-at #:content-updated-at
                 #:content-published-at #:content-revised-at)
   (:import-from #:koya-server/domain/media
@@ -46,21 +51,45 @@
   (typecase value
     (media (media->jobject value))
     (delivered (delivered->jobject value))
+    ((eql :null) json-null)
     ((and vector (not string)) (map 'vector #'present-value value))
-    (hash-table (let ((out (make-hash-table :test 'equal)))
-                  (maphash (lambda (k v) (setf (gethash k out) (present-value v))) value)
-                  out))
+    (cons (data->jvalue value))
     (t value)))
+
+(defun present-row (field row)
+  (let ((kind (row-kind field row)))
+    (if kind
+        (let ((out (present-fields (custom-field-fields kind) (values (rem-plist-val :field-id row :test #'eq)))))
+          (setf (gethash "fieldId" out) (access row :field-id :test #'eq))
+          out)
+        (present-value row))))
+
+(defun present-field (field value)
+  (case (field-type field)
+    (:custom (if (listp value) (present-fields (field-fields field) value) (present-value value)))
+    (:repeater (if (and (vectorp value) (not (stringp value)))
+                   (map 'vector (lambda (row) (present-row field row)) value)
+                   (present-value value)))
+    (t (present-value value))))
+
+(defun present-fields (fields data)
+  (let ((out (make-hash-table :test 'equal)))
+    (loop :for (key value) :on data :by #'cddr
+          :for field := (find key fields :key #'field-key)
+          :do (setf (gethash (if field (field-name field) (camel-key key)) out)
+                    (if field (present-field field value) (present-value value))))
+    out))
 
 (defun absolutize-richtext (data model)
   (let ((base (string-right-trim "/" (public-url))))
     (map-data-fields (model-fields model) data
                      (lambda (field object outer)
                        (declare (ignore outer))
-                       (let ((value (gethash (field-name field) object)))
+                       (let ((value (field-value object field)))
                          (when (and (eq (field-type field) :richtext) (stringp value))
-                           (setf (gethash (field-name field) object)
-                                 (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))))))
+                           (setf (field-value object field)
+                                 (regex-replace-all "(src|href)=\"/media/" value (format nil "\\1=\"~a/media/" base)))))
+                       object))))
 
 (defparameter +system-fields+ '("id" "createdAt" "updatedAt" "publishedAt" "revisedAt"))
 
@@ -74,15 +103,15 @@
         out)))
 
 (defun delivered->jobject (delivered &key fields)
-  (let ((content (delivered-content delivered))
-        (object (make-hash-table :test 'equal)))
-    (maphash (lambda (k v) (setf (gethash k object) (present-value v))) (delivered-data delivered))
+  (let* ((content (delivered-content delivered))
+         (model (delivered-model delivered))
+         (object (present-fields (model-fields model) (absolutize-richtext (delivered-data delivered) model))))
     (setf (gethash "id" object) (content-id content)
           (gethash "createdAt" object) (content-created-at content)
           (gethash "updatedAt" object) (content-updated-at content)
           (gethash "publishedAt" object) (or (content-published-at content) json-null)
           (gethash "revisedAt" object) (or (content-revised-at content) json-null))
-    (select-fields (absolutize-richtext object (delivered-model delivered)) fields)))
+    (select-fields object fields)))
 
 (defmethod webhook-payload (space model id event old new &key changes)
   (let ((payload (jobject "space" space
@@ -95,12 +124,12 @@
       (setf (gethash "changes" payload) (changes->jarray changes)))
     (to-json payload)))
 
-(defun admin-content->jobject (content)
-  (flet ((data (object) (and object (copy-object object))))
+(defun admin-content->jobject (content model)
+  (flet ((data (present data) (if present (present-fields (model-fields model) data) json-null)))
     (jobject "id" (content-id content)
              "status" (content-status content)
-             "published" (or (data (content-published content)) json-null)
-             "draft" (or (data (content-draft content)) json-null)
+             "published" (data (content-published-p content) (content-published content))
+             "draft" (data (content-draft-p content) (content-draft content))
              "draftKey" (or (content-draft-key content) json-null)
              "createdAt" (content-created-at content)
              "updatedAt" (content-updated-at content)

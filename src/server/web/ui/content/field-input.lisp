@@ -4,7 +4,7 @@
                 #:field-name #:field-type #:field-option #:field-required-p #:field-many-p
                 #:field-row-kinds #:custom-field-name)
   (:import-from #:koya-core/json
-                #:json-null #:to-json #:jobject #:json-array-p #:blank-p)
+                #:to-json #:jobject #:json-array-p #:blank-p)
   (:import-from #:koya-server/web/lib/forms #:field-param-name #:value->string)
   (:import-from #:koya-server/domain/media #:media-filename #:media-alt)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
@@ -14,7 +14,7 @@
   (:export #:~field-input #:~custom-input #:~repeater-input))
 (in-package #:koya-server/web/ui/content/field-input)
 
-(defun present-p (value) (and value (not (eq value json-null))))
+(defun present-p (value) (and value (not (eq value :null))))
 
 (defun selected-p (value option)
   (if (present-p value)

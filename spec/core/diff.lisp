@@ -7,9 +7,8 @@
                 #:destructive-changes-p #:dropped-custom-fields
                 #:tightened-change-p
                 #:format-change
-                #:change->jobject)
-  (:import-from #:koya-core/json
-                #:jget))
+                #:change-path
+                #:destructive-change-p))
 (in-package #:koya-spec/core/diff)
 
 (defun schema-a ()
@@ -99,19 +98,12 @@
         (ok (tightened-change-p (only (diff-schemas (sel :options '("a" "b") :many t) (sel :options '("a" "b"))))))
         (ok (tightened-change-p (only (diff-schemas (sel :options '("a" "b")) (sel :options '("a"))))))
         (ng (tightened-change-p (only (diff-schemas (sel :options '("a")) (sel :options '("a" "b"))))))))
-    (testing "contents that do not fit are counted in the description and listed in the object"
+    (testing "contents that do not fit are counted in the description"
       (let ((change (append (only (diff-schemas (blog) (blog :required t)))
                             (list :misfits (list (list :id "a" :field "title" :version "draft" :message "is required")
                                                  (list :id "a" :field "title" :version "published" :message "is required")
                                                  (list :id "b" :field "title" :version "draft" :message "is required"))))))
-        (ok (search "2 contents do not fit" (format-change change)))
-        (let ((misfits (jget (change->jobject change) "misfits")))
-          (ok (= (length misfits) 3))
-          (ok (equal (jget (aref misfits 0) "id") "a"))
-          (ok (equal (jget (aref misfits 0) "version") "draft"))
-          (ok (equal (jget (aref misfits 0) "message") "is required")))
-        (ng (jget (change->jobject (only (diff-schemas (blog) (blog :required t)))) "misfits")
-            "and a change with none has no list")))))
+        (ok (search "2 contents do not fit" (format-change change)))))))
 
 (deftest renames
   (flet ((posts (&rest fields)
@@ -126,8 +118,7 @@
         (ok (string= (getf (first changes) :from) "lede"))
         (ok (string= (getf (first changes) :field) "subtitle"))
         (ok (search "post.subtitle renamed from lede" (format-change (first changes))))
-        (ok (string= (jget (change->jobject (first changes)) "op") "rename_field"))
-        (ok (string= (jget (change->jobject (first changes)) "path") "post.subtitle"))))
+        (ok (string= (change-path (first changes)) "post.subtitle"))))
     (testing "without :was the same edit throws the content away"
       (ok (equal (ops (diff-schemas (posts (make-field :lede :text))
                                     (posts (make-field :subtitle :text))))
@@ -151,8 +142,7 @@
                                    (articles (make-field :title :text)))))
         (ok (equal (ops changes) '(:rename-model)))
         (ng (destructive-changes-p changes))
-        (ok (search "article renamed from post" (format-change (first changes))))
-        (ok (string= (jget (change->jobject (first changes)) "op") "rename_model")))
+        (ok (search "article renamed from post" (format-change (first changes)))))
       (let ((changes (diff-schemas (posts (make-field :lede :text))
                                    (articles (make-field :subtitle :text :was :lede)))))
         (ok (equal (ops changes) '(:rename-model :rename-field))
@@ -193,9 +183,8 @@
       (ok (eq (getf type-change :from) :richtext))
       (ok (eq (getf type-change :to) :textarea))
       (ok (search "richtext -> textarea" (format-change type-change)))
-      (ok (jget (change->jobject type-change) "destructive"))
-      (ok (string= (jget (change->jobject type-change) "op") "change_field_type"))
-      (ok (string= (jget (change->jobject type-change) "path") "blog.body")))
+      (ok (destructive-change-p type-change))
+      (ok (string= (change-path type-change) "blog.body")))
     (ok (search "- about" (format-change (second changes))))
     (ok (string= (string-trim " " (format-change (first changes))) "~ webhooks changed")
         "the space's own webhooks are named by the path, not by a space")))

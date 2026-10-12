@@ -10,5 +10,7 @@
 (defun @post (params)
   (with-route-model (space model :object) params
     (let ((body (read-json-body)))
-      (admin-content->jobject (publish-object space model :data (body-data body :nullable t)
-                                              :published-at (body-field body "publishedAt"))))))
+      (multiple-value-bind (data given) (body-data body :nullable t)
+        (admin-content->jobject (apply #'publish-object space model :published-at (body-field body "publishedAt")
+                                       (and given (list :data data)))
+                                model)))))

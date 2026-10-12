@@ -10,7 +10,18 @@
                 #:media-file-path)
   (:import-from #:koya-server/usecases/ports/archives
                 #:write-archive #:create-upload #:upload-size #:append-to-upload #:delete-upload
-                #:call-with-upload #:archive-entry-size #:archive-entry-bytes #:purge-stale-archives)
+                #:call-with-upload #:archive-document #:archive-entry-size #:archive-entry-bytes
+                #:purge-stale-archives)
+  (:import-from #:koya-core/json
+                #:jobject #:jget #:json-array-p #:parse-json #:to-json)
+  (:import-from #:koya-core/case
+                #:jvalue->data #:data->jvalue #:data->jobject)
+  (:import-from #:koya-core/schema-json
+                #:schema->jobject #:jobject->schema #:forget-slug-options)
+  (:import-from #:access
+                #:access)
+  (:import-from #:babel
+                #:string-to-octets #:octets-to-string)
   (:import-from #:koya-core/ulid
                 #:make-ulid)
   (:import-from #:cl-ppcre
@@ -25,8 +36,57 @@
 (defun archive-file (name)
   (ensure-directories-exist (merge-pathnames name (archive-dir))))
 
-(defmethod write-archive (files)
-  (let ((path (archive-file (format nil "export-~a.zip" (make-ulid)))))
+(defparameter +archive-version+ 1)
+
+(defparameter +max-document-bytes+ (* 100 1024 1024))
+
+(defun version->jvalue (data)
+  (if (eq data :null) 'null (data->jobject data)))
+
+(defun content->jvalue (content)
+  (let ((out (data->jvalue content)))
+    (setf (gethash "published" out) (version->jvalue (access content :published :test #'eq))
+          (gethash "draft" out) (version->jvalue (access content :draft :test #'eq))
+          (gethash "revisions" out)
+          (map 'vector (lambda (revision)
+                         (let ((r (data->jvalue revision)))
+                           (setf (gethash "data" r) (data->jobject (access revision :data :test #'eq)))
+                           r))
+               (access content :revisions :test #'eq)))
+    out))
+
+(defun document->json (document)
+  (let ((out (jobject "koyaExport" +archive-version+)))
+    (maphash (lambda (k v) (setf (gethash k out) v)) (data->jvalue document))
+    (setf (gethash "schema" out) (schema->jobject (access document :schema :test #'eq))
+          (gethash "contents" out) (map 'vector #'content->jvalue (access document :contents :test #'eq)))
+    (to-json out)))
+
+(defun without-slug-options (schema)
+  (let ((models (and (hash-table-p schema) (jget schema "models"))))
+    (when (json-array-p models)
+      (map nil #'forget-slug-options models)))
+  schema)
+
+(defun json->document (json)
+  (let ((document (handler-case (parse-json json)
+                    (error () (fail 'invalid-input "space.json is not valid JSON")))))
+    (unless (hash-table-p document) (fail 'invalid-input "space.json must be an object"))
+    (unless (eql (jget document "koyaExport") +archive-version+)
+      (fail 'invalid-input (format nil "Unsupported archive version ~s (expected ~a)"
+                                   (jget document "koyaExport") +archive-version+)))
+    (let ((schema (jobject->schema (without-slug-options (jget document "schema")))))
+      (remhash "schema" document)
+      (list* :schema schema (jvalue->data document)))))
+
+(defmethod archive-document (archive)
+  (let ((json (or (archive-entry-bytes archive "space.json" +max-document-bytes+)
+                  (fail 'invalid-input "The archive has no space.json"))))
+    (json->document (octets-to-string json :encoding :utf-8))))
+
+(defmethod write-archive (document media)
+  (let ((path (archive-file (format nil "export-~a.zip" (make-ulid))))
+        (files (cons (cons "space.json" (string-to-octets (document->json document) :encoding :utf-8)) media)))
     (compress-zip
      (make-instance 'zip-file
                     :entries (map 'vector

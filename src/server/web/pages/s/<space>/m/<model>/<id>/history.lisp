@@ -5,7 +5,7 @@
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-follow)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-name #:model-field #:field-type #:field-option)
+                #:model-kind #:model-name #:model-field #:field-type #:field-option #:field-value)
   (:import-from #:koya-core/validate #:blank-value-p)
   (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions)
   (:import-from #:koya-server/usecases/contents #:find-content)
@@ -77,7 +77,7 @@
              (richtext (~richtext :html value))
              (t (hsx (div :class "whitespace-pre-wrap font-mono text-xs leading-5" shown))))))))
 
-(defcomp ~changes (&key space model before after)
+(defcomp ~changes (&key space model compared before after)
   (let ((keys (changed-keys model before after)))
     (hsx
      (<> (if (null keys)
@@ -85,11 +85,11 @@
              (hsx (div :class "space-y-3"
                     (loop :for key :in keys :collect
                       (let ((field (model-field model key)))
-                        (multiple-value-bind (old found-old) (if before (gethash key before) (values nil nil))
-                          (multiple-value-bind (new found-new) (gethash key after)
+                        (multiple-value-bind (old found-old) (field-value before field)
+                          (multiple-value-bind (new found-new) (field-value after field)
                             (hsx (div
                                    (p :class "mb-1 text-sm font-medium" key)
-                                   (if before
+                                   (if compared
                                        (hsx (div :class "grid gap-2 sm:grid-cols-2"
                                               (~value :space space :field field :value old :found found-old
                                                       :class "border-danger/30 bg-danger/5")
@@ -112,6 +112,7 @@
      (when (null previous)
        (hsx (p :class "mb-2 text-sm text-muted" "The oldest version in this view.")))
      (~changes :space space :model model
+               :compared (and previous t)
                :before (and previous (revision-data previous))
                :after (revision-data revision)))))
 

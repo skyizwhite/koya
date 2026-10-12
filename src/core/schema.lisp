@@ -2,13 +2,8 @@
   (:use #:cl)
   (:import-from #:koya-core/case
                 #:camel-key #:kebab-keyword #:name-does-not-come-back)
-  (:import-from #:koya-core/json
-                #:jobject
-                #:jget
-                #:jkeys
-                #:json-array-p
-                #:json-null-p
-                #:copy-object)
+  (:import-from #:access
+                #:access #:rem-plist-val)
   (:import-from #:cl-ppcre
                 #:scan #:create-scanner)
   (:export #:+schema-version+
@@ -16,6 +11,7 @@
            #:*field-types*
            #:field-type-p
            #:field-type-options
+           #:+option-keys+
            #:field
            #:make-field
            #:field-name
@@ -29,12 +25,13 @@
            #:field-path-parts
            #:row-kind
            #:map-data-fields
+           #:field-value
+           #:without-field
+           #:name-key
            #:custom-field
            #:make-custom-field
            #:custom-field-name
            #:custom-field-fields
-           #:custom-field->jobject
-           #:jobject->custom-field
            #:schema-custom-fields
            #:schema-custom-field
            #:field-required-p
@@ -58,8 +55,6 @@
            #:webhook-url
            #:webhook-only
            #:webhook-covers-p
-           #:webhook->jobject
-           #:jobject->webhook
            #:model-preview-url
            #:model-public-url
            #:model-label
@@ -73,12 +68,6 @@
            #:schema-errors
            #:check-schema
            #:check-deployable
-           #:schema->jobject
-           #:jobject->schema
-           #:field->jobject
-           #:model->jobject
-           #:jobject->model
-           #:forget-slug-options
            #:slug-name-p
            #:field-name-p))
 (in-package #:koya-core/schema)
@@ -110,6 +99,10 @@
 (defun field-type-options (type)
   (append (rest (assoc type *field-types*)) *universal-options*))
 
+(defparameter +option-keys+
+  (remove-duplicates (append (loop :for (nil . options) :in *field-types* :append options)
+                             *universal-options*)))
+
 (define-condition schema-error (error)
   ((message :initarg :message :reader schema-error-message))
   (:report (lambda (c s) (format s "Invalid schema: ~a" (schema-error-message c)))))
@@ -130,6 +123,9 @@
   options
   fields)
 
+(defun name-key (name)
+  (kebab-keyword name))
+
 (defun camel-name (given)
   (if (symbolp given)
       (handler-case (camel-key given)
@@ -140,12 +136,12 @@
   (flet ((name-string (v) (if (symbolp v) (string-downcase (symbol-name v)) v)))
     (case key
       (:model (name-string value))
-      ((:was :custom-field) (if (and value (symbolp value) (not (json-null-p value))) (camel-name value) value))
-      (:options (if (or (listp value) (json-array-p value))
-                    (map 'list #'name-string value)
+      ((:was :custom-field) (if (and value (symbolp value)) (camel-name value) value))
+      (:options (if (listp value)
+                    (mapcar #'name-string value)
                     value))
-      (:custom-fields (if (or (listp value) (json-array-p value))
-                          (map 'list (lambda (v) (if (and v (symbolp v)) (camel-name v) v)) value)
+      (:custom-fields (if (listp value)
+                          (mapcar (lambda (v) (if (and v (symbolp v)) (camel-name v) v)) value)
                           value))
       (t value))))
 
@@ -206,7 +202,7 @@
       (fail "repeater ~s needs :custom-fields" name))
     (when (equal (getf options :was) name)
       (fail "field ~s: :was must name the field it was renamed from, not itself" name))
-    (%make-field :name name :key (kebab-keyword name) :type type :options options)))
+    (%make-field :name name :key (name-key name) :type type :options options)))
 
 (defun field-option (field key &optional default)
   (getf (field-options field) key default))
@@ -254,26 +250,35 @@
 (defun field-row-kind (field name)
   (find name (field-row-kinds field) :key #'custom-field-name :test #'equal))
 
+(defun field-value (object field)
+  (access object (field-key field) :test #'eq))
+
+(define-setf-expander field-value (object field &environment env)
+  (get-setf-expansion `(access ,object (field-key ,field) :test #'eq) env))
+
+(defun without-field (object field)
+  (values (rem-plist-val (field-key field) object :test #'eq)))
+
 (defun row-kind (field row)
-  (and (hash-table-p row) (field-row-kind field (gethash "fieldId" row))))
+  (and (listp row) (field-row-kind field (access row :field-id :test #'eq))))
 
 (defun map-data-fields (fields data fn)
   (labels ((walk (fields data outer)
-             (let ((out (copy-object data)))
+             (let ((out (copy-list data)))
                (dolist (field fields out)
-                 (let ((value (gethash (field-name field) out)))
+                 (multiple-value-bind (value found) (field-value out field)
                    (case (field-type field)
                      (:custom
-                      (when (hash-table-p value)
-                        (setf (gethash (field-name field) out) (walk (field-fields field) value field))))
+                      (when (and found (listp value))
+                        (setf (field-value out field) (walk (field-fields field) value field))))
                      (:repeater
-                      (when (json-array-p value)
-                        (setf (gethash (field-name field) out)
+                      (when (and (vectorp value) (not (stringp value)))
+                        (setf (field-value out field)
                               (map 'vector (lambda (row)
                                              (let ((kind (row-kind field row)))
                                                (if kind (walk (custom-field-fields kind) row field) row)))
                                    value))))
-                     (t (funcall fn field out outer))))))))
+                     (t (setf out (funcall fn field out outer)))))))))
     (walk fields data nil)))
 
 (defun field-path-parts (path)
@@ -302,7 +307,7 @@
 (defun normalize-only (label only)
   (let ((names (cond ((null only) '())
                      ((or (symbolp only) (stringp only)) (list only))
-                     ((or (listp only) (json-array-p only)) (coerce only 'list))
+                     ((listp only) only)
                      (t (fail "webhook ~s: :only must be a model name or a list of them, got ~s" label only)))))
     (let ((names (mapcar (lambda (n)
                            (let ((n (if (symbolp n) (string-downcase (symbol-name n)) n)))
@@ -326,15 +331,14 @@
     (append (list :label label :url url) (and only (list :only only)))))
 
 (defun normalize-webhook (entry)
-  (cond ((and (consp entry) (keywordp (first entry)))
-         (make-webhook (getf entry :label) (getf entry :url) :only (getf entry :only)))
-        ((hash-table-p entry) (jobject->webhook entry))
-        (t (fail "a webhook must be (webhook label url), got ~s" entry))))
+  (if (and (consp entry) (keywordp (first entry)))
+      (make-webhook (getf entry :label) (getf entry :url) :only (getf entry :only))
+      (fail "a webhook must be (webhook label url), got ~s" entry)))
 
 (defun normalize-webhooks (webhooks where)
-  (unless (or (listp webhooks) (json-array-p webhooks))
+  (unless (listp webhooks)
     (fail "~a: :webhooks must be a list, got ~s" where webhooks))
-  (let ((hooks (map 'list #'normalize-webhook webhooks)))
+  (let ((hooks (mapcar #'normalize-webhook webhooks)))
     (let ((labels (mapcar #'webhook-label hooks)))
       (when (/= (length labels) (length (remove-duplicates labels :test #'string=)))
         (fail "~a: webhook labels must be unique" where)))
@@ -356,15 +360,14 @@
         (fail "model ~s: a field is renamed from ~s, which the model still declares" model-name was)))))
 
 (defun name-designator (value)
-  (cond ((json-null-p value) value)
-        ((stringp value) (string-downcase value))
+  (cond ((stringp value) (string-downcase value))
         ((and value (symbolp value)) (string-downcase (symbol-name value)))
         (t value)))
 
 (defun make-model (name kind fields &key preview-url public-url label was)
   (let ((name (string-downcase (string name)))
         (was (name-designator was))
-        (label (if (and label (symbolp label) (not (json-null-p label))) (camel-name label) label)))
+        (label (if (and label (symbolp label)) (camel-name label) label)))
     (dolist (url (list preview-url public-url))
       (unless (or (null url) (stringp url))
         (fail "model ~s: URL templates must be strings" name))
@@ -548,127 +551,3 @@
     (when errors
       (fail "~{~a~^; ~}" errors)))
   schema)
-
-(defun option->jvalue (key value)
-  (case key
-    ((:options :custom-fields) (coerce value 'vector))
-    (t value)))
-
-(defun field->jobject (field)
-  (let ((obj (jobject "name" (field-name field)
-                      "type" (string-downcase (symbol-name (field-type field))))))
-    (let ((pairs (loop :for (k v) :on (field-options field) :by #'cddr :collect (cons k v))))
-      (loop :for (k . v) :in (sort pairs #'string< :key (lambda (pair) (camel-key (car pair))))
-            :do (setf (gethash (camel-key k) obj) (option->jvalue k v))))
-    obj))
-
-(defun webhook->jobject (webhook)
-  (let ((obj (jobject "label" (webhook-label webhook)
-                      "url" (webhook-url webhook))))
-    (when (webhook-only webhook)
-      (setf (gethash "only" obj) (coerce (webhook-only webhook) 'vector)))
-    obj))
-
-(defun jobject->webhook (obj)
-  (unless (hash-table-p obj) (fail "each webhook must be an object"))
-  (let ((label (jget obj "label")) (url (jget obj "url")))
-    (make-webhook (or label url) url :only (jget obj "only"))))
-
-(defun model->jobject (model)
-  (let ((obj (jobject "name" (model-name model)
-                      "kind" (string-downcase (symbol-name (model-kind model)))
-                      "fields" (map 'vector #'field->jobject (model-fields model)))))
-    (when (model-preview-url model) (setf (gethash "previewUrl" obj) (model-preview-url model)))
-    (when (model-public-url model) (setf (gethash "publicUrl" obj) (model-public-url model)))
-    (when (model-label model) (setf (gethash "label" obj) (model-label model)))
-    (when (model-was model) (setf (gethash "was" obj) (model-was model)))
-    obj))
-
-(defun custom-field->jobject (custom)
-  (jobject "name" (custom-field-name custom)
-           "fields" (map 'vector #'field->jobject (custom-field-fields custom))))
-
-(defun schema->jobject (schema)
-  (let ((obj (jobject "koyaSchema" +schema-version+
-                      "webhooks" (map 'vector #'webhook->jobject (schema-webhooks schema))
-                      "models" (map 'vector #'model->jobject (schema-models schema)))))
-    (when (schema-custom-fields schema)
-      (setf (gethash "customFields" obj) (map 'vector #'custom-field->jobject (schema-custom-fields schema))))
-    obj))
-
-(defun jvalue->option (key value)
-  (case key
-    ((:options :custom-fields) (if (json-array-p value) (coerce value 'list) value))
-    (t value)))
-
-(defun find-keyword (string candidates)
-  (and (stringp string)
-       (find string candidates :key (lambda (k) (string-downcase (symbol-name k))) :test #'string=)))
-
-(defparameter *option-keys*
-  (remove-duplicates (append (loop :for (nil . options) :in *field-types* :append options)
-                             *universal-options*)))
-
-(defun jobject->field (obj)
-  (unless (hash-table-p obj) (fail "each field must be an object"))
-  (let* ((name (jget obj "name"))
-         (type-string (jget obj "type"))
-         (type (find-keyword type-string (mapcar #'car *field-types*)))
-         (options '()))
-    (unless (stringp name) (fail "field without a name"))
-    (unless type (fail "field ~s has unknown type ~s" name type-string))
-    (dolist (key (jkeys obj))
-      (unless (member key '("name" "type") :test #'string=)
-        (let ((k (find key *option-keys* :key #'camel-key :test #'string=)))
-          (unless k (fail "field ~s has unknown option ~s" name key))
-          (setf options (append options (list k (jvalue->option k (gethash key obj))))))))
-    (apply #'make-field name type options)))
-
-(defun jobject->custom-field (obj)
-  (unless (hash-table-p obj) (fail "each custom field must be an object"))
-  (let ((name (jget obj "name"))
-        (fields (jget obj "fields")))
-    (unless (stringp name) (fail "custom field without a name"))
-    (unless (json-array-p fields) (fail "custom field ~s: fields must be an array" name))
-    (make-custom-field name (map 'list #'jobject->field fields))))
-
-(defun forget-slug-options (obj)
-  (let ((fields (and (hash-table-p obj) (jget obj "fields")))
-        (forgot nil))
-    (when (json-array-p fields)
-      (loop :for field :across fields
-            :when (and (hash-table-p field) (equal (jget field "type") "slug"))
-              :do (let ((from (remhash "from" field))
-                        (unique (remhash "unique" field)))
-                    (when (or from unique) (setf forgot t)))))
-    forgot))
-
-(defun jobject->model (obj)
-  (unless (hash-table-p obj) (fail "each model must be an object"))
-  (let ((name (jget obj "name"))
-        (kind (find-keyword (jget obj "kind") '(:list :object)))
-        (fields (jget obj "fields")))
-    (unless (stringp name) (fail "model without a name"))
-    (unless kind (fail "model ~s: kind must be \"list\" or \"object\"" name))
-    (unless (or (null fields) (json-array-p fields)) (fail "model ~s: fields must be an array" name))
-    (make-model name kind
-                (map 'list #'jobject->field (or fields #()))
-                :preview-url (jget obj "previewUrl")
-                :public-url (jget obj "publicUrl")
-                :label (jget obj "label")
-                :was (jget obj "was"))))
-
-(defun jobject->schema (obj)
-  (unless (hash-table-p obj) (fail "schema must be a JSON object"))
-  (let ((version (jget obj "koyaSchema")))
-    (unless (eql version +schema-version+)
-      (fail "unsupported koyaSchema version ~s (expected ~a)" version +schema-version+)))
-  (let ((webhooks (jget obj "webhooks"))
-        (custom-fields (jget obj "customFields"))
-        (models (jget obj "models")))
-    (unless (or (null webhooks) (json-array-p webhooks)) (fail "webhooks must be an array"))
-    (unless (or (null custom-fields) (json-array-p custom-fields)) (fail "customFields must be an array"))
-    (unless (or (null models) (json-array-p models)) (fail "models must be an array"))
-    (check-schema (make-schema :webhooks (coerce (or webhooks #()) 'list)
-                               :custom-fields (map 'list #'jobject->custom-field (or custom-fields #()))
-                               :models (map 'list #'jobject->model (or models #()))))))

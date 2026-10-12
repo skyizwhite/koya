@@ -3,10 +3,12 @@
   (:import-from #:koya-server/infra/db/connection
                 #:*db* #:*on-rollback* #:exec #:fetch #:col #:with-db #:with-db-transaction)
   (:import-from #:koya-core/schema
-                #:make-schema #:schema-webhooks #:schema-models #:webhook->jobject
-                #:jobject->webhook #:model-name #:model-kind #:model->jobject #:jobject->model
-                #:model-forget-renames #:schema-model #:schema-custom-fields
-                #:custom-field->jobject #:jobject->custom-field #:field-path-parts)
+                #:make-schema #:schema-webhooks #:schema-models #:model-name #:model-kind
+                #:model-forget-renames #:schema-model #:schema-custom-fields #:field-path-parts)
+  (:import-from #:koya-core/schema-json
+                #:webhook->jobject #:jobject->webhook #:model->jobject #:jobject->model
+                #:custom-field->jobject #:jobject->custom-field)
+  (:import-from #:koya-core/case #:jvalue->data)
   (:import-from #:koya-core/json
                 #:parse-json #:to-json #:json-array-p)
   (:import-from #:koya-core/diff #:dropped-custom-fields)
@@ -42,7 +44,7 @@
 (defun read-schema (space-name)
   (let ((row (first (fetch "SELECT webhooks, custom_fields FROM spaces WHERE name = ?" space-name))))
     (and row
-         (make-schema :webhooks (coerce (parse-json (col row "webhooks")) 'list)
+         (make-schema :webhooks (map 'list #'jobject->webhook (parse-json (col row "webhooks")))
                       :custom-fields (map 'list #'jobject->custom-field (parse-json (col row "custom_fields")))
                       :models (load-space-models space-name)))))
 
@@ -104,7 +106,9 @@
       (when (or in-published in-draft)
         (exec "UPDATE contents SET published = ?, draft = ?, published_text = ?, draft_text = ? WHERE space = ? AND id = ?"
               (and published (to-json published)) (and draft (to-json draft))
-              (text-column published) (text-column draft) space (col row "id")))))
+              (and published (text-column (jvalue->data published :intern t)))
+              (and draft (text-column (jvalue->data draft :intern t)))
+              space (col row "id")))))
   (rewrite-revision-data space model fn))
 
 (defun rewrite-revision-data (space model fn)

@@ -18,7 +18,6 @@
   (:import-from #:koya-server/usecases/media #:store-upload)
   (:import-from #:koya-server/usecases/contents #:create)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
-  (:import-from #:koya-core/json #:jobject)
   (:import-from #:babel #:string-to-octets))
 (in-package #:koya-spec/server/web/pages/media)
 
@@ -225,7 +224,7 @@
     (ok (null (search "Used by" (nth-value 1 (call-action :get (preview-media :space "website" :id id)))))
         "a file nothing uses says nothing about it")
     (multiple-value-bind (space model) (resolve-model "website" "blog")
-      (let ((user (content-id (create space model (jobject "title" "Has a cover" "cover" id)))))
+      (let ((user (content-id (create space model (list :title "Has a cover" :cover id)))))
         (let ((body (nth-value 1 (call-action :get (preview-media :space "website" :id id)))))
           (ok (search "Used by 1 content" body))
           (ok (< (search "name=\"alt\"" body) (search "Used by" body)) "under the alt text")

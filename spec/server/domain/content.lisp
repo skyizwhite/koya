@@ -1,14 +1,16 @@
 (defpackage #:koya-spec/server/domain/content
   (:use #:cl #:rove)
   (:import-from #:koya-server/domain/content
-                #:next-status #:check-transition #:make-content #:+statuses+ #:+operations+ #:held-ids)
+                #:next-status #:check-transition #:make-content #:+statuses+ #:+operations+ #:held-ids
+                #:new-content #:drafted #:published #:unpublished #:discarded #:content-status
+                #:content-published-p #:content-draft-p #:content-data
+                #:merge-data #:same-data-p #:initial-data #:to-the-minute)
+  (:import-from #:koya-core/schema #:make-model #:make-field)
   (:import-from #:koya-server/domain/errors #:conflict #:koya-error-code))
 (in-package #:koya-spec/server/domain/content)
 
 (defun content-in (status)
-  (make-content :id "c"
-                :published (and (member status '("published" "published+draft") :test #'string=) :data)
-                :draft (and (member status '("draft" "published+draft") :test #'string=) :data)))
+  (make-content :id "c" :status status))
 
 (defun refusal (status op)
   (handler-case (progn (check-transition (content-in status) op) nil)
@@ -53,3 +55,48 @@
     (ok (equal (held-ids "a" nil) '("a")))
     (ok (null (held-ids "" nil)) "holds nothing when it is blank")
     (ok (null (held-ids (vector "a") nil)) "or has a list")))
+
+(deftest a-content-s-status-says-which-versions-it-has
+  (let ((live (new-content "c" "s" "m" nil :publish t)))
+    (ok (string= (content-status live) "published") "data with no values is a version still")
+    (ok (content-published-p live))
+    (ng (content-draft-p live))
+    (let ((both (drafted live nil)))
+      (ok (string= (content-status both) "published+draft") "and so is an empty draft")
+      (ok (content-draft-p both))
+      (ok (string= (content-status (discarded both)) "published"))
+      (ok (string= (content-status (unpublished both)) "draft"))
+      (ok (string= (content-status (published both nil)) "published")))
+    (ok (string= (content-status (drafted (new-content "c" "s" "m" (list :a 1)) nil)) "draft")
+        "a draft saved again is a draft"))
+  (testing "the data of a version it has"
+    (let ((both (make-content :status "published+draft" :published (list :a 1) :draft nil)))
+      (ok (null (content-data both :draft t)) "an empty draft is the draft")
+      (ok (equal (content-data both) '(:a 1))))
+    (ok (equal (content-data (make-content :status "published" :published (list :a 1) :draft (list :a 2)) :draft t)
+               '(:a 1))
+        "and not one it has not")))
+
+(deftest a-patch-is-merged-key-by-key
+  (ok (equal (merge-data (list :a 1 :b 2) (list :b :null :c 3)) '(:c 3 :a 1)) "null clears, a value sets")
+  (ok (equal (merge-data (list :a 1) (list :a 2)) '(:a 2)))
+  (ok (equal (merge-data (list :blog-post "a") (list "blog-post" "b")) '("blog-post" "b" :blog-post "a"))
+      "a string key does not take the place of a keyword spelled the same")
+  (let ((base (list :a 1)))
+    (merge-data base (list :a 2))
+    (ok (equal base '(:a 1)) "and the data merged into is left as it was")))
+
+(deftest data-taken-in
+  (let ((model (make-model "m" :list (list (make-field :at :datetime)
+                                           (make-field :on :boolean :default t)
+                                           (make-field :off :boolean)
+                                           (make-field :title :text)))))
+    (ok (equal (initial-data model (list :at "2026-10-12T10:20:30Z" :title :null))
+               '(:on t :at "2026-10-12T10:20:00.000Z"))
+        "a new content keeps no null, has its defaults and its times to the minute")
+    (ok (equal (to-the-minute model (list :at "2026-10-12T10:20:30Z" :title :null :on nil))
+               '(:at "2026-10-12T10:20:00.000Z" :on nil))
+        "saved data keeps no null either, and no default is filled in")
+    (ok (same-data-p model (list :title "a") (list :title "a" :off nil)) "a boolean not given is false")
+    (ok (same-data-p model (list :title "a" :at "x") (list :at "x" :title "a")) "in whatever order")
+    (ng (same-data-p model (list :title "a") (list :title "a" "extra" 1)) "and a key more is a change")))

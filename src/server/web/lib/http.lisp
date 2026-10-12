@@ -7,6 +7,8 @@
                 #:parse-json #:to-json #:jobject #:blank-p #:json-null #:json-null-p)
   (:import-from #:koya-core/schema
                 #:schema-error #:schema-error-message)
+  (:import-from #:koya-core/case
+                #:jvalue->data)
   (:import-from #:koya-core/validate
                 #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/domain/errors
@@ -142,8 +144,8 @@
 
 (defun body-data (body &key nullable)
   (let ((data (body-field body "data" json-null)))
-    (cond ((hash-table-p data) data)
-          ((and nullable (json-null-p data)) nil)
+    (cond ((hash-table-p data) (values (jvalue->data data) t))
+          ((and nullable (json-null-p data)) (values nil nil))
           (nullable (fail-api 400 "bad_request" "\"data\" must be an object or null"))
           (t (fail-api 400 "bad_request" "\"data\" must be an object")))))
 

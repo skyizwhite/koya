@@ -2,8 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field #:schema-model
-                #:model-field)
-  (:import-from #:koya-core/json #:jobject #:json-null))
+                #:model-field))
 (in-package #:koya-spec/server/web/lib/value-text)
 
 (defun page-model ()
@@ -34,7 +33,7 @@
     (ok (string= (text (make-field :shown :boolean) t) "Yes"))
     (ok (string= (text (make-field :shown :boolean) nil) "No") "false is a value")
     (ok (null (text (make-field :shown :boolean) nil nil)) "but a box never set is none")
-    (ok (null (text (make-field :shown :boolean) json-null)) "and so is null"))
+    (ok (null (text (make-field :shown :boolean) :null)) "and so is null"))
   (testing "an id reads as the page's label for it"
     (ok (string= (text (make-field :related :reference :model "page") "01A") "Label of 01A"))
     (ok (string= (text (make-field :cover :media) "01M") "Label of 01M"))
@@ -44,19 +43,19 @@
   (testing "nothing is none"
     (ok (null (text (make-field :title :text) "")))
     (ok (null (text (make-field :title :text) "Hello" nil)) "a value the data does not hold")
-    (ok (null (text (make-field :title :text) json-null)))
+    (ok (null (text (make-field :title :text) :null)))
     (ok (null (text (make-field :labels :select :options '("a") :many t) (vector))))))
 
 (deftest a-custom-field-and-a-repeater-read-field-by-field
   (let* ((model (page-model))
          (card (model-field model "card"))
          (blocks (model-field model "blocks")))
-    (ok (string= (text card (jobject "title" "Hi" "body" "<p>Rich&#8217;s</p>"))
+    (ok (string= (text card (list :title "Hi" :body "<p>Rich&#8217;s</p>"))
                  (format nil "title: Hi~%body: Rich’s"))
         "a custom field's fields by name, rich text among them as text")
-    (ok (null (text card (jobject "title" "" "body" "<p></p>"))) "one with nothing in it is none")
-    (ok (string= (text blocks (vector (jobject "fieldId" "card" "title" "Hi")
-                                      (jobject "fieldId" "flag" "on" t "rank" 2)))
+    (ok (null (text card (list :title "" :body "<p></p>"))) "one with nothing in it is none")
+    (ok (string= (text blocks (vector (list :field-id "card" :title "Hi")
+                                      (list :field-id "flag" :on t :rank 2)))
                  (format nil "card: title: Hi~%flag: on: Yes; rank: 2"))
         "a repeater row by row, each by its custom field")
     (ok (null (text blocks "not rows")) "a repeater that holds no rows is none")))

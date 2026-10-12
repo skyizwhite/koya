@@ -18,6 +18,7 @@
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
+                #:content-published-p #:content-draft-p
                 #:content-published-at #:content-revised-at #:content-draft-key
                 #:content-created-at #:content-updated-at)
   (:import-from #:koya-server/domain/revision
@@ -30,7 +31,9 @@
                 #:query-filters #:query-fields #:query-include #:query-search #:query-error)
   (:import-from #:koya-core/validate #:validation-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name #:make-custom-field)
-  (:import-from #:koya-core/json #:parse-json #:jget))
+  (:import-from #:koya-core/json #:parse-json)
+  (:import-from #:koya-core/case #:jvalue->data)
+  (:import-from #:access #:access #:accesses))
 (in-package #:koya-spec/server/usecases/contents)
 
 (defun blog-model ()
@@ -59,12 +62,12 @@
 
 (defvar *read-eval-probe* nil)
 
-(defun data (json) (parse-json json))
+(defun data (json) (jvalue->data (parse-json json)))
 (defun blog () (find-model "website" "blog"))
 (defun make (json &rest args)
   (apply #'create "website" (blog) (data json) args))
 (defun q (&rest kv) (parse-query (loop :for (k v) :on kv :by #'cddr :collect (cons k v))))
-(defun titles (contents) (mapcar (lambda (c) (jget (content-published c) "title")) contents))
+(defun titles (contents) (mapcar (lambda (c) (access (content-published c) :title)) contents))
 
 (deftest an-id-koya-makes-is-twelve-letters-and-digits
   (let ((ids (loop :for n :below 20 :collect (content-id (make (format nil "{\"title\": \"T~a\"}" n))))))
@@ -82,7 +85,7 @@
   (let ((taken (content-id (make "{\"title\": \"First\"}"))))
     (ok (string= (content-id (with-drawn-ids (list taken "zzzzzzzzzzzz") (lambda () (make "{\"title\": \"Second\"}"))))
                  "zzzzzzzzzzzz"))
-    (ok (string= (jget (content-draft (get-content "website" taken)) "title") "First") "and the content that holds it is untouched")))
+    (ok (string= (access (content-draft (get-content "website" taken)) :title) "First") "and the content that holds it is untouched")))
 
 (deftest contents-made-at-once-are-written-out-in-the-order-they-were-made
   (with-drawn-ids (list "zzzzzzzzzzzz" "aaaaaaaaaaaa")
@@ -96,28 +99,28 @@
 (deftest lifecycle
   (let ((c (make "{\"title\": \"Draft one\"}")))
     (ok (string= (content-status c) "draft"))
-    (ok (null (content-published c)))
-    (ok (string= (jget (content-draft c) "title") "Draft one"))
+    (ng (content-published-p c))
+    (ok (string= (access (content-draft c) :title) "Draft one"))
     (ok (null (content-published-at c)))
     (let ((p (publish "website" (blog) (content-id c))))
       (ok (string= (content-status p) "published"))
-      (ok (string= (jget (content-published p) "title") "Draft one"))
-      (ok (null (content-draft p)))
+      (ok (string= (access (content-published p) :title) "Draft one"))
+      (ng (content-draft-p p))
       (ok (content-published-at p))
       (let ((d (update-draft "website" (blog) (content-id c) (data "{\"title\": \"Edited\"}"))))
         (ok (string= (content-status d) "published+draft"))
-        (ok (string= (jget (content-published d) "title") "Draft one") "published untouched by a draft save")
-        (ok (string= (jget (content-draft d) "title") "Edited"))
+        (ok (string= (access (content-published d) :title) "Draft one") "published untouched by a draft save")
+        (ok (string= (access (content-draft d) :title) "Edited"))
         (let ((p2 (publish "website" (blog) (content-id c))))
-          (ok (string= (jget (content-published p2) "title") "Edited") "publish promotes the draft")
+          (ok (string= (access (content-published p2) :title) "Edited") "publish promotes the draft")
           (ok (string= (content-published-at p2) (content-published-at p)) "first publish date is kept")
           (ok (string>= (content-revised-at p2) (content-revised-at p)))
           (let ((u (unpublish "website" (blog) (content-id c))))
             (ok (string= (content-status u) "draft"))
-            (ok (null (content-published u)))
+            (ng (content-published-p u))
             (ok (null (content-published-at u)) "an unpublished content has no publish date")
             (ok (null (content-revised-at u)) "nor a revision date")
-            (ok (string= (jget (content-draft u) "title") "Edited") "unpublish keeps the data as draft")
+            (ok (string= (access (content-draft u) :title) "Edited") "unpublish keeps the data as draft")
             (ok (string= (content-status (get-content "website" (content-id c))) "draft") "and that is what is stored"))))
       (destroy "website" (blog) (content-id c))
       (ng (get-content "website" (content-id c))))))
@@ -134,7 +137,7 @@
     (let ((revisions (list-revisions "website" id)))
       (ok (equal (mapcar #'revision-event revisions) '("unpublish" "discard" "draft" "publish" "draft" "draft"))
           "newest first; the second save of the same data is not an event")
-      (ok (equal (mapcar (lambda (r) (jget (revision-data r) "title")) revisions)
+      (ok (equal (mapcar (lambda (r) (access (revision-data r) :title)) revisions)
                  '("Two" "Two" "Three" "Two" "Two" "One"))
           "each holds what the write left the content with")
       (ok (equal (mapcar #'revision-by (last revisions 2)) '("key:ci" "owner")))
@@ -178,7 +181,7 @@
 (deftest object-content
   (ng (find-object-content "website" "about"))
   (create "website" (find-model "website" "about") (data "{\"body\": \"hi\"}") :publish t)
-  (ok (string= (jget (content-published (find-object-content "website" "about")) "body") "hi")))
+  (ok (string= (access (content-published (find-object-content "website" "about")) :body) "hi")))
 
 (deftest an-object-is-written-through-its-model
   (let ((about (find-model "website" "about")))
@@ -191,11 +194,11 @@
     (testing "a later save merges onto that content"
       (let ((id (content-id (object-content "website" about))))
         (update-object "website" about (data "{}"))
-        (ok (string= (jget (content-draft (object-content "website" about)) "body") "draft"))
+        (ok (string= (access (content-draft (object-content "website" about)) :body) "draft"))
         (ok (string= (content-id (object-content "website" about)) id) "and makes no second")))
     (testing "publishing publishes the draft, or the data given"
-      (ok (string= (jget (content-published (publish-object "website" about)) "body") "draft"))
-      (ok (string= (jget (content-published (publish-object "website" about :data (data "{\"body\": \"given\"}"))) "body")
+      (ok (string= (access (content-published (publish-object "website" about)) :body) "draft"))
+      (ok (string= (access (content-published (publish-object "website" about :data (data "{\"body\": \"given\"}"))) :body)
                    "given"))))
   (testing "a first write can publish at once"
     (exec "DELETE FROM contents")
@@ -310,7 +313,7 @@
   (make "{\"title\": \"Only a draft\"}")
   (let ((model (find-model "website" "blog")))
     (flet ((titles-with (status)
-             (sort (mapcar (lambda (c) (jget (or (content-draft c) (content-published c)) "title"))
+             (sort (mapcar (lambda (c) (access (or (content-draft c) (content-published c)) :title))
                            (list-contents "website" "blog" model (q "limit" "50")
                                           :status :all :only-status status))
                    #'string<)))
@@ -354,7 +357,7 @@
 
 (deftest a-datetime-is-kept-to-the-minute-in-utc
   (let ((model (find-model "website" "event")))
-    (flet ((at (json) (jget (content-draft (create "website" model (data json))) "at")))
+    (flet ((at (json) (access (content-draft (create "website" model (data json))) :at)))
       (ok (string= (at "{\"at\": \"2024-01-01T10:00:30.500Z\"}") "2024-01-01T10:00:00.000Z")
           "the seconds are dropped, as the editor gives none")
       (ok (string= (at "{\"at\": \"2024-01-01T19:05+09:00\"}") "2024-01-01T10:05:00.000Z")
@@ -371,9 +374,9 @@
         (ok (= (count-revisions "website" id) 1)))
       (testing "a change and a publish keep it to the minute too"
         (update-draft "website" model id (data "{\"at\": \"2024-03-01T08:30:15+01:00\"}"))
-        (ok (string= (jget (content-draft (get-content "website" id)) "at") "2024-03-01T07:30:00.000Z"))
+        (ok (string= (access (content-draft (get-content "website" id)) :at) "2024-03-01T07:30:00.000Z"))
         (publish "website" model id :data (data "{\"at\": \"2024-04-01T00:00:01Z\"}"))
-        (ok (string= (jget (content-published (get-content "website" id)) "at") "2024-04-01T00:00:00.000Z"))))))
+        (ok (string= (access (content-published (get-content "website" id)) :at) "2024-04-01T00:00:00.000Z"))))))
 
 (deftest a-missing-boolean-and-false-are-the-same-draft
   (let ((id (content-id (make "{\"title\": \"Flag\"}" :publish t))))
@@ -399,7 +402,7 @@
 
 (deftest a-blank-slug-stays-blank
   (let ((id (content-id (create "website" (find-model "website" "page") (data "{\"title\": \"Hello World\"}") :publish t))))
-    (ng (nth-value 1 (gethash "slug" (content-published (get-content "website" id))))
+    (ng (nth-value 1 (access (content-published (get-content "website" id)) :slug))
         "nothing makes a slug from the title")))
 
 (deftest a-slug-is-unique-without-saying-so
@@ -502,9 +505,9 @@
                                (data (format nil "{\"title\": \"P\", \"card\": {\"link\": \"~a\", \"at\": \"2026-09-20T10:00:59+09:00\"}}" tag))
                                :publish t)))
          (testing "a datetime inside is kept to the minute in UTC"
-           (ok (string= (jget (content-published content) "card" "at") "2026-09-20T01:00:00.000Z")))
+           (ok (string= (accesses (content-published content) :card :at) "2026-09-20T01:00:00.000Z")))
          (testing "a boolean inside starts as its default says"
-           (ok (eq (jget (content-published content) "card" "pinned") t)))
+           (ok (eq (accesses (content-published content) :card :pinned) t)))
          (testing "a reference inside is a use"
            (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
            (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
@@ -539,9 +542,9 @@
                                (data (format nil "{\"title\": \"P\", \"cards\": [{\"fieldId\": \"card\", \"link\": \"~a\", \"at\": \"2026-09-20T10:00:59+09:00\"}]}" tag))
                                :publish t)))
          (testing "a datetime in a row is kept to the minute in UTC"
-           (ok (string= (jget (aref (jget (content-published content) "cards") 0) "at") "2026-09-20T01:00:00.000Z")))
+           (ok (string= (access (aref (access (content-published content) :cards) 0) :at) "2026-09-20T01:00:00.000Z")))
          (testing "a boolean in a row starts as its default says"
-           (ok (eq (jget (aref (jget (content-published content) "cards") 0) "pinned") t)))
+           (ok (eq (access (aref (access (content-published content) :cards) 0) :pinned) t)))
          (testing "a reference in a row is a use"
            (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
            (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))

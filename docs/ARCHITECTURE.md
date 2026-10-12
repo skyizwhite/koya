@@ -25,8 +25,9 @@ qlfile  justfile  Dockerfile
 adr/                  ; one file per design decision
 docs/                 ; this, and the documents above
 src/
-  core/               ; the koya-core system (MIT): schema, validate, diff, json,
-                      ; case, time, ulid, and main, which re-exports them
+  core/               ; the koya-core system (MIT): schema, schema-json, validate,
+                      ; diff, data, json, case, time, ulid, and main, which
+                      ; re-exports them
   sdk/                ; the koya-sdk system (MIT)
     main.lisp         ; the koya-sdk package: the site's API from config, client and core
     config.lisp       ; defmodel / defcustomfield / defwebhooks / current-schema
@@ -107,6 +108,15 @@ web  ──▶  usecases  ──▶  domain
   port's function. Exactly one use case does, the one the function belongs
   with (a space's schema is `schema`'s, its keys and webhook secret
   `keys`'s), so a page has one place to import it from; a test holds it to one.
+- JSON is parsed and written at the edges alone: `web/` for requests and
+  answers, `infra/` for what SQLite and archives hold (`infra/archives` makes
+  and reads `space.json`), the SDK's client for what it sends and receives.
+  Inside, a content's data is a plist with kebab-case keyword keys, arrays are
+  vectors, and a field's value is read and set with `field-value` in
+  `core/schema`, which finds it by its keyword alone; `core/case` converts
+  keys and values, and `core/schema-json` a schema and a deploy's changes.
+  A content says which versions it has by its status, so a version with no
+  values is still a version.
 - Use cases hand over what they found, never JSON. A content as the delivery
   API serves it is a `delivered` (`usecases/delivery`): its data with
   media and the references asked for resolved. `web/lib/presenters` makes it, a
@@ -147,7 +157,7 @@ it is stale.
 | `schema_version` | which migrations have run |
 | `spaces` | a space, its webhooks, its custom fields and its webhook secret |
 | `models` | a deployed model, as the schema document's own JSON |
-| `contents` | every model's contents; `published` and `draft` are JSON, `published_text` and `draft_text` hold the text of their string values, tags taken out, for searching rich text, and `published_slug` and `draft_slug` the value of the model's slug field, for finding a content by it |
+| `contents` | every model's contents; `status` says which versions it has, `published` and `draft` are JSON, `published_text` and `draft_text` hold the text of their string values, tags taken out, for searching rich text, and `published_slug` and `draft_slug` the value of the model's slug field, for finding a content by it |
 | `content_revisions` | what each write left a content with, kept until the content is deleted |
 | `schema_deploys` | what each deploy changed |
 | `delivery_keys` `management_keys` | keys, as SHA-256 |
@@ -186,6 +196,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Browser | Nomini (requests, swaps and a page's state), `koya.js` (what a page holds) |
 | DB | cl-dbi + dbd-sqlite3 |
 | JSON | jzon, with kebab/camel conversion and Lisp data conversion in `core/case` |
+| Data | access, for reading and changing plists, vectors and structs |
 | Client | dexador |
 | Archives | zippy (a space's export and import) |
 | Other | ironclad, local-time, cl-dotenv, Tailwind CSS v4 (standalone) |

@@ -4,7 +4,7 @@
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
-                #:webhook-covers-p #:field-many-p)
+                #:webhook-covers-p #:field-many-p #:field-value)
   (:import-from #:koya-core/json #:json-array-p #:blank-p)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/web/lib/target #:target-model)
@@ -76,7 +76,7 @@
       string))
 
 (defun field-preview (field data ref-labels)
-  (multiple-value-bind (value found) (if data (gethash (field-name field) data) (values nil nil))
+  (multiple-value-bind (value found) (field-value data field)
     (if (eq (field-type field) :repeater)
         (and (json-array-p value) (plusp (length value)) (format nil "~a row~:p" (length value)))
         (let ((text (value-text field value found (lambda (field id) (reference-label field id ref-labels)))))
@@ -97,8 +97,8 @@
 
 (defcomp ~preview-cell (&key field content ref-labels media)
   (let* ((data (content-data content :draft t))
-         (ids (and data (eq (field-type field) :media)
-                   (held-ids (gethash (field-name field) data) (field-many-p field)))))
+         (ids (and (eq (field-type field) :media)
+                   (held-ids (field-value data field) (field-many-p field)))))
     (if ids
         (hsx (~media-cell :field field :id (first ids) :media media :more (1- (length ids))))
         (let ((preview (field-preview field data ref-labels)))

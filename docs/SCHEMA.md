@@ -290,6 +290,7 @@ always. A blank value is never taken, and nothing fills a blank `slug`.
 
 A `custom` value is there when an object is given, `{}` included, and absent
 when the key is missing or `null`; what the object holds does not decide it.
+`false` is taken as `{}`, and an answer writes the value as `{}`.
 `required` says two things, one on each side of the object:
 
 | `required` on | means |

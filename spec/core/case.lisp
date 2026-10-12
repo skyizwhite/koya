@@ -8,7 +8,8 @@
                 #:lisp->jvalue
                 #:jvalue->lisp
                 #:jvalue->data
-                #:data->jvalue)
+                #:data->jvalue
+                #:data->jobject)
   (:import-from #:koya-core/json
                 #:to-json
                 #:parse-json))
@@ -53,6 +54,9 @@
                "{\"publishedAt\":\"2026\",\"flag\":false,\"ok\":true,\"none\":null,\"tags\":[\"a\",\"b\"],\"meta\":{\"viewCount\":3},\"pageURL\":\"u\"}")
       "in the plist's order, with each key as it was named")
   (ok (string= (to-json (data->jvalue (vector (list :field-id "h") #()))) "[{\"fieldId\":\"h\"},[]]"))
+  (ok (string= (to-json (data->jvalue nil)) "false") "nil is false, as an empty object and false are one value")
+  (ok (string= (to-json (data->jobject nil)) "{}") "and data as a whole is an object even when empty")
+  (ok (string= (to-json (data->jobject (list :a 1))) "{\"a\":1}"))
   (ok (signals (data->jvalue (list :tags (list "a" "b")))) "a list that is not a plist is refused, as an array is a vector")
   (ok (signals (data->jvalue (list :a 1 :b))) "as is one with a key left without a value")
   (ok (signals (data->jvalue (list "unknown" 1))) "and one whose key is a string, which no field is"))

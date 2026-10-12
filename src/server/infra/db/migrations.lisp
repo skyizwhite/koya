@@ -5,7 +5,8 @@
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-core/json #:parse-json #:to-json)
-  (:import-from #:koya-core/schema #:forget-slug-options)
+  (:import-from #:koya-core/schema-json #:forget-slug-options)
+  (:import-from #:koya-core/case #:jvalue->data)
   (:import-from #:koya-server/infra/db/contents #:text-column)
   (:export #:migrate
            #:current-version))
@@ -233,7 +234,7 @@
               (to-json definition) (col row "space") (col row "name"))))))
 
 (defun fill-content-texts ()
-  (flet ((text (json) (and json (text-column (parse-json json)))))
+  (flet ((text (json) (and json (text-column (jvalue->data (parse-json json) :intern t)))))
     (dolist (row (fetch "SELECT rowid AS r, published, draft FROM contents"))
       (exec "UPDATE contents SET published_text = ?, draft_text = ? WHERE rowid = ?"
             (text (col row "published")) (text (col row "draft")) (col row "r")))))

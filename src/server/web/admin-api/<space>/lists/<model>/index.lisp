@@ -14,7 +14,7 @@
   (with-route-model (space model :list) params
     (let ((query (parse-query params)))
       (multiple-value-bind (contents total) (all-contents space model query)
-        (jobject "contents" (map 'vector #'admin-content->jobject contents)
+        (jobject "contents" (map 'vector (lambda (c) (admin-content->jobject c model)) contents)
                  "totalCount" total "offset" (query-offset query) "limit" (query-limit query))))))
 
 (defun @post (params)
@@ -31,4 +31,4 @@
                              :published-at (body-field body "publishedAt")
                              :revised-at (body-field body "revisedAt"))))
         (ok-status 201)
-        (admin-content->jobject content)))))
+        (admin-content->jobject content model)))))

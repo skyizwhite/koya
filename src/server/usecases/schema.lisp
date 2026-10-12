@@ -3,13 +3,15 @@
   (:import-from #:koya-core/schema
                 #:check-schema #:check-deployable #:schema-model #:model-field #:make-model
                 #:field-name #:field-option #:field-unique-p #:model-kind #:field-fields #:field-row-kind
-                #:field-path-parts #:custom-field-fields)
+                #:field-path-parts #:custom-field-fields #:field-key #:field-value #:name-key)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
-  (:import-from #:koya-core/json #:jobject #:json-array-p)
+  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:access #:access)
   (:import-from #:koya-server/usecases/ports/contents #:space-contents #:model-contents #:update-content)
   (:import-from #:koya-server/usecases/ports/store #:with-transaction)
   (:import-from #:koya-server/domain/content
-                #:content-id #:content-model #:content-published #:content-draft #:content-slugs)
+                #:content-id #:content-model #:content-published #:content-draft #:content-slugs
+                #:content-published-p #:content-draft-p)
   (:import-from #:koya-server/domain/deploy #:changes-by-served-model)
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-core/diff #:diff-schemas #:destructive-changes-p #:tightened-change-p)
@@ -92,8 +94,8 @@
     (if rename (getf rename :from) (or field model))))
 
 (defun versions (content)
-  (remove nil (list (and (content-published content) (list "published" (content-published content)))
-                    (and (content-draft content) (list "draft" (content-draft content))))))
+  (remove nil (list (and (content-published-p content) (list "published" (content-published content)))
+                    (and (content-draft-p content) (list "draft" (content-draft content))))))
 
 (defun misfit (content version field message)
   (list :id (content-id content) :field field :version version :message message))
@@ -105,54 +107,49 @@
           :append (multiple-value-bind (name kind inner) (field-path-parts (getf change :field))
                     (and inner (string= name outer) (list (cons kind inner))))))
 
+(defun stored-value (data name)
+  (access data (name-key name) :test #'eq))
+
 (defun without-gone (object kind gone)
-  (let ((kept (jobject)))
-    (maphash (lambda (k v)
-               (unless (find-if (lambda (g) (and (equal (car g) kind) (string= (cdr g) k))) gone)
-                 (setf (gethash k kept) v)))
-             object)
-    kept))
+  (loop :for (key value) :on object :by #'cddr
+        :unless (find-if (lambda (g) (and (equal (car g) kind) (eq (name-key (cdr g)) key))) gone)
+          :append (list key value)))
 
 (defun as-deployed (value gone)
   (cond ((null gone) value)
-        ((hash-table-p value) (without-gone value nil gone))
+        ((listp value) (without-gone value nil gone))
         ((json-array-p value)
          (map 'vector (lambda (row)
-                        (if (hash-table-p row) (without-gone row (gethash "fieldId" row) gone) row))
+                        (if (listp row) (without-gone row (access row :field-id :test #'eq) gone) row))
               value))
         (t value)))
 
 (defun value-misfits (contents field key &optional gone)
-  (let ((check (make-model "check" :list (list field)))
-        (name (field-name field)))
+  (let ((check (make-model "check" :list (list field))))
     (loop :for content :in contents
           :append (loop :for (version data) :in (versions content)
-                        :append (let ((one (jobject)))
-                                  (multiple-value-bind (value found) (gethash key data)
-                                    (when found (setf (gethash name one) (as-deployed value gone))))
+                        :append (multiple-value-bind (value found) (stored-value data key)
                                   (mapcar (lambda (e) (misfit content version (getf e :field) (getf e :message)))
-                                          (validate-content check one)))))))
+                                          (validate-content check (and found (list (field-key field) (as-deployed value gone))))))))))
 
-(defun object-misfits (content version check name object path)
-  (let ((one (jobject)))
-    (multiple-value-bind (value found) (gethash name object)
-      (when found (setf (gethash name one) value)))
+(defun object-misfits (content version check inner object path)
+  (multiple-value-bind (value found) (field-value object inner)
     (mapcar (lambda (e) (misfit content version (format nil "~a.~a" path (getf e :field)) (getf e :message)))
-            (validate-content check one))))
+            (validate-content check (and found (list (field-key inner) value))))))
 
 (defun inner-misfits (contents outer kind inner key gone)
-  (let ((check (make-model "check" :list (list inner)))
-        (name (field-name inner)))
+  (let ((check (make-model "check" :list (list inner))))
     (loop :for content :in contents
           :append (loop :for (version data) :in (versions content)
-                        :for value := (as-deployed (gethash key data) gone)
-                        :append (cond ((and (null kind) (hash-table-p value))
-                                       (object-misfits content version check name value (field-name outer)))
-                                      ((and kind (json-array-p value))
-                                       (loop :for row :across value
+                        :for (value found) := (multiple-value-list (stored-value data key))
+                        :for deployed := (as-deployed value gone)
+                        :append (cond ((and (null kind) found (listp deployed))
+                                       (object-misfits content version check inner deployed (field-name outer)))
+                                      ((and kind (json-array-p deployed))
+                                       (loop :for row :across deployed
                                              :for index :from 0
-                                             :when (and (hash-table-p row) (equal (gethash "fieldId" row) kind))
-                                               :append (object-misfits content version check name row
+                                             :when (and (listp row) (equal (access row :field-id :test #'eq) kind))
+                                               :append (object-misfits content version check inner row
                                                                        (format nil "~a[~a]" (field-name outer) index))))
                                       (t '()))))))
 
@@ -161,12 +158,12 @@
         (name (field-name field)))
     (dolist (content contents)
       (loop :for (version data) :in (versions content)
-            :for value := (gethash key data)
+            :for value := (stored-value data key)
             :unless (blank-value-p value)
               :do (pushnew (content-id content) (gethash value owners) :test #'equal)))
     (loop :for content :in contents
           :append (loop :for (version data) :in (versions content)
-                        :for value := (gethash key data)
+                        :for value := (stored-value data key)
                         :when (and (not (blank-value-p value)) (rest (gethash value owners)))
                           :collect (misfit content version name "must be unique")))))
 

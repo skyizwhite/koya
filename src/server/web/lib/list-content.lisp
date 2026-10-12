@@ -9,10 +9,10 @@
 (in-package #:koya-server/web/lib/list-content)
 
 (defun read-list-content (space model id)
-  (admin-content->jobject (resolve-content space (model-name model) id)))
+  (admin-content->jobject (resolve-content space (model-name model) id) model))
 
 (defun save-list-draft (space model id)
-  (admin-content->jobject (update-draft space model id (body-data (read-json-body)))))
+  (admin-content->jobject (update-draft space model id (body-data (read-json-body))) model))
 
 (defun delete-list-content (space model id)
   (destroy space model id)

@@ -1571,7 +1571,8 @@ components:
         `media` and `reference` fields; arrays on `many` fields; an object of
         its fields' values on a `custom` field; an array of rows on a
         `repeater`, each an object naming its custom field in `fieldId` beside
-        that custom field's fields' values.
+        that custom field's fields' values. A `null` is no value and is not
+        kept; a field without a value is absent.
       additionalProperties: true
 
     Content:

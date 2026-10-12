@@ -10,7 +10,8 @@
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field)
-  (:import-from #:koya-core/json #:jget))
+  (:import-from #:koya-core/case #:kebab-keyword)
+  (:import-from #:access #:access))
 (in-package #:koya-spec/server/usecases/revisions)
 
 (defun schema (&rest post-fields)
@@ -34,10 +35,8 @@
                                  (make-field :cover :media)
                                  (make-field :tags :reference :model "tag" :many t))))
 
-(defun object (&rest plist)
-  (let ((table (make-hash-table :test 'equal)))
-    (loop :for (k v) :on plist :by #'cddr :do (setf (gethash k table) v))
-    table))
+(defun object (&rest pairs)
+  (loop :for (k v) :on pairs :by #'cddr :append (list (kebab-keyword k) v)))
 (defun post () (find-model "site" "post"))
 (defun notes-of (notes) (mapcar (lambda (n) (getf n :field)) notes))
 
@@ -45,21 +44,21 @@
   (multiple-value-bind (data notes)
       (restore-data "site" (post) "x" (object "title" "Old" "lede" "Then" "count" 3) (object "title" "Now"))
     (ok (null notes))
-    (ok (string= (jget data "title") "Old"))
-    (ok (string= (jget data "lede") "Then"))
-    (ok (= (jget data "count") 3))))
+    (ok (string= (access data :title) "Old"))
+    (ok (string= (access data :lede) "Then"))
+    (ok (= (access data :count) 3))))
 
 (deftest what-the-schema-no-longer-has
   (testing "a value the field no longer accepts keeps the current one"
     (replace-schema "site" (schema (make-field :title :text :required t) (make-field :count :number :max 10)))
     (multiple-value-bind (data notes) (restore-data "site" (post) "x" (object "title" "Old" "count" 99) (object "count" 5))
-      (ok (= (jget data "count") 5))
+      (ok (= (access data :count) 5))
       (ok (equal (notes-of notes) '("count")))
       (ok (search "no longer accepts" (getf (first notes) :note)))))
   (testing "a field that is required now, and was empty then, keeps the current value"
     (replace-schema "site" (schema (make-field :title :text :required t) (make-field :lede :text :required t)))
     (multiple-value-bind (data notes) (restore-data "site" (post) "x" (object "title" "Old") (object "lede" "Kept"))
-      (ok (string= (jget data "lede") "Kept"))
+      (ok (string= (access data :lede) "Kept"))
       (ok (equal (notes-of notes) '("lede"))))))
 
 (deftest what-the-space-no-longer-has
@@ -71,14 +70,14 @@
           (restore-data "site" (post) "x"
                         (object "title" "Old" "tags" (vector (content-id live) (content-id drafted) "gone"))
                         (object))
-        (ok (equalp (jget data "tags") (vector (content-id live))))
+        (ok (equalp (access data :tags) (vector (content-id live))))
         (ok (equal (notes-of notes) '("tags")))
         (ok (search "2 references" (getf (first notes) :note)))))
     (testing "a media that is still in the library comes back; one that is not is dropped"
-      (ok (string= (jget (restore-data "site" (post) "x" (object "title" "Old" "cover" (media-id media)) (object)) "cover")
+      (ok (string= (access (restore-data "site" (post) "x" (object "title" "Old" "cover" (media-id media)) (object)) :cover)
                    (media-id media)))
       (multiple-value-bind (data notes) (restore-data "site" (post) "x" (object "title" "Old" "cover" "01GONE") (object))
-        (ng (nth-value 1 (gethash "cover" data)))
+        (ng (nth-value 1 (access data :cover)))
         (ok (equal (notes-of notes) '("cover")))))))
 
 (deftest a-unique-value-another-content-took-since
@@ -86,9 +85,9 @@
         (mine (create "site" (post) (object "title" "Mine" "slug" "mine") :publish t)))
     (multiple-value-bind (data notes)
         (restore-data "site" (post) (content-id mine) (object "title" "Mine" "slug" "taken") (object "slug" "mine"))
-      (ok (string= (jget data "slug") "mine") "the version's slug is the other content's now")
+      (ok (string= (access data :slug) "mine") "the version's slug is the other content's now")
       (ok (equal (notes-of notes) '("slug"))))
-    (ok (string= (jget (restore-data "site" (post) (content-id other) (object "title" "Taken" "slug" "taken") (object)) "slug")
+    (ok (string= (access (restore-data "site" (post) (content-id other) (object "title" "Taken" "slug" "taken") (object)) :slug)
                  "taken")
         "a content's own value is not taken from it")))
 
@@ -102,10 +101,10 @@
   (multiple-value-bind (data notes)
       (restore-data "site" (post) "x" (object "title" "Old" "card" (object "link" "gone" "photo" "01GONE" "caption" "Kept"))
                     (object))
-    (let ((card (jget data "card")))
-      (ng (nth-value 1 (gethash "link" card)) "a reference inside to what is gone is dropped")
-      (ng (nth-value 1 (gethash "photo" card)) "and a media")
-      (ok (string= (jget card "caption") "Kept") "the rest of the custom field comes back"))
+    (let ((card (access data :card)))
+      (ng (nth-value 1 (access card :link)) "a reference inside to what is gone is dropped")
+      (ng (nth-value 1 (access card :photo)) "and a media")
+      (ok (string= (access card :caption) "Kept") "the rest of the custom field comes back"))
     (ok (equal (notes-of notes) '("card")) "and the note names the custom field")
     (ok (equal (getf (first notes) :note)
                "link lost 1 reference to content that was deleted or is not published; photo lost 1 media that is no longer in the library")
@@ -122,9 +121,9 @@
       (restore-data "site" (post) "x" (object "title" "Old" "cards" (vector (object "fieldId" "card" "link" "gone" "caption" "Kept")
                                                                      (object "fieldId" "card" "photo" "01GONE")))
                     (object))
-    (let ((row (aref (jget data "cards") 0)))
-      (ng (nth-value 1 (gethash "link" row)) "a reference in a row to what is gone is dropped")
-      (ok (string= (jget row "caption") "Kept") "the rest of the row comes back"))
+    (let ((row (aref (access data :cards) 0)))
+      (ng (nth-value 1 (access row :link)) "a reference in a row to what is gone is dropped")
+      (ok (string= (access row :caption) "Kept") "the rest of the row comes back"))
     (ok (equal (notes-of notes) '("cards")) "and the note names the repeater")
     (ok (equal (getf (first notes) :note)
                "link lost 1 reference to content that was deleted or is not published; photo lost 1 media that is no longer in the library")

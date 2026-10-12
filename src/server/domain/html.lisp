@@ -56,13 +56,8 @@
                          (t (write-char c out) (incf i)))))))))
 
 (defun data-text (data)
-  (when data
-    (let ((text (make-hash-table :test 'equal)))
-      (maphash (lambda (name value)
-                 (cond ((stringp value) (setf (gethash name text) (html-text value)))
-                       ((hash-table-p value) (setf (gethash name text) (data-text value)))
-                       ((and (json-array-p value) (some #'hash-table-p value))
-                        (setf (gethash name text)
-                              (map 'vector (lambda (row) (if (hash-table-p row) (data-text row) row)) value)))))
-               data)
-      text)))
+  (loop :for (name value) :on data :by #'cddr
+        :append (cond ((stringp value) (list name (html-text value)))
+                      ((consp value) (list name (data-text value)))
+                      ((and (json-array-p value) (some #'consp value))
+                       (list name (map 'vector (lambda (row) (if (consp row) (data-text row) row)) value))))))

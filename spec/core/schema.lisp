@@ -3,14 +3,16 @@
   (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:field-name #:field-type #:field-option
                 #:field-was #:model-field #:model-kind #:model-was #:model-forget-renames
-                #:schema-model #:schema-webhooks #:model-preview-url #:model-public-url
+                #:schema-model #:model-public-url
                 #:model-label #:make-webhook #:webhook-only #:webhook-covers-p #:schema-error
-                #:schema-errors #:check-schema #:schema->jobject #:jobject->schema
-                #:model-options #:check-deployable
+                #:schema-errors #:check-schema
+                #:check-deployable
                 #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields
-                #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields #:field-key)
-  (:import-from #:koya-core/json
-                #:to-json #:parse-json #:jget #:jobject))
+                #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields #:field-key
+                #:field-value #:without-field #:row-kind)
+  (:import-from #:access
+                #:access #:accesses)
+  (:export #:sample-schema #:with-seo #:blocks-schema))
 (in-package #:koya-spec/core/schema)
 
 (defun sample-schema ()
@@ -33,10 +35,7 @@
     (ok (signals (make-model "about" :object '() :preview-url url) 'schema-error) (format nil "preview ~s" url))
     (ok (signals (make-model "about" :object '() :public-url url) 'schema-error) (format nil "public ~s" url)))
   (ok (make-model "about" :object '() :preview-url "http://localhost:3000/about?draft-key={DRAFT_KEY}"))
-  (ok (make-model "about" :object '() :public-url "HTTPS://x/about") "the scheme is not case sensitive")
-  (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 1, \"models\": [{\"name\": \"about\", \"kind\": \"object\", \"previewUrl\": \"javascript:alert(1)\"}]}"))
-               'schema-error)
-      "nor through a deploy"))
+  (ok (make-model "about" :object '() :public-url "HTTPS://x/about") "the scheme is not case sensitive"))
 
 (deftest webhook-urls-are-web-addresses
   (dolist (url '("javascript:alert(1)" "ftp://x/hook" "file:///etc/passwd" "gopher://x" "//x/hook" "/hook" "http://"))
@@ -78,13 +77,6 @@
     (ok (signals (make-schema :webhooks '("https://x")) 'schema-error) "a bare URL is not a webhook")
     (ok (signals (make-schema :webhooks (list (make-webhook "a" "https://x") (make-webhook "a" "https://y"))) 'schema-error)
         "labels are unique within a space")
-    (let ((wire (jobject->schema (parse-json "{\"koyaSchema\": 1, \"webhooks\": [{\"label\": \"new\", \"url\": \"https://new\", \"events\": [\"draft\"]}, {\"url\": \"https://m\", \"only\": [\"m\"]}], \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"webhooks\": [{\"url\": \"https://old\"}]}]}"))))
-      (ok (equal (first (schema-webhooks wire)) '(:label "new" :url "https://new"))
-          "the events older schemas carried are dropped on load")
-      (ok (equal (second (schema-webhooks wire)) '(:label "https://m" :url "https://m" :only ("m")))
-          "a label defaults to the URL on the wire, and :only survives it")
-      (ok (null (model-options (schema-model wire "m")))
-          "a webhooks key left on a model by an older schema is ignored"))
     (testing ":only"
       (ok (null (webhook-only (make-webhook "a" "https://a"))) "absent means every model")
       (ok (equal (webhook-only (make-webhook "a" "https://a" :only 'blog)) '("blog")) "one name is a list of one")
@@ -95,9 +87,6 @@
       (ok (signals (make-webhook "a" "https://a" :only "Not A Slug") 'schema-error))
       (ok (signals (make-webhook "a" "https://a" :only 5) 'schema-error))
       (ok (signals (make-webhook "a" "https://a" :only '(blog blog)) 'schema-error) "no duplicates"))
-    (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 1, \"webhooks\": [\"https://old\"]}"))
-                 'schema-error)
-        "a bare URL is not a webhook on the wire either")
     (ok (signals (make-model (format nil "blog~%") :list nil) 'schema-error) "no trailing newline"))
   (testing "model names must be slugs"
     (ok (signals (make-model "Blog Post" :list nil) 'schema-error))
@@ -117,10 +106,7 @@
     (ok (signals (make-model "blog" :list nil :was 'blog) 'schema-error))
     (ok (signals (make-field :title :text :was "Not A Field") 'schema-error))
     (ok (signals (make-field :title :text :was :created-at) 'schema-error) "system fields are not renamed")
-    (ok (signals (make-model "blog" :list nil :was "Not A Model") 'schema-error))
-    (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"was\": 5}]}"))
-                 'schema-error)
-        "a was that is not a name at all is refused, not left to signal elsewhere"))
+    (ok (signals (make-model "blog" :list nil :was "Not A Model") 'schema-error)))
   (testing "within a model a rename is unambiguous"
     (ok (signals (make-model "m" :list (list (make-field :a :text :was :old)
                                              (make-field :b :text :was :old)))
@@ -140,21 +126,7 @@
       (ok (string= (model-public-url stored) "https://x"))))
   (testing "an option given as nothing is not a rename"
     (ok (null (field-was (make-field :subtitle :text :was nil))))
-    (ok (null (model-was (make-model "article" :list nil :was nil)))))
-  (testing "a JSON null is not the name \"null\""
-    (dolist (json '("{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"was\": null}]}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"a\", \"type\": \"text\", \"was\": null}]}]}"))
-      (ok (signals (jobject->schema (parse-json json)) 'schema-error) json)))
-  (testing "a rename travels over the wire"
-    (let* ((schema (make-schema :models (list (make-model "article" :list
-                                                          (list (make-field :subtitle :text :was :lede))
-                                                          :was 'post))))
-           (json (to-json (schema->jobject schema)))
-           (back (schema-model (jobject->schema (parse-json json)) "article")))
-      (ok (search "\"was\":\"post\"" json))
-      (ok (search "\"was\":\"lede\"" json))
-      (ok (string= (model-was back) "post"))
-      (ok (string= (field-was (model-field back :subtitle)) "lede")))))
+    (ok (null (model-was (make-model "article" :list nil :was nil))))))
 
 (deftest lookups
   (let* ((schema (sample-schema))
@@ -226,64 +198,7 @@
         "a field that is not there, removed or renamed without the label following")
     (ok (= (length (errors (list (make-field :body :richtext)) :body)) 1)
         "a field whose value is not a line of text")
-    (ok (= (length (errors (list (make-field :tags :select :options '("a")) ) :tags)) 1)))
-  (testing "it goes over the wire and back"
-    (let* ((schema (make-schema :models (list (make-model "m" :list (list (make-field :title :text)) :label :title))))
-           (obj (schema->jobject schema)))
-      (ok (string= (jget (aref (jget obj "models") 0) "label") "title"))
-      (ok (string= (model-label (schema-model (jobject->schema (parse-json (to-json obj))) "m")) "title"))
-      (ng (nth-value 1 (jget (aref (jget (schema->jobject (make-schema :models (list (make-model "m" :list nil))))
-                                         "models") 0)
-                             "label"))
-          "absent when there is none"))))
-
-(deftest wire-format
-  (let* ((schema (sample-schema))
-         (obj (schema->jobject schema))
-         (json (to-json obj))
-         (back (jobject->schema (parse-json json))))
-    (ok (= (jget obj "koyaSchema") 1))
-    (ok (search "\"maxLength\":100" json))
-    (ok (search "\"eventAt\"" json))
-    (ok (search "\"kind\":\"object\"" json))
-    (ok (equal (schema-webhooks back)
-               '((:label "hook" :url "https://example.com/hook")
-                 (:label "blog-only" :url "https://example.com/blog-hook" :only ("blog")))))
-    (ok (search "\"webhooks\":[{\"label\":\"hook\"" json) "webhooks are objects on the wire")
-    (ok (search "\"only\":[\"blog\"]" json))
-    (let ((blog (schema-model back :blog)))
-      (ok (= (field-option (model-field blog :title) :max-length) 100))
-      (ok (field-option (model-field blog :tags) :many))
-      (ok (string= (field-option (model-field blog :tags) :model) "tag"))
-      (ok (eq (field-type (model-field blog :slug)) :slug)))
-    (let ((about (schema-model back :about)))
-      (ok (string= (model-preview-url about) "https://x/about?draft-key={DRAFT_KEY}"))
-      (ok (string= (model-public-url about) "https://x/about"))
-      (ok (search "\"previewUrl\"" json)))
-    (ok (null (model-public-url (schema-model back :blog))) "absent when not set")
-    (testing "round trip is stable"
-      (ok (string= json (to-json (schema->jobject back))))))
-  (testing "rejects bad input"
-    (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 2}")) 'schema-error))
-    (ok (signals (jobject->schema (parse-json "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"nope\"}]}]}")) 'schema-error))
-    (ok (signals (jobject->schema (parse-json "[]")) 'schema-error))
-    (dolist (json '("{\"koyaSchema\": 1, \"models\": 5}"
-                    "{\"koyaSchema\": 1, \"webhooks\": \"https://x\"}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": 5}]}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"LIST\"}]}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"text\", \"pattern\": \"(\"}]}]}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"text\", \"bogus\": 1}]}]}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"f\", \"type\": \"select\", \"options\": \"abc\"}]}]}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"t\", \"type\": \"text\"}, {\"name\": \"s\", \"type\": \"slug\", \"from\": \"t\"}]}]}"
-                    "{\"koyaSchema\": 1, \"models\": [{\"name\": \"m\", \"kind\": \"list\", \"fields\": [{\"name\": \"s\", \"type\": \"slug\", \"unique\": true}]}]}"))
-      (ok (signals (jobject->schema (parse-json json)) 'schema-error) json))))
-
-(deftest options-are-written-in-one-order
-  (flet ((json (field)
-           (to-json (schema->jobject (make-schema :models (list (make-model "m" :list (list field))))))))
-    (ok (string= (json (make-field :title :text :required t :max-length 10 :unique t))
-                 (json (make-field :title :text :unique t :max-length 10 :required t)))
-        "however the field was given its options")))
+    (ok (= (length (errors (list (make-field :tags :select :options '("a")) ) :tags)) 1))))
 
 (deftest help
   (testing "every type takes a help text for the editor"
@@ -293,14 +208,7 @@
       (ok (stringp (field-option field :help)))))
   (testing "a help text is a line of text"
     (ok (signals (make-field :title :text :help 3) 'schema-error))
-    (ok (signals (make-field :title :text :help "") 'schema-error) "an empty one says nothing"))
-  (testing "it goes over the wire and back"
-    (let* ((schema (make-schema :models (list (make-model "m" :list (list (make-field :cover :media :help "1200x630"))))))
-           (obj (schema->jobject schema))
-           (field (aref (jget (aref (jget obj "models") 0) "fields") 0)))
-      (ok (string= (jget field "help") "1200x630"))
-      (ok (string= (field-option (model-field (schema-model (jobject->schema (parse-json (to-json obj))) "m") :cover) :help)
-                   "1200x630")))))
+    (ok (signals (make-field :title :text :help "") 'schema-error) "an empty one says nothing")))
 
 (defun seo ()
   (make-custom-field "seo" (list (make-field :title :text :max-length 60)
@@ -351,18 +259,7 @@
            1)
         "a custom field labels nothing")
     (ok (signals (check-deployable (make-schema :custom-fields (list (make-custom-field "seo" (list (make-field :kind :select :options '("a,b"))))))) 'schema-error)
-        "a comma in an option inside is caught at deploy"))
-  (testing "it goes over the wire and back"
-    (let* ((obj (schema->jobject (with-seo)))
-           (json (to-json obj))
-           (back (jobject->schema (parse-json json))))
-      (ok (search "\"customFields\":[{\"name\":\"seo\",\"fields\":[" json))
-      (ok (search "{\"name\":\"meta\",\"type\":\"custom\",\"customField\":\"seo\"}" json)
-          "a model names it and does not repeat its fields")
-      (ok (equal (mapcar #'field-name (field-fields (model-field (schema-model back "blog") :meta)))
-                 '("title" "image" "kind")))
-      (ok (string= json (to-json (schema->jobject back))) "and the round trip is stable"))
-    (ng (search "customFields" (to-json (schema->jobject (make-schema)))) "absent when there are none")))
+        "a comma in an option inside is caught at deploy")))
 
 (defun blocks-schema (&rest repeater-options)
   (make-schema :custom-fields (list (make-custom-field "heading" (list (make-field :text :text)))
@@ -397,13 +294,7 @@
                                                :models (list (make-model "page" :list
                                                                          (list (make-field :blocks :repeater :custom-fields '(heading ghost))))))))
            1)
-        "a custom field that is not declared"))
-  (testing "it goes over the wire and back"
-    (let* ((json (to-json (schema->jobject (blocks-schema))))
-           (back (jobject->schema (parse-json json))))
-      (ok (search "{\"name\":\"blocks\",\"type\":\"repeater\",\"customFields\":[\"heading\",\"body\"]}" json))
-      (ok (equal (mapcar #'custom-field-name (field-row-kinds (model-field (schema-model back "page") :blocks)))
-                 '("heading" "body"))))))
+        "a custom field that is not declared")))
 
 (defun walked-schema ()
   (make-schema :custom-fields (list (seo)
@@ -416,62 +307,84 @@
 
 (defun upcase-texts (field object outer)
   (declare (ignore outer))
-  (let ((value (gethash (field-name field) object)))
+  (let ((value (field-value object field)))
     (when (stringp value)
-      (setf (gethash (field-name field) object) (string-upcase value)))))
+      (setf (field-value object field) (string-upcase value)))
+    object))
 
 (deftest walking-a-content-s-data
   (let ((fields (model-fields (schema-model (walked-schema) "page"))))
     (testing "every field gets the call, with the object it sits in and the field around it"
       (let ((seen '()))
         (map-data-fields fields
-                         (jobject "meta" (jobject "title" "t")
-                                  "blocks" (vector (jobject "fieldId" "heading" "text" "h")
-                                                   (jobject "fieldId" "body" "text" "b")))
+                         (list :meta (list :title "t")
+                               :blocks (vector (list :field-id "heading" :text "h")
+                                               (list :field-id "body" :text "b")))
                          (lambda (field object outer)
                            (push (list (and outer (field-name outer)) (field-name field)
-                                       (gethash (field-name field) object))
-                                 seen)))
+                                       (field-value object field))
+                                 seen)
+                           object))
         (ok (equal (reverse seen)
                    '((nil "title" nil)
                      ("meta" "title" "t") ("meta" "image" nil) ("meta" "kind" nil)
                      ("blocks" "text" "h") ("blocks" "text" "b")))
             "a field with no value too, and none for a custom or a repeater itself")))
-    (testing "what the call does lands in a copy"
-      (let* ((data (jobject "title" "a"
-                            "meta" (jobject "title" "b")
-                            "blocks" (vector (jobject "fieldId" "heading" "text" "c"))))
+    (testing "what the call returns lands in a copy"
+      (let* ((data (list :title "a"
+                         :meta (list :title "b")
+                         :blocks (vector (list :field-id "heading" :text "c"))))
              (out (map-data-fields fields data #'upcase-texts)))
-        (ok (string= (jget out "title") "A"))
-        (ok (string= (jget (jget out "meta") "title") "B") "inside a custom value")
-        (ok (string= (jget (aref (jget out "blocks") 0) "text") "C") "inside a repeater row")
-        (ok (string= (jget data "title") "a") "and the data given is left as it was")
-        (ok (string= (jget (jget data "meta") "title") "b"))
-        (ok (string= (jget (aref (jget data "blocks") 0) "text") "c"))))
+        (ok (string= (access out :title) "A"))
+        (ok (string= (accesses out :meta :title) "B") "inside a custom value")
+        (ok (string= (accesses out :blocks 0 :text) "C") "inside a repeater row")
+        (ok (string= (access data :title) "a") "and the data given is left as it was")
+        (ok (string= (accesses data :meta :title) "b"))
+        (ok (string= (accesses data :blocks 0 :text) "c"))))
+    (testing "an empty custom value is walked, and an absent one is not made"
+      (ok (equal (map-data-fields fields (list :meta nil)
+                                  (lambda (field object outer)
+                                    (if (and outer (string= (field-name field) "kind"))
+                                        (list* (field-key field) "page" object)
+                                        object)))
+                 '(:meta (:kind "page"))))
+      (ok (null (map-data-fields fields nil #'upcase-texts))))
     (testing "what is not shaped as its field says is passed over"
-      (let* ((stray (jobject "fieldId" "ghost" "text" "x"))
+      (let* ((stray (list :field-id "ghost" :text "x"))
              (out (map-data-fields fields
-                                   (jobject "meta" "flat" "blocks" (vector stray "loose"))
+                                   (list :meta "flat" :blocks (vector stray "loose"))
                                    #'upcase-texts)))
-        (ok (string= (jget out "meta") "flat") "a custom value that is not an object")
-        (ok (eq (aref (jget out "blocks") 0) stray) "a row whose fieldId names no custom field of the repeater")
-        (ok (string= (aref (jget out "blocks") 1) "loose") "a row that is not an object")))
+        (ok (string= (access out :meta) "flat") "a custom value that is not an object")
+        (ok (eq (accesses out :blocks 0) stray) "a row whose fieldId names no custom field of the repeater")
+        (ok (string= (accesses out :blocks 1) "loose") "a row that is not an object")))
     (testing "a repeater that is not an array is passed over"
-      (ok (string= (jget (map-data-fields fields (jobject "blocks" "flat") #'upcase-texts) "blocks") "flat")))))
+      (ok (string= (access (map-data-fields fields (list :blocks "flat") #'upcase-texts) :blocks) "flat")))))
+
+(deftest a-field-s-value-is-found-by-its-keyword-alone
+  (let ((field (make-field :blog-post :text)))
+    (ok (equal (multiple-value-list (field-value (list :blog-post "a") field)) '("a" t)))
+    (ok (equal (multiple-value-list (field-value (list :blog-post nil) field)) '(nil t)) "a value of nil is there")
+    (ok (null (nth-value 1 (field-value nil field))) "and no key is no value")
+    (ok (null (nth-value 1 (field-value (list "blog-post" "a" "BLOG-POST" "b") field)))
+        "a string key spelled as the keyword is not the field")
+    (let ((data (list "blog-post" "a")))
+      (setf (field-value data field) "b")
+      (ok (equal data '(:blog-post "b" "blog-post" "a")) "nor is it set in its place"))
+    (let ((data (list :blog-post "a" :other 1)))
+      (setf (field-value data field) "b")
+      (ok (equal data '(:blog-post "b" :other 1)) "a key that is there is set where it is"))
+    (ok (equal (without-field (list "blog-post" "a" :blog-post "b") field) '("blog-post" "a"))
+        "and only the field's own key is taken away"))
+  (testing "a row's custom field is found by its fieldId"
+    (let ((field (model-field (schema-model (blocks-schema) "page") :blocks)))
+      (ok (string= (custom-field-name (row-kind field (list :field-id "body"))) "body"))
+      (ok (null (row-kind field (list "field-id" "body"))) "by its keyword alone")
+      (ok (null (row-kind field nil)) "and an empty row has none")
+      (ok (null (row-kind field "body")) "nor has what is not a row"))))
 
 (deftest a-field-has-its-name-as-a-keyword
   (ok (eq (field-key (make-field :event-at :text)) :event-at))
-  (ok (eq (field-key (make-field "pageURL" :text)) :page-u-r-l) "as a name with capitals in a row comes back")
-  (let* ((schema (jobject->schema (parse-json "{\"koyaSchema\": 1,
-                                                \"customFields\": [{\"name\": \"card\", \"fields\": [{\"name\": \"cardCaptionQq\", \"type\": \"text\"}]}],
-                                                \"models\": [{\"name\": \"page\", \"kind\": \"list\", \"fields\": [
-                                                  {\"name\": \"pageWidthQq\", \"type\": \"number\"},
-                                                  {\"name\": \"card\", \"type\": \"custom\", \"customField\": \"card\"}]}]}")))
-         (model (schema-model schema "page")))
-    (ok (eq (field-key (model-field model "pageWidthQq")) (find-symbol "PAGE-WIDTH-QQ" :keyword))
-        "a schema read from JSON interns its fields' keywords")
-    (ok (eq (field-key (first (field-fields (model-field model "card")))) :card-caption-qq)
-        "and those of the fields inside a custom field")))
+  (ok (eq (field-key (make-field "pageURL" :text)) :page-u-r-l) "as a name with capitals in a row comes back"))
 
 (deftest a-field-declared-as-a-symbol-comes-back-as-that-symbol
   (ok (eq (field-key (make-field 'image-alt-text :text)) :image-alt-text))
