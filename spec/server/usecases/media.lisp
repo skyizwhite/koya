@@ -229,11 +229,13 @@
 
 (deftest a-failed-insert-is-the-error-told
   (let* ((left nil)
+         (written nil)
          (insert (defmethod insert-media :around (space id &key &allow-other-keys)
                    (declare (ignore space))
                    (error "The row is not written")))
          (cleanup (defmethod delete-media-file :around (space id mime)
-                    (setf left (list space id mime))
+                    (setf left (list space id mime)
+                          written (probe-file (media-file-path space id mime)))
                     (error "The file will not go"))))
     (unwind-protect
          (progn
@@ -241,7 +243,7 @@
                         (error (e) (princ-to-string e)))
                       "The row is not written")
                "the insert's error, not the one taking its file away")
-           (ok left "and the file it wrote is taken away"))
+           (ok written "and the file it wrote is taken away"))
       (remove-method #'insert-media insert)
       (remove-method #'delete-media-file cleanup)
       (when left (apply #'delete-media-file left)))))

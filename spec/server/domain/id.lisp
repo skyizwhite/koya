@@ -8,7 +8,7 @@
 (defun with-drawn-ids (ids thunk)
   (let ((original (fdefinition 'new-id)))
     (unwind-protect
-         (progn (setf (fdefinition 'new-id) (lambda () (pop ids)))
+         (progn (setf (fdefinition 'new-id) (lambda () (or (pop ids) (error "No drawn id is left"))))
                 (funcall thunk))
       (setf (fdefinition 'new-id) original))))
 
