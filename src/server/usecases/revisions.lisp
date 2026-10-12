@@ -6,10 +6,10 @@
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-server/usecases/ports/contents
-                #:find-content #:list-revisions #:count-revisions
+                #:find-contents-by-ids #:list-revisions #:count-revisions
                 #:find-revision)
-  (:import-from #:koya-server/domain/content #:content-published-p)
-  (:import-from #:koya-server/usecases/ports/media #:find-media)
+  (:import-from #:koya-server/domain/content #:content-published-p #:held-ids)
+  (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/usecases/contents #:value-taken-p)
   (:export #:restore-data
            #:list-revisions
@@ -17,18 +17,40 @@
            #:find-revision))
 (in-package #:koya-server/usecases/revisions)
 
-(defun usable-id-p (space field id)
+(defun held-in (model revision)
+  (let ((media '())
+        (references (make-hash-table :test 'equal)))
+    (map-data-fields (model-fields model) revision
+                     (lambda (field value found object outer)
+                       (declare (ignore found outer))
+                       (when (member (field-type field) '(:media :reference))
+                         (let ((ids (held-ids value (array-p value))))
+                           (if (eq (field-type field) :media)
+                               (setf media (append ids media))
+                               (let ((target (field-option field :model)))
+                                 (setf (gethash target references) (append ids (gethash target references)))))))
+                       object))
+    (values media references)))
+
+(defun read-held (space model revision)
+  (multiple-value-bind (media references) (held-in model revision)
+    (let ((contents (make-hash-table :test 'equal)))
+      (maphash (lambda (target ids) (setf (gethash target contents) (find-contents-by-ids space target ids)))
+               references)
+      (values (find-media-by-ids space media) contents))))
+
+(defun usable-id-p (media contents field id)
   (and (stringp id)
        (if (eq (field-type field) :media)
-           (and (find-media space id) t)
-           (let ((target (find-content space (field-option field :model) id)))
+           (and (gethash id media) t)
+           (let ((target (gethash id (gethash (field-option field :model) contents))))
              (and target (content-published-p target))))))
 
-(defun drop-unusable-ids (space field value)
+(defun drop-unusable-ids (media contents field value)
   (if (array-p value)
-      (let ((kept (remove-if-not (lambda (id) (usable-id-p space field id)) value)))
+      (let ((kept (remove-if-not (lambda (id) (usable-id-p media contents field id)) value)))
         (values kept (- (length value) (length kept))))
-      (if (usable-id-p space field value)
+      (if (usable-id-p media contents field value)
           (values value 0)
           (values nil 1))))
 
@@ -39,22 +61,23 @@
                    ~:*~[are~;is~:;are~] not published" count)))
 
 (defun drop-unusable (space model revision)
-  (let ((notes (make-hash-table :test 'equal)))
-    (values (map-data-fields (model-fields model) revision
-                             (lambda (field value found object outer)
-                               (declare (ignore found))
-                               (if (and (member (field-type field) '(:reference :media)) (not (blank-value-p value)))
-                                   (multiple-value-bind (left dropped) (drop-unusable-ids space field value)
-                                     (cond ((zerop dropped) object)
-                                           (t (push (if outer
-                                                        (format nil "~a ~a" (field-name field) (dropped-note field dropped))
-                                                        (dropped-note field dropped))
-                                                    (gethash (field-name (or outer field)) notes))
-                                              (if (blank-value-p left)
-                                                  (without-field object field)
-                                                  (progn (setf (field-value object field) left) object)))))
-                                   object)))
-            notes)))
+  (multiple-value-bind (media contents) (read-held space model revision)
+    (let ((notes (make-hash-table :test 'equal)))
+      (values (map-data-fields (model-fields model) revision
+                               (lambda (field value found object outer)
+                                 (declare (ignore found))
+                                 (if (and (member (field-type field) '(:reference :media)) (not (blank-value-p value)))
+                                     (multiple-value-bind (left dropped) (drop-unusable-ids media contents field value)
+                                       (cond ((zerop dropped) object)
+                                             (t (push (if outer
+                                                          (format nil "~a ~a" (field-name field) (dropped-note field dropped))
+                                                          (dropped-note field dropped))
+                                                      (gethash (field-name (or outer field)) notes))
+                                                (if (blank-value-p left)
+                                                    (without-field object field)
+                                                    (progn (setf (field-value object field) left) object)))))
+                                     object)))
+              notes))))
 
 (defun restore-data (space model id revision current)
   (multiple-value-bind (revision dropped) (drop-unusable space model revision)

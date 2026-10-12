@@ -13,7 +13,8 @@
   (:import-from #:koya-core/case #:kebab-keyword)
   (:import-from #:access #:access)
   (:import-from #:koya-core/data #:data-equal)
-  (:import-from #:koya-server/domain/id #:new-id))
+  (:import-from #:koya-server/domain/id #:new-id)
+  (:import-from #:koya-spec/server/reads #:reads-of))
 (in-package #:koya-spec/server/usecases/revisions)
 
 (defun schema (&rest post-fields)
@@ -82,6 +83,37 @@
         (ng (nth-value 1 (access data :cover)))
         (ok (equal (notes-of notes) '("cover")))))))
 
+(deftest a-version-s-references-and-media-are-read-together
+  (replace-schema "site" (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
+                                                                                          (make-field :photo :media))))
+                                      :models (list (make-model "post" :list (list (make-field :title :text)
+                                                                                   (make-field :cover :media)
+                                                                                   (make-field :lead :reference :model "tag")
+                                                                                   (make-field :tags :reference :model "tag" :many t)
+                                                                                   (make-field :cards :repeater :custom-fields '(card))))
+                                                    (make-model "tag" :list (list (make-field :name :text))))))
+  (let* ((tags (loop :for name :in '("a" "b" "c")
+                     :collect (content-id (create "site" (find-model "site" "tag") (object "name" name) :publish t))))
+         (media (loop :for name :in '("a.png" "b.png" "c.png")
+                      :collect (media-id (insert-media "site" (new-id) :filename name :mime "image/png" :size 1))))
+         (one (reads-of (lambda ()
+                          (restore-data "site" (post) "x"
+                                        (object "title" "Old" "cover" (first media) "tags" (vector (first tags))
+                                                "cards" (vector (object "fieldId" "card" "link" (first tags) "photo" (first media))))
+                                        (object)))))
+         (rows (loop :for tag :in tags :for photo :in media
+                     :collect (object "fieldId" "card" "link" tag "photo" photo))))
+    (ok (equal one '("(FIND-CONTENTS-BY-IDS tag)" "FIND-MEDIA-BY-IDS"))
+        "a version is read once for the contents of each model it refers to and once for its media")
+    (ok (equal (reads-of (lambda ()
+                           (restore-data "site" (post) "x"
+                                         (object "title" "Old" "cover" (second media) "lead" (second tags)
+                                                 "tags" (coerce (append tags '("gone")) 'vector)
+                                                 "cards" (coerce rows 'vector))
+                                         (object))))
+               one)
+        "however many references and media its fields and rows hold")))
+
 (deftest a-unique-value-another-content-took-since
   (let ((other (create "site" (post) (object "title" "Taken" "slug" "taken") :publish t))
         (mine (create "site" (post) (object "title" "Mine" "slug" "mine") :publish t)))
@@ -110,7 +142,13 @@
     (ok (equal (notes-of notes) '("card")) "and the note names the custom field")
     (ok (equal (getf (first notes) :note)
                "link lost 1 reference to content that was deleted or is not published; photo lost 1 media that is no longer in the library")
-        "and each field inside that lost something, in the custom field's order")))
+        "and each field inside that lost something, in the custom field's order"))
+  (let* ((live (content-id (create "site" (find-model "site" "tag") (object "name" "live") :publish t)))
+         (media (media-id (insert-media "site" (new-id) :filename "c.png" :mime "image/png" :size 1)))
+         (card (access (restore-data "site" (post) "x" (object "title" "Old" "card" (object "link" live "photo" media)) (object))
+                       :card)))
+    (ok (and (string= (access card :link) live) (string= (access card :photo) media))
+        "a reference and a media inside that are still there come back")))
 
 (deftest what-a-row-no-longer-has
   (replace-schema "site" (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
@@ -129,4 +167,13 @@
     (ok (equal (notes-of notes) '("cards")) "and the note names the repeater")
     (ok (equal (getf (first notes) :note)
                "link lost 1 reference to content that was deleted or is not published; photo lost 1 media that is no longer in the library")
-        "and each field in a row that lost something, in row order")))
+        "and each field in a row that lost something, in row order"))
+  (let* ((live (content-id (create "site" (find-model "site" "tag") (object "name" "live") :publish t)))
+         (media (media-id (insert-media "site" (new-id) :filename "c.png" :mime "image/png" :size 1)))
+         (row (aref (access (restore-data "site" (post) "x"
+                                          (object "title" "Old" "cards" (vector (object "fieldId" "card" "link" live "photo" media)))
+                                          (object))
+                            :cards)
+                    0)))
+    (ok (and (string= (access row :link) live) (string= (access row :photo) media))
+        "a reference and a media in a row that are still there come back")))
