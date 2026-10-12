@@ -4,7 +4,7 @@
                 #:next-status #:check-transition #:make-content #:+statuses+ #:+operations+ #:held-ids
                 #:new-content #:drafted #:published #:unpublished #:discarded #:content-status
                 #:content-published-p #:content-draft-p #:content-data
-                #:merge-data #:comparable-data #:initial-data #:to-the-minute)
+                #:merge-data #:comparable-data #:initial-data #:to-the-minute #:content-labels)
   (:import-from #:koya-core/data #:data-equal)
   (:import-from #:koya-core/schema #:make-model #:make-field)
   (:import-from #:koya-server/domain/errors #:conflict #:koya-error-code))
@@ -56,6 +56,16 @@
     (ok (equal (held-ids "a" nil) '("a")))
     (ok (null (held-ids "" nil)) "holds nothing when it is blank")
     (ok (null (held-ids (vector "a") nil)) "or has a list")))
+
+(deftest contents-are-named-by-their-label
+  (let ((contents (make-hash-table :test 'equal))
+        (model (make-model "tag" :list (list (make-field :name :text)) :label "name")))
+    (setf (gethash "a" contents) (make-content :id "a" :status "draft" :draft (list :name "Lisp"))
+          (gethash "b" contents) (make-content :id "b" :status "draft" :draft (list :name "")))
+    (let ((labels (content-labels contents model)))
+      (ok (string= (gethash "a" labels) "Lisp") "each id is named by its content's label")
+      (ok (string= (gethash "b" labels) "b") "or by itself when the label is blank")
+      (ok (= (hash-table-count labels) 2)))))
 
 (deftest a-content-s-status-says-which-versions-it-has
   (let ((live (new-content "c" "s" "m" nil :publish t)))
