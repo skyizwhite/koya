@@ -22,8 +22,8 @@
                 #:koya-error #:koya-error-code #:conflict #:rejected #:too-large)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema)
   (:import-from #:babel #:string-to-octets)
-  (:export #:png-bytes #:*media-root* #:multipart-body)
-  (:import-from #:koya-spec/server/main #:with-env))
+  (:import-from #:koya-spec/server/main #:with-env)
+  (:export #:png-bytes #:*media-root* #:multipart-body))
 (in-package #:koya-spec/server/usecases/media)
 
 (defvar *media-root*

@@ -9,7 +9,8 @@
   (:import-from #:koya-server/usecases/keys #:list-delivery-keys)
   (:import-from #:koya-server/usecases/settings #:enable-totp #:disable-totp)
   (:import-from #:koya-server/domain/totp #:totp #:unix-now)
-  (:import-from #:koya-server/web/pages/settings #:begin-two-factor-action))
+  (:import-from #:koya-server/web/pages/settings #:begin-two-factor-action)
+  (:import-from #:koya-spec/server/main #:with-env))
 (in-package #:koya-spec/server/web/pages/login)
 
 (setup (setup-pages) (log-in))
@@ -163,30 +164,24 @@
 
 (deftest a-missing-secret-is-a-short-one
   (let ((*cookie* nil))
-    (setf (uiop:getenv "KOYA_SECRET") "")
-    (unwind-protect
-         (progn
-           (multiple-value-bind (status body) (request :get "/login")
-             (ok (= status 200))
-             (ok (search "KOYA_SECRET is shorter than 32 characters" body)))
-           (ok (= 403 (post-login :form '(("secret" . ""))))))
-      (setf (uiop:getenv "KOYA_SECRET") *secret*))))
+    (with-env (("KOYA_SECRET" ""))
+      (multiple-value-bind (status body) (request :get "/login")
+        (ok (= status 200))
+        (ok (search "KOYA_SECRET is shorter than 32 characters" body)))
+      (ok (= 403 (post-login :form '(("secret" . ""))))))))
 
 (deftest a-short-secret-turns-logging-in-off
   (let ((*cookie* nil)
         (short (make-string 31 :initial-element #\s)))
-    (setf (uiop:getenv "KOYA_SECRET") short)
-    (unwind-protect
-         (progn
-           (multiple-value-bind (status body) (request :get "/login")
-             (ok (= status 200))
-             (ok (search "KOYA_SECRET is shorter than 32 characters" body) "the page says why")
-             (ng (search "name=\"secret\"" body) "and asks for no secret"))
-           (multiple-value-bind (status body) (post-login :form `(("secret" . ,short)))
-             (ok (= status 403) "even the short secret itself does not log in")
-             (ok (search "KOYA_SECRET is shorter than 32 characters" body)))
-           (ok (null *cookie*) "and no session was made"))
-      (setf (uiop:getenv "KOYA_SECRET") *secret*))
+    (with-env (("KOYA_SECRET" short))
+      (multiple-value-bind (status body) (request :get "/login")
+        (ok (= status 200))
+        (ok (search "KOYA_SECRET is shorter than 32 characters" body) "the page says why")
+        (ng (search "name=\"secret\"" body) "and asks for no secret"))
+      (multiple-value-bind (status body) (post-login :form `(("secret" . ,short)))
+        (ok (= status 403) "even the short secret itself does not log in")
+        (ok (search "KOYA_SECRET is shorter than 32 characters" body)))
+      (ok (null *cookie*) "and no session was made"))
     (ok (= 200 (post-login :form `(("secret" . ,*secret*)))) "a long secret and a restart are all it takes")))
 
 (deftest a-failed-login-does-not-say-which-factor-was-wrong

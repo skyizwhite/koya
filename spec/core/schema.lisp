@@ -383,8 +383,7 @@
           "which a row naming no custom field of the repeater still gives")
       (ok (equal (multiple-value-list (row-kind field "body")) '(nil nil)) "and what is not a row gives none")
       (ok (null (row-kind field (list "field-id" "body"))) "by its keyword alone")
-      (ok (null (row-kind field nil)) "and an empty row has none")
-      (ok (null (row-kind field "body")) "nor has what is not a row")))
+      (ok (null (row-kind field nil)) "and an empty row has none")))
   (testing "a row is its fieldId and its fields"
     (ok (string= (row-field-id (list :text "t" :field-id "body")) "body"))
     (ok (null (row-field-id (list "field-id" "body"))) "found by its keyword alone")
