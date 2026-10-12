@@ -5,7 +5,7 @@
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-fields #:field-name #:field-type
                 #:webhook-covers-p #:field-many-p #:field-value)
-  (:import-from #:koya-core/json #:json-array-p #:blank-p)
+  (:import-from #:koya-core/data #:array-p #:blank-p)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/web/lib/target #:target-model)
   (:import-from #:koya-server/domain/content
@@ -78,7 +78,7 @@
 (defun field-preview (field data ref-labels)
   (multiple-value-bind (value found) (field-value data field)
     (if (eq (field-type field) :repeater)
-        (and (json-array-p value) (plusp (length value)) (format nil "~a row~:p" (length value)))
+        (and (array-p value) (plusp (length value)) (format nil "~a row~:p" (length value)))
         (let ((text (value-text field value found (lambda (field id) (reference-label field id ref-labels)))))
           (and text (truncate-text (collapse-whitespace text)))))))
 

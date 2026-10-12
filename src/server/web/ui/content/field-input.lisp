@@ -4,7 +4,8 @@
                 #:field-name #:field-type #:field-option #:field-required-p #:field-many-p
                 #:field-row-kinds #:custom-field-name)
   (:import-from #:koya-core/json
-                #:to-json #:jobject #:json-array-p #:blank-p)
+                #:to-json #:jobject)
+  (:import-from #:koya-core/data #:array-p #:blank-p)
   (:import-from #:koya-server/web/lib/forms #:field-param-name #:value->string)
   (:import-from #:koya-server/domain/media #:media-filename #:media-alt)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
@@ -18,14 +19,14 @@
 
 (defun selected-p (value option)
   (if (present-p value)
-      (if (json-array-p value)
+      (if (array-p value)
           (and (find option value :test #'equal) t)
           (equal option value))
       nil))
 
 (defun reference-choices (value references)
   (let ((selected (cond ((not (present-p value)) '())
-                        ((json-array-p value) (coerce value 'list))
+                        ((array-p value) (coerce value 'list))
                         (t (list value)))))
     (append references
             (loop :for id :in selected
@@ -232,7 +233,7 @@
          (:media
           (if (field-many-p field)
               (hsx (~media-list-control :name name
-                                        :entries (and (present-p value) (json-array-p value)
+                                        :entries (and (present-p value) (array-p value)
                                                       (map 'list (lambda (id) (cons id (cdr (assoc id media :test #'equal)))) value))))
               (hsx (~media-control :name name :value (and (present-p value) (stringp value) value) :media media))))
          (t (hsx (input :type "text" :id id :name name :value string :class "input"))))

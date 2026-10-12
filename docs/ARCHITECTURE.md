@@ -140,7 +140,9 @@ that belongs to another layer (`cl-dbi` outside `infra/`, `jingle` outside
 -- ningle is reached through jingle, which re-exports it. `lack` is infra's as
 well as the web's, since the session store infra keeps in the database speaks
 its protocol. What no layer owns — koya-core, alexandria and the like — is
-listed as usable anywhere. `main` checks with okite,
+listed as usable anywhere, except koya-core's JSON and its conversions
+(`core/json`, `core/case`, `core/schema-json`), which only the web and infra
+use. `main` checks with okite,
 as it loads, that every generic function of `usecases/ports/` has a method.
 See `adr/2026-09-27-the-server-is-layered-and-depends-inward.md`.
 

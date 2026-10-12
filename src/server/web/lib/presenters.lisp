@@ -1,6 +1,7 @@
 (defpackage #:koya-server/web/lib/presenters
   (:use #:cl)
-  (:import-from #:koya-core/json #:jobject #:json-null #:json-array-p #:to-json)
+  (:import-from #:koya-core/json #:jobject #:json-null #:to-json)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-core/case #:camel-key #:data->jvalue)
   (:import-from #:koya-core/schema
                 #:model-fields #:field-name #:field-key #:field-type #:field-fields #:custom-field-fields
@@ -51,7 +52,7 @@
     (media (media->jobject value))
     (delivered (delivered->jobject value))
     ((eql :null) json-null)
-    ((satisfies json-array-p) (map 'vector #'present-value value))
+    ((satisfies array-p) (map 'vector #'present-value value))
     (cons (data->jvalue value))
     (t value)))
 
@@ -66,7 +67,7 @@
 (defun present-field (field value)
   (case (field-type field)
     (:custom (if (listp value) (present-fields (field-fields field) value) (present-value value)))
-    (:repeater (if (json-array-p value)
+    (:repeater (if (array-p value)
                    (map 'vector (lambda (row) (present-row field row)) value)
                    (present-value value)))
     (t (present-value value))))

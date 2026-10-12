@@ -6,8 +6,8 @@
                 #:jobject
                 #:jget
                 #:jkeys
-                #:json-array-p
                 #:json-null-p)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-core/schema
                 #:+schema-version+ #:*field-types* #:+option-keys+ #:schema-error
                 #:field-name #:field-type #:field-options #:make-field
@@ -58,7 +58,7 @@
   (unless (hash-table-p obj) (fail "each webhook must be an object"))
   (let ((label (jget obj "label")) (url (jget obj "url")) (only (jget obj "only")))
     (when (json-null-p only) (fail "webhook ~s: only is null" (or label url)))
-    (make-webhook (or label url) url :only (if (json-array-p only) (coerce only 'list) only))))
+    (make-webhook (or label url) url :only (if (array-p only) (coerce only 'list) only))))
 
 (defun model->jobject (model)
   (let ((obj (jobject "name" (model-name model)
@@ -84,7 +84,7 @@
 
 (defun jvalue->option (key value)
   (case key
-    ((:options :custom-fields) (if (json-array-p value) (coerce value 'list) value))
+    ((:options :custom-fields) (if (array-p value) (coerce value 'list) value))
     (t value)))
 
 (defun find-keyword (string candidates)
@@ -113,13 +113,13 @@
   (let ((name (jget obj "name"))
         (fields (jget obj "fields")))
     (unless (stringp name) (fail "custom field without a name"))
-    (unless (json-array-p fields) (fail "custom field ~s: fields must be an array" name))
+    (unless (array-p fields) (fail "custom field ~s: fields must be an array" name))
     (make-custom-field name (map 'list #'jobject->field fields))))
 
 (defun forget-slug-options (obj)
   (let ((fields (and (hash-table-p obj) (jget obj "fields")))
         (forgot nil))
-    (when (json-array-p fields)
+    (when (array-p fields)
       (loop :for field :across fields
             :when (and (hash-table-p field) (equal (jget field "type") "slug"))
               :do (let ((from (remhash "from" field))
@@ -139,7 +139,7 @@
         (fields (jget obj "fields")))
     (unless (stringp name) (fail "model without a name"))
     (unless kind (fail "model ~s: kind must be \"list\" or \"object\"" name))
-    (unless (or (null fields) (json-array-p fields)) (fail "model ~s: fields must be an array" name))
+    (unless (or (null fields) (array-p fields)) (fail "model ~s: fields must be an array" name))
     (make-model name kind
                 (map 'list #'jobject->field (or fields #()))
                 :preview-url (model-value obj name "previewUrl")
@@ -155,9 +155,9 @@
   (let ((webhooks (jget obj "webhooks"))
         (custom-fields (jget obj "customFields"))
         (models (jget obj "models")))
-    (unless (or (null webhooks) (json-array-p webhooks)) (fail "webhooks must be an array"))
-    (unless (or (null custom-fields) (json-array-p custom-fields)) (fail "customFields must be an array"))
-    (unless (or (null models) (json-array-p models)) (fail "models must be an array"))
+    (unless (or (null webhooks) (array-p webhooks)) (fail "webhooks must be an array"))
+    (unless (or (null custom-fields) (array-p custom-fields)) (fail "customFields must be an array"))
+    (unless (or (null models) (array-p models)) (fail "models must be an array"))
     (check-schema (make-schema :webhooks (map 'list #'jobject->webhook (or webhooks #()))
                                :custom-fields (map 'list #'jobject->custom-field (or custom-fields #()))
                                :models (map 'list #'jobject->model (or models #()))))))

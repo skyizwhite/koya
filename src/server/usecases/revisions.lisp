@@ -4,7 +4,7 @@
                 #:model-fields #:field-name #:field-type #:field-option #:field-unique-p
                 #:field-required-p #:map-data-fields #:field-value #:without-field #:field-key)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
-  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-server/usecases/ports/contents
                 #:find-content #:list-revisions #:count-revisions
                 #:find-revision)
@@ -25,7 +25,7 @@
              (and target (content-published-p target))))))
 
 (defun drop-unusable-ids (space field value)
-  (if (json-array-p value)
+  (if (array-p value)
       (let ((kept (remove-if-not (lambda (id) (usable-id-p space field id)) value)))
         (values kept (- (length value) (length kept))))
       (if (usable-id-p space field value)

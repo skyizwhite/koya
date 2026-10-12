@@ -30,7 +30,10 @@
               ("clack" :main) ("lack" :web :infra) ("lack-mw" :web)
               ("jingle" :web :ui :pages :admin-api)
               ("ningle-actions" :web :ui :pages) ("ningle-fbr" :web) ("smart-buffer" :web)
-              ("hsx" :web :ui :pages) ("okite" :main))
+              ("hsx" :web :ui :pages) ("okite" :main)
+              ("koya-core/json" :web :ui :pages :api :admin-api :infra)
+              ("koya-core/case" :web :ui :pages :api :admin-api :infra)
+              ("koya-core/schema-json" :web :ui :pages :api :admin-api :infra))
   (:anywhere "koya-core" "access" "alexandria" "cl-ppcre" "babel" "ironclad" "local-time"
              "bordeaux-threads" "quri")
   (:forbid "koya-sdk" "ningle"))

@@ -10,7 +10,8 @@
                 #:custom-field->jobject #:jobject->custom-field)
   (:import-from #:koya-core/case #:jvalue->data)
   (:import-from #:koya-core/json
-                #:parse-json #:to-json #:json-array-p)
+                #:parse-json #:to-json)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-core/diff #:dropped-custom-fields)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
   (:import-from #:koya-server/infra/db/contents #:text-column)
@@ -134,7 +135,7 @@
   (let ((value (and data (gethash outer data))))
     (cond ((and (null kind) (hash-table-p value))
            (remhash inner value))
-          ((and kind (json-array-p value))
+          ((and kind (array-p value))
            (let ((dropped nil))
              (loop :for row :across value
                    :when (and (hash-table-p row) (equal (gethash "fieldId" row) kind) (remhash inner row))
@@ -165,7 +166,7 @@
     (rewrite-revision-data space model
                            (lambda (data)
                              (let ((rows (gethash field data)))
-                               (when (and (json-array-p rows) (some #'gone-p rows))
+                               (when (and (array-p rows) (some #'gone-p rows))
                                  (setf (gethash field data) (remove-if #'gone-p rows))
                                  t))))))
 

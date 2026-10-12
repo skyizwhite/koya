@@ -13,7 +13,8 @@
                 #:call-with-upload #:archive-document #:archive-entry-size #:archive-entry-bytes
                 #:purge-stale-archives)
   (:import-from #:koya-core/json
-                #:jobject #:jget #:json-array-p #:parse-json #:to-json)
+                #:jobject #:jget #:parse-json #:to-json)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-core/case
                 #:jvalue->data #:data->jvalue #:data->jobject)
   (:import-from #:koya-core/schema-json
@@ -70,7 +71,7 @@
 
 (defun without-slug-options (schema)
   (let ((models (and (hash-table-p schema) (jget schema "models"))))
-    (when (json-array-p models)
+    (when (array-p models)
       (map nil #'forget-slug-options models)))
   schema)
 
@@ -82,11 +83,11 @@
           (setf (gethash key object) 'null))))))
 
 (defun versions-as-written (contents)
-  (when (json-array-p contents)
+  (when (array-p contents)
     (loop :for content :across contents
           :do (false-as-null content '("published" "draft" "revisions"))
               (let ((revisions (and (hash-table-p content) (gethash "revisions" content))))
-                (when (json-array-p revisions)
+                (when (array-p revisions)
                   (loop :for revision :across revisions :do (false-as-null revision '("data"))))))))
 
 (defun json->document (json)

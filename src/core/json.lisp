@@ -10,11 +10,7 @@
            #:json-null
            #:json-null-p
            #:json-array
-           #:json-array-p
-           #:blank-p
-           #:copy-object
            #:jget
-           #:jset
            #:jobject
            #:jkeys
            #:json-equal))
@@ -25,15 +21,6 @@
 (defun json-null-p (value) (eq value 'null))
 
 (defun json-array (&rest values) (coerce values 'vector))
-
-(defun json-array-p (value) (and (vectorp value) (not (stringp value))))
-
-(defun blank-p (value) (or (null value) (zerop (length value))))
-
-(defun copy-object (object)
-  (let ((out (make-hash-table :test 'equal)))
-    (when object (maphash (lambda (k v) (setf (gethash k out) v)) object))
-    out))
 
 (defun parse-json (string)
   (parse string))
@@ -55,22 +42,7 @@
                 (if rest (setf current v) (return-from jget (values v t)))))
     (values current t)))
 
-(defun jset (object key value)
-  (setf (gethash key object) value)
-  object)
-
 (defun jkeys (object)
   (let ((keys '()))
     (maphash (lambda (k v) (declare (ignore v)) (push k keys)) object)
     (sort keys #'string<)))
-
-(defun json-equal (a b)
-  (cond ((and (hash-table-p a) (hash-table-p b))
-         (and (= (hash-table-count a) (hash-table-count b))
-              (loop :for key :being :the :hash-keys :of a :using (:hash-value value)
-                    :always (multiple-value-bind (other found) (gethash key b)
-                              (and found (json-equal value other))))))
-        ((and (json-array-p a) (json-array-p b))
-         (and (= (length a) (length b)) (every #'json-equal a b)))
-        ((and (numberp a) (numberp b)) (= a b))
-        (t (equal a b))))

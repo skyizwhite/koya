@@ -8,7 +8,7 @@
                 #:model-name #:model-preview-url #:model-public-url #:field-fields #:field-option
                 #:field-row-kind #:row-kind #:custom-field-name #:custom-field-fields #:model-field
                 #:field-many-p #:field-value)
-  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents
@@ -112,7 +112,7 @@
       (:repeater
        (hsx (~repeater-input :field field :error (field-error errors (field-name field))
                              :add-url (repeater-row :space space :model model :field (field-name field))
-              (when (json-array-p value)
+              (when (array-p value)
                 (loop :for row :across value
                       :for index :from 0
                       :for kind := (row-kind field row)

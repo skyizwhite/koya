@@ -1,6 +1,6 @@
 (defpackage #:koya-server/domain/references
   (:use #:cl)
-  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-model #:model-name #:model-fields #:field-type #:field-option
                 #:field-fields #:field-row-kinds #:custom-field-name #:custom-field-fields #:field-value #:row-kind)
@@ -26,7 +26,7 @@
 
 (defun some-inside (test field inner value)
   (if (eq (field-type field) :repeater)
-      (and (json-array-p value)
+      (and (array-p value)
            (some (lambda (row)
                    (let* ((kind (row-kind field row))
                           (entries (and kind (cdr (assoc (custom-field-name kind) inner :test #'equal)))))

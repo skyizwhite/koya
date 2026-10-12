@@ -1,6 +1,6 @@
 (defpackage #:koya-core/case
   (:use #:cl)
-  (:import-from #:koya-core/json #:json-array-p)
+  (:import-from #:koya-core/data #:array-p)
   (:export #:camel-key
            #:name-does-not-come-back
            #:kebab-keyword
@@ -70,7 +70,7 @@
          (loop :for k :being :the :hash-keys :of value :using (:hash-value v)
                :append (list (if intern (kebab-keyword k) (or (find-kebab-keyword k) k))
                              (jvalue->data v :intern intern))))
-        ((json-array-p value) (map 'vector (lambda (v) (jvalue->data v :intern intern)) value))
+        ((array-p value) (map 'vector (lambda (v) (jvalue->data v :intern intern)) value))
         (t value)))
 
 (defun data->jvalue (value)
@@ -82,7 +82,7 @@
                        (error "~s is not a plist of data" value))
                      (setf (gethash (camel-key (first rest)) out) (data->jvalue (second rest))))
            out))
-        ((json-array-p value) (map 'vector #'data->jvalue value))
+        ((array-p value) (map 'vector #'data->jvalue value))
         (t value)))
 
 (defun data->jobject (data)
@@ -94,7 +94,7 @@
          (plist->object value))
         ((listp value)
          (map 'vector #'lisp->jvalue value))
-        ((json-array-p value)
+        ((array-p value)
          (map 'vector #'lisp->jvalue value))
         ((hash-table-p value)
          (let ((out (make-hash-table :test 'equal)))
@@ -105,7 +105,7 @@
 (defun jvalue->lisp (value)
   (cond ((eq value 'null) nil)
         ((hash-table-p value) (object->plist value))
-        ((json-array-p value)
+        ((array-p value)
          (map 'list #'jvalue->lisp value))
         (t value)))
 

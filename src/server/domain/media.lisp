@@ -1,6 +1,6 @@
 (defpackage #:koya-server/domain/media
   (:use #:cl)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-server/domain/image
                 #:image-extension)
   (:export #:media #:make-media

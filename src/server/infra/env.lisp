@@ -1,6 +1,6 @@
 (defpackage #:koya-server/infra/env
   (:use #:cl)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:cl-dotenv
                 #:load-env)
   (:import-from #:koya-server/usecases/ports/config

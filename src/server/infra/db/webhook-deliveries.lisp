@@ -1,6 +1,6 @@
 (defpackage #:koya-server/infra/db/webhook-deliveries
   (:use #:cl)
-  (:import-from #:koya-core/json #:blank-p)
+  (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
   (:import-from #:koya-server/domain/webhook-delivery
                 #:make-delivery)
