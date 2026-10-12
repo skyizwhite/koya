@@ -21,6 +21,12 @@ and two fields would share a key.
 - kebab-case becomes camelCase by the reverse: each `-` and the letter after it
   become that letter in uppercase.
 - One conversion, in `koya-core`, is used by the server's edges and the SDK.
+- A name or key that would not come back as itself is refused, whichever way it
+  is converted: a symbol such as `item-2`, which becomes `item2` and comes back
+  as `:item2`, and a key such as `blog-post`, which becomes `:blog-post` and
+  comes back as `blogPost`. The SDK refuses such a key in an answer too, rather
+  than reading it some other way: every key koya sends is camelCase and comes
+  back, so one that would not is a fault to show, not a spelling to guess at.
 
 ## Consequences
 
@@ -29,3 +35,5 @@ and two fields would share a key.
   letter, `:page-u-r-l`.
 - A site using the SDK that reads a field such as `pageURL` finds it under
   `:page-u-r-l` where it was `:page-url`.
+- A schema declaring a field, a custom field or a label as a symbol that would
+  not come back is refused, and the error names what it would become.

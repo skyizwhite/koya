@@ -33,8 +33,12 @@
    (comes-back-as :initarg :comes-back-as))
   (:report (lambda (c s)
              (with-slots (name becomes comes-back-as) c
-               (format s "~s does not come back as itself: it becomes ~a, which comes back as ~a"
-                       name becomes comes-back-as)))))
+               (format s "~a does not come back as itself: it becomes ~a, which comes back as ~a"
+                       (typecase name
+                         (keyword (format nil ":~(~a~)" name))
+                         (symbol (string-downcase (symbol-name name)))
+                         (t (format nil "~s" name)))
+                       becomes comes-back-as)))))
 
 (defun camel-key (key)
   (if (or (symbolp key) (find #\- key))

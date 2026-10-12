@@ -471,7 +471,8 @@ and coming back, an object becomes a kebab-case keyword plist, an array a list a
 capital into `-` and its lowercase letter and back, so every camelCase key, as
 every key koya sends is, comes back as it was: `publishedAt` is `:published-at`
 and `pageURL` is `:page-u-r-l`. A keyword that would not come back as itself,
-such as `:item-2`, is refused, and so is a key that is not camelCase.
+such as `:item-2`, is refused, and so is a key that would not, such as
+`blog-post`.
 
 There is no Lisp spelling for JSON `false`: the server treats `null` and `false`
 alike for booleans, so `nil` means "off". On `admin-update-list-content` and

@@ -75,7 +75,8 @@
       "whichever way it is converted")
   (ok (signals (data->jvalue (list :item-2 1))) "and is not written")
   (ok (signals (lisp->jvalue '(:item-2 1))) "by either conversion")
-  (ok (signals (jvalue->lisp (parse-json "{\"blog-post\": 1}"))) "and a key koya would never send is not read"))
+  (ok (signals (jvalue->lisp (parse-json "{\"blog-post\": 1}")) 'name-does-not-come-back)
+      "and a key that would not come back is not read"))
 
 (deftest null-becomes-nil
   (let ((back (jvalue->lisp (parse-json "{\"publishedAt\": null, \"tags\": [null, \"a\"], \"n\": 0}"))))
