@@ -13,7 +13,8 @@
   (:import-from #:koya-core/case #:kebab-keyword)
   (:import-from #:access #:access)
   (:import-from #:koya-core/data #:data-equal)
-  (:import-from #:koya-server/domain/id #:new-id))
+  (:import-from #:koya-server/domain/id #:new-id)
+  (:import-from #:koya-spec/server/reads #:reads-of))
 (in-package #:koya-spec/server/usecases/revisions)
 
 (defun schema (&rest post-fields)
@@ -81,6 +82,23 @@
       (multiple-value-bind (data notes) (restore-data "site" (post) "x" (object "title" "Old" "cover" "01GONE") (object))
         (ng (nth-value 1 (access data :cover)))
         (ok (equal (notes-of notes) '("cover")))))))
+
+(deftest a-version-s-references-and-media-are-read-together
+  (let* ((tags (loop :for name :in '("a" "b" "c")
+                     :collect (content-id (create "site" (find-model "site" "tag") (object "name" name) :publish t))))
+         (media (loop :for name :in '("a.png" "b.png")
+                      :collect (media-id (insert-media "site" (new-id) :filename name :mime "image/png" :size 1))))
+         (one (reads-of (lambda ()
+                          (restore-data "site" (post) "x"
+                                        (object "title" "Old" "cover" (first media) "tags" (vector (first tags)))
+                                        (object))))))
+    (ok (equal (reads-of (lambda ()
+                           (restore-data "site" (post) "x"
+                                         (object "title" "Old" "cover" (second media) "tags" (coerce (append tags '("gone")) 'vector))
+                                         (object))))
+               one)
+        "a version is read for what it holds in as many reads, however many references it has")
+    (ng (intersection one '("FIND-CONTENT" "FIND-MEDIA") :test #'string=) "and not one by one")))
 
 (deftest a-unique-value-another-content-took-since
   (let ((other (create "site" (post) (object "title" "Taken" "slug" "taken") :publish t))

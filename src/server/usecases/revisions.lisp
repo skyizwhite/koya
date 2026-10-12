@@ -6,10 +6,10 @@
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-server/usecases/ports/contents
-                #:find-content #:list-revisions #:count-revisions
+                #:find-contents-by-ids #:list-revisions #:count-revisions
                 #:find-revision)
-  (:import-from #:koya-server/domain/content #:content-published-p)
-  (:import-from #:koya-server/usecases/ports/media #:find-media)
+  (:import-from #:koya-server/domain/content #:content-published-p #:held-ids)
+  (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/usecases/contents #:value-taken-p)
   (:export #:restore-data
            #:list-revisions
@@ -17,18 +17,41 @@
            #:find-revision))
 (in-package #:koya-server/usecases/revisions)
 
-(defun usable-id-p (space field id)
+(defun held-in (model revision)
+  (let ((media '())
+        (references (make-hash-table :test 'equal)))
+    (map-data-fields (model-fields model) revision
+                     (lambda (field value found object outer)
+                       (declare (ignore found outer))
+                       (let ((ids (held-ids value (array-p value))))
+                         (case (field-type field)
+                           (:media (setf media (append ids media)))
+                           (:reference (setf (gethash (field-option field :model) references)
+                                             (append ids (gethash (field-option field :model) references))))))
+                       object))
+    (values media references)))
+
+(defun read-held (space model revision)
+  (multiple-value-bind (media references) (held-in model revision)
+    (let ((found (make-hash-table :test 'equal)))
+      (setf (gethash :media found) (if media (find-media-by-ids space media) (make-hash-table :test 'equal)))
+      (maphash (lambda (target ids) (setf (gethash target found) (find-contents-by-ids space target ids)))
+               references)
+      found)))
+
+(defun usable-id-p (held field id)
   (and (stringp id)
        (if (eq (field-type field) :media)
-           (and (find-media space id) t)
-           (let ((target (find-content space (field-option field :model) id)))
+           (and (gethash id (gethash :media held)) t)
+           (let* ((found (gethash (field-option field :model) held))
+                  (target (and found (gethash id found))))
              (and target (content-published-p target))))))
 
-(defun drop-unusable-ids (space field value)
+(defun drop-unusable-ids (held field value)
   (if (array-p value)
-      (let ((kept (remove-if-not (lambda (id) (usable-id-p space field id)) value)))
+      (let ((kept (remove-if-not (lambda (id) (usable-id-p held field id)) value)))
         (values kept (- (length value) (length kept))))
-      (if (usable-id-p space field value)
+      (if (usable-id-p held field value)
           (values value 0)
           (values nil 1))))
 
@@ -39,12 +62,13 @@
                    ~:*~[are~;is~:;are~] not published" count)))
 
 (defun drop-unusable (space model revision)
-  (let ((notes (make-hash-table :test 'equal)))
+  (let ((notes (make-hash-table :test 'equal))
+        (held (read-held space model revision)))
     (values (map-data-fields (model-fields model) revision
                              (lambda (field value found object outer)
                                (declare (ignore found))
                                (if (and (member (field-type field) '(:reference :media)) (not (blank-value-p value)))
-                                   (multiple-value-bind (left dropped) (drop-unusable-ids space field value)
+                                   (multiple-value-bind (left dropped) (drop-unusable-ids held field value)
                                      (cond ((zerop dropped) object)
                                            (t (push (if outer
                                                         (format nil "~a ~a" (field-name field) (dropped-note field dropped))
