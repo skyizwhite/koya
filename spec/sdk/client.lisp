@@ -32,6 +32,19 @@
               (socket-error () (sleep 0.05)))
         :finally (error "Nothing listens on port ~a" port)))
 
+(defun declare-site ()
+  (clear-schema)
+  (defmodel blog (:kind :list)
+    (title :text :required t)
+    (slug :slug)
+    (body :richtext)
+    (tags :reference :model tag :many t)
+    (cover :media))
+  (defmodel tag (:kind :list)
+    (name :text :required t))
+  (defmodel about (:kind :object)
+    (body :richtext)))
+
 (setup
   (setf (uiop:getenv "KOYA_SECRET") *secret*)
   (setf (uiop:getenv "KOYA_MEDIA_DIR") (namestring *media-root*))
@@ -44,17 +57,7 @@
   (configure :base-url (format nil "http://127.0.0.1:~a" *port*)
              :management-key (create-management-key "website" :label "client")
              :space "website")
-  (clear-schema)
-  (defmodel blog (:kind :list)
-    (title :text :required t)
-    (slug :slug)
-    (body :richtext)
-    (tags :reference :model tag :many t)
-    (cover :media))
-  (defmodel tag (:kind :list)
-    (name :text :required t))
-  (defmodel about (:kind :object)
-    (body :richtext)))
+  (declare-site))
 
 (teardown
   (stop)
@@ -73,16 +76,16 @@
       (ok (= (koya-error-status e) 403))
       (ok (string= (koya-error-code e) "forbidden"))))
   (testing "destructive push without confirmation is refused"
-    (clear-schema)
-    (defmodel blog (:kind :list) (title :text :required t))
-    (ok (null (deploy :confirm nil :stream (make-broadcast-stream))))
-    (ok (= (length (schema-models (pull))) 3) "untouched")
-    (ok (deploy :force t :stream (make-broadcast-stream)))
-    (ok (= (length (schema-models (pull))) 1))
-    (defmodel blog (:kind :list) (title :text :required t) (slug :slug) (body :richtext) (tags :reference :model tag :many t) (cover :media))
-    (defmodel tag (:kind :list) (name :text :required t))
-    (defmodel about (:kind :object) (body :richtext))
-    (deploy :force t :stream (make-broadcast-stream))))
+    (unwind-protect
+         (progn
+           (clear-schema)
+           (defmodel blog (:kind :list) (title :text :required t))
+           (ok (null (deploy :confirm nil :stream (make-broadcast-stream))))
+           (ok (= (length (schema-models (pull))) 3) "untouched")
+           (ok (deploy :force t :stream (make-broadcast-stream)))
+           (ok (= (length (schema-models (pull))) 1)))
+      (declare-site)
+      (deploy :force t :stream (make-broadcast-stream)))))
 
 (deftest contents-and-delivery
   (configure :delivery-key (create-delivery-key "website" :label "client"))

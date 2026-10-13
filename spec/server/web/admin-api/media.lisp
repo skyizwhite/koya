@@ -7,8 +7,7 @@
   (:import-from #:koya-core/json #:jobject #:jget)
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-spec/server/usecases/media #:png-bytes)
-  (:import-from #:koya-spec/server/web/api-support #:test-schema)
-  (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-spec/server/schema #:with-schema)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-custom-field))
 (in-package #:koya-spec/server/web/admin-api/media)
 
@@ -120,61 +119,57 @@
         (ok (= status 403) "a key of another space is refused before the route is reached")))))
 
 (deftest media-inside-a-custom-field
-  (replace-schema "website"
-                  (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :photo :media)
-                                                                                    (make-field :note :richtext))))
-                               :models (list (make-model "blog" :list (list (make-field :title :text)
-                                                                            (make-field :card :custom :custom-field "card"))))))
-  (unwind-protect
-       (let* ((id (jget (aref (jget (nth-value 1 (admin-upload "/admin/api/website/media"
-                                                               (list (list "file" "inside.png" "image/png" (png-bytes 2 2)))))
-                                    "media")
-                              0)
-                        "id"))
-              (post (jget (nth-value 1 (admin :post "/admin/api/website/lists/blog"
-                                              :body (jobject "data" (jobject "title" "Inside"
-                                                                             "card" (jobject "photo" id
-                                                                                             "note" "<p><img src=\"/media/website/x.png\"></p>"))
-                                                             "publish" t)))
-                          "id")))
-         (multiple-value-bind (status json) (delivery (format nil "/api/v1/website/lists/blog/~a" post))
-           (ok (= status 200))
-           (ok (search "/media/website/" (jget json "card" "photo" "url")) "media inside is expanded")
-           (ok (search "src=\"http://localhost:3000/media/website/x.png\"" (jget json "card" "note"))
-               "and rich text inside has its media paths made absolute"))
-         (ok (= (jget (nth-value 1 (admin :get (format nil "/admin/api/website/media/~a" id))) "references") 1)
-             "it counts as a use")
-         (ok (= 409 (admin :delete (format nil "/admin/api/website/media/~a" id))) "so it is not deleted")
-         (admin :delete (format nil "/admin/api/website/lists/blog/~a" post))
-         (admin :delete (format nil "/admin/api/website/media/~a" id)))
-    (replace-schema "website" (test-schema))))
+  (with-schema ("website"
+                (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :photo :media)
+                                                                                  (make-field :note :richtext))))
+                             :models (list (make-model "blog" :list (list (make-field :title :text)
+                                                                          (make-field :card :custom :custom-field "card"))))))
+    (let* ((id (jget (aref (jget (nth-value 1 (admin-upload "/admin/api/website/media"
+                                                            (list (list "file" "inside.png" "image/png" (png-bytes 2 2)))))
+                                 "media")
+                           0)
+                     "id"))
+           (post (jget (nth-value 1 (admin :post "/admin/api/website/lists/blog"
+                                           :body (jobject "data" (jobject "title" "Inside"
+                                                                          "card" (jobject "photo" id
+                                                                                          "note" "<p><img src=\"/media/website/x.png\"></p>"))
+                                                          "publish" t)))
+                       "id")))
+      (multiple-value-bind (status json) (delivery (format nil "/api/v1/website/lists/blog/~a" post))
+        (ok (= status 200))
+        (ok (search "/media/website/" (jget json "card" "photo" "url")) "media inside is expanded")
+        (ok (search "src=\"http://localhost:3000/media/website/x.png\"" (jget json "card" "note"))
+            "and rich text inside has its media paths made absolute"))
+      (ok (= (jget (nth-value 1 (admin :get (format nil "/admin/api/website/media/~a" id))) "references") 1)
+          "it counts as a use")
+      (ok (= 409 (admin :delete (format nil "/admin/api/website/media/~a" id))) "so it is not deleted")
+      (admin :delete (format nil "/admin/api/website/lists/blog/~a" post))
+      (admin :delete (format nil "/admin/api/website/media/~a" id)))))
 
 (deftest media-in-a-row
-  (replace-schema "website"
-                  (make-schema :custom-fields (list (make-custom-field "gallery" (list (make-field :photo :media)
-                                                                                       (make-field :note :richtext))))
-                               :models (list (make-model "blog" :list (list (make-field :title :text)
-                                                                            (make-field :rows :repeater :custom-fields '(gallery)))))))
-  (unwind-protect
-       (let* ((id (jget (aref (jget (nth-value 1 (admin-upload "/admin/api/website/media"
-                                                               (list (list "file" "row.png" "image/png" (png-bytes 2 2)))))
-                                    "media")
-                              0)
-                        "id"))
-              (post (jget (nth-value 1 (admin :post "/admin/api/website/lists/blog"
-                                              :body (jobject "data" (jobject "title" "Rows"
-                                                                             "rows" (vector (jobject "fieldId" "gallery" "photo" id
-                                                                                                     "note" "<p><img src=\"/media/website/y.png\"></p>")))
-                                                             "publish" t)))
-                          "id")))
-         (multiple-value-bind (status json) (delivery (format nil "/api/v1/website/lists/blog/~a" post))
-           (ok (= status 200))
-           (let ((row (aref (jget json "rows") 0)))
-             (ok (search "/media/website/" (jget row "photo" "url")) "media in a row is expanded")
-             (ok (search "src=\"http://localhost:3000/media/website/y.png\"" (jget row "note"))
-                 "and rich text in a row has its media paths made absolute")))
-         (ok (= (jget (nth-value 1 (admin :get (format nil "/admin/api/website/media/~a" id))) "references") 1)
-             "it counts as a use")
-         (admin :delete (format nil "/admin/api/website/lists/blog/~a" post))
-         (admin :delete (format nil "/admin/api/website/media/~a" id)))
-    (replace-schema "website" (test-schema))))
+  (with-schema ("website"
+                (make-schema :custom-fields (list (make-custom-field "gallery" (list (make-field :photo :media)
+                                                                                     (make-field :note :richtext))))
+                             :models (list (make-model "blog" :list (list (make-field :title :text)
+                                                                          (make-field :rows :repeater :custom-fields '(gallery)))))))
+    (let* ((id (jget (aref (jget (nth-value 1 (admin-upload "/admin/api/website/media"
+                                                            (list (list "file" "row.png" "image/png" (png-bytes 2 2)))))
+                                 "media")
+                           0)
+                     "id"))
+           (post (jget (nth-value 1 (admin :post "/admin/api/website/lists/blog"
+                                           :body (jobject "data" (jobject "title" "Rows"
+                                                                          "rows" (vector (jobject "fieldId" "gallery" "photo" id
+                                                                                                  "note" "<p><img src=\"/media/website/y.png\"></p>")))
+                                                          "publish" t)))
+                       "id")))
+      (multiple-value-bind (status json) (delivery (format nil "/api/v1/website/lists/blog/~a" post))
+        (ok (= status 200))
+        (let ((row (aref (jget json "rows") 0)))
+          (ok (search "/media/website/" (jget row "photo" "url")) "media in a row is expanded")
+          (ok (search "src=\"http://localhost:3000/media/website/y.png\"" (jget row "note"))
+              "and rich text in a row has its media paths made absolute")))
+      (ok (= (jget (nth-value 1 (admin :get (format nil "/admin/api/website/media/~a" id))) "references") 1)
+          "it counts as a use")
+      (admin :delete (format nil "/admin/api/website/lists/blog/~a" post))
+      (admin :delete (format nil "/admin/api/website/media/~a" id)))))

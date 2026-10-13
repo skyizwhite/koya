@@ -4,6 +4,7 @@
   (:import-from #:koya-server/domain/errors #:conflict #:invalid-input #:not-found #:koya-error-code)
   (:import-from #:koya-server/domain/key #:key-label)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-spec/server/schema #:with-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:fetch-one #:col #:exec)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
@@ -509,78 +510,62 @@
     (ng (space-for-delivery-key key))))
 
 (deftest inside-a-custom-field
-  (replace-schema "website"
-                  (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
-                                                                                    (make-field :shown :boolean)
-                                                                                    (make-field :at :datetime)
-                                                                                    (make-field :pinned :boolean :default t))))
-                               :models (list (blog-model)
-                                             (make-model "tag" :list (list (make-field :name :text)))
-                                             (make-model "event" :list (list (make-field :at :datetime)))
-                                             (make-model "page" :list (list (make-field :title :text)
-                                                                            (make-field :card :custom :custom-field "card")))
-                                             (make-model "about" :object (list (make-field :body :richtext))))))
-  (unwind-protect
-       (let* ((page (find-model "website" "page"))
-              (tag (content-id (create "website" (find-model "website" "tag") (list :name "x") :publish t)))
-              (content (create "website" page
-                               (list :title "P" :card (list :link tag :at "2026-09-20T10:00:59+09:00"))
-                               :publish t)))
-         (testing "a datetime inside is kept to the minute in UTC"
-           (ok (string= (accesses (content-published content) :card :at) "2026-09-20T01:00:00.000Z")))
-         (testing "a boolean inside starts as its default says"
-           (ok (eq (accesses (content-published content) :card :pinned) t)))
-         (testing "a reference inside is a use"
-           (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
-           (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
-         (testing "a boolean missing inside and one that is false are the same"
-           (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
-                                                         (list :title "P" :card (list :link tag :at "2026-09-20T01:00:00.000Z"
-                                                                                      :shown nil :pinned t))
-                                                         :replace t))))))
-    (replace-schema "website"
-                    (make-schema :models (list (blog-model)
-                                               (make-model "tag" :list (list (make-field :name :text)))
-                                               (make-model "event" :list (list (make-field :at :datetime)))
-                                               (make-model "page" :list (list (make-field :title :text)
-                                                                              (make-field :slug :slug)))
-                                               (make-model "about" :object (list (make-field :body :richtext))))))))
+  (with-schema ("website"
+                (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
+                                                                                  (make-field :shown :boolean)
+                                                                                  (make-field :at :datetime)
+                                                                                  (make-field :pinned :boolean :default t))))
+                             :models (list (blog-model)
+                                           (make-model "tag" :list (list (make-field :name :text)))
+                                           (make-model "event" :list (list (make-field :at :datetime)))
+                                           (make-model "page" :list (list (make-field :title :text)
+                                                                          (make-field :card :custom :custom-field "card")))
+                                           (make-model "about" :object (list (make-field :body :richtext))))))
+    (let* ((page (find-model "website" "page"))
+           (tag (content-id (create "website" (find-model "website" "tag") (list :name "x") :publish t)))
+           (content (create "website" page
+                            (list :title "P" :card (list :link tag :at "2026-09-20T10:00:59+09:00"))
+                            :publish t)))
+      (testing "a datetime inside is kept to the minute in UTC"
+        (ok (string= (accesses (content-published content) :card :at) "2026-09-20T01:00:00.000Z")))
+      (testing "a boolean inside starts as its default says"
+        (ok (eq (accesses (content-published content) :card :pinned) t)))
+      (testing "a reference inside is a use"
+        (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
+        (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
+      (testing "a boolean missing inside and one that is false are the same"
+        (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
+                                                      (list :title "P" :card (list :link tag :at "2026-09-20T01:00:00.000Z"
+                                                                                   :shown nil :pinned t))
+                                                      :replace t))))))))
 
 (deftest inside-a-repeater
-  (replace-schema "website"
-                  (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
-                                                                                    (make-field :shown :boolean)
-                                                                                    (make-field :at :datetime)
-                                                                                    (make-field :pinned :boolean :default t))))
-                               :models (list (blog-model)
-                                             (make-model "tag" :list (list (make-field :name :text)))
-                                             (make-model "event" :list (list (make-field :at :datetime)))
-                                             (make-model "page" :list (list (make-field :title :text)
-                                                                            (make-field :cards :repeater :custom-fields '(card))))
-                                             (make-model "about" :object (list (make-field :body :richtext))))))
-  (unwind-protect
-       (let* ((page (find-model "website" "page"))
-              (tag (content-id (create "website" (find-model "website" "tag") (list :name "x") :publish t)))
-              (content (create "website" page
-                               (list :title "P" :cards (vector (list :field-id "card" :link tag :at "2026-09-20T10:00:59+09:00")))
-                               :publish t)))
-         (testing "a datetime in a row is kept to the minute in UTC"
-           (ok (string= (access (aref (access (content-published content) :cards) 0) :at) "2026-09-20T01:00:00.000Z")))
-         (testing "a boolean in a row starts as its default says"
-           (ok (eq (access (aref (access (content-published content) :cards) 0) :pinned) t)))
-         (testing "a reference in a row is a use"
-           (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
-           (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
-         (testing "a boolean missing in a row and one that is false are the same"
-           (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
-                                                         (list :title "P" :cards (vector (list :field-id "card" :link tag
-                                                                                               :at "2026-09-20T01:00:00.000Z"
-                                                                                               :shown nil :pinned t)))
-                                                         :replace t))))))
-    (replace-schema "website"
-                    (make-schema :models (list (blog-model)
-                                               (make-model "tag" :list (list (make-field :name :text)))
-                                               (make-model "event" :list (list (make-field :at :datetime)))
-                                               (make-model "page" :list (list (make-field :title :text)
-                                                                              (make-field :slug :slug)))
-                                               (make-model "about" :object (list (make-field :body :richtext))))))))
+  (with-schema ("website"
+                (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
+                                                                                  (make-field :shown :boolean)
+                                                                                  (make-field :at :datetime)
+                                                                                  (make-field :pinned :boolean :default t))))
+                             :models (list (blog-model)
+                                           (make-model "tag" :list (list (make-field :name :text)))
+                                           (make-model "event" :list (list (make-field :at :datetime)))
+                                           (make-model "page" :list (list (make-field :title :text)
+                                                                          (make-field :cards :repeater :custom-fields '(card))))
+                                           (make-model "about" :object (list (make-field :body :richtext))))))
+    (let* ((page (find-model "website" "page"))
+           (tag (content-id (create "website" (find-model "website" "tag") (list :name "x") :publish t)))
+           (content (create "website" page
+                            (list :title "P" :cards (vector (list :field-id "card" :link tag :at "2026-09-20T10:00:59+09:00")))
+                            :publish t)))
+      (testing "a datetime in a row is kept to the minute in UTC"
+        (ok (string= (access (aref (access (content-published content) :cards) 0) :at) "2026-09-20T01:00:00.000Z")))
+      (testing "a boolean in a row starts as its default says"
+        (ok (eq (access (aref (access (content-published content) :cards) 0) :pinned) t)))
+      (testing "a reference in a row is a use"
+        (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
+        (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
+      (testing "a boolean missing in a row and one that is false are the same"
+        (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
+                                                      (list :title "P" :cards (vector (list :field-id "card" :link tag
+                                                                                            :at "2026-09-20T01:00:00.000Z"
+                                                                                            :shown nil :pinned t)))
+                                                      :replace t))))))))
