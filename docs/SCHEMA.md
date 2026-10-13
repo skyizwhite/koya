@@ -178,8 +178,8 @@ model none. Its value is unique within the model without a `unique` option.
 | `help` | string | non-empty; shown under the field's name in the editor, to say what the field expects |
 
 `default: true` on a `boolean` field sets it to `true` on a new content whose
-`data` leaves it out; an explicit `false` is kept, and so is a `null`, which a
-boolean takes as `false`. On output the
+`data` leaves it out; an explicit `false` is kept, and a `null` gets no default,
+so the field reads as `false`. On output the
 options of a field are written in alphabetical key order, so two equal fields
 serialize identically.
 

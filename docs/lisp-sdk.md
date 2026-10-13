@@ -183,9 +183,9 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
   duplicates, taken literally and camelised like field names:
   `(blocks :repeater :custom-fields (heading body))`. A `:repeater` sits only in
   a `defmodel`.
-- `:default t` on a `:boolean` sets the field to true on a new content that does
-  not mention it (the editor starts with the box checked); an explicit `false` is
-  kept.
+- `:default t` on a `:boolean` sets the field to true on a new content that
+  leaves it out (the editor starts with the box checked); an explicit `false` is
+  kept, and a `null` (`nil` from Lisp) gets no default, so the field is false.
 
 What each type stores, what counts as blank, and how every option is enforced
 (`:unique` across drafts and published data, `:pattern` as a `cl-ppcre` regex,
@@ -269,11 +269,12 @@ dropping a custom field from a repeater's `:custom-fields`. Deleting the space
 itself is not among them — that is done in the admin UI, with its own
 confirmation. The exact list, and the shape of each change, is in
 [SCHEMA.md, "Changes"](SCHEMA.md#changes). A rename declared with `:was` carries
-existing content through, and removing a field or changing its type or target
-model takes its values out of every published object, draft and revision
-(inside a custom field or a repeater's rows too), and
-a custom field dropped from a repeater takes its rows out of every revision;
-changing a model's kind deletes its contents, as removing it would.
+existing content through, and removing a field or changing its type, its
+target model or its custom field takes its values out of every published
+object, draft and revision (inside a custom field or a repeater's rows too),
+and a custom field dropped from a repeater takes its rows out of every
+revision; changing a model's kind deletes its contents and their history, as
+removing it would.
 
 Tightening a field's options, or adding a `:required` field to a model that has
 contents, is not destructive (except dropping a custom field from a repeater, as
