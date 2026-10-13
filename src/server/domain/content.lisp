@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-fields #:model-label #:model-slug-field #:model-field #:field-type #:field-option
-                #:map-data-fields #:field-value)
+                #:map-data-fields #:field-value #:without-field)
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/data
@@ -190,9 +190,12 @@
   (map-data-fields (model-fields model) data
                    (lambda (field value found object outer)
                      (declare (ignore found outer))
-                     (when (and (eq (field-type field) :boolean) (member value '(nil :null)))
-                       (setf (field-value object field) nil))
-                     object)))
+                     (cond ((eq (field-type field) :boolean)
+                            (when (member value '(nil :null))
+                              (setf (field-value object field) nil))
+                            object)
+                           ((eq value :null) (without-field object field))
+                           (t object)))))
 
 (defun default-data (model)
   (initial-data model nil))

@@ -94,6 +94,27 @@
     (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :title "Changed" :featured :null) :replace t)) :unchanged)
         "but a boolean given null is false, as it is when left out")))
 
+(deftest a-null-inside-is-no-change
+  (with-schema ("website"
+                (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :text)
+                                                                                 (make-field :note :text))))
+                             :models (list (make-model "post" :list (list (make-field :title :text)
+                                                                          (make-field :card :custom :custom-field "card")
+                                                                          (make-field :cards :repeater :custom-fields '(card)))))))
+    (let* ((post (find-model "website" "post"))
+           (id (content-id (create "website" post (list :title "P" :card (list :link "a")
+                                                         :cards (vector (list :field-id "card" :link "b")))
+                                   :publish t))))
+      (ok (eq (nth-value 1 (update-draft "website" post id (list :card (list :link "a" :note :null)
+                                                                 :cards (vector (list :field-id "card" :link "b" :note :null)))))
+              :unchanged)
+          "a null inside a custom field or a row, of a field that has no value, changes nothing")
+      (ok (eq (nth-value 1 (update-draft "website" post id (list :title "Q"))) :saved))
+      (ok (eq (nth-value 1 (update-draft "website" post id (list :title "P" :card (list :link "a" :note :null))))
+              :published)
+          "and data back to the published one with such a null drops the draft"))
+    (exec "DELETE FROM contents")))
+
 (defvar *read-eval-probe* nil)
 
 (defun blog () (find-model "website" "blog"))
