@@ -544,7 +544,13 @@
       (testing "a datetime inside is kept to the minute in UTC"
         (ok (string= (accesses (content-published content) :card :at) "2026-09-20T01:00:00.000Z")))
       (testing "a boolean inside starts as its default says"
-        (ok (eq (accesses (content-published content) :card :pinned) t)))
+        (ok (eq (accesses (content-published content) :card :pinned) t))
+        (ok (null (nth-value 1 (access (access (content-published
+                                                (create "website" page (list :title "N" :card (list :at "2026-09-20T01:00:00.000Z" :pinned :null))
+                                                        :publish t))
+                                               :card)
+                                       :pinned)))
+            "unless it is given null, which is false"))
       (testing "a reference inside is a use"
         (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
         (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
@@ -586,7 +592,15 @@
       (testing "a datetime in a row is kept to the minute in UTC"
         (ok (string= (access (aref (access (content-published content) :cards) 0) :at) "2026-09-20T01:00:00.000Z")))
       (testing "a boolean in a row starts as its default says"
-        (ok (eq (access (aref (access (content-published content) :cards) 0) :pinned) t)))
+        (ok (eq (access (aref (access (content-published content) :cards) 0) :pinned) t))
+        (ok (null (nth-value 1 (access (aref (access (content-published
+                                                      (create "website" page
+                                                              (list :title "N" :cards (vector (list :field-id "card" :pinned :null)))
+                                                              :publish t))
+                                                     :cards)
+                                             0)
+                                       :pinned)))
+            "unless it is given null, which is false"))
       (testing "a reference in a row is a use"
         (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
         (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
