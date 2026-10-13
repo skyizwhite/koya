@@ -10,7 +10,7 @@ is in [../adr](../adr). Setting up to work on it is in
 
 | System | Holds | Licence |
 |---|---|---|
-| `koya-core` | the schema, its validation, the diff between two of them, JSON and name conversion, time, ULIDs | MIT |
+| `koya-core` | the schema, its validation, the diff between two of them, content data (comparing it, dropping its nulls), JSON and name conversion, time, ULIDs | MIT |
 | `koya-sdk` | the schema DSL and the HTTP client, behind one package that exports a site's API alone | MIT |
 | `koya-server` | the admin UI, the delivery API, the admin API and the media store | AGPL |
 
@@ -35,8 +35,8 @@ src/
   server/             ; the koya-server system (AGPL)
     main.lisp         ; the composition root: loads infra/, then web/
     domain/           ; what koya is made of: content, media, revision, deploy,
-                      ; key, webhook-delivery, references, query, errors, image,
-                      ; totp, timezone, address, html, number
+                      ; key, id, webhook-delivery, references, query, errors,
+                      ; image, totp, timezone, address, html, number
     usecases/         ; what koya does, knowing neither HTTP nor SQL, one file
                       ; per part: contents (writes), listing (the admin's reads),
                       ; delivery (the delivery API's reads), held (what data
@@ -83,11 +83,12 @@ web  ──▶  usecases  ──▶  domain
           ports  ◀── defines ──  infra
 ```
 
-- `domain/` depends on `koya-core` alone, and on the libraries that give it
-  randomness and hashes. What a write makes of a content --
-  drafted, published, unpublished, discarded -- is a function there that
-  returns the content as it then is; a use case hands that to the store and
-  records the event in the history, and the store keeps what it is handed.
+- `domain/` depends on `koya-core` alone, and on general libraries: randomness
+  and hashes, times, patterns, URLs, text encodings, locks and `access`. What a
+  write makes of a content -- drafted, published, unpublished, discarded -- is
+  a function there that returns the content as it then is; a use case hands
+  that to the store and records the event in the history, and the store keeps
+  what it is handed.
 - `usecases/` uses `domain/` and its ports. It raises the errors in
   `domain/errors`, which say what went wrong without an HTTP status, and names
   who is making a change from `*actor*` (`usecases/actor`).

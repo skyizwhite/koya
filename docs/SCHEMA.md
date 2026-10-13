@@ -178,7 +178,8 @@ model none. Its value is unique within the model without a `unique` option.
 | `help` | string | non-empty; shown under the field's name in the editor, to say what the field expects |
 
 `default: true` on a `boolean` field sets it to `true` on a new content whose
-`data` does not mention it; an explicit `false` is kept. On output the
+`data` leaves it out; an explicit `false` is kept, and a `null` gets no default,
+so the field reads as `false`. On output the
 options of a field are written in alphabetical key order, so two equal fields
 serialize identically.
 
@@ -339,7 +340,7 @@ the difference between the space's stored schema and the one sent as a list of
 | `add_model` `add_field` | something new | no |
 | `remove_model` `remove_field` | something gone | **yes** |
 | `rename_model` `rename_field` | a `was` was matched, see [Renames](#renames) | no |
-| `change_kind` | a model's `kind` changed; its contents are deleted | **yes** |
+| `change_kind` | a model's `kind` changed; its contents and their history are deleted | **yes** |
 | `change_field_type` | a field's `type` changed, the `model` a `reference` points at, or the `customField` a `custom` field uses | **yes** |
 | `change_field_options` | a field's options changed | no, unless a custom field is dropped from a repeater's `customFields`; when tightened, refused while stored content does not fit, see below |
 | `change_model_options` | `previewUrl` / `publicUrl` / `label` changed | no |

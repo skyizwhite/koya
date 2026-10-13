@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: koya
-  version: 0.20.0
+  version: 0.21.0
   summary: Delivery and admin APIs of a koya server
   description: |
     Two JSON APIs on one server.
@@ -226,10 +226,13 @@ paths:
         Validates the document, diffs it against the space's stored schema and,
         unless a destructive change is present without `force=true`, stores it.
         Existing content changes only as the schema does: a rename carries it
-        through, and a removed or retyped field's values are taken out of every
-        published object, draft and revision. The space must already exist — it is
-        made in the admin UI — and a deploy to another name, one that does not
-        exist included, is a 403.
+        through, a removed or retyped field's values are taken out of every
+        published object, draft and revision (inside a custom field or a
+        repeater's rows too), a custom field dropped from a repeater's
+        `customFields` takes its rows out of every revision, and a model removed,
+        or whose `kind` changes, loses its contents and their history. The
+        space must already exist — it is made in the admin UI — and a deploy to
+        another name, one that does not exist included, is a 403.
       security: [{ managementKey: [] }]
       parameters:
         - name: force
@@ -1184,7 +1187,7 @@ components:
       required: [space, version]
       properties:
         space: { type: string, description: "the space the management key is limited to" }
-        version: { type: string, examples: ["0.20.0"] }
+        version: { type: string, examples: ["0.21.0"] }
 
     Schema:
       type: object
@@ -1360,7 +1363,7 @@ components:
         was: { $ref: "#/components/schemas/FieldName" }
         help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
-        default: { type: boolean, description: "`true` sets the field on a new content whose data does not mention it" }
+        default: { type: boolean, description: "`true` sets the field on a new content whose data leaves it out; a `false` or `null` given for the field gets no default" }
 
     DateField:
       type: object
