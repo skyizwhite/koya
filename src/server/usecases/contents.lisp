@@ -4,7 +4,7 @@
                 #:model-kind #:model-fields #:field-name #:field-unique-p #:model-name #:model-slug-field
                 #:field-value)
   (:import-from #:koya-core/validate
-                #:validate-content #:validation-error #:blank-value-p #:datetime-string-p
+                #:validate-content #:unknown-fields #:validation-error #:blank-value-p #:datetime-string-p
                 #:validation-error-errors)
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:koya-server/domain/errors
@@ -54,6 +54,11 @@
       (slug-taken-p space-name (model-name model) value :exclude-id exclude-id)
       (unique-value-taken-p space-name (model-name model) (field-name field) value :exclude-id exclude-id)))
 
+(defun refuse-unknown-fields (model data)
+  (let ((errors (unknown-fields model data)))
+    (when errors
+      (error 'validation-error :errors errors))))
+
 (defun check-content (space-name model data &key partial exclude-id)
   (let ((errors (validate-content model data :partial partial)))
     (dolist (field (model-fields model))
@@ -94,6 +99,7 @@
   content)
 
 (defun create (space model data &key publish created-at updated-at published-at revised-at)
+  (refuse-unknown-fields model data)
   (let ((space-name space)
         (model-name (model-name model))
         (created-at (check-timestamp "createdAt" created-at))
@@ -137,6 +143,7 @@
          (current (content-data content :draft t))
          (live (content-published content)))
     (check-unchanged-since content since)
+    (refuse-unknown-fields model patch)
     (let* ((data (to-the-minute model (if replace patch (merge-data current patch))))
            (comparable (comparable-data model data)))
       (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
@@ -162,6 +169,7 @@
       (return-from publish-now :skipped))
     (check-unchanged-since content since)
     (check-transition content :publish)
+    (when data-p (refuse-unknown-fields model data))
     (let ((data (to-the-minute model (if data-p data (content-data content :draft t)))))
       (check-content space model data :exclude-id id)
       (values (store model (published content data :published-at published-at) "publish" data)

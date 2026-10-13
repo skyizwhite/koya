@@ -211,10 +211,11 @@
   object)
 
 (defun initial-data (model data)
-  (map-data-fields (model-fields model) (without-nulls data)
-                   (lambda (field value found object outer)
-                     (declare (ignore outer))
-                     (keep-to-the-minute field value (fill-default field found object)))))
+  (without-nulls
+   (map-data-fields (model-fields model) data
+                    (lambda (field value found object outer)
+                      (declare (ignore outer))
+                      (keep-to-the-minute field value (fill-default field found object))))))
 
 (defun to-the-minute (model data)
   (map-data-fields (model-fields model) (without-nulls data)

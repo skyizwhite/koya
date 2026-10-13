@@ -105,6 +105,8 @@
     (ok (equal (initial-data model (list :at "2026-10-12T10:20:30Z" :title :null))
                '(:on t :at "2026-10-12T10:20:00.000Z"))
         "a new content keeps no null, has its defaults and its times to the minute")
+    (ok (null (initial-data model (list :on :null)))
+        "and a boolean given null is given, so no default is filled in for it")
     (ok (equal (to-the-minute model (list :at "2026-10-12T10:20:30Z" :title :null :on nil))
                '(:at "2026-10-12T10:20:00.000Z" :on nil))
         "saved data keeps no null either, and no default is filled in")

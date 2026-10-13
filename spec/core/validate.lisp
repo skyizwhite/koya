@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:make-custom-field #:schema-model)
   (:import-from #:koya-core/validate
-                #:validate-content #:fitted-shape)
+                #:validate-content #:fitted-shape #:unknown-fields)
   (:import-from #:koya-core/data
                 #:data-equal))
 (in-package #:koya-spec/core/validate)
@@ -121,6 +121,13 @@
 
 (defun seo-codes (data &optional (model *with-seo*))
   (codes data :model model))
+
+(deftest the-keys-no-field-has
+  (flet ((named (data) (mapcar (lambda (e) (getf e :field)) (unknown-fields *with-seo* data))))
+    (ok (equal (named (list :meta (list :title "Too long" :bogus :null) :extra :null)) '("extra" "meta.bogus"))
+        "are found at any depth, whatever their values, and nothing else is")
+    (ok (null (unknown-fields *with-seo* (list :meta (list :title 3)))) "a known field's value is not looked at")
+    (ok (equal (named (list :rows 1)) '("rows")))))
 
 (deftest a-custom-field-is-an-object-of-its-fields
   (ok (null (seo-codes (list :meta (list :title "Hi" :image "01ARZ3NDEKTSV4RRFFQ69G5FAV")))))

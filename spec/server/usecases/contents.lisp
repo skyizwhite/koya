@@ -82,6 +82,20 @@
     (ok (equal (multiple-value-list (apply-to-each "website" (blog) (list live also) "unpublish")) '(1 1 0 nil))
         "unpublishing skips a draft")))
 
+(deftest a-key-no-field-has-is-refused-first
+  (let ((id (content-id (make (list :title "Kept")))))
+    (ok (signals (update-draft "website" (blog) id (list :title "Changed" :feautred :null) :replace t) 'validation-error)
+        "a key no field has is refused, null or not")
+    (ok (signals (update-draft "website" (blog) id (list :title "Kept" :feautred :null) :replace t) 'validation-error)
+        "even when the rest is as it is")
+    (ok (signals (update-draft "website" (blog) id (list :feautred :null)) 'validation-error)
+        "and in a patch, where a null would take a field's value away")
+    (ok (equal (content-draft (update-draft "website" (blog) id (list :title "Changed" :body :null) :replace t))
+               '(:title "Changed"))
+        "while a field given null is saved as no value")
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :title "Changed" :featured :null) :replace t)) :unchanged)
+        "and a boolean given null is false, as it is when left out")))
+
 (defvar *read-eval-probe* nil)
 
 (defun blog () (find-model "website" "blog"))
@@ -514,7 +528,8 @@
                 (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
                                                                                   (make-field :shown :boolean)
                                                                                   (make-field :at :datetime)
-                                                                                  (make-field :pinned :boolean :default t))))
+                                                                                  (make-field :pinned :boolean :default t)
+                                                                                  (make-field :note :text))))
                              :models (list (blog-model)
                                            (make-model "tag" :list (list (make-field :name :text)))
                                            (make-model "event" :list (list (make-field :at :datetime)))
@@ -529,7 +544,13 @@
       (testing "a datetime inside is kept to the minute in UTC"
         (ok (string= (accesses (content-published content) :card :at) "2026-09-20T01:00:00.000Z")))
       (testing "a boolean inside starts as its default says"
-        (ok (eq (accesses (content-published content) :card :pinned) t)))
+        (ok (eq (accesses (content-published content) :card :pinned) t))
+        (ok (null (nth-value 1 (access (access (content-published
+                                                (create "website" page (list :title "N" :card (list :at "2026-09-20T01:00:00.000Z" :pinned :null))
+                                                        :publish t))
+                                               :card)
+                                       :pinned)))
+            "unless it is given null, which is false"))
       (testing "a reference inside is a use"
         (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
         (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
@@ -537,14 +558,26 @@
         (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
                                                       (list :title "P" :card (list :link tag :at "2026-09-20T01:00:00.000Z"
                                                                                    :shown nil :pinned t))
-                                                      :replace t))))))))
+                                                      :replace t)))))
+      (flet ((card (&rest more) (list* :link tag :at "2026-09-20T01:00:00.000Z" :pinned t more)))
+        (testing "a null inside, for a field that has no value, changes nothing"
+          (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content) (list :card (card :note :null))))))
+          (ok (eq :saved (nth-value 1 (update-draft "website" page (content-id content) (list :title "Q"))))
+              "a draft that differs from the published data is kept")
+          (ok (eq :published (nth-value 1 (update-draft "website" page (content-id content)
+                                                        (list :title "P" :card (card :note :null)))))
+              "and one back to the published data with such a null is dropped"))
+        (testing "a key the custom field does not have is refused, null or not"
+          (ok (signals (update-draft "website" page (content-id content) (list :card (card :bogus :null)))
+                       'validation-error)))))))
 
 (deftest inside-a-repeater
   (with-schema ("website"
                 (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
                                                                                   (make-field :shown :boolean)
                                                                                   (make-field :at :datetime)
-                                                                                  (make-field :pinned :boolean :default t))))
+                                                                                  (make-field :pinned :boolean :default t)
+                                                                                  (make-field :note :text))))
                              :models (list (blog-model)
                                            (make-model "tag" :list (list (make-field :name :text)))
                                            (make-model "event" :list (list (make-field :at :datetime)))
@@ -559,7 +592,15 @@
       (testing "a datetime in a row is kept to the minute in UTC"
         (ok (string= (access (aref (access (content-published content) :cards) 0) :at) "2026-09-20T01:00:00.000Z")))
       (testing "a boolean in a row starts as its default says"
-        (ok (eq (access (aref (access (content-published content) :cards) 0) :pinned) t)))
+        (ok (eq (access (aref (access (content-published content) :cards) 0) :pinned) t))
+        (ok (null (nth-value 1 (access (aref (access (content-published
+                                                      (create "website" page
+                                                              (list :title "N" :cards (vector (list :field-id "card" :pinned :null)))
+                                                              :publish t))
+                                                     :cards)
+                                             0)
+                                       :pinned)))
+            "unless it is given null, which is false"))
       (testing "a reference in a row is a use"
         (ok (equal (mapcar (lambda (r) (getf r :id)) (content-references "website" "tag" tag)) (list (content-id content))))
         (ok (signals (unpublish "website" (find-model "website" "tag") tag) 'conflict)))
@@ -568,4 +609,11 @@
                                                       (list :title "P" :cards (vector (list :field-id "card" :link tag
                                                                                             :at "2026-09-20T01:00:00.000Z"
                                                                                             :shown nil :pinned t)))
-                                                      :replace t))))))))
+                                                      :replace t)))))
+      (flet ((rows (&rest more)
+               (vector (list* :field-id "card" :link tag :at "2026-09-20T01:00:00.000Z" :pinned t more))))
+        (testing "a null in a row, for a field that has no value, changes nothing"
+          (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content) (list :cards (rows :note :null)))))))
+        (testing "a key a row's custom field does not have is refused, null or not"
+          (ok (signals (update-draft "website" page (content-id content) (list :cards (rows :bogus :null)))
+                       'validation-error)))))))

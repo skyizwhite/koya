@@ -5,7 +5,7 @@
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook
                 #:make-custom-field)
   (:import-from #:koya-core/schema-json #:schema->jobject)
-  (:import-from #:koya-core/json #:jobject #:jget)
+  (:import-from #:koya-core/json #:jobject #:jget #:json-null)
   (:import-from #:koya-spec/server/schema #:with-schema)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)
   (:import-from #:koya-server/domain/deploy #:deploy-changes #:deploy-destructive #:change-op #:change-destructive))
@@ -25,7 +25,25 @@
   (multiple-value-bind (status json)
       (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Explicit" "featured" nil) "publish" t))
     (ok (= status 201))
-    (ok (eq (jget json "published" "featured") nil) "an explicit false is kept")))
+    (ok (eq (jget json "published" "featured") nil) "an explicit false is kept"))
+  (multiple-value-bind (status json)
+      (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Null" "featured" json-null) "publish" t))
+    (ok (= status 201))
+    (ok (eq (jget json "published" "featured") nil) "and so is a null, which a boolean takes as false")))
+
+(deftest a-key-given-null-is-still-checked
+  (flet ((refusal (status json &rest text)
+           (declare (ignore text))
+           (and (= status 422)
+                (equal (jget (aref (jget json "error" "details") 0) "code") "unknown_field"))))
+    (ok (multiple-value-call #'refusal
+          (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Typo" "feautred" json-null))))
+        "a key no field has is refused on create, null or not")
+    (let ((id (jget (nth-value 1 (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Kept")))) "id")))
+      (ok (multiple-value-call #'refusal
+            (admin :post (format nil "/admin/api/website/lists/blog/~a/publish" id)
+                   :body (jobject "data" (jobject "title" "Kept" "feautred" json-null))))
+          "and when published with its data"))))
 
 (deftest schema-endpoints
   (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
