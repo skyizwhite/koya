@@ -10,6 +10,7 @@
   (:import-from #:koya-server/usecases/ports/media
                 #:find-media #:list-media #:count-media #:update-media #:media-file-path
                 #:insert-media #:write-media-file #:delete-media-file #:find-media-by-ids)
+  (:import-from #:koya-server/usecases/ports/contents #:space-contents)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-spec/server/domain/image #:jpeg #:octets)
   (:import-from #:koya-server/usecases/media
@@ -282,7 +283,15 @@
                   (ok (equal (multiple-value-list (remove-each "website" (list (media-id used) "gonegonegone")))
                              '(0 2 "The library cannot be read"))
                       "a selection that cannot be read is counted as failed, not lost")
-               (remove-method #'find-media-by-ids broken))))
+               (remove-method #'find-media-by-ids broken)))
+           (let ((broken (defmethod space-contents :around ((space string))
+                           (declare (ignore space))
+                           (error "The contents cannot be read"))))
+             (unwind-protect
+                  (ok (equal (multiple-value-list (remove-each "website" (list (media-id used))))
+                             '(0 1 "The contents cannot be read"))
+                      "and so is one whose uses cannot be counted")
+               (remove-method #'space-contents broken))))
       (exec "DELETE FROM contents")
       (remove-media used))))
 
