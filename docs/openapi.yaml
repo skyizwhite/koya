@@ -1363,7 +1363,7 @@ components:
         was: { $ref: "#/components/schemas/FieldName" }
         help: { $ref: "#/components/schemas/FieldHelp" }
         required: { type: boolean }
-        default: { type: boolean, description: "`true` sets the field on a new content whose data leaves it out; `false` and `null` get no default" }
+        default: { type: boolean, description: "`true` sets the field on a new content whose data leaves it out; a `false` or `null` given for the field gets no default" }
 
     DateField:
       type: object

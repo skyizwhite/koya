@@ -340,7 +340,7 @@ the difference between the space's stored schema and the one sent as a list of
 | `add_model` `add_field` | something new | no |
 | `remove_model` `remove_field` | something gone | **yes** |
 | `rename_model` `rename_field` | a `was` was matched, see [Renames](#renames) | no |
-| `change_kind` | a model's `kind` changed; its contents are deleted | **yes** |
+| `change_kind` | a model's `kind` changed; its contents and their history are deleted | **yes** |
 | `change_field_type` | a field's `type` changed, the `model` a `reference` points at, or the `customField` a `custom` field uses | **yes** |
 | `change_field_options` | a field's options changed | no, unless a custom field is dropped from a repeater's `customFields`; when tightened, refused while stored content does not fit, see below |
 | `change_model_options` | `previewUrl` / `publicUrl` / `label` changed | no |

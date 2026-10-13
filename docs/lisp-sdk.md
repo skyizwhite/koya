@@ -184,8 +184,8 @@ far, models and custom fields, `(koya-sdk:clear-schema)` empties the registry, a
   `(blocks :repeater :custom-fields (heading body))`. A `:repeater` sits only in
   a `defmodel`.
 - `:default t` on a `:boolean` sets the field to true on a new content that
-  leaves it out (the editor starts with the box checked); an explicit `false` is
-  kept, and a `null` (`nil` from Lisp) gets no default, so the field is false.
+  leaves it out (the editor starts with the box checked); `nil`, which is sent
+  as `null`, gets no default, so the field is false.
 
 What each type stores, what counts as blank, and how every option is enforced
 (`:unique` across drafts and published data, `:pattern` as a `cl-ppcre` regex,
