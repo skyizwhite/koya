@@ -35,10 +35,10 @@
 (defun check-login (secret code &key (time (unix-now)))
   (cond ((not (owner-secret-long-enough-p)) :short-secret)
         ((and (totp-enabled-p) (>= (wrong-codes time) +wrong-codes-per-step+)) :too-many-codes)
-        ((not (secure-string= secret (owner-secret))) nil)
+        ((not (secure-string= secret (owner-secret))) :wrong-secret)
         ((not (totp-enabled-p)) t)
         ((totp-code-valid-p code :time time) t)
-        (t (count-wrong-code time) :code)))
+        (t (count-wrong-code time) :wrong-code)))
 
 (defun end-other-sessions (session-id)
   (delete-sessions :except session-id))
