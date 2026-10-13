@@ -9,14 +9,14 @@
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:export #:read-held
            #:held-names
-           #:held-name))
+           #:held-entry))
 (in-package #:koya-server/usecases/held)
 
-(defun held-in (model datas)
+(defun held-in (fields datas)
   (let ((media '())
         (references (make-hash-table :test 'equal)))
     (dolist (data datas)
-      (map-data-fields (model-fields model) data
+      (map-data-fields fields data
                        (lambda (field value found object outer)
                          (declare (ignore found outer))
                          (when (member (field-type field) '(:media :reference))
@@ -28,15 +28,15 @@
                          object)))
     (values media references)))
 
-(defun read-held (space model datas)
-  (multiple-value-bind (media references) (held-in model datas)
+(defun read-held (space model datas &key (fields (model-fields model)))
+  (multiple-value-bind (media references) (held-in fields datas)
     (let ((contents (make-hash-table :test 'equal)))
       (maphash (lambda (target ids) (setf (gethash target contents) (find-contents-by-ids space target ids)))
                references)
       (values (find-media-by-ids space media) contents))))
 
-(defun held-names (space model datas)
-  (multiple-value-bind (media contents) (read-held space model datas)
+(defun held-names (space model datas &key (fields (model-fields model)))
+  (multiple-value-bind (media contents) (read-held space model datas :fields fields)
     (let ((media-names (make-hash-table :test 'equal))
           (content-names (make-hash-table :test 'equal)))
       (maphash (lambda (id media) (setf (gethash id media-names) (media-filename media))) media)
@@ -45,8 +45,8 @@
                contents)
       (values media-names content-names))))
 
-(defun held-name (media-names content-names field id)
-  (let ((names (if (eq (field-type field) :media)
-                   media-names
-                   (gethash (field-option field :model) content-names))))
-    (and names (gethash id names))))
+(defun held-entry (media contents field id)
+  (let ((table (if (eq (field-type field) :media)
+                   media
+                   (gethash (field-option field :model) contents))))
+    (and table (gethash id table))))

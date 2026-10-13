@@ -1,7 +1,7 @@
 (defpackage #:koya-server/usecases/revisions
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:field-name #:field-type #:field-option #:field-unique-p
+                #:model-fields #:field-name #:field-type #:field-unique-p
                 #:field-required-p #:map-data-fields #:field-value #:without-field #:field-key)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/data #:array-p)
@@ -9,7 +9,7 @@
                 #:list-revisions #:count-revisions #:find-revision)
   (:import-from #:koya-server/domain/content #:content-published-p)
   (:import-from #:koya-server/usecases/contents #:value-taken-p)
-  (:import-from #:koya-server/usecases/held #:read-held)
+  (:import-from #:koya-server/usecases/held #:read-held #:held-entry)
   (:export #:restore-data
            #:list-revisions
            #:count-revisions
@@ -17,11 +17,10 @@
 (in-package #:koya-server/usecases/revisions)
 
 (defun usable-id-p (media contents field id)
-  (and (stringp id)
-       (if (eq (field-type field) :media)
-           (and (gethash id media) t)
-           (let ((target (gethash id (gethash (field-option field :model) contents))))
-             (and target (content-published-p target))))))
+  (let ((entry (held-entry media contents field id)))
+    (and entry
+         (or (eq (field-type field) :media) (content-published-p entry))
+         t)))
 
 (defun drop-unusable-ids (media contents field value)
   (if (array-p value)
