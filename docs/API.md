@@ -256,7 +256,8 @@ under `objects/` (`404`).
   revision, no webhook); when it is the published data again, the draft is
   dropped, as `discard-draft` would.
 - A `null` in the data a write is given, at the top or inside a custom field or a
-  row, is no value, so it is not kept.
+  row, is no value, so it is not kept. A key that is no field of the model is
+  refused (`unknown_field`) all the same, `null` or not, in a patch too.
 - Publishing takes `data` when given, `{}` included, else the draft, else
   re-publishes.
 - A content's id is made by the server: 12 lowercase letters and digits, drawn

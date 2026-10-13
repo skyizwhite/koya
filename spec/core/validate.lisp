@@ -110,13 +110,6 @@
              '(("name" . "unknown_field")))
       "nor is one whose keyword exists for another reason"))
 
-(deftest the-keys-no-field-has
-  (flet ((named (data) (mapcar (lambda (e) (getf e :field)) (unknown-fields *with-seo* data))))
-    (ok (equal (named (list :meta (list :title "Too long" :bogus :null) :extra :null)) '("extra" "meta.bogus"))
-        "are found at any depth, whatever their values, and nothing else is")
-    (ok (null (unknown-fields *with-seo* (list :meta (list :title 3)))) "a known field's value is not looked at")
-    (ok (equal (named (list :rows 1)) '("rows")))))
-
 (defparameter *with-seo*
   (schema-model
    (make-schema :custom-fields (list (make-custom-field "seo" (list (make-field :title :text :required t :max-length 5)
@@ -128,6 +121,13 @@
 
 (defun seo-codes (data &optional (model *with-seo*))
   (codes data :model model))
+
+(deftest the-keys-no-field-has
+  (flet ((named (data) (mapcar (lambda (e) (getf e :field)) (unknown-fields *with-seo* data))))
+    (ok (equal (named (list :meta (list :title "Too long" :bogus :null) :extra :null)) '("extra" "meta.bogus"))
+        "are found at any depth, whatever their values, and nothing else is")
+    (ok (null (unknown-fields *with-seo* (list :meta (list :title 3)))) "a known field's value is not looked at")
+    (ok (equal (named (list :rows 1)) '("rows")))))
 
 (deftest a-custom-field-is-an-object-of-its-fields
   (ok (null (seo-codes (list :meta (list :title "Hi" :image "01ARZ3NDEKTSV4RRFFQ69G5FAV")))))

@@ -26,7 +26,7 @@
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/references #:reference-fields #:refers-p #:referrers)
-  (:import-from #:koya-core/data #:data-equal #:without-nulls)
+  (:import-from #:koya-core/data #:data-equal)
   (:export #:check-content
            #:create
            #:update-draft
@@ -106,7 +106,7 @@
         (updated-at (check-timestamp "updatedAt" updated-at))
         (published-at (check-published-at published-at))
         (revised-at (check-timestamp "revisedAt" revised-at))
-        (data (without-nulls (initial-data model data))))
+        (data (initial-data model data)))
     (let ((content
             (with-transaction
               (when (and (eq (model-kind model) :object) (find-object-content-id space-name model-name))
@@ -144,7 +144,7 @@
          (live (content-published content)))
     (check-unchanged-since content since)
     (refuse-unknown-fields model patch)
-    (let* ((data (without-nulls (to-the-minute model (if replace patch (merge-data current patch)))))
+    (let* ((data (to-the-minute model (if replace patch (merge-data current patch))))
            (comparable (comparable-data model data)))
       (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
             ((and (nth-value 1 (next-status (content-status content) :discard))
@@ -170,7 +170,7 @@
     (check-unchanged-since content since)
     (check-transition content :publish)
     (when data-p (refuse-unknown-fields model data))
-    (let ((data (without-nulls (to-the-minute model (if data-p data (content-data content :draft t))))))
+    (let ((data (to-the-minute model (if data-p data (content-data content :draft t)))))
       (check-content space model data :exclude-id id)
       (values (store model (published content data :published-at published-at) "publish" data)
               (published-view space model content)))))
