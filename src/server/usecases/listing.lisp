@@ -2,11 +2,11 @@
   (:use #:cl)
   (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-core/schema
-                #:model-name #:model-fields #:model-field #:field-name #:field-type
-                #:+system-fields+ #:field-option #:field-many-p #:map-data-fields #:field-value)
+                #:model-name #:model-fields #:model-field #:field-type
+                #:+system-fields+ #:field-many-p #:map-data-fields #:field-value)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-contents #:count-contents #:find-object-content #:find-contents-by-ids)
-  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:content-labels #:held-ids)
+                #:list-contents #:count-contents #:find-object-content)
+  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:held-ids)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/domain/query #:make-query)
   (:import-from #:koya-server/usecases/ports/spaces #:find-model)
@@ -17,8 +17,7 @@
            #:all-contents
            #:count-contents
            #:find-object-content
-           #:reference-options
-           #:reference-labels))
+           #:reference-options))
 (in-package #:koya-server/usecases/listing)
 
 (defun sortable-p (model name)
@@ -75,17 +74,3 @@
     (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target)))
                   (list-contents space model-name target (make-query :limit nil) :status :all))
           #'string-lessp :key #'cdr)))
-
-(defun referenced-ids (field contents)
-  (loop :for content :in contents
-        :for data := (content-data content :draft t)
-        :for value := (field-value data field)
-        :append (held-ids value (field-many-p field))))
-
-(defun reference-labels (space model contents)
-  (let ((table (make-hash-table :test 'equal)))
-    (dolist (field (model-fields model) table)
-      (when (eq (field-type field) :reference)
-        (let ((target (find-model space (field-option field :model))))
-          (setf (gethash (field-name field) table)
-                (content-labels (find-contents-by-ids space (model-name target) (referenced-ids field contents)) target)))))))

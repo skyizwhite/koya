@@ -14,7 +14,7 @@
   (:import-from #:koya-server/domain/media #:media-id)
   (:import-from #:koya-server/usecases/ports/media #:insert-media)
   (:import-from #:koya-server/usecases/contents #:create)
-  (:import-from #:koya-core/schema #:model-fields #:make-schema #:make-model #:make-field)
+  (:import-from #:koya-core/schema #:model-fields #:make-schema #:make-model #:make-field #:make-custom-field)
   (:import-from #:koya-spec/server/web/pages/support #:call-action)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents)
   (:import-from #:koya-server/usecases/schema #:resolve-model #:find-model)
@@ -267,6 +267,26 @@
           (ok (search "Alpha target, Beta target" body)
               "a reference reads as the label of what it points at, looked up for the page's rows")))))
   (exec "DELETE FROM contents"))
+
+(deftest list-names-what-a-custom-field-holds
+  (exec "DELETE FROM contents")
+  (with-schema ("website" (make-schema :custom-fields (list (make-custom-field "byline" (list (make-field :author :reference :model "blog")
+                                                                                            (make-field :photo :media))))
+                                       :models (list (blog-model)
+                                                     (make-model "about" :object (list (make-field :body :richtext)))
+                                                     (make-model "story" :list (list (make-field :title :text)
+                                                                                     (make-field :byline :custom :custom-field "byline")
+                                                                                     (make-field :blocks :repeater :custom-fields '(byline)))))))
+    (unwind-protect
+         (let ((target (content-id (create "website" (find-model "website" "blog") (list :title "Alpha target") :publish t)))
+               (photo (media-id (insert-media "website" (new-id) :filename "portrait.png" :mime "image/png" :size 10 :width 1 :height 1))))
+           (create "website" (find-model "website" "story")
+                   (list :title "S" :byline (list :author target :photo photo)) :publish t)
+           (let ((body (nth-value 1 (request :get "/s/website/m/story"))))
+             (ok (search "author: Alpha target" body) "a reference inside a custom field reads as the label of what it points at")
+             (ok (search "photo: portrait.png" body) "and a media inside as its file name")))
+      (exec "DELETE FROM contents")
+      (exec "DELETE FROM media"))))
 
 (deftest list-shows-rich-text-as-its-text
   (exec "DELETE FROM contents")

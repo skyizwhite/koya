@@ -3,7 +3,7 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-name #:model-fields #:field-name #:field-type
+                #:model-kind #:model-name #:model-fields #:field-name #:field-type #:field-option
                 #:webhook-covers-p #:field-many-p #:field-value)
   (:import-from #:koya-core/data #:array-p #:blank-p)
   (:import-from #:koya-server/usecases/spaces #:find-space)
@@ -21,8 +21,8 @@
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-follow #:on-click)
   (:import-from #:koya-server/usecases/listing
-                #:parse-sort #:content-page #:page-media #:count-contents #:find-object-content
-                #:reference-labels)
+                #:parse-sort #:content-page #:page-media #:count-contents #:find-object-content)
+  (:import-from #:koya-server/usecases/revisions #:held-names)
   (:import-from #:koya-server/usecases/contents #:bulk-action-p #:apply-to-each)
   (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
@@ -63,9 +63,14 @@
 
 (defparameter +row-height+ "h-14")
 
-(defun reference-label (field id ref-labels)
-  (let ((table (and ref-labels (gethash (field-name field) ref-labels))))
-    (or (and table (stringp id) (gethash id table)) id)))
+(defun id-label-for (space model contents)
+  (multiple-value-bind (media-names content-names)
+      (held-names space model (mapcar (lambda (content) (content-data content :draft t)) contents))
+    (lambda (field id)
+      (let ((names (if (eq (field-type field) :media)
+                       media-names
+                       (gethash (field-option field :model) content-names))))
+        (or (and names (stringp id) (gethash id names)) id)))))
 
 (defun collapse-whitespace (string)
   (string-trim " " (regex-replace-all "\\s+" string " ")))
@@ -75,11 +80,11 @@
       (format nil "~a…" (subseq string 0 limit))
       string))
 
-(defun field-preview (field data ref-labels)
+(defun field-preview (field data label)
   (multiple-value-bind (value found) (field-value data field)
     (if (eq (field-type field) :repeater)
         (and (array-p value) (plusp (length value)) (format nil "~a row~:p" (length value)))
-        (let ((text (value-text field value found (lambda (field id) (reference-label field id ref-labels)))))
+        (let ((text (value-text field value found label)))
           (and text (truncate-text (collapse-whitespace text)))))))
 
 (defcomp ~media-cell (&key field id media more)
@@ -95,13 +100,13 @@
          (when (and more (plusp more))
            (hsx (span :class "text-xs text-muted" (format nil "+~a" more)))))))))
 
-(defcomp ~preview-cell (&key field content ref-labels media)
+(defcomp ~preview-cell (&key field content label media)
   (let* ((data (content-data content :draft t))
          (ids (and (eq (field-type field) :media)
                    (held-ids (field-value data field) (field-many-p field)))))
     (if ids
         (hsx (~media-cell :field field :id (first ids) :media media :more (1- (length ids))))
-        (let ((preview (field-preview field data ref-labels)))
+        (let ((preview (field-preview field data label)))
           (hsx (td :class (clsx "py-2 pr-4" (if preview "" "text-muted"))
                  (div :class (clsx "line-clamp-2" (column-width field)) (or preview "—"))))))))
 
@@ -211,7 +216,7 @@
 (defcomp ~content-list (&key space model state contents pages)
   (let ((model-name (model-name model))
         (fields (model-fields model))
-        (ref-labels (reference-labels space model contents))
+        (label (id-label-for space model contents))
         (media (page-media space model contents))
         (page (getf state :page))
         (search-text (getf state :search-text))
@@ -244,7 +249,7 @@
                                  (td :class "py-2 pr-4 whitespace-nowrap"
                                    (~status-badge :status (content-status content)))
                                  (loop :for field :in fields :collect
-                                   (hsx (~preview-cell :field field :content content :ref-labels ref-labels :media media)))
+                                   (hsx (~preview-cell :field field :content content :label label :media media)))
                                  (td :class "py-2 pl-4 pr-4 text-right text-muted group-hover:text-accent"
                                    (a :href (content-url space model-name (content-id content))
                                       :class "after:absolute after:inset-0"
