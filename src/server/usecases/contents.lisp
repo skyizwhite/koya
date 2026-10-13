@@ -4,7 +4,7 @@
                 #:model-kind #:model-fields #:field-name #:field-unique-p #:model-name #:model-slug-field
                 #:field-value)
   (:import-from #:koya-core/validate
-                #:validate-content #:validation-error #:blank-value-p #:datetime-string-p
+                #:validate-content #:unknown-fields #:validation-error #:blank-value-p #:datetime-string-p
                 #:validation-error-errors)
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:koya-server/domain/errors
@@ -54,6 +54,11 @@
       (slug-taken-p space-name (model-name model) value :exclude-id exclude-id)
       (unique-value-taken-p space-name (model-name model) (field-name field) value :exclude-id exclude-id)))
 
+(defun refuse-unknown-fields (model data)
+  (let ((errors (unknown-fields model data)))
+    (when errors
+      (error 'validation-error :errors errors))))
+
 (defun check-content (space-name model data &key partial exclude-id)
   (let ((errors (validate-content model data :partial partial)))
     (dolist (field (model-fields model))
@@ -94,20 +99,20 @@
   content)
 
 (defun create (space model data &key publish created-at updated-at published-at revised-at)
+  (refuse-unknown-fields model data)
   (let ((space-name space)
         (model-name (model-name model))
         (created-at (check-timestamp "createdAt" created-at))
         (updated-at (check-timestamp "updatedAt" updated-at))
         (published-at (check-published-at published-at))
         (revised-at (check-timestamp "revisedAt" revised-at))
-        (given (initial-data model data)))
-    (let* ((data (without-nulls given))
-           (content
+        (data (without-nulls (initial-data model data))))
+    (let ((content
             (with-transaction
               (when (and (eq (model-kind model) :object) (find-object-content-id space-name model-name))
                 (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
                       :code "object_exists"))
-              (check-content space-name model given)
+              (check-content space-name model data)
               (let ((content (loop :for content := (new-content (new-id) space-name model-name data
                                                                 :publish publish
                                                                 :created-at created-at :updated-at updated-at
@@ -138,16 +143,16 @@
          (current (content-data content :draft t))
          (live (content-published content)))
     (check-unchanged-since content since)
-    (let* ((given (to-the-minute model (if replace patch (merge-data current patch))))
-           (data (without-nulls given))
-           (comparable (comparable-data model given)))
+    (refuse-unknown-fields model patch)
+    (let* ((data (without-nulls (to-the-minute model (if replace patch (merge-data current patch)))))
+           (comparable (comparable-data model data)))
       (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
             ((and (nth-value 1 (next-status (content-status content) :discard))
                   (data-equal comparable (comparable-data model live)))
              (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
             (t
              (check-transition content :save)
-             (check-content space model given :exclude-id id)
+             (check-content space model data :exclude-id id)
              (values (store model (drafted content data) "draft" data) :saved))))))
 
 (defun publish (space model id &key (data nil data-p) published-at since skip-if-done)
@@ -164,9 +169,9 @@
       (return-from publish-now :skipped))
     (check-unchanged-since content since)
     (check-transition content :publish)
-    (let* ((given (to-the-minute model (if data-p data (content-data content :draft t))))
-           (data (without-nulls given)))
-      (check-content space model given :exclude-id id)
+    (when data-p (refuse-unknown-fields model data))
+    (let ((data (without-nulls (to-the-minute model (if data-p data (content-data content :draft t))))))
+      (check-content space model data :exclude-id id)
       (values (store model (published content data :published-at published-at) "publish" data)
               (published-view space model content)))))
 

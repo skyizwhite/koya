@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:make-custom-field #:schema-model)
   (:import-from #:koya-core/validate
-                #:validate-content #:fitted-shape)
+                #:validate-content #:fitted-shape #:unknown-fields)
   (:import-from #:koya-core/data
                 #:data-equal))
 (in-package #:koya-spec/core/validate)
@@ -109,6 +109,13 @@
   (ok (equal (codes (list :title "Ok" :event-at "2026-09-20T00:00:00Z" :name 1))
              '(("name" . "unknown_field")))
       "nor is one whose keyword exists for another reason"))
+
+(deftest the-keys-no-field-has
+  (flet ((named (data) (mapcar (lambda (e) (getf e :field)) (unknown-fields *with-seo* data))))
+    (ok (equal (named (list :meta (list :title "Too long" :bogus :null) :extra :null)) '("extra" "meta.bogus"))
+        "are found at any depth, whatever their values, and nothing else is")
+    (ok (null (unknown-fields *with-seo* (list :meta (list :title 3)))) "a known field's value is not looked at")
+    (ok (equal (named (list :rows 1)) '("rows")))))
 
 (defparameter *with-seo*
   (schema-model

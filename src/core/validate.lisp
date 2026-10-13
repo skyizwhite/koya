@@ -23,6 +23,7 @@
   (:import-from #:koya-core/time
                 #:parse-iso)
   (:export #:validate-content
+           #:unknown-fields
            #:fitted-shape
            #:validation-error
            #:validation-error-errors
@@ -171,6 +172,10 @@
 
 (defun validate-content (model data &key partial)
   (validate-fields (model-fields model) data partial))
+
+(defun unknown-fields (model data)
+  (remove "unknown_field" (validate-content model data :partial t)
+          :key (lambda (e) (getf e :code)) :test-not #'string=))
 
 (defun validate-fields (fields data partial)
   (let ((errors '())

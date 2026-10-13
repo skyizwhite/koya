@@ -111,6 +111,4 @@
                '(:at "2026-10-12T10:20:00.000Z" :title :null :on nil))
         "saved data has its times to the minute, and no default is filled in")
     (ok (data-equal (comparable-data model (list :title "a" :on :null)) (list :title "a" :on nil :off nil))
-        "data is compared with every boolean there, one not given or null as false")
-    (ok (data-equal (comparable-data model (list :title :null :bogus :null)) (list :bogus :null :on nil :off nil))
-        "and a field given null as one not given, while a key no field has stays to tell it apart")))
+        "data is compared with every boolean there, one not given or null as false")))

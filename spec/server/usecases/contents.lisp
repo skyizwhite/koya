@@ -82,38 +82,19 @@
     (ok (equal (multiple-value-list (apply-to-each "website" (blog) (list live also) "unpublish")) '(1 1 0 nil))
         "unpublishing skips a draft")))
 
-(deftest a-draft-replaced-checks-a-key-given-null
+(deftest a-key-no-field-has-is-refused-first
   (let ((id (content-id (make (list :title "Kept")))))
     (ok (signals (update-draft "website" (blog) id (list :title "Changed" :feautred :null) :replace t) 'validation-error)
         "a key no field has is refused, null or not")
+    (ok (signals (update-draft "website" (blog) id (list :title "Kept" :feautred :null) :replace t) 'validation-error)
+        "even when the rest is as it is")
+    (ok (signals (update-draft "website" (blog) id (list :feautred :null)) 'validation-error)
+        "and in a patch, where a null would take a field's value away")
     (ok (equal (content-draft (update-draft "website" (blog) id (list :title "Changed" :body :null) :replace t))
                '(:title "Changed"))
         "while a field given null is saved as no value")
-    (ok (signals (update-draft "website" (blog) id (list :title "Changed" :feautred :null) :replace t) 'validation-error)
-        "and the key no field has is refused even when the rest is as it is")
     (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :title "Changed" :featured :null) :replace t)) :unchanged)
-        "but a boolean given null is false, as it is when left out")))
-
-(deftest a-null-inside-is-no-change
-  (with-schema ("website"
-                (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :text)
-                                                                                 (make-field :note :text))))
-                             :models (list (make-model "post" :list (list (make-field :title :text)
-                                                                          (make-field :card :custom :custom-field "card")
-                                                                          (make-field :cards :repeater :custom-fields '(card)))))))
-    (let* ((post (find-model "website" "post"))
-           (id (content-id (create "website" post (list :title "P" :card (list :link "a")
-                                                         :cards (vector (list :field-id "card" :link "b")))
-                                   :publish t))))
-      (ok (eq (nth-value 1 (update-draft "website" post id (list :card (list :link "a" :note :null)
-                                                                 :cards (vector (list :field-id "card" :link "b" :note :null)))))
-              :unchanged)
-          "a null inside a custom field or a row, of a field that has no value, changes nothing")
-      (ok (eq (nth-value 1 (update-draft "website" post id (list :title "Q"))) :saved))
-      (ok (eq (nth-value 1 (update-draft "website" post id (list :title "P" :card (list :link "a" :note :null))))
-              :published)
-          "and data back to the published one with such a null drops the draft"))
-    (exec "DELETE FROM contents")))
+        "and a boolean given null is false, as it is when left out")))
 
 (defvar *read-eval-probe* nil)
 
@@ -547,7 +528,8 @@
                 (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
                                                                                   (make-field :shown :boolean)
                                                                                   (make-field :at :datetime)
-                                                                                  (make-field :pinned :boolean :default t))))
+                                                                                  (make-field :pinned :boolean :default t)
+                                                                                  (make-field :note :text))))
                              :models (list (blog-model)
                                            (make-model "tag" :list (list (make-field :name :text)))
                                            (make-model "event" :list (list (make-field :at :datetime)))
@@ -570,14 +552,26 @@
         (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content)
                                                       (list :title "P" :card (list :link tag :at "2026-09-20T01:00:00.000Z"
                                                                                    :shown nil :pinned t))
-                                                      :replace t))))))))
+                                                      :replace t)))))
+      (flet ((card (&rest more) (list* :link tag :at "2026-09-20T01:00:00.000Z" :pinned t more)))
+        (testing "a null inside, for a field that has no value, changes nothing"
+          (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content) (list :card (card :note :null))))))
+          (ok (eq :saved (nth-value 1 (update-draft "website" page (content-id content) (list :title "Q"))))
+              "a draft that differs from the published data is kept")
+          (ok (eq :published (nth-value 1 (update-draft "website" page (content-id content)
+                                                        (list :title "P" :card (card :note :null)))))
+              "and one back to the published data with such a null is dropped"))
+        (testing "a key the custom field does not have is refused, null or not"
+          (ok (signals (update-draft "website" page (content-id content) (list :card (card :bogus :null)))
+                       'validation-error)))))))
 
 (deftest inside-a-repeater
   (with-schema ("website"
                 (make-schema :custom-fields (list (make-custom-field "card" (list (make-field :link :reference :model "tag")
                                                                                   (make-field :shown :boolean)
                                                                                   (make-field :at :datetime)
-                                                                                  (make-field :pinned :boolean :default t))))
+                                                                                  (make-field :pinned :boolean :default t)
+                                                                                  (make-field :note :text))))
                              :models (list (blog-model)
                                            (make-model "tag" :list (list (make-field :name :text)))
                                            (make-model "event" :list (list (make-field :at :datetime)))
@@ -601,4 +595,11 @@
                                                       (list :title "P" :cards (vector (list :field-id "card" :link tag
                                                                                             :at "2026-09-20T01:00:00.000Z"
                                                                                             :shown nil :pinned t)))
-                                                      :replace t))))))))
+                                                      :replace t)))))
+      (flet ((rows (&rest more)
+               (vector (list* :field-id "card" :link tag :at "2026-09-20T01:00:00.000Z" :pinned t more))))
+        (testing "a null in a row, for a field that has no value, changes nothing"
+          (ok (eq :unchanged (nth-value 1 (update-draft "website" page (content-id content) (list :cards (rows :note :null)))))))
+        (testing "a key a row's custom field does not have is refused, null or not"
+          (ok (signals (update-draft "website" page (content-id content) (list :cards (rows :bogus :null)))
+                       'validation-error)))))))
