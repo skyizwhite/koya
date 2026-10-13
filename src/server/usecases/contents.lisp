@@ -146,15 +146,18 @@
              (check-content space model data :exclude-id id)
              (values (store model (drafted content data) "draft" data) :saved))))))
 
-(defun publish (space model id &key (data nil data-p) published-at since)
+(defun publish (space model id &key (data nil data-p) published-at since skip-if-done)
   (let ((published-at (check-published-at published-at)))
     (multiple-value-bind (live old)
-        (with-transaction (publish-now space model id data data-p published-at since))
-      (notify space model id :publish :old old :new (published-view space model live))
-      live)))
+        (with-transaction (publish-now space model id data data-p published-at since skip-if-done))
+      (cond ((eq live :skipped) :skipped)
+            (t (notify space model id :publish :old old :new (published-view space model live))
+               live)))))
 
-(defun publish-now (space model id data data-p published-at since)
+(defun publish-now (space model id data data-p published-at since skip-if-done)
   (let ((content (resolve-content space (model-name model) id)))
+    (when (and skip-if-done (done-p content :publish))
+      (return-from publish-now :skipped))
     (check-unchanged-since content since)
     (check-transition content :publish)
     (let ((data (to-the-minute model (if data-p data (content-data content :draft t)))))
@@ -169,19 +172,23 @@
                               references verb)
             :code "in_use"))))
 
-(defun unpublish (space model id)
+(defun unpublish (space model id &key skip-if-done)
   (let ((space-name space)
         (model-name (model-name model)))
     (multiple-value-bind (next old)
         (with-transaction
           (let ((content (resolve-content space-name model-name id)))
-            (check-transition content :unpublish)
-            (check-unreferenced space-name model-name (content-id content) "unpublish")
-            (let ((next (unpublished content)))
-              (values (store model next "unpublish" (content-draft next))
-                      (published-view space model content)))))
-      (notify space model id :unpublish :old old)
-      next)))
+            (if (and skip-if-done (done-p content :unpublish))
+                :skipped
+                (progn
+                  (check-transition content :unpublish)
+                  (check-unreferenced space-name model-name (content-id content) "unpublish")
+                  (let ((next (unpublished content)))
+                    (values (store model next "unpublish" (content-draft next))
+                            (published-view space model content)))))))
+      (cond ((eq next :skipped) :skipped)
+            (t (notify space model id :unpublish :old old)
+               next)))))
 
 (defun discard (space model id &key since)
   (let ((space-name space)
@@ -248,23 +255,18 @@
   (or (only-one (find-contents-by-slug space-name model-name slug))
       (fail 'not-found (format nil "No content has the slug ~a" slug))))
 
-(defparameter +bulk-actions+
-  '(("publish" :publish publish)
-    ("unpublish" :unpublish unpublish)
-    ("delete" :delete destroy)))
+(defun done-p (content op)
+  (let ((status (content-status content)))
+    (multiple-value-bind (next allowed) (next-status status op)
+      (or (not allowed) (equal next status)))))
 
 (defun bulk-action-function (action)
-  (let ((entry (assoc action +bulk-actions+ :test #'equal)))
-    (and entry (fdefinition (third entry)))))
+  (cond ((equal action "publish") (lambda (space model id) (publish space model id :skip-if-done t)))
+        ((equal action "unpublish") (lambda (space model id) (unpublish space model id :skip-if-done t)))
+        ((equal action "delete") #'destroy)))
 
 (defun bulk-action-p (action)
   (and (bulk-action-function action) t))
-
-(defun nothing-to-do-p (action content)
-  (and content
-       (let ((status (content-status content)))
-         (multiple-value-bind (next allowed) (next-status status (second (assoc action +bulk-actions+ :test #'equal)))
-           (or (not allowed) (equal next status))))))
 
 (defun failure-message (condition)
   (typecase condition
@@ -277,17 +279,15 @@
 
 (defun apply-to-each (space model ids action)
   (let ((function (bulk-action-function action))
-        (model-name (model-name model))
         (done 0)
         (skipped 0)
         (failed 0)
         (message nil))
     (dolist (id ids (values done skipped failed message))
       (handler-case
-          (if (nothing-to-do-p action (find-content space model-name id))
+          (if (eq (funcall function space model id) :skipped)
               (incf skipped)
-              (progn (funcall function space model id)
-                     (incf done)))
+              (incf done))
         (error (e) (incf failed) (unless message (setf message (failure-message e))))))))
 
 (defun content-references (space model id)

@@ -7,7 +7,7 @@
                 #:media-id #:media-space #:media-filename #:media-mime #:safe-filename
                 #:+max-upload-bytes+)
   (:import-from #:koya-server/usecases/ports/media
-                #:insert-media #:delete-media #:find-media #:list-media #:count-media #:update-media
+                #:insert-media #:delete-media #:find-media #:find-media-by-ids #:list-media #:count-media #:update-media
                 #:space-media #:write-media-file #:delete-media-file #:delete-space-media-files
                 #:media-file-path #:media-file-exists-p)
   (:import-from #:koya-server/domain/references #:media-fields #:mentioned-ids #:referrers)
@@ -31,13 +31,13 @@
 (in-package #:koya-server/usecases/media)
 
 (defun media-reference-counts (space ids)
-  (let ((counts (make-hash-table :test 'equal))
-        (fields (media-fields (load-schema space))))
+  (let ((counts (make-hash-table :test 'equal)))
     (dolist (id ids) (setf (gethash id counts) 0))
     (when ids
-      (dolist (content (space-contents space))
-        (dolist (id (mentioned-ids content fields ids))
-          (incf (gethash id counts)))))
+      (let ((fields (media-fields (load-schema space))))
+        (dolist (content (space-contents space))
+          (dolist (id (mentioned-ids content fields ids))
+            (incf (gethash id counts))))))
     counts))
 
 (defun media-references (space id)
@@ -72,30 +72,38 @@
     (fail 'too-large (upload-limit-message)))
   (mapcar (lambda (file) (store-upload space (first file) :filename (second file) :alt alt)) files))
 
-(defun remove-media (media)
-  (let ((references (length (media-references (media-space media) (media-id media)))))
-    (when (plusp references)
-      (fail 'conflict (format nil "~a is used by ~a content~:p; remove it from them first"
-                              (media-filename media) references)
-            :code "in_use")))
+(defun remove-unused (media references)
+  (when (plusp references)
+    (fail 'conflict (format nil "~a is used by ~a content~:p; remove it from them first"
+                            (media-filename media) references)
+          :code "in_use"))
   (delete-media (media-space media) (media-id media))
   (delete-media-file (media-space media) (media-id media) (media-mime media)))
 
+(defun remove-media (media)
+  (remove-unused media (length (media-references (media-space media) (media-id media)))))
+
 (defun remove-each (space ids)
-  (let ((done 0) (failed 0) (message nil))
-    (dolist (id ids (values done failed message))
-      (handler-case
-          (let ((media (find-media space id)))
-            (cond ((null media)
-                   (incf failed)
-                   (unless message (setf message "one was gone already")))
-                  (t (remove-media media) (incf done))))
-        (koya-error (e)
-          (incf failed)
-          (unless message (setf message (koya-error-message e))))
-        (error (e)
-          (incf failed)
-          (unless message (setf message (princ-to-string e))))))))
+  (handler-case
+      (let* ((found (find-media-by-ids space ids))
+             (counts (media-reference-counts space (loop :for id :being :the :hash-keys :of found :collect id)))
+             (done 0) (failed 0) (message nil))
+        (dolist (id ids (values done failed message))
+          (handler-case
+              (let ((media (gethash id found)))
+                (cond ((null media)
+                       (incf failed)
+                       (unless message (setf message "one was gone already")))
+                      (t (remhash id found)
+                         (remove-unused media (gethash id counts))
+                         (incf done))))
+            (koya-error (e)
+              (incf failed)
+              (unless message (setf message (koya-error-message e))))
+            (error (e)
+              (incf failed)
+              (unless message (setf message (princ-to-string e)))))))
+    (error (e) (values 0 (length ids) (princ-to-string e)))))
 
 (defun remove-space-media (space)
   (delete-space-media-files space))

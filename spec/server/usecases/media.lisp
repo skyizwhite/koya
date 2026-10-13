@@ -9,7 +9,8 @@
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/usecases/ports/media
                 #:find-media #:list-media #:count-media #:update-media #:media-file-path
-                #:insert-media #:write-media-file #:delete-media-file)
+                #:insert-media #:write-media-file #:delete-media-file #:find-media-by-ids)
+  (:import-from #:koya-server/usecases/ports/contents #:space-contents)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-spec/server/domain/image #:jpeg #:octets)
   (:import-from #:koya-server/usecases/media
@@ -24,6 +25,7 @@
   (:import-from #:babel #:string-to-octets)
   (:import-from #:koya-spec/server/main #:with-env)
   (:import-from #:koya-spec/server/domain/id #:with-drawn-ids)
+  (:import-from #:koya-spec/server/reads #:reads-of)
   (:export #:png-bytes #:*media-root* #:multipart-body #:with-space-cleared))
 (in-package #:koya-spec/server/usecases/media)
 
@@ -247,6 +249,51 @@
       (remove-method #'insert-media insert)
       (remove-method #'delete-media-file cleanup)
       (when left (apply #'delete-media-file left)))))
+
+(deftest removing-each-reads-what-the-selection-needs-once
+  (let ((used (store-upload "website" (png-bytes) :filename "used.png"))
+        (free (loop :for name :in '("a.png" "b.png" "c.png")
+                    :collect (store-upload "website" (png-bytes) :filename name))))
+    (create "website" (find-model "website" "blog") (list :title "Uses it" :cover (media-id used)))
+    (unwind-protect
+         (let* ((result nil)
+                (reads (reads-of (lambda ()
+                                   (setf result (multiple-value-list
+                                                 (remove-each "website" (append (list (media-id used) "gonegonegone")
+                                                                                (mapcar #'media-id free))))))
+                                 :of '(:find-media :find-media-by-ids :load-schema :space-contents :contents-mentioning))))
+           (ok (equal reads '("FIND-MEDIA-BY-IDS" "LOAD-SCHEMA" "SPACE-CONTENTS"))
+               "the media, the schema and the contents are read once, however many are selected")
+           (ok (equal result '(3 2 "used.png is used by 1 content; remove it from them first"))
+               "a media in use stays, named as removing it alone would, and one gone already fails too")
+           (ok (find-media "website" (media-id used)))
+           (ok (notany (lambda (media) (find-media "website" (media-id media))) free) "the rest are removed")
+           (ok (notany (lambda (media) (probe-file (media-path media))) free) "with their files")
+           (ok (equal (multiple-value-list (remove-each "website" (list (media-id used) (media-id used))))
+                      '(0 2 "used.png is used by 1 content; remove it from them first"))
+               "a media selected twice is counted once")
+           (ok (equal (reads-of (lambda () (remove-each "website" (list "gonegonegone")))
+                                :of '(:find-media-by-ids :load-schema :space-contents))
+                      '("FIND-MEDIA-BY-IDS"))
+               "and when none of the selection is there, nothing is looked through for it")
+           (let ((broken (defmethod find-media-by-ids :around ((space string) ids)
+                           (declare (ignore space ids))
+                           (error "The library cannot be read"))))
+             (unwind-protect
+                  (ok (equal (multiple-value-list (remove-each "website" (list (media-id used) "gonegonegone")))
+                             '(0 2 "The library cannot be read"))
+                      "a selection that cannot be read is counted as failed, not lost")
+               (remove-method #'find-media-by-ids broken)))
+           (let ((broken (defmethod space-contents :around ((space string))
+                           (declare (ignore space))
+                           (error "The contents cannot be read"))))
+             (unwind-protect
+                  (ok (equal (multiple-value-list (remove-each "website" (list (media-id used))))
+                             '(0 1 "The contents cannot be read"))
+                      "and so is one whose uses cannot be counted")
+               (remove-method #'space-contents broken))))
+      (exec "DELETE FROM contents")
+      (remove-media used))))
 
 (deftest removing-each-goes-past-a-file-that-will-not-go
   (let* ((stuck (store-upload "website" (png-bytes) :filename "stuck.png"))
