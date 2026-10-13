@@ -226,10 +226,13 @@ paths:
         Validates the document, diffs it against the space's stored schema and,
         unless a destructive change is present without `force=true`, stores it.
         Existing content changes only as the schema does: a rename carries it
-        through, and a removed or retyped field's values are taken out of every
-        published object, draft and revision. The space must already exist — it is
-        made in the admin UI — and a deploy to another name, one that does not
-        exist included, is a 403.
+        through, a removed or retyped field's values are taken out of every
+        published object, draft and revision (inside a custom field or a
+        repeater's rows too), a custom field dropped from a repeater's
+        `customFields` takes its rows out of every revision, and a model whose
+        `kind` changes loses its contents and their history. The space must
+        already exist — it is made in the admin UI — and a deploy to another
+        name, one that does not exist included, is a 403.
       security: [{ managementKey: [] }]
       parameters:
         - name: force

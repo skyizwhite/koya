@@ -305,7 +305,8 @@ missing or unpublished, or a media that is gone, is dropped, and the banner
 names the custom field. A
 repeater comes back with its rows the same way, and the banner names the
 repeater. A field removed from the model,
-or given another type, took its old values out of the history with it. A deleted
+or given another type, took its old values out of the history with it, and a
+custom field dropped from a repeater took its rows out of the history. A deleted
 content cannot be restored at all: its history went with it.
 
 ## The webhook delivery log

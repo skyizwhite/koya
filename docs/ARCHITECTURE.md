@@ -10,7 +10,7 @@ is in [../adr](../adr). Setting up to work on it is in
 
 | System | Holds | Licence |
 |---|---|---|
-| `koya-core` | the schema, its validation, the diff between two of them, JSON and name conversion, time, ULIDs | MIT |
+| `koya-core` | the schema, its validation, the diff between two of them, content data (comparing it, dropping its nulls), JSON and name conversion, time, ULIDs | MIT |
 | `koya-sdk` | the schema DSL and the HTTP client, behind one package that exports a site's API alone | MIT |
 | `koya-server` | the admin UI, the delivery API, the admin API and the media store | AGPL |
 
