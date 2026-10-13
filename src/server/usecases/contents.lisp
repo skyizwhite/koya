@@ -140,7 +140,7 @@
     (check-unchanged-since content since)
     (let* ((given (to-the-minute model (if replace patch (merge-data current patch))))
            (data (without-nulls given))
-           (comparable (comparable-data model data)))
+           (comparable (comparable-data model given)))
       (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
             ((and (nth-value 1 (next-status (content-status content) :discard))
                   (data-equal comparable (comparable-data model live)))

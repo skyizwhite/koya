@@ -88,7 +88,11 @@
         "a key no field has is refused, null or not")
     (ok (equal (content-draft (update-draft "website" (blog) id (list :title "Changed" :body :null) :replace t))
                '(:title "Changed"))
-        "while a field given null is saved as no value")))
+        "while a field given null is saved as no value")
+    (ok (signals (update-draft "website" (blog) id (list :title "Changed" :feautred :null) :replace t) 'validation-error)
+        "and the key no field has is refused even when the rest is as it is")
+    (ok (eq (nth-value 1 (update-draft "website" (blog) id (list :title "Changed" :featured :null) :replace t)) :unchanged)
+        "but a boolean given null is false, as it is when left out")))
 
 (defvar *read-eval-probe* nil)
 
