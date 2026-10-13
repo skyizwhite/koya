@@ -9,7 +9,7 @@
   (:import-from #:koya-server/domain/content #:content-id)
   (:import-from #:koya-server/usecases/ports/media
                 #:find-media #:list-media #:count-media #:update-media #:media-file-path
-                #:insert-media #:write-media-file #:delete-media-file)
+                #:insert-media #:write-media-file #:delete-media-file #:find-media-by-ids)
   (:import-from #:koya-server/domain/image #:sniff-image)
   (:import-from #:koya-spec/server/domain/image #:jpeg #:octets)
   (:import-from #:koya-server/usecases/media
@@ -267,7 +267,22 @@
                "a media in use stays, named as removing it alone would, and one gone already fails too")
            (ok (find-media "website" (media-id used)))
            (ok (notany (lambda (media) (find-media "website" (media-id media))) free) "the rest are removed")
-           (ok (notany (lambda (media) (probe-file (media-path media))) free) "with their files"))
+           (ok (notany (lambda (media) (probe-file (media-path media))) free) "with their files")
+           (ok (equal (multiple-value-list (remove-each "website" (list (media-id used) (media-id used))))
+                      '(0 2 "used.png is used by 1 content; remove it from them first"))
+               "a media selected twice is counted once")
+           (ok (equal (reads-of (lambda () (remove-each "website" (list "gonegonegone")))
+                                :of '(:find-media-by-ids :load-schema :space-contents))
+                      '("FIND-MEDIA-BY-IDS"))
+               "and when none of the selection is there, nothing is looked through for it")
+           (let ((broken (defmethod find-media-by-ids :around ((space string) ids)
+                           (declare (ignore space ids))
+                           (error "The library cannot be read"))))
+             (unwind-protect
+                  (ok (equal (multiple-value-list (remove-each "website" (list (media-id used) "gonegonegone")))
+                             '(0 2 "The library cannot be read"))
+                      "a selection that cannot be read is counted as failed, not lost")
+               (remove-method #'find-media-by-ids broken))))
       (exec "DELETE FROM contents")
       (remove-media used))))
 
