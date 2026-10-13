@@ -14,8 +14,8 @@
                 #:space-webhook-secret #:load-schema)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:record-revision
-                #:find-object-content #:unique-value-taken-p #:slug-taken-p #:find-content
-                #:find-contents-by-slug #:contents-mentioning)
+                #:find-object-content #:find-object-content-id #:unique-value-taken-p #:slug-taken-p #:find-content
+                #:find-contents-by-slug #:find-content-ids-by-slug #:contents-mentioning)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-updated-at #:content-published #:content-draft #:content-draft-key #:content-data
                 #:content-published-p
@@ -36,10 +36,12 @@
            #:destroy
            #:draft-key
            #:object-content
+           #:object-content-id
            #:update-object
            #:publish-object
            #:resolve-content
            #:content-by-slug
+           #:content-id-by-slug
            #:value-taken-p
            #:find-content
            #:bulk-action-p
@@ -101,7 +103,7 @@
         (data (initial-data model data)))
     (let ((content
             (with-transaction
-              (when (and (eq (model-kind model) :object) (find-object-content space-name model-name))
+              (when (and (eq (model-kind model) :object) (find-object-content-id space-name model-name))
                 (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
                       :code "object_exists"))
               (check-content space-name model data)
@@ -223,22 +225,29 @@
           (notify space model id :discard :old draft))
       t)))
 
+(defun no-object-content (model)
+  (fail 'not-found (format nil "~a has no content yet" (model-name model))))
+
 (defun object-content (space model)
   (or (find-object-content space (model-name model))
-      (fail 'not-found (format nil "~a has no content yet" (model-name model)))))
+      (no-object-content model)))
+
+(defun object-content-id (space model)
+  (or (find-object-content-id space (model-name model))
+      (no-object-content model)))
 
 (defun update-object (space model data &key replace since)
-  (let ((content (find-object-content space (model-name model))))
-    (if content
-        (update-draft space model (content-id content) data :replace replace :since since)
+  (let ((id (find-object-content-id space (model-name model))))
+    (if id
+        (update-draft space model id data :replace replace :since since)
         (create space model data))))
 
 (defun publish-object (space model &key (data nil data-p) published-at since)
-  (let ((content (find-object-content space (model-name model))))
-    (cond (content (apply #'publish space model (content-id content) :published-at published-at :since since
-                          (and data-p (list :data data))))
+  (let ((id (find-object-content-id space (model-name model))))
+    (cond (id (apply #'publish space model id :published-at published-at :since since
+                     (and data-p (list :data data))))
           (data-p (create space model data :publish t :published-at published-at))
-          (t (object-content space model)))))
+          (t (no-object-content model)))))
 
 (defun draft-key (space model id)
   (with-transaction
@@ -251,9 +260,16 @@
   (or (find-content space-name model-name id)
       (fail 'not-found (format nil "Content ~a does not exist" id))))
 
+(defun no-slug-content (slug)
+  (fail 'not-found (format nil "No content has the slug ~a" slug)))
+
 (defun content-by-slug (space-name model-name slug)
   (or (only-one (find-contents-by-slug space-name model-name slug))
-      (fail 'not-found (format nil "No content has the slug ~a" slug))))
+      (no-slug-content slug)))
+
+(defun content-id-by-slug (space-name model-name slug)
+  (or (only-one (find-content-ids-by-slug space-name model-name slug))
+      (no-slug-content slug)))
 
 (defun done-p (content op)
   (let ((status (content-status content)))

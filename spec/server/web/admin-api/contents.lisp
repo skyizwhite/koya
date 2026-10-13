@@ -10,7 +10,8 @@
   (:import-from #:koya-core/json #:jobject #:jget #:json-null #:jkeys #:parse-json #:json-parse-error)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
-  (:import-from #:koya-server/web/app #:app))
+  (:import-from #:koya-server/web/app #:app)
+  (:import-from #:koya-spec/server/reads #:reads-of))
 (in-package #:koya-spec/server/web/admin-api/contents)
 
 (setup (setup-api))
@@ -462,6 +463,31 @@
           (ok (= status 200))
           (ok (eq (jget json "deleted") t)))
         (ok (= (admin :get (format nil "/admin/api/website/lists/page/~a" id)) 404) "it is gone")))))
+
+(deftest a-route-reads-the-content-it-acts-on-once
+  (with-pages
+    (lambda ()
+      (admin :post "/admin/api/website/lists/page" :body (jobject "data" (jobject "title" "One" "slug" "one") "publish" t))
+      (flet ((reads (method path &optional body)
+               (reads-of (lambda () (ok (= (admin method path :body body) 200) (format nil "~a ~a" method path)))
+                         :of '(:find-content :find-contents-by-slug :find-object-content))))
+        (ok (equal (reads :get "/admin/api/website/lists/page/slugs/one") '("FIND-CONTENTS-BY-SLUG"))
+            "a content read at its slug is read once")
+        (ok (equal (reads :patch "/admin/api/website/lists/page/slugs/one" (jobject "data" (jobject "title" "Two")))
+                   '("FIND-CONTENT"))
+            "and one changed at its slug is read once, where it is changed")
+        (ok (null (reads :post "/admin/api/website/objects/about/publish" (jobject "data" (jobject "body" "made"))))
+            "an object made by publishing it is not read whole to find there is none")
+        (dolist (route '((:patch "/admin/api/website/objects/about" t)
+                         (:post "/admin/api/website/objects/about/draft-key" nil)
+                         (:post "/admin/api/website/objects/about/discard-draft" nil)
+                         (:post "/admin/api/website/objects/about/publish" nil)
+                         (:post "/admin/api/website/objects/about/unpublish" nil)))
+          (destructuring-bind (method path body) route
+            (ok (equal (reads method path (and body (jobject "data" (jobject "body" "edited")))) '("FIND-CONTENT"))
+                (format nil "~a is read once, where it is changed" path))))
+        (ok (equal (reads :delete "/admin/api/website/lists/page/slugs/one") '("FIND-CONTENT"))
+            "and so is a content deleted at its slug")))))
 
 (defun with-notes ()
   (let ((schema (test-schema)))

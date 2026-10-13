@@ -3,7 +3,9 @@
   (:export #:find-content
            #:find-contents-by-ids
            #:find-contents-by-slug
+           #:find-content-ids-by-slug
            #:find-object-content
+           #:find-object-content-id
            #:list-contents
            #:count-contents
            #:space-contents
@@ -27,7 +29,11 @@
 
 (defgeneric find-contents-by-slug (space model slug))
 
+(defgeneric find-content-ids-by-slug (space model slug))
+
 (defgeneric find-object-content (space model))
+
+(defgeneric find-object-content-id (space model))
 
 (defgeneric list-contents (space model schema-model query &key status only-status))
 

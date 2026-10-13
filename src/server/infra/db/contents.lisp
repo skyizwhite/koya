@@ -17,8 +17,8 @@
   (:import-from #:koya-server/domain/html #:data-text)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:find-content
-                #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
-                #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
+                #:find-contents-by-ids #:find-contents-by-slug #:find-content-ids-by-slug #:list-contents #:count-contents
+                #:find-object-content #:find-object-content-id #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
   (:export #:json-column #:text-column))
 (in-package #:koya-server/infra/db/contents)
@@ -106,6 +106,15 @@
           (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ?
                                 AND (published_slug = ? OR draft_slug = ?)" +columns+)
                  space model slug slug)))
+
+(defmethod find-content-ids-by-slug (space model slug)
+  (mapcar (lambda (row) (col row "id"))
+          (fetch "SELECT id FROM contents WHERE space = ? AND model = ? AND (published_slug = ? OR draft_slug = ?)"
+                 space model slug slug)))
+
+(defmethod find-object-content-id (space model)
+  (let ((row (fetch-one "SELECT id FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" space model)))
+    (and row (col row "id"))))
 
 (defmethod find-object-content (space model)
   (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" +columns+) space model)))
