@@ -15,7 +15,9 @@
                 #:count-revisions #:find-revision)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key
-                #:object-content #:update-object #:publish-object #:content-references #:content-by-slug)
+                #:object-content #:update-object #:publish-object #:content-references #:content-by-slug
+                #:apply-to-each)
+  (:import-from #:koya-spec/server/reads #:reads-of)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-published #:content-draft
@@ -59,6 +61,25 @@
 (teardown (disconnect-db))
 
 (defhook :before (exec "DELETE FROM contents"))
+
+(deftest a-bulk-action-reads-each-content-once
+  (let* ((draft (content-id (make (list :title "Draft"))))
+         (live (content-id (make (list :title "Live") :publish t)))
+         (also (content-id (make (list :title "Also live") :publish t)))
+         (ids (list draft live also)))
+    (let ((reads (reads-of (lambda ()
+                             (ok (equal (multiple-value-list (apply-to-each "website" (blog) ids "publish")) '(1 2 0 nil))
+                                 "publishing a selection publishes the draft and skips what is published")))))
+      (ok (equal reads '("FIND-CONTENT" "FIND-CONTENT" "FIND-CONTENT"))
+          "reading each content once, where it is changed"))
+    (ok (equal (reads-of (lambda () (apply-to-each "website" (blog) (list draft "gone") "delete")))
+               '("FIND-CONTENT" "FIND-CONTENT"))
+        "and so does deleting")
+    (ok (equal (multiple-value-list (apply-to-each "website" (blog) (list live "gone") "unpublish"))
+               '(1 0 1 "Content gone does not exist"))
+        "a content that is gone fails, and the rest go on")
+    (ok (equal (multiple-value-list (apply-to-each "website" (blog) (list live also) "unpublish")) '(1 1 0 nil))
+        "unpublishing skips a draft")))
 
 (defvar *read-eval-probe* nil)
 

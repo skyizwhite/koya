@@ -1,5 +1,7 @@
 # A bulk action takes each item one at a time, through the path a single one takes
 
+Superseded by adr/2026-10-13-a-bulk-action-takes-each-item-by-the-rules-a-single-one-follows.md
+
 *2026-09-27, restating a decision of 2026-09-23*
 
 ## Context
