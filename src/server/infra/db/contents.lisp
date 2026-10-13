@@ -17,8 +17,8 @@
   (:import-from #:koya-server/domain/html #:data-text)
   (:import-from #:koya-server/usecases/ports/contents
                 #:insert-content #:update-content #:delete-content #:find-content
-                #:find-contents-by-ids #:find-contents-by-slug #:list-contents #:count-contents
-                #:find-object-content #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
+                #:find-contents-by-ids #:find-contents-by-slug #:find-content-ids-by-slug #:list-contents #:count-contents
+                #:find-object-content #:find-object-content-id #:unique-value-taken-p #:slug-taken-p #:space-contents #:model-contents
                 #:contents-mentioning)
   (:export #:json-column #:text-column))
 (in-package #:koya-server/infra/db/contents)
@@ -101,14 +101,27 @@
                  space (append (and exclude-id (list exclude-id))
                                (let ((like (format nil "%~a%" needle))) (list like like))))))
 
+(defun by-slug (columns space model slug)
+  (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ?
+                        AND (published_slug = ? OR draft_slug = ?)" columns)
+         space model slug slug))
+
+(defun object-row (columns space model)
+  (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" columns)
+             space model))
+
 (defmethod find-contents-by-slug (space model slug)
-  (mapcar #'row->content
-          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ?
-                                AND (published_slug = ? OR draft_slug = ?)" +columns+)
-                 space model slug slug)))
+  (mapcar #'row->content (by-slug +columns+ space model slug)))
+
+(defmethod find-content-ids-by-slug (space model slug)
+  (mapcar (lambda (row) (col row "id")) (by-slug "id" space model slug)))
+
+(defmethod find-object-content-id (space model)
+  (let ((row (object-row "id" space model)))
+    (and row (col row "id"))))
 
 (defmethod find-object-content (space model)
-  (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" +columns+) space model)))
+  (let ((row (object-row +columns+ space model)))
     (and row (row->content row))))
 
 (defun status-clause (status)

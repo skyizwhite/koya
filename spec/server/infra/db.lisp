@@ -29,7 +29,7 @@
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-revisions #:count-revisions)
   (:import-from #:koya-server/usecases/contents #:create #:update-draft #:publish #:destroy #:unpublish #:discard
-                #:content-by-slug)
+                #:content-by-slug #:content-id-by-slug)
   (:import-from #:koya-server/domain/errors #:not-found)
   (:import-from #:koya-server/usecases/delivery #:delivered-list-content-by-slug)
   (:import-from #:koya-server/domain/query #:parse-query)
@@ -735,10 +735,12 @@
     (ok (string= (access (content-data-of "pair") :a) "x") "and a model with two slug fields keeps both"))
   (testing "and finds nothing by slug until it is put right"
     (ok (signals (content-by-slug "older" "page" "same") 'not-found) "a slug two contents hold")
+    (ok (signals (content-id-by-slug "older" "page" "same") 'not-found) "nor is it found to be changed")
     (ok (signals (delivered-list-content-by-slug "older" (find-model "older" "page") "same" (parse-query nil)) 'not-found)
         "even where one of them holds it only in a draft the delivery API does not show")
     (ok (string= (content-id (content-by-slug "older" "page" "only")) "only") "while one slug held once still finds its content")
     (ok (signals (content-by-slug "older" "twin" "x") 'not-found) "a model with two slug fields")
+    (ok (string= (content-id-by-slug "older" "page" "only") "only") "and its id is found to change it")
     (ok (signals (update-draft "older" (find-model "older" "page") "second" (list :title "Changed")) 'validation-error)
         "a content that shares a slug is refused on its next save"))
   (migrated-fully))

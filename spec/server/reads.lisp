@@ -1,7 +1,8 @@
 (defpackage #:koya-spec/server/reads
   (:use #:cl)
   (:import-from #:koya-server/usecases/ports/contents #:find-content #:find-contents-by-ids #:list-contents)
-  (:import-from #:koya-server/usecases/ports/contents #:space-contents #:contents-mentioning)
+  (:import-from #:koya-server/usecases/ports/contents #:space-contents #:contents-mentioning
+                #:find-contents-by-slug #:find-object-content)
   (:import-from #:koya-server/usecases/ports/media #:find-media #:find-media-by-ids)
   (:import-from #:koya-server/usecases/ports/spaces #:load-schema)
   (:export #:reads-of))
@@ -36,6 +37,16 @@
 (defmethod list-contents :around (space model schema-model query &key status only-status)
   (declare (ignore space schema-model query status only-status))
   (note (list :list-contents model))
+  (call-next-method))
+
+(defmethod find-contents-by-slug :around (space model slug)
+  (declare (ignore space model slug))
+  (note :find-contents-by-slug)
+  (call-next-method))
+
+(defmethod find-object-content :around (space model)
+  (declare (ignore space model))
+  (note :find-object-content)
   (call-next-method))
 
 (defmethod load-schema :around (space-name)
