@@ -232,12 +232,14 @@
       (dolist (path paths)
         (edit path :form '(("action" . "delete")) :headers origin)))))
 
-(defun with-album (&rest models)
-  (make-schema :models (list* (blog-model) (make-model "about" :object (list (make-field :body :richtext))) models)))
+(defun with-album ()
+  (make-schema :models (list (blog-model)
+                             (make-model "about" :object (list (make-field :body :richtext)))
+                             (make-model "album" :list (list (make-field :title :text)
+                                                             (make-field :photos :media :many t))))))
 
 (deftest list-shows-the-first-of-many-media
-  (with-schema ("website" (with-album (make-model "album" :list (list (make-field :title :text)
-                                                                     (make-field :photos :media :many t)))))
+  (with-schema ("website" (with-album))
     (unwind-protect
          (let ((first-photo (media-id (insert-media "website" (new-id) :filename "a.png" :mime "image/png" :size 10 :width 1 :height 1)))
                (second-photo (media-id (insert-media "website" (new-id) :filename "b.png" :mime "image/png" :size 10 :width 1 :height 1))))
