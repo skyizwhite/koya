@@ -3,8 +3,8 @@
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:cl-ppcre #:regex-replace-all)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-name #:model-fields #:field-name #:field-type #:field-option
-                #:webhook-covers-p #:field-many-p #:field-value)
+                #:model-kind #:model-name #:model-fields #:field-name #:field-type
+                #:webhook-covers-p #:field-many-p #:field-value #:without-field)
   (:import-from #:koya-core/data #:array-p #:blank-p)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/web/lib/target #:target-model)
@@ -22,7 +22,7 @@
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-follow #:on-click)
   (:import-from #:koya-server/usecases/listing
                 #:parse-sort #:content-page #:page-media #:count-contents #:find-object-content)
-  (:import-from #:koya-server/usecases/revisions #:held-names)
+  (:import-from #:koya-server/usecases/held #:held-names #:held-name)
   (:import-from #:koya-server/usecases/contents #:bulk-action-p #:apply-to-each)
   (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
@@ -63,14 +63,15 @@
 
 (defparameter +row-height+ "h-14")
 
+(defun shown-data (model content)
+  (reduce (lambda (data field) (if (eq (field-type field) :repeater) (without-field data field) data))
+          (model-fields model) :initial-value (content-data content :draft t)))
+
 (defun id-label-for (space model contents)
   (multiple-value-bind (media-names content-names)
-      (held-names space model (mapcar (lambda (content) (content-data content :draft t)) contents))
+      (held-names space model (mapcar (lambda (content) (shown-data model content)) contents))
     (lambda (field id)
-      (let ((names (if (eq (field-type field) :media)
-                       media-names
-                       (gethash (field-option field :model) content-names))))
-        (or (and names (stringp id) (gethash id names)) id)))))
+      (or (held-name media-names content-names field id) id))))
 
 (defun collapse-whitespace (string)
   (string-trim " " (regex-replace-all "\\s+" string " ")))

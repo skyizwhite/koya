@@ -6,52 +6,15 @@
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-server/usecases/ports/contents
-                #:find-contents-by-ids #:list-revisions #:count-revisions
-                #:find-revision)
-  (:import-from #:koya-server/domain/content #:content-published-p #:content-labels #:held-ids)
-  (:import-from #:koya-server/domain/media #:media-filename)
-  (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
-  (:import-from #:koya-server/usecases/ports/spaces #:find-model)
+                #:list-revisions #:count-revisions #:find-revision)
+  (:import-from #:koya-server/domain/content #:content-published-p)
   (:import-from #:koya-server/usecases/contents #:value-taken-p)
+  (:import-from #:koya-server/usecases/held #:read-held)
   (:export #:restore-data
-           #:held-names
            #:list-revisions
            #:count-revisions
            #:find-revision))
 (in-package #:koya-server/usecases/revisions)
-
-(defun held-in (model revisions)
-  (let ((media '())
-        (references (make-hash-table :test 'equal)))
-    (dolist (revision revisions)
-      (map-data-fields (model-fields model) revision
-                       (lambda (field value found object outer)
-                         (declare (ignore found outer))
-                         (when (member (field-type field) '(:media :reference))
-                           (let ((ids (held-ids value (array-p value))))
-                             (if (eq (field-type field) :media)
-                                 (setf media (append ids media))
-                                 (let ((target (field-option field :model)))
-                                   (setf (gethash target references) (append ids (gethash target references)))))))
-                         object)))
-    (values media references)))
-
-(defun read-held (space model revisions)
-  (multiple-value-bind (media references) (held-in model revisions)
-    (let ((contents (make-hash-table :test 'equal)))
-      (maphash (lambda (target ids) (setf (gethash target contents) (find-contents-by-ids space target ids)))
-               references)
-      (values (find-media-by-ids space media) contents))))
-
-(defun held-names (space model revisions)
-  (multiple-value-bind (media contents) (read-held space model revisions)
-    (let ((media-names (make-hash-table :test 'equal))
-          (content-names (make-hash-table :test 'equal)))
-      (maphash (lambda (id media) (setf (gethash id media-names) (media-filename media))) media)
-      (maphash (lambda (target found)
-                 (setf (gethash target content-names) (content-labels found (find-model space target))))
-               contents)
-      (values media-names content-names))))
 
 (defun usable-id-p (media contents field id)
   (and (stringp id)

@@ -129,8 +129,9 @@ opens the delivery log filtered to this model.
   referenced content's label, a media as a small thumbnail (the first of a `many`
   one, with how many more), a `many` field as its
   values comma-separated, a custom field as the `name: value` of each field
-  inside on one line, a repeater as its number of rows (*2 rows*), an empty field
-  as `—`.
+  inside on one line (a reference inside as its content's label, a media as its
+  file name, and one that is gone as its id), a repeater as its number of rows
+  (*2 rows*), an empty field as `—`.
 - A row shows its **draft** when it has one, so the table reflects what is being
   worked on rather than what is live.
 - Contents are listed newest first, 20 to a page, with **Previous** / **Next**
