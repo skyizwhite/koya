@@ -79,6 +79,6 @@
             ((t) (go-on))
             (:short-secret (set-response-status 403) (hsx (~short-secret)))
             (:too-many-codes (refuse 429 "Too many wrong codes. Wait for the next code, then try again."))
-            (t (refuse 401 (if (totp-enabled-p) "Wrong secret or one-time code" "Wrong secret"))))))))
+            ((:wrong-secret :wrong-code) (refuse 401 (if (totp-enabled-p) "Wrong secret or one-time code" "Wrong secret"))))))))
 
 (public-path (log-in))

@@ -30,8 +30,8 @@
 (deftest wrong-codes-are-limited-each-step
   (let ((time 1800000000))
     (dotimes (i 4)
-      (ok (eq (check-login *secret* (wrong-code-at time) :time time) :code)))
-    (ok (eq (check-login *secret* nil :time time) :code) "no code is a wrong one")
+      (ok (eq (check-login *secret* (wrong-code-at time) :time time) :wrong-code)))
+    (ok (eq (check-login *secret* nil :time time) :wrong-code) "no code is a wrong one")
     (ok (eq (check-login *secret* (code-at time) :time time) :too-many-codes)
         "after five wrong codes, not even the right one is taken")
     (ok (eq (check-login "not the secret" (code-at time) :time (+ time 29)) :too-many-codes)
@@ -48,6 +48,6 @@
 (deftest a-wrong-secret-counts-no-code
   (let ((time 1800000600))
     (dotimes (i 10)
-      (ok (null (check-login "not the secret" (wrong-code-at time) :time time))))
+      (ok (eq (check-login "not the secret" (wrong-code-at time) :time time) :wrong-secret)))
     (ok (eq (check-login *secret* (code-at time) :time time) t)
         "only someone who has the secret can spend the codes")))
