@@ -26,7 +26,7 @@
   (:import-from #:koya-server/usecases/webhooks #:notify-webhooks)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/references #:reference-fields #:refers-p #:referrers)
-  (:import-from #:koya-core/data #:data-equal)
+  (:import-from #:koya-core/data #:data-equal #:without-nulls)
   (:export #:check-content
            #:create
            #:update-draft
@@ -100,13 +100,14 @@
         (updated-at (check-timestamp "updatedAt" updated-at))
         (published-at (check-published-at published-at))
         (revised-at (check-timestamp "revisedAt" revised-at))
-        (data (initial-data model data)))
-    (let ((content
+        (given (initial-data model data)))
+    (let* ((data (without-nulls given))
+           (content
             (with-transaction
               (when (and (eq (model-kind model) :object) (find-object-content-id space-name model-name))
                 (fail 'conflict (format nil "~a already has its content; change that one instead" model-name)
                       :code "object_exists"))
-              (check-content space-name model data)
+              (check-content space-name model given)
               (let ((content (loop :for content := (new-content (new-id) space-name model-name data
                                                                 :publish publish
                                                                 :created-at created-at :updated-at updated-at
@@ -137,7 +138,8 @@
          (current (content-data content :draft t))
          (live (content-published content)))
     (check-unchanged-since content since)
-    (let* ((data (to-the-minute model (if replace patch (merge-data current patch))))
+    (let* ((given (to-the-minute model (if replace patch (merge-data current patch))))
+           (data (without-nulls given))
            (comparable (comparable-data model data)))
       (cond ((data-equal comparable (comparable-data model current)) (values content :unchanged))
             ((and (nth-value 1 (next-status (content-status content) :discard))
@@ -145,7 +147,7 @@
              (values (store model (discarded content) "discard" live) :published (draft-view space model content)))
             (t
              (check-transition content :save)
-             (check-content space model data :exclude-id id)
+             (check-content space model given :exclude-id id)
              (values (store model (drafted content data) "draft" data) :saved))))))
 
 (defun publish (space model id &key (data nil data-p) published-at since skip-if-done)
@@ -162,8 +164,9 @@
       (return-from publish-now :skipped))
     (check-unchanged-since content since)
     (check-transition content :publish)
-    (let ((data (to-the-minute model (if data-p data (content-data content :draft t)))))
-      (check-content space model data :exclude-id id)
+    (let* ((given (to-the-minute model (if data-p data (content-data content :draft t))))
+           (data (without-nulls given)))
+      (check-content space model given :exclude-id id)
       (values (store model (published content data :published-at published-at) "publish" data)
               (published-view space model content)))))
 
