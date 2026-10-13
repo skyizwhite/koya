@@ -6,7 +6,7 @@
                 #:make-custom-field)
   (:import-from #:koya-core/schema-json #:schema->jobject)
   (:import-from #:koya-core/json #:jobject #:jget)
-  (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-spec/server/schema #:with-schema)
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys)
   (:import-from #:koya-server/domain/deploy #:deploy-changes #:deploy-destructive #:change-op #:change-destructive))
 (in-package #:koya-spec/server/web/admin-api/schema)
@@ -85,11 +85,11 @@
       (ok (= status 400) "nor is it deployed, forced or not")
       (ok (string= (jget json "error" "code") "invalid_schema")))
     (testing "a space already stored with one, or imported with one, is read as it is"
-      (replace-schema "website" comma)
-      (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
-        (ok (= status 200))
-        (ok (= (length (jget json "models")) 1)))
-      (ok (= 200 (nth-value 0 (admin :get "/admin/api/website/lists/blog")))))))
+      (with-schema ("website" comma)
+        (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
+          (ok (= status 200))
+          (ok (= (length (jget json "models")) 1)))
+        (ok (= 200 (nth-value 0 (admin :get "/admin/api/website/lists/blog"))))))))
 
 (deftest a-tightened-option-waits-for-the-contents-to-fit
   (flet ((notes (&rest code-options)
@@ -101,94 +101,86 @@
                  "id"))
          (misfits (json path)
            (loop :for change :across (apply #'jget json path) :append (coerce (or (jget change "misfits") #()) 'list))))
-    (replace-schema "website" (notes))
-    (unwind-protect
-         (let ((long (add-note (jobject "title" "Long" "code" "abcdefgh") :publish t))
-               (none (add-note (jobject "title" "None")))
-               (twin (add-note (jobject "title" "Twin" "code" "abcdefgh"))))
-           (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
-                                                     :body (schema->jobject (notes :max-length 5)))
-             (ok (= status 200))
-             (ng (jget json "destructive") "tightening asks for no force")
-             (ok (equal (sort (mapcar (lambda (m) (jget m "id")) (misfits json '("changes"))) #'string<)
-                        (sort (list long twin) #'string<))
-                 "the plan names every content whose value no longer fits")
-             (ok (search "2 contents do not fit" (jget (aref (jget json "changes") 0) "description"))))
-           (dolist (query '(nil "force=true"))
-             (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
-                                                       :body (schema->jobject (notes :max-length 5)) :query query)
-               (ok (= status 409) (format nil "the deploy is refused~@[ with ~a~]" query))
-               (ok (string= (jget json "error" "code") "contents_do_not_fit"))
-               (ok (= (length (misfits json '("error" "details"))) 2))))
-           (ok (plusp (length (jget (nth-value 1 (admin :post "/admin/api/website/schema/plan"
-                                                         :body (schema->jobject (notes :max-length 5))))
-                                    "changes")))
-               "and nothing is applied")
-           (testing "unique and required are checked the same way"
-             (ok (= 2 (length (misfits (nth-value 1 (admin :post "/admin/api/website/schema/plan"
-                                                          :body (schema->jobject (notes :unique t))))
-                                       '("changes"))))
-                 "the two contents that share a value")
-             (ok (equal (mapcar (lambda (m) (jget m "id"))
-                                (misfits (nth-value 1 (admin :post "/admin/api/website/schema/plan"
-                                                             :body (schema->jobject (notes :required t))))
-                                         '("changes")))
-                        (list none))
-                 "the content without one"))
-           (testing "once they fit, the deploy goes through"
-             (admin :patch (format nil "/admin/api/website/lists/note/~a" long) :body (jobject "data" (jobject "code" "abc")))
-             (admin :post (format nil "/admin/api/website/lists/note/~a/publish" long))
-             (admin :patch (format nil "/admin/api/website/lists/note/~a" twin) :body (jobject "data" (jobject "code" "xyz")))
-             (ok (= 200 (admin :put "/admin/api/website/schema" :body (schema->jobject (notes :max-length 5))))))
-           (testing "a required field added to a model with contents waits for them too"
-             (let ((with-lede (make-schema :models (list (make-model "note" :list
-                                                                     (list (make-field :title :text)
-                                                                           (make-field :code :text :max-length 5)
-                                                                           (make-field :lede :text :required t)))))))
-               (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject with-lede))
-                 (ok (= status 409))
-                 (ok (= (length (misfits json '("error" "details"))) 3)
-                     "every stored version of every content lacks it")))))
-      (replace-schema "website" (test-schema)))))
+    (with-schema ("website" (notes))
+      (let ((long (add-note (jobject "title" "Long" "code" "abcdefgh") :publish t))
+            (none (add-note (jobject "title" "None")))
+            (twin (add-note (jobject "title" "Twin" "code" "abcdefgh"))))
+        (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
+                                                  :body (schema->jobject (notes :max-length 5)))
+          (ok (= status 200))
+          (ng (jget json "destructive") "tightening asks for no force")
+          (ok (equal (sort (mapcar (lambda (m) (jget m "id")) (misfits json '("changes"))) #'string<)
+                     (sort (list long twin) #'string<))
+              "the plan names every content whose value no longer fits")
+          (ok (search "2 contents do not fit" (jget (aref (jget json "changes") 0) "description"))))
+        (dolist (query '(nil "force=true"))
+          (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
+                                                    :body (schema->jobject (notes :max-length 5)) :query query)
+            (ok (= status 409) (format nil "the deploy is refused~@[ with ~a~]" query))
+            (ok (string= (jget json "error" "code") "contents_do_not_fit"))
+            (ok (= (length (misfits json '("error" "details"))) 2))))
+        (ok (plusp (length (jget (nth-value 1 (admin :post "/admin/api/website/schema/plan"
+                                                      :body (schema->jobject (notes :max-length 5))))
+                                 "changes")))
+            "and nothing is applied")
+        (testing "unique and required are checked the same way"
+          (ok (= 2 (length (misfits (nth-value 1 (admin :post "/admin/api/website/schema/plan"
+                                                       :body (schema->jobject (notes :unique t))))
+                                    '("changes"))))
+              "the two contents that share a value")
+          (ok (equal (mapcar (lambda (m) (jget m "id"))
+                             (misfits (nth-value 1 (admin :post "/admin/api/website/schema/plan"
+                                                          :body (schema->jobject (notes :required t))))
+                                      '("changes")))
+                     (list none))
+              "the content without one"))
+        (testing "once they fit, the deploy goes through"
+          (admin :patch (format nil "/admin/api/website/lists/note/~a" long) :body (jobject "data" (jobject "code" "abc")))
+          (admin :post (format nil "/admin/api/website/lists/note/~a/publish" long))
+          (admin :patch (format nil "/admin/api/website/lists/note/~a" twin) :body (jobject "data" (jobject "code" "xyz")))
+          (ok (= 200 (admin :put "/admin/api/website/schema" :body (schema->jobject (notes :max-length 5))))))
+        (testing "a required field added to a model with contents waits for them too"
+          (let ((with-lede (make-schema :models (list (make-model "note" :list
+                                                                  (list (make-field :title :text)
+                                                                        (make-field :code :text :max-length 5)
+                                                                        (make-field :lede :text :required t)))))))
+            (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject with-lede))
+              (ok (= status 409))
+              (ok (= (length (misfits json '("error" "details"))) 3)
+                  "every stored version of every content lacks it"))))))))
 
 (deftest misfits-are-told-first-and-not-of-contents-that-go
   (flet ((notes (kind &rest code-options)
            (make-schema :models (list (make-model "note" kind (list (make-field :title :text)
                                                                     (apply #'make-field :code :text code-options)))))))
-    (replace-schema "website" (notes :list))
-    (unwind-protect
-         (progn
-           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "title" "Long" "code" "abcdefgh")))
-           (testing "a deploy that could never go through says why before it asks for force"
-             (let ((without-title (make-schema :models (list (make-model "note" :list
-                                                                         (list (make-field :code :text :max-length 5)))))))
-               (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject without-title))
-                 (ok (= status 409))
-                 (ok (string= (jget json "error" "code") "contents_do_not_fit")))))
-           (testing "a model made anew is not checked, as its contents go"
-             (ok (= 200 (admin :put "/admin/api/website/schema" :body (schema->jobject (notes :object :max-length 5))
-                                                                :query "force=true")))))
-      (replace-schema "website" (test-schema)))))
+    (with-schema ("website" (notes :list))
+      (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "title" "Long" "code" "abcdefgh")))
+      (testing "a deploy that could never go through says why before it asks for force"
+        (let ((without-title (make-schema :models (list (make-model "note" :list
+                                                                    (list (make-field :code :text :max-length 5)))))))
+          (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject without-title))
+            (ok (= status 409))
+            (ok (string= (jget json "error" "code") "contents_do_not_fit")))))
+      (testing "a model made anew is not checked, as its contents go"
+        (ok (= 200 (admin :put "/admin/api/website/schema" :body (schema->jobject (notes :object :max-length 5))
+                                                           :query "force=true")))))))
 
 (deftest a-custom-field-goes-over-the-api
   (flet ((cards (&rest title-options)
            (make-schema :custom-fields (list (make-custom-field "card" (list (apply #'make-field :title :text title-options))))
                         :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card")))))))
-    (replace-schema "website" (cards))
-    (unwind-protect
-         (progn
-           (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
-             (ok (= status 200))
-             (ok (string= (jget (aref (jget json "customFields") 0) "name") "card") "it is read back"))
-           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "abcdefgh"))))
-           (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
-                                                     :body (schema->jobject (cards :max-length 5)))
-             (ok (= status 200))
-             (let ((misfit (loop :for change :across (jget json "changes")
-                                 :thereis (and (jget change "misfits") (aref (jget change "misfits") 0)))))
-               (ok misfit "tightening a field inside is checked against stored contents")
-               (ok (string= (jget misfit "field") "card.title") "and the misfit says where"))))
-      (replace-schema "website" (test-schema)))))
+    (with-schema ("website" (cards))
+      (multiple-value-bind (status json) (admin :get "/admin/api/website/schema")
+        (ok (= status 200))
+        (ok (string= (jget (aref (jget json "customFields") 0) "name") "card") "it is read back"))
+      (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "abcdefgh"))))
+      (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
+                                                :body (schema->jobject (cards :max-length 5)))
+        (ok (= status 200))
+        (let ((misfit (loop :for change :across (jget json "changes")
+                            :thereis (and (jget change "misfits") (aref (jget change "misfits") 0)))))
+          (ok misfit "tightening a field inside is checked against stored contents")
+          (ok (string= (jget misfit "field") "card.title") "and the misfit says where"))))))
 
 (deftest a-field-tightened-inside-is-checked-alone
   (flet ((cards (&rest fields)
@@ -197,22 +189,19 @@
          (required-cards (&rest fields)
            (make-schema :custom-fields (list (make-custom-field "card" fields))
                         :models (list (make-model "note" :list (list (make-field :card :custom :custom-field "card" :required t)))))))
-    (replace-schema "website" (cards (make-field :title :text) (make-field :image :text)))
-    (unwind-protect
-         (progn
-           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "T" "image" "I"))))
-           (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
-                                                     :body (schema->jobject (required-cards (make-field :title :text))))
-             (ok (= status 200))
-             (ok (every (lambda (c) (null (jget c "misfits"))) (jget json "changes"))
-                 "a custom field made required is checked with what the same deploy removes from it gone"))
-           (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject)))
-           (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
-                                                     :body (schema->jobject (cards (make-field :title :text :required t)))
-                                                     :query "force=true")
-             (ok (= status 200) "a field made required inside is checked alone, not with one the same deploy removes")
-             (ng (jget json "error"))))
-      (replace-schema "website" (test-schema)))))
+    (with-schema ("website" (cards (make-field :title :text) (make-field :image :text)))
+      (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "card" (jobject "title" "T" "image" "I"))))
+      (multiple-value-bind (status json) (admin :post "/admin/api/website/schema/plan"
+                                                :body (schema->jobject (required-cards (make-field :title :text))))
+        (ok (= status 200))
+        (ok (every (lambda (c) (null (jget c "misfits"))) (jget json "changes"))
+            "a custom field made required is checked with what the same deploy removes from it gone"))
+      (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject)))
+      (multiple-value-bind (status json) (admin :put "/admin/api/website/schema"
+                                                :body (schema->jobject (cards (make-field :title :text :required t)))
+                                                :query "force=true")
+        (ok (= status 200) "a field made required inside is checked alone, not with one the same deploy removes")
+        (ng (jget json "error"))))))
 
 (deftest a-repeater-is-checked-row-by-row
   (flet ((pages (kinds &rest heading-options)
@@ -220,25 +209,22 @@
                                                                                 (make-field :note :text)))
                                              (make-custom-field "quote" (list (make-field :text :text))))
                         :models (list (make-model "note" :list (list (make-field :blocks :repeater :custom-fields kinds)))))))
-    (replace-schema "website" (pages '(heading quote)))
-    (unwind-protect
-         (progn
-           (admin :post "/admin/api/website/lists/note"
-                  :body (jobject "data" (jobject "blocks" (vector (jobject "fieldId" "quote" "text" "Q")
-                                                                  (jobject "fieldId" "heading" "text" "abcdefgh" "note" "n")))))
-           (flet ((misfit-fields (schema)
-                    (let ((json (nth-value 1 (admin :post "/admin/api/website/schema/plan" :body (schema->jobject schema)))))
-                      (loop :for change :across (jget json "changes")
-                            :append (map 'list (lambda (m) (jget m "field")) (or (jget change "misfits") #()))))))
-             (ok (equal (misfit-fields (pages '(heading quote) :max-length 5)) '("blocks[1].text"))
-                 "a field tightened inside is checked in the rows of its custom field, named by the row")
-             (ok (equal (misfit-fields (pages '(heading))) '("blocks[0]"))
-                 "a custom field taken from the list is checked against the rows of it")
-             (ok (eq (jget (nth-value 1 (admin :post "/admin/api/website/schema/plan" :body (schema->jobject (pages '(heading)))))
-                           "destructive")
-                     t)
-                 "and is destructive, since the rows of it leave the history")))
-      (replace-schema "website" (test-schema)))))
+    (with-schema ("website" (pages '(heading quote)))
+      (admin :post "/admin/api/website/lists/note"
+             :body (jobject "data" (jobject "blocks" (vector (jobject "fieldId" "quote" "text" "Q")
+                                                             (jobject "fieldId" "heading" "text" "abcdefgh" "note" "n")))))
+      (flet ((misfit-fields (schema)
+               (let ((json (nth-value 1 (admin :post "/admin/api/website/schema/plan" :body (schema->jobject schema)))))
+                 (loop :for change :across (jget json "changes")
+                       :append (map 'list (lambda (m) (jget m "field")) (or (jget change "misfits") #()))))))
+        (ok (equal (misfit-fields (pages '(heading quote) :max-length 5)) '("blocks[1].text"))
+            "a field tightened inside is checked in the rows of its custom field, named by the row")
+        (ok (equal (misfit-fields (pages '(heading))) '("blocks[0]"))
+            "a custom field taken from the list is checked against the rows of it")
+        (ok (eq (jget (nth-value 1 (admin :post "/admin/api/website/schema/plan" :body (schema->jobject (pages '(heading)))))
+                      "destructive")
+                t)
+            "and is destructive, since the rows of it leave the history")))))
 
 (deftest dropping-a-custom-field-from-a-repeater-needs-force
   (flet ((pages (&rest kinds)
@@ -248,23 +234,20 @@
          (listed-kinds ()
            (jget (aref (jget (aref (jget (nth-value 1 (admin :get "/admin/api/website/schema")) "models") 0) "fields") 0)
                  "customFields")))
-    (replace-schema "website" (pages 'heading 'quote))
-    (unwind-protect
-         (progn
-           (admin :post "/admin/api/website/lists/note"
-                  :body (jobject "data" (jobject "blocks" (vector (jobject "fieldId" "heading" "text" "H")))))
-           (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject (pages 'heading)))
-             (ok (= status 409) "even when no content holds a row of it")
-             (ok (string= (jget json "error" "code") "destructive_changes")))
-           (ok (equalp (listed-kinds) #("heading" "quote")) "and nothing is applied")
-           (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject (pages 'heading))
-                                                                                     :query "force=true")
-             (ok (= status 200))
-             (ng (jget json "error")))
-           (ok (equalp (listed-kinds) #("heading")) "it is applied with force")
-           (ok (equal (mapcar (lambda (c) (list (change-op c) (change-destructive c)))
-                              (deploy-changes (first (list-deploys "website"))))
-                      '(("change_field_options" t)))
-               "and logged as a destructive change")
-           (ok (deploy-destructive (first (list-deploys "website"))) "in a deploy marked destructive"))
-      (replace-schema "website" (test-schema)))))
+    (with-schema ("website" (pages 'heading 'quote))
+      (admin :post "/admin/api/website/lists/note"
+             :body (jobject "data" (jobject "blocks" (vector (jobject "fieldId" "heading" "text" "H")))))
+      (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject (pages 'heading)))
+        (ok (= status 409) "even when no content holds a row of it")
+        (ok (string= (jget json "error" "code") "destructive_changes")))
+      (ok (equalp (listed-kinds) #("heading" "quote")) "and nothing is applied")
+      (multiple-value-bind (status json) (admin :put "/admin/api/website/schema" :body (schema->jobject (pages 'heading))
+                                                                                :query "force=true")
+        (ok (= status 200))
+        (ng (jget json "error")))
+      (ok (equalp (listed-kinds) #("heading")) "it is applied with force")
+      (ok (equal (mapcar (lambda (c) (list (change-op c) (change-destructive c)))
+                         (deploy-changes (first (list-deploys "website"))))
+                 '(("change_field_options" t)))
+          "and logged as a destructive change")
+      (ok (deploy-destructive (first (list-deploys "website"))) "in a deploy marked destructive"))))

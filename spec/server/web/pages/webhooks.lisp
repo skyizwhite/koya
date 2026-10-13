@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/webhooks
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-spec/server/schema #:with-schema)
   (:import-from #:koya-server/web/lib/binds #:on-search)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:blog-model #:request #:call-action #:setup-pages #:log-in)
@@ -24,8 +24,7 @@
                              :models (list (blog-model)
                                            (make-model "about" :object (list (make-field :body :richtext)))))))
     (unwind-protect
-         (progn
-           (replace-schema "website" hooked)
+         (with-schema ("website" hooked)
            (exec "DELETE FROM webhook_deliveries")
            (record-delivery "website" :label "revalidate" :url "https://site.test/api/revalidate"
                                       :model "blog" :event "publish" :content-id "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -55,9 +54,8 @@
                                                                           :only '(blog)))
                                             :models (list (blog-model)
                                                           (make-model "about" :object (list (make-field :body :richtext)))))))
-               (replace-schema "website" narrow)
-               (unwind-protect (request :get "/s/website/m/about")
-                 (replace-schema "website" hooked)))
+               (with-schema ("website" narrow)
+                 (request :get "/s/website/m/about")))
                (ok (= status 200))
                (ng (search "/s/website/webhooks?model=about" body))))
            (testing "a model page links to the log narrowed to that model"
@@ -116,9 +114,6 @@
                  (ok (search "<option value=\"blog\" selected" body)))))
            (multiple-value-bind (status) (request :get "/s/nope/webhooks")
              (ok (= status 404))))
-      (replace-schema "website"
-                   (make-schema :models (list (blog-model)
-                                              (make-model "about" :object (list (make-field :body :richtext))))))
       (exec "DELETE FROM webhook_deliveries")))
   (testing "with the webhooks gone, nothing offers a log that can only be empty"
     (multiple-value-bind (status body) (request :get "/s/website/m/blog")

@@ -17,7 +17,8 @@
   (:import-from #:koya-core/schema #:model-fields #:make-schema #:make-model #:make-field)
   (:import-from #:koya-spec/server/web/pages/support #:call-action)
   (:import-from #:koya-server/web/pages/s/<space>/m/<model>/index #:bulk-contents #:browse-contents)
-  (:import-from #:koya-server/usecases/schema #:resolve-model #:replace-schema #:find-model)
+  (:import-from #:koya-server/usecases/schema #:resolve-model #:find-model)
+  (:import-from #:koya-spec/server/schema #:with-schema)
   (:import-from #:koya-server/domain/id #:new-id))
 (in-package #:koya-spec/server/web/pages/content-list)
 
@@ -235,25 +236,24 @@
   (make-schema :models (list* (blog-model) (make-model "about" :object (list (make-field :body :richtext))) models)))
 
 (deftest list-shows-the-first-of-many-media
-  (replace-schema "website" (with-album (make-model "album" :list (list (make-field :title :text)
-                                                                       (make-field :photos :media :many t)))))
-  (unwind-protect
-       (let ((first-photo (media-id (insert-media "website" (new-id) :filename "a.png" :mime "image/png" :size 10 :width 1 :height 1)))
-             (second-photo (media-id (insert-media "website" (new-id) :filename "b.png" :mime "image/png" :size 10 :width 1 :height 1))))
-         (create "website" (find-model "website" "album")
-                 (list :title "Trip" :photos (vector first-photo second-photo second-photo)) :publish t)
-         (let ((body (nth-value 1 (request :get "/s/website/m/album"))))
-           (ok (search (format nil "src=\"/media/website/~a.png\"" first-photo) body) "a field of many media is its first image")
-           (ok (search ">+2<" body) "and how many more it holds"))
-         (exec "UPDATE contents SET published = json_set(published, '$.photos', json_array('', ?)) WHERE model = 'album'"
-               second-photo)
-         (let ((body (nth-value 1 (request :get "/s/website/m/album"))))
-           (ok (search (format nil "src=\"/media/website/~a.png\"" second-photo) body)
-               "a blank id is passed over, as data written to the database by hand")
-           (ng (search "(missing)" body))))
-    (exec "DELETE FROM contents WHERE model = 'album'")
-    (exec "DELETE FROM media")
-    (replace-schema "website" (with-album))))
+  (with-schema ("website" (with-album (make-model "album" :list (list (make-field :title :text)
+                                                                     (make-field :photos :media :many t)))))
+    (unwind-protect
+         (let ((first-photo (media-id (insert-media "website" (new-id) :filename "a.png" :mime "image/png" :size 10 :width 1 :height 1)))
+               (second-photo (media-id (insert-media "website" (new-id) :filename "b.png" :mime "image/png" :size 10 :width 1 :height 1))))
+           (create "website" (find-model "website" "album")
+                   (list :title "Trip" :photos (vector first-photo second-photo second-photo)) :publish t)
+           (let ((body (nth-value 1 (request :get "/s/website/m/album"))))
+             (ok (search (format nil "src=\"/media/website/~a.png\"" first-photo) body) "a field of many media is its first image")
+             (ok (search ">+2<" body) "and how many more it holds"))
+           (exec "UPDATE contents SET published = json_set(published, '$.photos', json_array('', ?)) WHERE model = 'album'"
+                 second-photo)
+           (let ((body (nth-value 1 (request :get "/s/website/m/album"))))
+             (ok (search (format nil "src=\"/media/website/~a.png\"" second-photo) body)
+                 "a blank id is passed over, as data written to the database by hand")
+             (ng (search "(missing)" body))))
+      (exec "DELETE FROM contents WHERE model = 'album'")
+      (exec "DELETE FROM media"))))
 
 (deftest list-shows-references-by-label
   (exec "DELETE FROM contents")

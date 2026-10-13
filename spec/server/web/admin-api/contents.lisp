@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/admin-api/contents
   (:use #:cl #:rove)
-  (:import-from #:koya-server/usecases/schema #:replace-schema)
+  (:import-from #:koya-spec/server/schema #:with-schema)
   (:import-from #:koya-spec/server/web/api-support
                 #:*webhooks* #:admin #:delivery #:webhook-events #:setup-api #:reset-api
                 #:test-schema #:*management-key*)
@@ -311,12 +311,10 @@
                      "id")))
       (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Keeps an id" "tags" (vector tag))))
       (ok (= 409 (admin :delete (format nil "/admin/api/website/lists/tag/~a" tag))))
-      (replace-schema "website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text :required t)))
-                                                        (make-model "tag" :list (list (make-field :name :text :required t)))
-                                                        (make-model "about" :object (list (make-field :body :richtext))))))
-      (unwind-protect
-           (ok (= 200 (admin :delete (format nil "/admin/api/website/lists/tag/~a" tag))))
-        (replace-schema "website" (test-schema))))))
+      (with-schema ("website" (make-schema :models (list (make-model "blog" :list (list (make-field :title :text :required t)))
+                                                      (make-model "tag" :list (list (make-field :name :text :required t)))
+                                                      (make-model "about" :object (list (make-field :body :richtext))))))
+        (ok (= 200 (admin :delete (format nil "/admin/api/website/lists/tag/~a" tag))))))))
 
 (deftest a-patch-that-changes-nothing-writes-nothing
   (let ((id (jget (nth-value 1 (admin :post "/admin/api/website/lists/tag"
@@ -411,14 +409,13 @@
     (ok (jget json "contents"))))
 
 (defun with-pages (thunk)
-  (replace-schema "website"
-                  (make-schema :webhooks (schema-webhooks (test-schema))
-                               :models (append (schema-models (test-schema))
-                                               (list (make-model "page" :list (list (make-field :title :text)
-                                                                                    (make-field :slug :slug)))))))
-  (unwind-protect (funcall thunk)
-    (exec "DELETE FROM contents")
-    (replace-schema "website" (test-schema))))
+  (with-schema ("website"
+                (make-schema :webhooks (schema-webhooks (test-schema))
+                             :models (append (schema-models (test-schema))
+                                             (list (make-model "page" :list (list (make-field :title :text)
+                                                                                  (make-field :slug :slug)))))))
+    (unwind-protect (funcall thunk)
+      (exec "DELETE FROM contents"))))
 
 (deftest a-list-content-is-reached-by-its-slug
   (with-pages
@@ -507,46 +504,44 @@
                                                                       (make-field :card :custom :custom-field "card"))))))))
 
 (deftest data-is-taken-and-answered-as-its-fields
-  (replace-schema "website" (with-notes))
-  (unwind-protect
-       (flet ((note (id &optional action) (format nil "/admin/api/website/lists/note/~a~@[/~a~]" id action)))
-         (testing "a content with no values is a version still"
-           (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject) "publish" t))
-             (ok (= status 201))
-             (ok (string= (jget json "status") "published"))
-             (ok (zerop (hash-table-count (jget json "published"))) "with an empty object as its data")
-             (let ((id (jget json "id")))
-               (ok (string= (jget (nth-value 1 (admin :get (note id))) "status") "published") "as it is stored")
-               (ok (= 200 (delivery (format nil "/api/v1/website/lists/note/~a" id))) "and delivered")
-               (admin :patch (note id) :body (jobject "data" (jobject "memoText" "draft")))
-               (let ((json (nth-value 1 (admin :post (note id "publish") :body (jobject "data" (jobject))))))
-                 (ng (nth-value 1 (jget json "published" "memoText")) "a publish given {} publishes no values"))
-               (admin :patch (note id) :body (jobject "data" (jobject "memoText" "draft")))
-               (let ((json (nth-value 1 (admin :post (note id "publish") :body (jobject "data" json-null)))))
-                 (ok (string= (jget json "published" "memoText") "draft") "and one given null publishes the draft")))))
-         (testing "an empty custom field is answered as an object"
-           (let ((id (jget (nth-value 1 (admin :post "/admin/api/website/lists/note"
-                                               :body (jobject "data" (jobject "card" (jobject)) "publish" t)))
-                           "id")))
-             (ok (hash-table-p (jget (nth-value 1 (admin :get (note id))) "published" "card")) "by the admin API")
-             (ok (hash-table-p (jget (nth-value 1 (delivery (format nil "/api/v1/website/lists/note/~a" id))) "card"))
-                 "by the delivery API")
-             (ok (hash-table-p (jget (second (first *webhooks*)) "contents" "new" "card")) "and in a webhook")))
-         (testing "a key spelled as a field's keyword is not that field"
-           (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/note"
-                                                     :body (jobject "data" (jobject "memo-text" "x")))
-             (ok (= status 422))
-             (ok (string= (jget (aref (jget json "error" "details") 0) "field") "memo-text"))
-             (ok (string= (jget (aref (jget json "error" "details") 0) "code") "unknown_field")))
-           (let ((id (jget (nth-value 1 (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "memoText" "a"))))
-                           "id")))
-             (ok (= 422 (admin :patch (note id) :body (jobject "data" (jobject "memo-text" "b"))))
-                 "nor does a patch take the field's place with it")
-             (ok (string= (jget (nth-value 1 (admin :get (note id))) "draft" "memoText") "a"))))
-         (testing "a null is not kept"
-           (let* ((body (jobject "data" (jobject "memoText" json-null "card" (jobject "caption" json-null))))
-                  (id (jget (nth-value 1 (admin :post "/admin/api/website/lists/note" :body body)) "id"))
-                  (draft (jget (nth-value 1 (admin :get (note id))) "draft")))
-             (ng (nth-value 1 (jget draft "memoText")) "a field given null has no value")
-             (ok (zerop (hash-table-count (jget draft "card"))) "inside a custom field too"))))
-    (replace-schema "website" (test-schema))))
+  (with-schema ("website" (with-notes))
+    (flet ((note (id &optional action) (format nil "/admin/api/website/lists/note/~a~@[/~a~]" id action)))
+      (testing "a content with no values is a version still"
+        (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject) "publish" t))
+          (ok (= status 201))
+          (ok (string= (jget json "status") "published"))
+          (ok (zerop (hash-table-count (jget json "published"))) "with an empty object as its data")
+          (let ((id (jget json "id")))
+            (ok (string= (jget (nth-value 1 (admin :get (note id))) "status") "published") "as it is stored")
+            (ok (= 200 (delivery (format nil "/api/v1/website/lists/note/~a" id))) "and delivered")
+            (admin :patch (note id) :body (jobject "data" (jobject "memoText" "draft")))
+            (let ((json (nth-value 1 (admin :post (note id "publish") :body (jobject "data" (jobject))))))
+              (ng (nth-value 1 (jget json "published" "memoText")) "a publish given {} publishes no values"))
+            (admin :patch (note id) :body (jobject "data" (jobject "memoText" "draft")))
+            (let ((json (nth-value 1 (admin :post (note id "publish") :body (jobject "data" json-null)))))
+              (ok (string= (jget json "published" "memoText") "draft") "and one given null publishes the draft")))))
+      (testing "an empty custom field is answered as an object"
+        (let ((id (jget (nth-value 1 (admin :post "/admin/api/website/lists/note"
+                                            :body (jobject "data" (jobject "card" (jobject)) "publish" t)))
+                        "id")))
+          (ok (hash-table-p (jget (nth-value 1 (admin :get (note id))) "published" "card")) "by the admin API")
+          (ok (hash-table-p (jget (nth-value 1 (delivery (format nil "/api/v1/website/lists/note/~a" id))) "card"))
+              "by the delivery API")
+          (ok (hash-table-p (jget (second (first *webhooks*)) "contents" "new" "card")) "and in a webhook")))
+      (testing "a key spelled as a field's keyword is not that field"
+        (multiple-value-bind (status json) (admin :post "/admin/api/website/lists/note"
+                                                  :body (jobject "data" (jobject "memo-text" "x")))
+          (ok (= status 422))
+          (ok (string= (jget (aref (jget json "error" "details") 0) "field") "memo-text"))
+          (ok (string= (jget (aref (jget json "error" "details") 0) "code") "unknown_field")))
+        (let ((id (jget (nth-value 1 (admin :post "/admin/api/website/lists/note" :body (jobject "data" (jobject "memoText" "a"))))
+                        "id")))
+          (ok (= 422 (admin :patch (note id) :body (jobject "data" (jobject "memo-text" "b"))))
+              "nor does a patch take the field's place with it")
+          (ok (string= (jget (nth-value 1 (admin :get (note id))) "draft" "memoText") "a"))))
+      (testing "a null is not kept"
+        (let* ((body (jobject "data" (jobject "memoText" json-null "card" (jobject "caption" json-null))))
+               (id (jget (nth-value 1 (admin :post "/admin/api/website/lists/note" :body body)) "id"))
+               (draft (jget (nth-value 1 (admin :get (note id))) "draft")))
+          (ng (nth-value 1 (jget draft "memoText")) "a field given null has no value")
+          (ok (zerop (hash-table-count (jget draft "card"))) "inside a custom field too"))))))
