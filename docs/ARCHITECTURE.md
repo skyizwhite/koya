@@ -39,7 +39,8 @@ src/
                       ; totp, timezone, address, html, number
     usecases/         ; what koya does, knowing neither HTTP nor SQL, one file
                       ; per part: contents (writes), listing (the admin's reads),
-                      ; delivery (the delivery API's reads), revisions, spaces,
+                      ; delivery (the delivery API's reads), held (what data
+                      ; holds, read together and named), revisions, spaces,
                       ; schema (models and deploys), archive, media, webhooks,
                       ; keys, settings, auth, actor, system
       ports/          ; what the use cases need from outside: store, spaces,

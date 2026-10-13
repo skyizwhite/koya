@@ -5,9 +5,10 @@
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-follow)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-name #:model-field #:field-type #:field-option #:field-value)
+                #:model-kind #:model-name #:model-field #:field-type #:field-value)
   (:import-from #:koya-core/validate #:blank-value-p)
-  (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions #:held-names)
+  (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions)
+  (:import-from #:koya-server/usecases/held #:held-names #:held-entry)
   (:import-from #:koya-server/usecases/contents #:find-content)
   (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content #:content-id #:content-label)
@@ -49,10 +50,7 @@
 (defun id-text-for (space model revisions)
   (multiple-value-bind (media-names content-names) (held-names space model (mapcar #'revision-data revisions))
     (lambda (field id)
-      (let* ((names (if (eq (field-type field) :media)
-                        media-names
-                        (gethash (field-option field :model) content-names)))
-             (label (and names (gethash id names))))
+      (let ((label (held-entry media-names content-names field id)))
         (if (and label (string/= label id)) (format nil "~a (~a)" label id) id)))))
 
 (defun richtext-document (html)
