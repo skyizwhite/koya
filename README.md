@@ -181,8 +181,10 @@ secret (on its **Keys** page) in `X-KOYA-WEBHOOK-KEY`:
 { "space": "website", "model": "blog", "id": "k3x9m2qa7t0b", "event": "publish", "contents": { "old": null, "new": { … } } }
 ```
 
-`event` is `publish`, `unpublish`, `delete`, `draft` or `discard`. `draft` and
-`discard` change only a draft; the others change what the delivery API serves.
+`event` is `publish`, `unpublish`, `delete`, `draft`, `discard` or `deploy`.
+`draft` and `discard` change only a draft; the others change what the delivery
+API serves. `deploy` is sent for each model a schema deploy changes the answers
+of, with `id` `null` and the model's `changes`.
 What to act on is up to the receiver. See [docs/API.md](docs/API.md#webhooks).
 
 ## Documentation

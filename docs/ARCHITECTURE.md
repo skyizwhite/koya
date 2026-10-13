@@ -35,8 +35,8 @@ src/
   server/             ; the koya-server system (AGPL)
     main.lisp         ; the composition root: loads infra/, then web/
     domain/           ; what koya is made of: content, media, revision, deploy,
-                      ; key, webhook-delivery, references, query, errors, image,
-                      ; totp, timezone, address, html, number
+                      ; key, id, webhook-delivery, references, query, errors,
+                      ; image, totp, timezone, address, html, number
     usecases/         ; what koya does, knowing neither HTTP nor SQL, one file
                       ; per part: contents (writes), listing (the admin's reads),
                       ; delivery (the delivery API's reads), held (what data
@@ -83,11 +83,12 @@ web  ──▶  usecases  ──▶  domain
           ports  ◀── defines ──  infra
 ```
 
-- `domain/` depends on `koya-core` alone, and on the libraries that give it
-  randomness and hashes. What a write makes of a content --
-  drafted, published, unpublished, discarded -- is a function there that
-  returns the content as it then is; a use case hands that to the store and
-  records the event in the history, and the store keeps what it is handed.
+- `domain/` depends on `koya-core` alone, and on general libraries: randomness
+  and hashes, times, patterns, URLs, text encodings, locks and `access`. What a
+  write makes of a content -- drafted, published, unpublished, discarded -- is
+  a function there that returns the content as it then is; a use case hands
+  that to the store and records the event in the history, and the store keeps
+  what it is handed.
 - `usecases/` uses `domain/` and its ports. It raises the errors in
   `domain/errors`, which say what went wrong without an HTTP status, and names
   who is making a change from `*actor*` (`usecases/actor`).
