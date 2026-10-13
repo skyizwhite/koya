@@ -229,10 +229,10 @@ paths:
         through, a removed or retyped field's values are taken out of every
         published object, draft and revision (inside a custom field or a
         repeater's rows too), a custom field dropped from a repeater's
-        `customFields` takes its rows out of every revision, and a model whose
-        `kind` changes loses its contents and their history. The space must
-        already exist — it is made in the admin UI — and a deploy to another
-        name, one that does not exist included, is a 403.
+        `customFields` takes its rows out of every revision, and a model removed,
+        or whose `kind` changes, loses its contents and their history. The
+        space must already exist — it is made in the admin UI — and a deploy to
+        another name, one that does not exist included, is a 403.
       security: [{ managementKey: [] }]
       parameters:
         - name: force

@@ -264,13 +264,14 @@ asking, so a script never applies a destructive change by accident.
 
 Destructive means a change that can hide or invalidate content already stored:
 removing a model or field, changing a kind or a field type (for a reference,
-the model it points at), or dropping a custom field from a repeater's
-`:custom-fields`. Deleting the space
+the model it points at; for a `:custom` field, the custom field it uses), or
+dropping a custom field from a repeater's `:custom-fields`. Deleting the space
 itself is not among them — that is done in the admin UI, with its own
 confirmation. The exact list, and the shape of each change, is in
 [SCHEMA.md, "Changes"](SCHEMA.md#changes). A rename declared with `:was` carries
 existing content through, and removing a field or changing its type or target
-model takes its values out of every published object, draft and revision, and
+model takes its values out of every published object, draft and revision
+(inside a custom field or a repeater's rows too), and
 a custom field dropped from a repeater takes its rows out of every revision;
 changing a model's kind deletes its contents, as removing it would.
 
