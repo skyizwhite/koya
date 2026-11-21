@@ -239,7 +239,7 @@
          (public-url (and published (expand-url-template (model-public-url model)
                                                          :id id :slug (slug-value model (content-published content))))))
     (hsx
-     (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring original errors))
+     (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring original))
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (h1 :class "text-2xl font-bold" model-name
            (unless object-p

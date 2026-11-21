@@ -370,6 +370,7 @@
         (multiple-value-bind (status body) (request :get url :query "revision=999999")
           (ok (= status 200))
           (ok (search "does not exist for this content" body))
+          (ok (search "koya.editor(this, false)" body) "the current data, which is stored already")
           (ng (search "Restoring the version of" body)))
         (dolist (revision '("9223372036854775808" "99999999999999999999" "-1" "first"))
           (multiple-value-bind (status body) (request :get url :query (format nil "revision=~a" revision))
@@ -437,6 +438,7 @@
             (multiple-value-bind (status body) (request :get "/s/website/m/blog/new" :query (format nil "from=~a" from))
               (ok (= status 200) from)
               (ok (search "does not exist in this model; this is an empty content" body))
+              (ok (search "koya.editor(this, false)" body) "and holds nothing to save")
               (ng (search "A copy of" body))
               (ng (search "value=\"only\"" body))))))
       (testing "an existing content's editor does not take a duplicate"
