@@ -260,7 +260,8 @@ where the element of its id is. `koya.js` wraps `window.fetch` so that Nomini re
 answer whole and draws a refused one as any other. A list is sent comma-separated. A
 part of a page that holds state in the browser is a Nomini scope made by a factory in
 `assets/js/koya.js` (`nm-data="...koya.bulk(this)"`). See
-`adr/2026-10-01-nomini-swaps-and-holds-the-pages-state.md`,
+`adr/2026-11-21-nomini-swaps-what-an-action-answers-and-holds-a-pages-state.md`,
+`adr/2026-11-21-a-scope-adds-elements-the-server-drew.md`,
 `adr/2026-10-02-an-element-asks-with-nominis-get-and-post.md` and
 `adr/2026-10-02-nomini-is-handed-each-answer-whole-and-drawable.md`.
 

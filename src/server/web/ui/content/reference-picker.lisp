@@ -2,7 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:jingle #:set-response-status)
-  (:import-from #:koya-server/web/lib/binds #:js-string #:on-search #:on-reveal)
+  (:import-from #:koya-server/web/lib/binds #:on-search #:on-reveal)
   (:import-from #:koya-server/web/lib/http #:param)
   (:import-from #:koya-server/web/lib/paging #:page-number)
   (:import-from #:koya-server/web/lib/urls #:editor-url)
@@ -11,8 +11,8 @@
   (:import-from #:koya-server/usecases/listing #:content-page)
   (:import-from #:koya-server/domain/content #:content-id #:content-label #:content-status)
   (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state)
-  (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/content/field-input #:~reference-card)
+  (:import-from #:koya-server/web/ui/picker #:~picker-dialog)
   (:export #:reference-picker
            #:reference-picker-search
            #:reference-picker-more
@@ -38,7 +38,7 @@
        (button :type "button"
                :class "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm ring-accent hover:bg-accent/5 disabled:opacity-50"
                :data-pick-id id
-               :nm-bind "{ onclick: () => _pick(this.dataset.pickId), 'class.ring-2': () => _has(this.dataset.pickId), disabled: () => _taken(this.dataset.pickId), ariaPressed: () => _many ? String(_has(this.dataset.pickId)) : null }"
+               :nm-bind "{ onclick: () => _pick(this), 'class.ring-2': () => _has(this.dataset.pickId), disabled: () => _taken(this.dataset.pickId), ariaPressed: () => _many ? String(_has(this.dataset.pickId)) : null }"
          (span :class "min-w-0 flex-1 truncate" label)
          (~status-badge :status (content-status content)))
        (template
@@ -110,19 +110,5 @@
         (unknown))))
 
 (defcomp ~reference-picker-dialog (&key space)
-  (hsx
-   (dialog :id "reference-picker" :class "koya-dialog koya-dialog-wide max-w-xl"
-           :nm-data (format nil "...koya.referencePicker(this, ~a)" (js-string (reference-picker :space space)))
-           :nm-bind "{ onclick: (e) => e.target === this && _close(), onopenpicker: (e) => _open(e.detail) }"
-     (div :class "flex items-center justify-between border-b border-line px-4 py-3"
-       (h2 :class "font-semibold" "Contents")
-       (button :type "button" :class "btn btn-icon" :nm-bind "{ onclick: () => _close() }" :aria-label "Close"
-         (~icon :name :close)))
-     (div :class "max-h-[70vh] overflow-y-auto p-4"
-       (div :id "reference-picker-body" :class "text-sm text-muted" "Loading…"))
-     (div :class "flex items-center justify-end gap-3 border-t border-line px-4 py-3" :hidden t
-          :nm-bind "{ hidden: () => !_many }"
-       (span :class "text-sm text-muted" :nm-bind "{ textContent: () => `${_chosen.length} chosen` }")
-       (button :type "button" :class "btn btn-primary"
-               :nm-bind "{ onclick: () => _done(), disabled: () => !_chosen.length }"
-         (~icon :name :check) "Add")))))
+  (hsx (~picker-dialog :id "reference-picker" :class "max-w-xl" :title "Contents" :factory "referencePicker"
+                       :url (reference-picker :space space) :add-label "Add")))

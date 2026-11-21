@@ -594,7 +594,7 @@
           (ok (search (format nil "data-pick-id=\"~a\"" drafted) body))
           (ok (search "Drafted only" body) "each by its label")
           (ok (search ">draft</span>" body) "and how it stands")
-          (ok (search (bound "{ onclick: () => _pick(this.dataset.pickId), 'class.ring-2': () => _has(this.dataset.pickId), disabled: () => _taken(this.dataset.pickId), ariaPressed: () => _many ? String(_has(this.dataset.pickId)) : null }")
+          (ok (search (bound "{ onclick: () => _pick(this), 'class.ring-2': () => _has(this.dataset.pickId), disabled: () => _taken(this.dataset.pickId), ariaPressed: () => _many ? String(_has(this.dataset.pickId)) : null }")
                       body)
               "a content is picked by a click, and one the field holds is not offered again")
           (ok (search (format nil "<input type=\"hidden\" name=\"\" value=\"~a\">" published) body)
