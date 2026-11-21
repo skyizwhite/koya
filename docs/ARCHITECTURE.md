@@ -197,6 +197,12 @@ A transaction holds the lock for its extent, so nothing reads while a write is
 under way -- an import of a large space is a pause for every request. This is
 the price of one process and no connection pool, and it is what lets a use
 case read and then write without another request slipping in between.
+Woo answers on `KOYA_WORKERS` threads (four by default), so the work around the
+database runs side by side: drawing a page, encoding JSON, sending a file or
+reading an upload. That work, not the lock, is most of what a large delivery
+response or an admin page costs. What reads and then writes from what it read is
+one transaction: logging in, which reads the two-factor count and the last
+code's step, and creating a space, which first looks for one of that name.
 A transaction is a SQLite savepoint, so one opened inside another can be undone
 alone, and every statement is freed once it has run.
 
@@ -212,7 +218,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 
 | Layer | |
 |---|---|
-| HTTP | Clack / Lack; Hunchentoot in development, Woo in production |
+| HTTP | Clack / Lack; Hunchentoot in development, Woo with `KOYA_WORKERS` threads in production |
 | Middlewares | lack-mw: Lack's own, and the guards combined with `mw-every` / `mw-except` |
 | Router | jingle (a ningle extension) + ningle-fbr |
 | Templates | hsx; ningle-actions for everything done on a page |
@@ -299,14 +305,19 @@ runtime options when it starts; no size of space needs more, as archives move
 through files one media file at a time.
 
 Environment: `KOYA_SECRET`, `KOYA_DB_PATH`, `KOYA_MEDIA_DIR`, `KOYA_BASE_URL`,
-`KOYA_PORT` and `KOYA_ENV`. A `KOYA_SECRET` under 32 characters turns logging in
-off, and the server says so when it starts. A missing or malformed
-`KOYA_BASE_URL`, or a `KOYA_PORT` that is not a port number, stops it before it
+`KOYA_PORT`, `KOYA_WORKERS` and `KOYA_ENV`. A `KOYA_SECRET` under 32 characters
+turns logging in off, and the server says so when it starts. A missing or
+malformed `KOYA_BASE_URL`, a `KOYA_PORT` that is not a port number, or a
+`KOYA_WORKERS` that is not a whole number of 1 or more, stops it before it
 starts: `main` exits 1 with a line naming each, and `start` signals
 `setting-error`. `GET /health` is answered ahead of
 everything else, so it opens no session and leaves no line in the access log: it
 reads a table and answers `{"status": "ok"}`, or 503 `unavailable` when the
 database cannot be read.
+
+The image stops the server with SIGQUIT, on which Woo lets its workers finish
+and close the store; on SIGTERM or SIGINT it kills them, which can leave the
+process hung under load.
 
 Backups are the volume's; a space's Export is the portable copy of one space.
 Assets and media are served `immutable` (their URLs carry a version, and a media

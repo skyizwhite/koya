@@ -14,7 +14,8 @@
            #:db-path
            #:media-dir
            #:archive-dir
-           #:server-port))
+           #:server-port
+           #:server-workers))
 (in-package #:koya-server/infra/env)
 
 (let ((env-path "./.env"))
@@ -33,6 +34,7 @@
 (defun archive-dir ()
   (merge-pathnames "archives/" (uiop:pathname-directory-pathname (db-path))))
 (defun server-port () (parse-integer (env "KOYA_PORT" "3100")))
+(defun server-workers () (parse-integer (env "KOYA_WORKERS" "4")))
 (defmethod public-url () (env "KOYA_BASE_URL"))
 
 (define-condition setting-error (error)
@@ -40,11 +42,21 @@
   (:report (lambda (condition stream)
              (format stream "~{~a~^~%~}" (setting-error-problems condition)))))
 
+(defun whole-number (value)
+  (let ((number (parse-integer value :junk-allowed t)))
+    (and number (= (length (princ-to-string number)) (length value)) number)))
+
 (defun port-problem ()
   (let* ((value (env "KOYA_PORT" "3100"))
-         (port (parse-integer value :junk-allowed t)))
-    (unless (and port (= (length (princ-to-string port)) (length value)) (<= 1 port 65535))
+         (port (whole-number value)))
+    (unless (and port (<= 1 port 65535))
       (format nil "KOYA_PORT must be a port number from 1 to 65535, not ~s" value))))
+
+(defun workers-problem ()
+  (let* ((value (env "KOYA_WORKERS" "4"))
+         (workers (whole-number value)))
+    (unless (and workers (<= 1 workers))
+      (format nil "KOYA_WORKERS must be a whole number of 1 or more, not ~s" value))))
 
 (defun base-url-problem ()
   (let ((value (env "KOYA_BASE_URL")))
@@ -56,6 +68,6 @@
            (format nil "KOYA_BASE_URL must be an http or https URL, not ~s" value)))))
 
 (defun check-settings ()
-  (let ((problems (remove nil (list (base-url-problem) (port-problem)))))
+  (let ((problems (remove nil (list (base-url-problem) (port-problem) (workers-problem)))))
     (when problems
       (error 'setting-error :problems problems))))

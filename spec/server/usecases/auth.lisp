@@ -5,7 +5,8 @@
   (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
   (:import-from #:koya-server/domain/totp #:totp #:generate-totp-secret)
-  (:import-from #:koya-spec/server/logs #:logged))
+  (:import-from #:koya-spec/server/logs #:logged)
+  (:import-from #:koya-spec/server/threads #:at-once))
 (in-package #:koya-spec/server/usecases/auth)
 
 (defparameter *secret* "auth-spec-secret-long-enough-to-log-in")
@@ -83,3 +84,16 @@
         (dotimes (i 5) (check-login *secret* (wrong-code-at at) :time at))
         (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: too many wrong codes"
                     (logged (lambda () (check-login *secret* (code-at at) :time at)))))))))
+
+(deftest logins-at-once-spend-no-more-codes-than-one-after-another
+  (testing "wrong codes sent together are counted as if they came one by one"
+    (let* ((time 2000000000)
+           (outcomes (at-once 40 (lambda () (check-login *secret* (wrong-code-at time) :time time)))))
+      (ok (= (count :wrong-code outcomes) 5) "five are read as wrong codes")
+      (ok (= (count :too-many-codes outcomes) 35) "and every other is refused unread")))
+  (testing "the right code sent together logs in once"
+    (let* ((time 2000000300)
+           (outcomes (at-once 40 (lambda () (check-login *secret* (code-at time) :time time)))))
+      (ok (= (count t outcomes) 1) "one logs in")
+      (ok (= (count :wrong-code outcomes) 5) "the code, once used, is a wrong one for the next five")
+      (ok (= (count :too-many-codes outcomes) 34) "and every other is refused unread"))))

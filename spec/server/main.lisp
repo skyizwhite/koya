@@ -1,7 +1,7 @@
 (defpackage #:koya-spec/server/main
   (:use #:cl #:rove)
   (:import-from #:koya-server #:start #:stop)
-  (:import-from #:koya-server/infra/env #:setting-error)
+  (:import-from #:koya-server/infra/env #:setting-error #:server-workers)
   (:import-from #:koya-spec/server/logs #:logged)
   (:export #:with-env))
 (in-package #:koya-spec/server/main)
@@ -27,9 +27,20 @@
     (with-env (("KOYA_BASE_URL" "https://cms.example.com") ("KOYA_PORT" port))
       (ok (search (format nil "KOYA_PORT must be a port number from 1 to 65535, not ~s" port) (or (refusal) ""))
           (format nil "~s is no port" port))))
-  (with-env (("KOYA_BASE_URL" "") ("KOYA_PORT" "abc"))
+  (dolist (workers '("abc" "0" "-1" "2x"))
+    (with-env (("KOYA_BASE_URL" "https://cms.example.com") ("KOYA_PORT" "3100") ("KOYA_WORKERS" workers))
+      (ok (search (format nil "KOYA_WORKERS must be a whole number of 1 or more, not ~s" workers) (or (refusal) ""))
+          (format nil "~s is no number of workers" workers))))
+  (with-env (("KOYA_BASE_URL" "") ("KOYA_PORT" "abc") ("KOYA_WORKERS" "0"))
     (let ((message (or (refusal) "")))
-      (ok (and (search "KOYA_BASE_URL" message) (search "KOYA_PORT" message)) "and every bad one is named at once"))))
+      (ok (and (search "KOYA_BASE_URL" message) (search "KOYA_PORT" message) (search "KOYA_WORKERS" message))
+          "and every bad one is named at once"))))
+
+(deftest a-number-of-workers-is-taken-or-four-by-default
+  (with-env (("KOYA_WORKERS" ""))
+    (ok (= (server-workers) 4)))
+  (with-env (("KOYA_WORKERS" "2"))
+    (ok (= (server-workers) 2))))
 
 (deftest the-server-logs-its-start-and-stop
   (with-env (("KOYA_BASE_URL" "http://localhost:39117") ("KOYA_PORT" "39117") ("KOYA_SECRET" "short-secret"))
