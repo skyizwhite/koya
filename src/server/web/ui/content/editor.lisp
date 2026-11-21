@@ -9,17 +9,18 @@
                 #:field-row-kind #:row-kind #:custom-field-name #:custom-field-fields #:model-field
                 #:field-many-p #:field-value)
   (:import-from #:koya-core/data #:array-p)
+  (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:koya-core/ulid #:make-ulid)
   (:import-from #:koya-core/validate #:validation-error #:validation-error-errors)
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy
-                #:update-object #:publish-object #:content-references)
+                #:update-object #:publish-object #:content-references #:find-content)
   (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-space #:content-status #:content-published #:content-draft
                 #:content-published-p #:content-draft-p
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
-                #:default-data #:content-label #:slug-value #:held-ids)
+                #:default-data #:duplicated-data #:content-label #:slug-value #:held-ids)
   (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
@@ -212,7 +213,19 @@
               (loop :for note :in notes :collect
                 (hsx (li (strong (getf note :field)) " " (getf note :note))))))))))
 
-(defcomp ~editor (&key space model content data errors restoring)
+(defun duplicate-url (space model id)
+  (render-uri (make-uri :path (content-url space model "new") :query `(("from" . ,id)))))
+
+(defcomp ~duplicating (&key space model original)
+  (hsx
+   (div :class "mb-6 rounded-md border border-accent/40 bg-accent/5 px-4 py-3 text-sm"
+     (div :class "flex flex-wrap items-center justify-between gap-2"
+       (p (strong "A copy of " (content-label original model) ".")
+          " Nothing is stored until you save a draft or publish.")
+       (a :href (editor-url space model (content-id original)) :class "btn"
+          (~icon :name :close) "Cancel")))))
+
+(defcomp ~editor (&key space model content data errors restoring original)
   (let* ((space-name space)
          (model-name (model-name model))
          (id (if content (content-id content) "new"))
@@ -226,7 +239,7 @@
          (public-url (and published (expand-url-template (model-public-url model)
                                                          :id id :slug (slug-value model (content-published content))))))
     (hsx
-     (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring errors))
+     (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring original))
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (h1 :class "text-2xl font-bold" model-name
            (unless object-p
@@ -239,6 +252,9 @@
              (when content
                (hsx (a :href (history-url space-name model-name id) :class "btn"
                        (~icon :name :history) "History")))
+             (when (and content (not object-p))
+               (hsx (a :href (duplicate-url space-name model-name id) :class "btn"
+                       (~icon :name :duplicate) "Duplicate")))
              (when (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))
                (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
                        (~icon :name :webhook) "Webhooks"))))
@@ -256,6 +272,7 @@
        (~errors :id "editor-errors" :errors errors)
        (when restoring (hsx (~restoring :space space-name :model model :content content
                                         :revision (getf restoring :revision) :notes (getf restoring :notes))))
+       (when original (hsx (~duplicating :space space-name :model model :original original)))
        (form :id "editor-form" :class "space-y-6" :nm-ref "form"
              :nm-bind (on-submit (editor-action :space space-name :model model-name :id id :op "save")
                                  :binds "oninput: () => _track(), onchange: () => _track()")
@@ -289,7 +306,7 @@
            (hsx (div :class "mt-6 border-t border-line pt-6"
                   (~referrers :space space-name :heading "Referenced by" :references references)))))))))
 
-(defcomp ~editor-page (&key space model content data errors restoring)
+(defcomp ~editor-page (&key space model content data errors restoring original)
   (let ((model-name (model-name model)))
     (hsx
      (~layout :space space
@@ -297,7 +314,8 @@
                           (list (cons model-name nil))
                           (list (cons model-name (model-url space model-name))
                                 (cons (if content (content-label content model) "new") nil)))
-       (~editor :space space :model model :content content :data data :errors errors :restoring restoring)
+       (~editor :space space :model model :content content :data data :errors errors :restoring restoring
+                :original original)
        (~media-picker-dialog :space space)
        (~reference-picker-dialog :space space)))))
 
@@ -309,22 +327,36 @@
                             (find-revision (content-space content) (content-id content) n))))
         (values revision (null revision))))))
 
+(defun requested-original (params space model content)
+  (let ((id (param params "from")))
+    (when (and id (null content))
+      (let ((original (find-content space (model-name model) id)))
+        (values original (null original))))))
+
 (defun show-editor (params space model content)
   (set-title (format nil "~a · ~a · koya" (model-name model) space))
   (multiple-value-bind (revision unknown) (requested-revision params content)
-    (let ((current (if content (content-data content :draft t) (default-data model))))
-      (cond
-        (revision
-         (multiple-value-bind (data notes)
-             (restore-data space model (content-id content) (revision-data revision) current)
-           (hsx (~editor-page :space space :model model :content content :data data
-                              :restoring (list :revision revision :notes notes)))))
-        (unknown
-         (hsx (~editor-page :space space :model model :content content :data current
-                            :errors (list (list :field "revision"
-                                                :message "does not exist for this content; this is its current data")))))
-        (t
-         (hsx (~editor-page :space space :model model :content content :data current)))))))
+    (multiple-value-bind (original missing) (requested-original params space model content)
+      (let ((current (if content (content-data content :draft t) (default-data model))))
+        (cond
+          (revision
+           (multiple-value-bind (data notes)
+               (restore-data space model (content-id content) (revision-data revision) current)
+             (hsx (~editor-page :space space :model model :content content :data data
+                                :restoring (list :revision revision :notes notes)))))
+          (unknown
+           (hsx (~editor-page :space space :model model :content content :data current
+                              :errors (list (list :field "revision"
+                                                  :message "does not exist for this content; this is its current data")))))
+          (original
+           (hsx (~editor-page :space space :model model :data (duplicated-data model (content-data original :draft t))
+                              :original original)))
+          (missing
+           (hsx (~editor-page :space space :model model :data current
+                              :errors (list (list :field "from"
+                                                  :message "does not exist in this model; this is an empty content")))))
+          (t
+           (hsx (~editor-page :space space :model model :content content :data current))))))))
 
 (defun done (space model content message)
   (hsx (<> (~editor :space space :model model :content content :data (content-data content :draft t))
