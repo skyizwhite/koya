@@ -90,6 +90,7 @@ web  ──▶  usecases  ──▶  domain
   sets verbose up: no colours, and its thread stopped before the image is saved
   and started again when the executable runs. A line names what happened and
   never a credential (see `adr/2026-11-21-the-log-never-holds-a-credential.md`).
+  The access log is written through it too, so one thread writes every line.
 - `domain/` depends on `koya-core` alone, and on general libraries: randomness
   and hashes, times, patterns, URLs, text encodings, locks and `access`. What a
   write makes of a content -- drafted, published, unpublished, discarded -- is

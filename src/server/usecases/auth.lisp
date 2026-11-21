@@ -44,6 +44,7 @@
 (defun log-login (outcome)
   (case outcome
     ((t) (log-info :koya.auth "the owner logged in"))
+    (:short-secret (log-warn :koya.auth "a login was refused: KOYA_SECRET is too short"))
     (:too-many-codes (log-warn :koya.auth "a login was refused: too many wrong codes"))
     (:wrong-secret (log-warn :koya.auth "a login was refused: wrong secret"))
     (:wrong-code (log-warn :koya.auth "a login was refused: wrong code"))))

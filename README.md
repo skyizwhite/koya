@@ -213,16 +213,16 @@ port 3100 and keeps everything under `/data`; mount a persistent volume there.
 | `KOYA_DB_PATH`, `KOYA_MEDIA_DIR` | no | default `/data/koya.db` and `/data/media` |
 | `KOYA_ENV` | no | `production` (default) hides error details; `dev` shows them |
 
-The server logs to standard output, one line per event with its time, level
-and what it is about, such as
+The server logs to standard output, a line per event with its time, level and
+what it is about, such as
 `2026-11-21 09:00:00 [WARN ] <KOYA.AUTH>: a login was refused: wrong secret`:
 its start and stop, migrations applied, logins and refused logins, schema
-deploys, a space's export and import, a webhook that fails (by its label), and
-an error left unhandled, with the method, the path and the functions it went
-through. Beside it, the access log has one line per request. Neither writes the
-owner secret, a key, a session cookie, a one-time code, a webhook's URL or
-secret, or a query string, where a preview's `draftKey` travels, in a request's
-URL or its Referer.
+deploys, a space's export and import, a webhook that fails (by its label), each
+request but `/health` (`<KOYA.ACCESS>`), and an error left unhandled, with the
+method, the path and, a line each under it, the functions it went through. It
+never writes the owner secret, a key, a session cookie, a one-time code, a
+webhook's URL or secret, or a query string, where a preview's `draftKey`
+travels, of a request's URL or its Referer.
 
 `GET /health` answers without a key, and the image declares it as its
 `HEALTHCHECK`. The server starts in about a second and stops cleanly on

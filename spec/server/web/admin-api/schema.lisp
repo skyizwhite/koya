@@ -56,9 +56,9 @@
       (ok (eq (jget json "destructive") t))
       (ok (plusp (length (jget json "changes")))))
     (multiple-value-bind (status json) (values nil nil)
-      (ok (string= (logged (lambda () (multiple-value-setq (status json)
-                                        (admin :put "/admin/api/website/schema" :body (schema->jobject new)))))
-                   "")
+      (ng (search "<KOYA.SCHEMA>"
+                  (logged (lambda () (multiple-value-setq (status json)
+                                       (admin :put "/admin/api/website/schema" :body (schema->jobject new))))))
           "a refused deploy is no deploy")
       (ok (= status 409))
       (ok (string= (jget json "error" "code") "destructive_changes"))

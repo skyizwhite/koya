@@ -70,6 +70,14 @@
         (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: wrong code" log))
         (ng (search *secret* log))
         (ng (search code log))))
+    (testing "and one refused because the secret is too short to log in with"
+      (let ((saved (uiop:getenv "KOYA_SECRET")))
+        (setf (uiop:getenv "KOYA_SECRET") "short-secret")
+        (unwind-protect
+             (let ((log (logged (lambda () (check-login "short-secret" nil :time time)))))
+               (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: KOYA_SECRET is too short" log))
+               (ng (search "short-secret" log)))
+          (setf (uiop:getenv "KOYA_SECRET") saved))))
     (testing "and one refused for too many wrong codes"
       (let ((at (+ time 120)))
         (dotimes (i 5) (check-login *secret* (wrong-code-at at) :time at))

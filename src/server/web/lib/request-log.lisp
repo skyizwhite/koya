@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:lack-mw #:with-args #:*mw-accesslog* #:default-formatter)
   (:import-from #:alexandria #:copy-hash-table)
-  (:import-from #:koya-server/log #:log-error)
+  (:import-from #:koya-server/log #:log-info #:log-error)
   (:export #:log-unhandled
            #:*mw-error-log*
            #:*mw-access-log*))
@@ -12,7 +12,8 @@
 
 (defun frame-names ()
   (let ((names '())
-        (*package* (find-package :keyword)))
+        (*package* (find-package :keyword))
+        (*print-pretty* nil))
     (sb-debug:map-backtrace
      (lambda (frame)
        (push (prin1-to-string (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))) names))
@@ -51,4 +52,5 @@
 
 (defparameter *mw-access-log*
   (with-args *mw-accesslog*
-    :formatter (lambda (env response now) (default-formatter (without-queries env) response now))))
+    :formatter (lambda (env response now) (default-formatter (without-queries env) response now))
+    :logger (lambda (line) (log-info :koya.access "~a" line))))

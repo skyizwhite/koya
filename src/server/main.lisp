@@ -38,9 +38,8 @@
 
 (defun warn-about-a-short-secret ()
   (unless (owner-secret-long-enough-p)
-    (log-warn :koya.server
-                                "KOYA_SECRET is shorter than ~a characters: logging in is off until it is replaced"
-                                +min-secret-length+)))
+    (log-warn :koya.server "KOYA_SECRET is shorter than ~a characters: logging in is off until it is replaced"
+              +min-secret-length+)))
 
 (defun start (&key (server :hunchentoot) (address "127.0.0.1") port (db (db-path)))
   (when *server*
@@ -49,6 +48,7 @@
   (check-settings)
   (open-store db)
   (warn-about-a-short-secret)
+  (log-info :koya.server "server starting on ~a:~a" address (or port (server-port)))
   (setf *server* (clack:clackup (app) :server server :address address :port (or port (server-port))
                                       :debug (dev-mode-p)))
   *server*)
@@ -81,6 +81,7 @@
       (quit 1)))
   (open-store (db-path))
   (warn-about-a-short-secret)
+  (log-info :koya.server "server starting on 0.0.0.0:~a" (server-port))
   (clack:clackup (app) :server :woo :address "0.0.0.0" :port (server-port) :debug nil :use-thread nil)
   (close-store)
   (log-info :koya.server "server stopped")
