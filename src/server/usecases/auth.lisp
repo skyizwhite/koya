@@ -11,6 +11,7 @@
   (:import-from #:koya-server/usecases/ports/sessions
                 #:make-session-store #:delete-sessions #:+session-seconds+)
   (:import-from #:koya-server/domain/totp #:unix-now)
+  (:import-from #:koya-server/log #:log-info #:log-warn)
   (:export #:secure-string=
            #:+min-secret-length+
            #:owner-secret-long-enough-p
@@ -32,13 +33,25 @@
 
 (defparameter +wrong-codes-per-step+ 5)
 
-(defun check-login (secret code &key (time (unix-now)))
+(defun login-outcome (secret code time)
   (cond ((not (owner-secret-long-enough-p)) :short-secret)
         ((and (totp-enabled-p) (>= (wrong-codes time) +wrong-codes-per-step+)) :too-many-codes)
         ((not (secure-string= secret (owner-secret))) :wrong-secret)
         ((not (totp-enabled-p)) t)
         ((totp-code-valid-p code :time time) t)
         (t (count-wrong-code time) :wrong-code)))
+
+(defun log-login (outcome)
+  (case outcome
+    ((t) (log-info :koya.auth "the owner logged in"))
+    (:too-many-codes (log-warn :koya.auth "a login was refused: too many wrong codes"))
+    (:wrong-secret (log-warn :koya.auth "a login was refused: wrong secret"))
+    (:wrong-code (log-warn :koya.auth "a login was refused: wrong code"))))
+
+(defun check-login (secret code &key (time (unix-now)))
+  (let ((outcome (login-outcome secret code time)))
+    (log-login outcome)
+    outcome))
 
 (defun end-other-sessions (session-id)
   (delete-sessions :except session-id))

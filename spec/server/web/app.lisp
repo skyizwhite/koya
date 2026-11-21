@@ -5,7 +5,8 @@
   (:import-from #:koya-server/web/ui/media/picker #:media-picker)
   (:import-from #:koya-spec/server/web/pages/support
                 #:bound #:edit #:*cookie* #:request #:request-url #:call-action #:location #:setup-pages #:log-in)
-  (:import-from #:koya-server/web/app #:app #:*page-app*)
+  (:import-from #:koya-server/web/app #:app #:*page-app* #:*api-app*)
+  (:import-from #:koya-spec/server/logs #:logged)
   (:import-from #:koya-server/usecases/keys #:create-delivery-key)
   (:import-from #:jingle #:route)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
@@ -114,22 +115,57 @@
            (ok (= 1 fetches) "nor does the assets' prefix"))
       (remove-method #'lack/middleware/session/store:fetch-session spy))))
 
+(defun fail-with (secret)
+  (error "The probe fails after ~a characters" (length secret)))
+
 (deftest an-error-is-logged-and-not-cached
   (setf (route *page-app* "/probe-page-that-fails")
-        (lambda (params) (declare (ignore params)) (error "The probe fails")))
+        (lambda (params) (declare (ignore params)) (fail-with "probe-argument-secret")))
   (let* ((status nil)
          (body nil)
          (headers nil)
          (errors (make-string-output-stream))
-         (log (with-output-to-string (*standard-output*)
-                (let ((*error-output* errors))
-                  (multiple-value-setq (status body headers)
-                    (request :get "/probe-page-that-fails"))))))
+         (access nil)
+         (log (logged (lambda ()
+                        (setf access
+                              (with-output-to-string (*standard-output*)
+                                (let ((*error-output* errors))
+                                  (multiple-value-setq (status body headers)
+                                    (request :get "/probe-page-that-fails" :query "draft-key=query-secret")))))))))
     (ok (= status 500))
     (ok (search "Internal Server Error" body))
-    (ok (search "The probe fails" (get-output-stream-string errors)) "the error itself is logged")
+    (ok (search "[ERROR] <KOYA.HTTP>: GET /probe-page-that-fails: The probe fails after 21 characters" log)
+        "the error is logged with its method and path")
+    (ok (search "KOYA-SPEC/SERVER/WEB/APP::FAIL-WITH" log) "and the backtrace")
+    (ng (search "probe-argument-secret" log) "which names each function without its arguments")
+    (ng (search "query-secret" log) "nor is the query logged")
+    (ok (string= (get-output-stream-string errors) "") "it is logged once, by koya")
     (ok (string= (getf headers :cache-control) "no-store") "an error page is not cached")
-    (ok (search "\"GET /probe-page-that-fails HTTP/1.1\" 500" log) "and is in the access log")))
+    (ok (search "\"GET /probe-page-that-fails HTTP/1.1\" 500" access) "and is in the access log")
+    (ng (search "query-secret" access) "which leaves the query out too")))
+
+(deftest the-access-log-leaves-out-every-query
+  (let ((access (with-output-to-string (*standard-output*)
+                  (request :get "/s/website" :query "draft-key=query-secret"
+                                             :headers '(("referer" . "https://site.test/blog/a?draft-key=referer-secret"))))))
+    (ok (search "\"GET /s/website HTTP/1.1\" 200" access))
+    (ok (search "\"https://site.test/blog/a\"" access) "the referer is kept up to its query")
+    (ng (search "secret" access))))
+
+(deftest an-api-error-is-logged-as-a-page-error-is
+  (setf (route *api-app* "/v1/website/probe-fails")
+        (lambda (params) (declare (ignore params)) (fail-with "probe-argument-secret")))
+  (let* ((status nil)
+         (body nil)
+         (log (logged (lambda ()
+                        (multiple-value-setq (status body)
+                          (request :get "/api/v1/website/probe-fails"
+                                   :headers `(("x-koya-delivery-key" . ,(create-delivery-key "website")))))))))
+    (ok (= status 500))
+    (ok (search "internal_error" body) "the answer is the API's own")
+    (ok (search "[ERROR] <KOYA.HTTP>: GET /api/v1/website/probe-fails: The probe fails after 21 characters" log))
+    (ok (search "KOYA-SPEC/SERVER/WEB/APP::FAIL-WITH" log))
+    (ng (search "probe-argument-secret" log))))
 
 (deftest a-trailing-slash
   (multiple-value-bind (status body headers) (request :get "/s/website/")

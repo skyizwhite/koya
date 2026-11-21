@@ -38,9 +38,7 @@
     (http-request-failed (e)
       (values (response-status e) (response-body e) nil))
     (error (e)
-      (let ((message (princ-to-string e)))
-        (format *error-output* "~&[koya] webhook ~a failed: ~a~%" url message)
-        (values nil nil message)))))
+      (values nil nil (princ-to-string e)))))
 
 (defmethod resolve-host (host)
   (handler-case (get-hosts-by-name host)

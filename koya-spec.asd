@@ -37,6 +37,7 @@
                "koya-spec/server/web/admin-api/contents"
                "koya-spec/server/web/admin-api/media"
                "koya-spec/server/web/admin-api/keys"
+               "koya-spec/server/logs"
                "koya-spec/server/web/app"
                "koya-spec/server/web/lib/auth"
                "koya-spec/server/web/lib/binds"

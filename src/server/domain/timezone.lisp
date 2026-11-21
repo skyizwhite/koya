@@ -8,6 +8,7 @@
   (:import-from #:bordeaux-threads-2)
   (:import-from #:koya-core/time
                 #:parse-iso #:format-iso)
+  (:import-from #:koya-server/log #:log-warn)
   (:export #:find-timezone
            #:timezone-name-p
            #:timezone-names
@@ -28,7 +29,7 @@
     (bordeaux-threads-2:with-lock-held (*repository-lock*)
       (unless *repository-loaded*
         (handler-case (reread-timezone-repository :timezone-repository (repository-path))
-          (error (e) (format *error-output* "~&[koya] time zone database not loaded, UTC only: ~a~%" e)))
+          (error (e) (log-warn :koya.timezone "time zone database not loaded, UTC only: ~a" e)))
         (setf *repository-loaded* t)))))
 
 (defun repository-count ()

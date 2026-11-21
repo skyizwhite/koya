@@ -14,6 +14,7 @@
   (:import-from #:koya-server/infra/db/webhook-deliveries)
   (:import-from #:koya-server/infra/db/settings)
   (:import-from #:koya-server/infra/db/sessions #:purge-expired-sessions)
+  (:import-from #:koya-server/log #:log-info)
   (:export #:open-store
            #:close-store
            #:write-snapshot))
@@ -22,7 +23,7 @@
 (defun open-store (path)
   (connect-db path)
   (let ((applied (migrate)))
-    (when applied (format t "~&[koya] applied migrations ~{~a~^, ~}~%" applied)))
+    (when applied (log-info :koya.db "applied migrations ~{~a~^, ~}" applied)))
   (purge-expired-sessions))
 
 (defun close-store ()

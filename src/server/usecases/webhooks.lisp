@@ -10,6 +10,7 @@
                 #:find-delivery #:delivery-labels #:delivery-models #:+deliveries-kept+)
   (:import-from #:koya-server/usecases/ports/presenters #:webhook-payload)
   (:import-from #:bordeaux-threads-2 #:make-thread)
+  (:import-from #:koya-server/log #:log-error #:log-warn)
   (:export #:space-webhooks
            #:notify-webhooks
            #:*webhook-async*
@@ -64,19 +65,25 @@
                                       (location (format nil "Redirected to ~a; change the webhook URL to go there" location))
                                       (t "Redirected, with no Location")))))))
       (error (e) (setf status nil body nil failure (princ-to-string e))))
-    (handler-case
-        (record-delivery space
-                         :label (webhook-label hook)
-                         :url (webhook-url hook)
-                         :model model
-                         :event event
-                         :content-id (or id "")
-                         :ok (and (null failure) (ok-status-p status))
-                         :status (and (integerp status) status)
-                         :response body
-                         :error failure
-                         :duration-ms (elapsed-ms start))
-      (error (e) (format *error-output* "~&[koya] webhook log failed: ~a~%" e)))))
+    (let ((ok (and (null failure) (ok-status-p status)))
+          (status (and (integerp status) status)))
+      (unless ok
+        (log-warn :koya.webhook "webhook ~a of ~a failed on ~a: ~:[no answer~;answered ~:*~a~]"
+                  (webhook-label hook) space event status))
+      (handler-case
+          (record-delivery space
+                           :label (webhook-label hook)
+                           :url (webhook-url hook)
+                           :model model
+                           :event event
+                           :content-id (or id "")
+                           :ok ok
+                           :status status
+                           :response body
+                           :error failure
+                           :duration-ms (elapsed-ms start))
+        (error (e) (log-error :koya.webhook "the call of webhook ~a of ~a could not be recorded: ~a"
+                              (webhook-label hook) space e))))))
 
 (defun notify-webhooks (space-name model id event &key old new changes (async *webhook-async*) secret)
   (assert (member event +events+))

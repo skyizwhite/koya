@@ -43,6 +43,7 @@
   (:import-from #:koya-core/time #:parse-iso #:format-iso)
   (:import-from #:cl-ppcre #:scan)
   (:import-from #:bordeaux-threads-2 )
+  (:import-from #:koya-server/log #:log-info)
   (:export #:export-space
            #:begin-import
            #:continue-import
@@ -112,8 +113,10 @@
       (unless (media-file-exists-p (media-space m) (media-id m) (media-mime m))
         (fail "The file of ~a (~a) is missing from the media library" (media-filename m) (media-id m))))
     (purge-stale-archives)
-    (write-archive document (mapcar (lambda (m) (cons (media-entry-name (media-id m) (media-mime m)) m))
-                                    media))))
+    (multiple-value-prog1
+        (write-archive document (mapcar (lambda (m) (cons (media-entry-name (media-id m) (media-mime m)) m))
+                                        media))
+      (log-info :koya.archive "space ~a exported" space))))
 
 (defun value-of (object key)
   (multiple-value-bind (value found) (access object key :test #'eq)
@@ -257,11 +260,12 @@
           (delivery-keys (parse-keys document :delivery-keys))
           (management-keys (parse-keys document :management-keys)))
       (check-contents-together schema (mapcar #'first contents))
-      (import-into space archive schema contents media
-                   :secret (string-field document :webhook-secret)
-                   :delivery-keys delivery-keys
-                   :management-keys management-keys
-                   :by by))))
+      (prog1 (import-into space archive schema contents media
+                          :secret (string-field document :webhook-secret)
+                          :delivery-keys delivery-keys
+                          :management-keys management-keys
+                          :by by)
+        (log-info :koya.archive "space ~a imported" space)))))
 
 (defun check-contents-together (schema contents)
   (loop :for (content . rest) :on contents

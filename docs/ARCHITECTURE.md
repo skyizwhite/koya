@@ -34,6 +34,7 @@ src/
     client.lisp       ; plan / deploy / pull, get-list …, the admin API wrappers
   server/             ; the koya-server system (AGPL)
     main.lisp         ; the composition root: loads infra/, then web/
+    log.lisp          ; log-info / log-warn / log-error, which every layer may use
     domain/           ; what koya is made of: content, media, revision, deploy,
                       ; key, id, webhook-delivery, references, query, errors,
                       ; image, totp, timezone, address, html, number
@@ -83,6 +84,12 @@ web  ──▶  usecases  ──▶  domain
           ports  ◀── defines ──  infra
 ```
 
+- `log` is under every layer: `log-info`, `log-warn` and `log-error` write a
+  line to standard output with its time, level and category (`:koya.auth`,
+  `:koya.http` and so on). It is the only layer that reaches verbose, and `main`
+  sets verbose up: no colours, and its thread stopped before the image is saved
+  and started again when the executable runs. A line names what happened and
+  never a credential (see `adr/2026-11-21-the-log-never-holds-a-credential.md`).
 - `domain/` depends on `koya-core` alone, and on general libraries: randomness
   and hashes, times, patterns, URLs, text encodings, locks and `access`. What a
   write makes of a content -- drafted, published, unpublished, discarded -- is
@@ -142,7 +149,9 @@ that belongs to another layer (`cl-dbi` outside `infra/`, `jingle` outside
 `web/`), from a library it does not list at all, or from `koya-sdk` or `ningle`
 -- ningle is reached through jingle, which re-exports it. `lack` is the web's,
 and its session middleware, `lack-middleware-session`, infra's, since the
-session store infra keeps in the database speaks its protocol. What no layer owns — koya-core, alexandria and the like — is
+session store infra keeps in the database speaks its protocol. `verbose` is
+`log`'s and `main`'s, and `piping`, which `main` uses to reach verbose's output,
+`main`'s. What no layer owns — koya-core, alexandria and the like — is
 listed as usable anywhere, except koya-core's JSON and its conversions
 (`core/json`, `core/case`, `core/schema-json`): of the server's layers, only the
 web and infra import them, and no layer imports the `koya-core` package that
@@ -212,6 +221,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Data | access, for reading and changing plists, vectors and structs |
 | Client | dexador |
 | Archives | zippy (a space's export and import) |
+| Logging | verbose, behind `koya-server/log`; `main` alone sets it up |
 | Other | ironclad, local-time, cl-dotenv, Tailwind CSS v4 (standalone) |
 | Checks | okite: the ports as the server loads, the layers in the tests |
 | Lint | mallet (`just lint`, and the pre-commit hook) |
@@ -220,7 +230,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 The four apps — pages, delivery API, admin API and actions — are separate ningle
 apps mounted together, so each decides its own response type. A request first
 goes through what every answer needs (the deletion of a temporary file once sent,
-the access log, Cache-Control, the error page, the body limit), then to the app
+the access log, Cache-Control, the error page and the log of the error, the body limit), then to the app
 mounted at its path, which carries the middlewares it needs: CORS and a guard
 for the delivery API, a guard for the admin API, the session for the actions and
 the pages; the assets and the media need none.

@@ -16,7 +16,8 @@
                 #:delivery-content-id #:delivery-duration-ms)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:make-webhook #:schema-models)
   (:import-from #:koya-core/schema-json #:schema->jobject)
-  (:import-from #:koya-core/json #:jobject #:jget #:json-null #:parse-json))
+  (:import-from #:koya-core/json #:jobject #:jget #:json-null #:parse-json)
+  (:import-from #:koya-spec/server/logs #:logged))
 (in-package #:koya-spec/server/usecases/webhooks)
 
 (setup (setup-api))
@@ -125,12 +126,15 @@
           (ok (string= (delivery-url d) "https://example.com/hook"))
           (ok (string= (delivery-content-id d) (jget json "id")))
           (ok (integerp (delivery-duration-ms d)))))))
-  (testing "a refusal is recorded as one, with its body"
+  (testing "a refusal is recorded as one, with its body, and logged by its label"
     (exec "DELETE FROM webhook_deliveries")
     (let ((*webhook-sender* (lambda (url payload headers)
                               (declare (ignore url payload headers))
                               (values 500 "revalidation failed" nil))))
-      (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Refused") "publish" t)))
+      (let ((log (logged (lambda () (admin :post "/admin/api/website/lists/blog"
+                                           :body (jobject "data" (jobject "title" "Refused") "publish" t))))))
+        (ok (search "[WARN ] <KOYA.WEBHOOK>: webhook hook of website failed on publish: answered 500" log))
+        (ng (search "example.com" log) "a webhook's URL, which can hold a token, is never logged")))
     (let ((d (first (list-deliveries "website"))))
       (ok (null (delivery-ok d)) "5xx is not an acceptance")
       (ok (= (delivery-status d) 500))
@@ -138,13 +142,23 @@
   (testing "a call that never arrived has no status"
     (exec "DELETE FROM webhook_deliveries")
     (let ((*webhook-sender* (lambda (url payload headers)
-                              (declare (ignore url payload headers))
-                              (error "connection refused"))))
-      (admin :post "/admin/api/website/lists/blog" :body (jobject "data" (jobject "title" "Unreachable") "publish" t)))
+                              (declare (ignore payload headers))
+                              (error "connection refused by ~a" url))))
+      (let ((log (logged (lambda () (admin :post "/admin/api/website/lists/blog"
+                                           :body (jobject "data" (jobject "title" "Unreachable") "publish" t))))))
+        (ok (search "[WARN ] <KOYA.WEBHOOK>: webhook hook of website failed on publish: no answer" log))
+        (ng (search "example.com" log) "nor what the failure says, which can name it")))
     (let ((d (first (list-deliveries "website"))))
       (ok (null (delivery-ok d)))
       (ok (null (delivery-status d)))
       (ok (search "connection refused" (delivery-error d)) "the condition is kept as the error")))
+  (testing "a delivery that cannot be recorded is logged as an error"
+    (exec "ALTER TABLE webhook_deliveries RENAME TO webhook_deliveries_away")
+    (unwind-protect
+         (let ((log (logged (lambda () (admin :post "/admin/api/website/lists/blog"
+                                              :body (jobject "data" (jobject "title" "Unrecorded") "publish" t))))))
+           (ok (search "[ERROR] <KOYA.WEBHOOK>: the call of webhook hook of website could not be recorded" log)))
+      (exec "ALTER TABLE webhook_deliveries_away RENAME TO webhook_deliveries")))
   (testing "an oversized body is clipped, and the log does not grow without end"
     (exec "DELETE FROM webhook_deliveries")
     (let ((*webhook-sender* (lambda (url payload headers)
