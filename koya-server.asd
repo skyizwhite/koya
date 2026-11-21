@@ -6,7 +6,7 @@
 (register-system-packages "verbose" '(:org.shirakumo.verbose))
 
 (defsystem "koya-server"
-  :version "0.21.0"
+  :version "0.22.0"
   :description "koya - a small headless CMS in Common Lisp (server)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
   :license "AGPL-3.0-or-later"
