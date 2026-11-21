@@ -182,6 +182,8 @@ A transaction holds the lock for its extent, so nothing reads while a write is
 under way -- an import of a large space is a pause for every request. This is
 the price of one process and no connection pool, and it is what lets a use
 case read and then write without another request slipping in between.
+A transaction is a SQLite savepoint, so one opened inside another can be undone
+alone, and every statement is freed once it has run.
 
 A space's schema is read from its rows once and kept in memory until a deploy
 or a deletion replaces it, or a transaction rolls back (`infra/db/schema-store`):
