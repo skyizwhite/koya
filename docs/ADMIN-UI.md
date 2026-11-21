@@ -200,15 +200,20 @@ by its model's `label` field, or by its id.
 | `boolean` | checkbox — unchecked means `false`; a field with `default: true` starts checked on a new content |
 | `date` | date picker |
 | `datetime` | date and time picker to the minute, in the time zone chosen under **Settings** |
-| `select` | dropdown, or checkboxes when `many` |
-| `reference` | dropdown, or chips plus a dropdown when `many` |
+| `select` | radio buttons, or checkboxes when `many`; one that is not required has a **None** button for no value |
+| `reference` | a card for each content it holds — its label and status, opening that content's editor when clicked, and × to take it out — with **Select…** (one) or **Add…** (`many`), which opens the reference picker. A `many` one's cards are moved by dragging the handle (⠿) or by **↑** / **↓** |
 | `media` | thumbnail with **Choose…** (opens the media picker) and **Clear**; a `many` one is a row of thumbnails, each moved by dragging it or by ← and →, and removed by ×, with **Add images**, which opens the picker to choose several at once |
 | `custom` | a box of the controls of the custom field's fields, under a heading like any field's: its name, `custom`, a red `*` when required, and its help beside them. One that is not required starts absent with an **Add** button and, once there, has a **Remove** button; a required one is always there and has neither. Only one that is there is saved, its required fields asked for, and a box left unchecked inside it is `false` |
 | `repeater` | its rows under a heading like any field's: its name, `repeater`, a red `*` when required, and its help beside them. Each row is a box headed by its custom field's name, with a drag handle (⠿), **↑** / **↓** to move it and **×** to remove it, holding the controls of that custom field's fields. Under the rows, a dropdown of the repeater's custom fields and **Add row** add a row of the one chosen at the end; rich text in it starts its own editor. Rows are reordered with the buttons or by dragging the handle |
 
-- A reference dropdown lists every content of the target model, drafts included,
-  by its label. A reference to a content that no longer exists is kept and shown
-  as *(missing)*, so a save never drops it silently.
+- The reference picker lists the target model's contents, drafts included, by
+  label and status, newest first, twenty at a time and more as the list is
+  scrolled, with a box that searches them as the content list's does. For one
+  reference a click chooses the content and closes it; for `many` the clicks
+  mark contents and **Add** puts them after the cards there, and a content the
+  field holds already is not offered.
+- A reference to a content that no longer exists is kept and shown as
+  *(missing)*, without a link, so a save never drops it silently.
 - When validation fails the page comes back with a summary at the top and the
   message under each offending field, inside a custom field or a repeater's
   row too; nothing is saved.

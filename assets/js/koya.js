@@ -23,6 +23,9 @@
   const pickMedia = (onpick) =>
     document.getElementById("media-picker")?.dispatchEvent(new CustomEvent("openpicker", { detail: onpick }));
 
+  const pickReferences = (detail) =>
+    document.getElementById("reference-picker")?.dispatchEvent(new CustomEvent("openpicker", { detail }));
+
   koya.form = (form) => {
     const data = new FormData(form);
     const fields = {};
@@ -195,21 +198,31 @@
     };
   }
 
-  koya.references = (el) => ({
-    _chosen: Array.from(el.querySelector("select[multiple]").selectedOptions, (option) => option.value),
-    _has(id) {
-      return this._chosen.includes(id);
-    },
-    _add(select) {
-      if (select.value && !this._has(select.value)) this._chosen = [...this._chosen, select.value];
-      select.value = "";
-      changed(this.$refs.select);
-    },
-    _remove(id) {
-      this._chosen = this._chosen.filter((chosen) => chosen !== id);
-      changed(this.$refs.select);
-    },
-  });
+  koya.references = (el, model, many) => {
+    const list = el.querySelector("[data-reference-list]");
+    list.addEventListener("click", (event) => {
+      const button = event.target.closest?.("[data-action]");
+      if (!button) return;
+      if (button.dataset.action === "remove") koya.removeRow(button);
+      else koya.moveRow(button, button.dataset.action === "up" ? -1 : 1);
+    });
+    return {
+      _choose() {
+        pickReferences({
+          model,
+          many,
+          held: many ? Array.from(list.querySelectorAll("input"), (input) => input.value) : [],
+          onpick: (cards) => {
+            if (!cards.length) return;
+            for (const card of cards) card.querySelector("input").name = list.id;
+            if (many) list.append(...cards);
+            else list.replaceChildren(...cards);
+            changed(list);
+          },
+        });
+      },
+    };
+  };
 
   koya.customField = (on) => ({
     _on: on,
@@ -335,6 +348,61 @@
       onpick?.(chosen);
     },
   });
+
+  koya.referencePicker = (dialog, url) => {
+    const cards = new Map();
+    const cardOf = (id) =>
+      dialog.querySelector(`[data-pick-id="${CSS.escape(id)}"]`).nextElementSibling.content.firstElementChild.cloneNode(true);
+    return {
+      _onpick: null,
+      _many: false,
+      _held: [],
+      _chosen: [],
+      _open(detail) {
+        this._many = detail.many;
+        this._onpick = detail.onpick;
+        this._held = detail.held;
+        this._chosen = [];
+        cards.clear();
+        this.$get(url, { model: detail.model, many: detail.many });
+        dialog.showModal();
+      },
+      _close() {
+        this._onpick = null;
+        this._chosen = [];
+        cards.clear();
+        dialog.close();
+      },
+      _has(id) {
+        return this._chosen.includes(id);
+      },
+      _taken(id) {
+        return this._held.includes(id);
+      },
+      _pick(id) {
+        if (this._many) {
+          if (this._has(id)) {
+            this._chosen = this._chosen.filter((chosen) => chosen !== id);
+            cards.delete(id);
+          } else {
+            cards.set(id, cardOf(id));
+            this._chosen = [...this._chosen, id];
+          }
+          return;
+        }
+        const onpick = this._onpick;
+        const card = cardOf(id);
+        this._close();
+        onpick?.([card]);
+      },
+      _done() {
+        const onpick = this._onpick;
+        const chosen = this._chosen.map((id) => cards.get(id));
+        this._close();
+        onpick?.(chosen);
+      },
+    };
+  };
 
   koya.mediaList = (el) => {
     const list = el.querySelector("[data-media-list]");

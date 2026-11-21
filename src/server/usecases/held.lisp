@@ -23,8 +23,9 @@
                            (let ((ids (held-ids value (array-p value))))
                              (if (eq (field-type field) :media)
                                  (setf media (append ids media))
-                                 (let ((target (field-option field :model)))
-                                   (setf (gethash target references) (append ids (gethash target references)))))))
+                                 (when ids
+                                   (let ((target (field-option field :model)))
+                                     (setf (gethash target references) (append ids (gethash target references))))))))
                          object)))
     (values media references)))
 
@@ -33,7 +34,7 @@
     (let ((contents (make-hash-table :test 'equal)))
       (maphash (lambda (target ids) (setf (gethash target contents) (find-contents-by-ids space target ids)))
                references)
-      (values (find-media-by-ids space media) contents))))
+      (values (if media (find-media-by-ids space media) (make-hash-table :test 'equal)) contents))))
 
 (defun held-names (space model datas &key (fields (model-fields model)))
   (multiple-value-bind (media contents) (read-held space model datas :fields fields)

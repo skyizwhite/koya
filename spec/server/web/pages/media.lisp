@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-reveal #:on-pick)
   (:import-from #:koya-spec/server/web/pages/support
-                #:replaced-url #:bound #:post-login #:edit #:*secret* #:*cookie* #:blog-model #:request
+                #:replaced-url #:bound #:escaped #:count-matches #:post-login #:edit #:*secret* #:*cookie* #:blog-model #:request
                 #:request-url #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/contents #:list-contents)
@@ -20,14 +20,6 @@
   (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:import-from #:babel #:string-to-octets))
 (in-package #:koya-spec/server/web/pages/media)
-
-(defun escaped (url)
-  (cl-ppcre:regex-replace-all "&" url "&amp;"))
-
-(defun count-matches (needle haystack)
-  (loop :for start := 0 :then (+ found (length needle))
-        :for found := (search needle haystack :start2 start)
-        :while found :count t))
 
 (setup (setup-pages) (log-in))
 

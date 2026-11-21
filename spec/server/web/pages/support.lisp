@@ -16,7 +16,7 @@
   (:import-from #:quri #:url-encode-params)
   (:import-from #:cl-ppcre #:scan-to-strings)
   (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in
-           #:asked-first #:count-ids #:replaced-url #:bound))
+           #:asked-first #:count-ids #:replaced-url #:bound #:escaped #:count-matches))
 (in-package #:koya-spec/server/web/pages/support)
 
 (defparameter *secret* "ui-secret-long-enough-to-log-in-with-it")
@@ -24,6 +24,14 @@
 (defvar *cookie* nil)
 
 (defvar *set-cookie* nil)
+
+(defun escaped (url)
+  (cl-ppcre:regex-replace-all "&" url "&amp;"))
+
+(defun count-matches (needle haystack)
+  (loop :for start := 0 :then (+ found (length needle))
+        :for found := (search needle haystack :start2 start)
+        :while found :count t))
 
 (defun blog-model ()
   (make-model "blog" :list (list (make-field :title :text :required t)

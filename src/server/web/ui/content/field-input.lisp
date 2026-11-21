@@ -11,8 +11,9 @@
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/usecases/settings #:display-timezone-name)
   (:import-from #:koya-server/web/ui/icon #:~icon)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge)
   (:import-from #:koya-server/web/lib/binds #:js-string)
-  (:export #:~field-input #:~custom-input #:~repeater-input))
+  (:export #:~field-input #:~custom-input #:~repeater-input #:~reference-card))
 (in-package #:koya-server/web/ui/content/field-input)
 
 (defun present-p (value) (and value (not (eq value :null))))
@@ -24,53 +25,37 @@
           (equal option value))
       nil))
 
-(defun reference-choices (value references)
-  (let ((selected (cond ((not (present-p value)) '())
-                        ((array-p value) (coerce value 'list))
-                        (t (list value)))))
-    (append references
-            (loop :for id :in selected
-                  :unless (assoc id references :test #'equal)
-                    :collect (cons id (format nil "~a (missing)" id))))))
-
-(defcomp ~reference-chips (&key name value choices)
+(defcomp ~reference-card (&key name id label status href many)
   (hsx
-   (div :class "flex flex-wrap items-center gap-2" :nm-data "...koya.references(this)"
-     (select :id name :name name :multiple t :hidden t :nm-ref "select"
-       (loop :for (id . label) :in choices :collect
-         (hsx (option :value id :selected (selected-p value id)
-                      :nm-bind "{ selected: () => _has(this.value) }"
-                label))))
-     (loop :for (id . label) :in choices :collect
-       (hsx (span :class "badge inline-flex items-center gap-1 bg-line text-fg"
-                  :data-id id :hidden (not (selected-p value id))
-                  :nm-bind "{ hidden: () => !_has(this.dataset.id) }"
-              label
-              (button :type "button" :class "text-muted hover:text-danger" :data-id id
-                      :aria-label (format nil "Remove ~a" label)
-                      :nm-bind "{ onclick: () => _remove(this.dataset.id) }"
-                "×"))))
-     (select :aria-label "Add" :nm-bind "{ onchange: () => _add(this) }"
-       (option :value "" "Add…")
-       (loop :for (id . label) :in choices :collect
-         (let ((chosen (selected-p value id)))
-           (hsx (option :value id :hidden chosen :disabled chosen
-                        :nm-bind "{ hidden: () => _has(this.value), disabled: () => _has(this.value) }"
-                  label))))))))
+   (li :class "flex w-fit max-w-full items-center gap-2 rounded-md border border-line bg-panel px-3 py-2" :data-row t
+     (when many
+       (hsx (span :class "cursor-move select-none text-muted" :aria-hidden "true" :data-drag-handle t "⠿")))
+     (if href
+         (hsx (a :href href :class "min-w-0 flex-1 truncate text-sm font-medium hover:underline" label))
+         (hsx (span :class "min-w-0 flex-1 truncate text-sm text-muted" label)))
+     (when status (hsx (~status-badge :status status)))
+     (when many
+       (hsx (<> (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Move ~a up" label) :data-action "up"
+                  (~icon :name :up))
+                (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Move ~a down" label) :data-action "down"
+                  (~icon :name :down)))))
+     (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Remove ~a" label) :data-action "remove"
+       (~icon :name :close))
+     (input :type "hidden" :name name :value id))))
 
-(defcomp ~reference-select (&key field parent value references)
-  (let ((name (field-param-name field parent))
-        (choices (reference-choices value references)))
+(defcomp ~reference-control (&key field name references)
+  (let ((many (field-many-p field)))
     (hsx
-     (<>
-       (if (field-many-p field)
-           (hsx (~reference-chips :name name :value value :choices choices))
-           (hsx (select :id name :name name
-                  (option :value "" "—")
-                  (loop :for (id . label) :in choices :collect
-                    (hsx (option :value id :selected (selected-p value id) label))))))
-       (p :class "text-xs text-muted"
-         (format nil "~a content~:p of ~a" (length choices) (field-option field :model)))))))
+     (div :class "space-y-2"
+          :nm-data (format nil "...koya.references(this, ~a, ~:[false~;true~])" (js-string (field-option field :model)) many)
+       (ul :id name :class "space-y-2 empty:hidden" :data-reference-list t
+           :nm-bind (and many "{ oninit: () => koya.sortable(this) }")
+         (loop :for reference :in references :collect
+           (hsx (~reference-card :name name :many many
+                                 :id (getf reference :id) :label (getf reference :label)
+                                 :status (getf reference :status) :href (getf reference :href)))))
+       (button :type "button" :class "btn" :nm-bind "{ onclick: () => _choose() }"
+         (~icon :name :plus) (if many "Add…" "Select…"))))))
 
 (defcomp ~media-control (&key name value media)
   (let ((url (if media (media-url media :absolute nil) ""))
@@ -217,19 +202,19 @@
           (hsx (<> (input :type "datetime-local" :id id :name name :value string :class "input")
                    (p :class "text-xs text-muted" (display-timezone-name)))))
          (:select
-          (if (field-many-p field)
-              (hsx (div :class "flex flex-wrap gap-3"
-                     (loop :for option :in (field-option field :options) :collect
-                       (hsx (label :class "inline-flex items-center gap-1.5 text-sm"
-                              (input :type "checkbox" :name name :value option
-                                     :checked (and (present-p value) (find option value :test #'equal) t))
-                              option)))))
-              (hsx (select :id id :name name
-                     (option :value "" "—")
-                     (loop :for option :in (field-option field :options) :collect
-                       (hsx (option :value option :selected (equal option value) option)))))))
+          (let ((many (field-many-p field)))
+            (hsx (div :class "flex flex-wrap gap-3"
+                   (unless (or many (field-required-p field))
+                     (hsx (label :class "inline-flex items-center gap-1.5 text-sm"
+                            (input :type "radio" :name name :value "" :checked (not (present-p value)))
+                            "None")))
+                   (loop :for option :in (field-option field :options) :collect
+                     (hsx (label :class "inline-flex items-center gap-1.5 text-sm"
+                            (input :type (if many "checkbox" "radio") :name name :value option
+                                   :checked (selected-p value option))
+                            option)))))))
          (:reference
-          (hsx (~reference-select :field field :parent parent :value value :references references)))
+          (hsx (~reference-control :field field :name name :references references)))
          (:media
           (if (field-many-p field)
               (hsx (~media-list-control :name name

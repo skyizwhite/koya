@@ -3,21 +3,18 @@
   (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-core/schema
                 #:model-name #:model-fields #:model-field #:field-type
-                #:+system-fields+ #:field-many-p #:map-data-fields #:field-value)
+                #:+system-fields+ #:field-many-p #:field-value)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content)
-  (:import-from #:koya-server/domain/content #:content-data #:content-id #:content-label #:held-ids)
+  (:import-from #:koya-server/domain/content #:content-data #:held-ids)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
   (:import-from #:koya-server/domain/query #:make-query)
-  (:import-from #:koya-server/usecases/ports/spaces #:find-model)
   (:export #:parse-sort
            #:content-page
            #:page-media
-           #:data-media
            #:all-contents
            #:count-contents
-           #:find-object-content
-           #:reference-options))
+           #:find-object-content))
 (in-package #:koya-server/usecases/listing)
 
 (defun sortable-p (model name)
@@ -55,22 +52,5 @@
                                       (first (held-ids (field-value data field) (field-many-p field))))
                       :when id :collect id))))
 
-(defun data-media (space model data)
-  (let ((ids '()))
-    (map-data-fields (model-fields model) data
-                     (lambda (field value found object outer)
-                       (declare (ignore found outer))
-                       (when (eq (field-type field) :media)
-                         (dolist (id (held-ids value (field-many-p field)))
-                           (push id ids)))
-                       object))
-    (if ids (find-media-by-ids space ids) (make-hash-table :test 'equal))))
-
 (defun all-contents (space model query)
   (list-contents space (model-name model) model query :status :all))
-
-(defun reference-options (space model-name)
-  (let ((target (find-model space model-name)))
-    (sort (mapcar (lambda (content) (cons (content-id content) (content-label content target)))
-                  (list-contents space model-name target (make-query :limit nil) :status :all))
-          #'string-lessp :key #'cdr)))
