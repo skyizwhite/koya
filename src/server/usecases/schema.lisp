@@ -22,6 +22,7 @@
                 #:list-deploys #:count-deploys #:+deploys-kept+)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/usecases/spaces #:resolve-space)
+  (:import-from #:koya-server/log #:log-info)
   (:export #:load-schema
            #:find-model
            #:resolve-model
@@ -239,5 +240,6 @@
       (fail 'conflict "Schema deploy contains destructive changes; retry with force=true"
             :code "destructive_changes" :details changes))
     (store-schema space schema changes *actor*)
+    (log-info :koya.schema "space ~a deployed a schema with ~a change~:p" space (length changes))
     (notify-deploy space before changes)
     changes))

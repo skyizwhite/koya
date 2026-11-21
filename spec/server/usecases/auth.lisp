@@ -4,7 +4,8 @@
   (:import-from #:koya-server/usecases/settings #:enable-totp)
   (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
-  (:import-from #:koya-server/domain/totp #:totp #:generate-totp-secret))
+  (:import-from #:koya-server/domain/totp #:totp #:generate-totp-secret)
+  (:import-from #:koya-spec/server/logs #:logged))
 (in-package #:koya-spec/server/usecases/auth)
 
 (defparameter *secret* "auth-spec-secret-long-enough-to-log-in")
@@ -51,3 +52,34 @@
       (ok (eq (check-login "not the secret" (wrong-code-at time) :time time) :wrong-secret)))
     (ok (eq (check-login *secret* (code-at time) :time time) t)
         "only someone who has the secret can spend the codes")))
+
+(deftest a-login-is-logged-without-what-was-typed
+  (let ((time 1900000000))
+    (testing "a login, with a timestamp and its level"
+      (let ((log (logged (lambda () (check-login *secret* (code-at time) :time time)))))
+        (ok (cl-ppcre:scan "^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d \\[INFO \\] <KOYA.AUTH>: the owner logged in$"
+                           (string-right-trim '(#\Newline) log)))
+        (ng (search *secret* log))))
+    (testing "a refused one, naming what was wrong and neither the secret nor the code"
+      (let ((log (logged (lambda () (check-login "typed-secret-that-is-wrong" (code-at time) :time time)))))
+        (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: wrong secret" log))
+        (ng (search "typed-secret-that-is-wrong" log))
+        (ng (search (code-at time) log)))
+      (let* ((code (wrong-code-at (+ time 60)))
+             (log (logged (lambda () (check-login *secret* code :time (+ time 60))))))
+        (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: wrong code" log))
+        (ng (search *secret* log))
+        (ng (search code log))))
+    (testing "and one refused because the secret is too short to log in with"
+      (let ((saved (uiop:getenv "KOYA_SECRET")))
+        (setf (uiop:getenv "KOYA_SECRET") "short-secret")
+        (unwind-protect
+             (let ((log (logged (lambda () (check-login "short-secret" nil :time time)))))
+               (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: KOYA_SECRET is too short" log))
+               (ng (search "short-secret" log)))
+          (setf (uiop:getenv "KOYA_SECRET") saved))))
+    (testing "and one refused for too many wrong codes"
+      (let ((at (+ time 120)))
+        (dotimes (i 5) (check-login *secret* (wrong-code-at at) :time at))
+        (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: too many wrong codes"
+                    (logged (lambda () (check-login *secret* (code-at at) :time at)))))))))

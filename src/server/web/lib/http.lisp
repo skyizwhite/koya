@@ -16,6 +16,7 @@
                 #:koya-error #:koya-error-code #:koya-error-message #:koya-error-details
                 #:not-found #:conflict #:invalid-input #:rejected #:too-large)
   (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
+  (:import-from #:koya-server/web/lib/request-log #:log-unhandled)
   (:import-from #:quri
                 #:uri #:uri-scheme #:uri-host #:uri-port #:uri-error)
   (:import-from #:babel
@@ -84,8 +85,19 @@
 (defun make-json-app ()
   (make-instance 'json-app))
 
+(defun internal-error (condition)
+  (json-response 500 (error-object "internal_error"
+                                   (if (dev-mode-p) (princ-to-string condition) "Internal server error"))))
+
 (defmethod lack/component:call :around ((app json-app) env)
-  (handler-case (let ((answer (call-next-method)))
+  (block answered
+    (handler-bind ((error (lambda (e)
+                            (log-unhandled e env)
+                            (return-from answered (internal-error e)))))
+      (answer-known-errors (lambda () (call-next-method))))))
+
+(defun answer-known-errors (call)
+  (handler-case (let ((answer (funcall call)))
                   (if (equal answer '(400 () ("Bad Request")))
                       (json-response 400 (error-object "bad_json" "Request body could not be read"))
                       answer))
@@ -99,11 +111,7 @@
       (json-response 400 (error-object "invalid_schema" (schema-error-message e))))
     (validation-error (e)
       (json-response 422 (error-object "validation_failed" "Content is invalid"
-                                       (validation-details (validation-error-errors e)))))
-    (error (e)
-      (format *error-output* "~&[koya] unhandled error: ~a~%" e)
-      (json-response 500 (error-object "internal_error"
-                                       (if (dev-mode-p) (princ-to-string e) "Internal server error"))))))
+                                       (validation-details (validation-error-errors e)))))))
 
 (defmethod process-response :around ((app json-app) result)
   (set-response-header :content-type "application/json; charset=utf-8")

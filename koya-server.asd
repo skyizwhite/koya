@@ -3,6 +3,7 @@
 (register-system-packages "lack-middleware-session" '(:lack/middleware/session/store))
 (register-system-packages "dexador" '(:dexador.error))
 (register-system-packages "zippy" '(:org.shirakumo.zippy))
+(register-system-packages "verbose" '(:org.shirakumo.verbose))
 
 (defsystem "koya-server"
   :version "0.21.0"

@@ -10,12 +10,13 @@
                 #:lack-app-file)
   (:import-from #:lack-mw
                 #:with-args #:*mw-trim-trailing-slash* #:*mw-recovery*
-                #:*mw-mount* #:*mw-session* #:*mw-accesslog* #:make-cookie-state)
+                #:*mw-mount* #:*mw-session* #:make-cookie-state)
   (:import-from #:koya-server/usecases/system #:dev-mode-p #:public-url)
   (:import-from #:koya-server/web/lib/media #:media-app)
   (:import-from #:koya-server/web/lib/health #:health-app)
   (:import-from #:koya-server/web/lib/http
                 #:make-json-app)
+  (:import-from #:koya-server/web/lib/request-log #:*mw-error-log* #:*mw-access-log*)
   (:import-from #:koya-server/web/lib/middlewares
                 #:*mw-temporary-file* #:*mw-max-body* #:*mw-session-cookie-renewal*
                 #:*mw-default-cache-control* #:*mw-delivery-cors* #:+max-body-bytes+)
@@ -87,9 +88,10 @@
     (lack:builder
      (with-args *mw-mount* "/health" #'health-app)
      *mw-temporary-file*
-     *mw-accesslog*
+     *mw-access-log*
      *mw-default-cache-control*
-     (with-args *mw-recovery* :dev-mode (dev-mode-p))
+     (with-args *mw-recovery* :dev-mode (dev-mode-p) :logger nil)
+     *mw-error-log*
      *mw-max-body*
      (with-args *mw-mount* "/assets" (make-instance 'lack-app-file :root #p"assets/"))
      (with-args *mw-mount* "/media" #'media-app)

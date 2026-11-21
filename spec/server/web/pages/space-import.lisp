@@ -43,7 +43,8 @@
   (:import-from #:koya-core/schema #:schema-models #:model-name #:webhook-url)
   (:import-from #:koya-server/web/pages/index
                 #:begin-import-action #:continue-import-action #:finish-import-action)
-  (:import-from #:koya-server/infra/env #:archive-dir))
+  (:import-from #:koya-server/infra/env #:archive-dir)
+  (:import-from #:koya-spec/server/logs #:logged))
 (in-package #:koya-spec/server/web/pages/space-import)
 
 (setup (setup-pages) (log-in))
@@ -134,7 +135,10 @@
         (ok (search "href=\"/s/archive/export\"" body))
         (ng (search "download" body) "a failed export must show its toast, not be saved as a file")))
     (testing "export is a zip download"
-      (multiple-value-bind (status body headers) (request :get "/s/archive/export")
+      (multiple-value-bind (status body headers) (values nil nil nil)
+        (let ((log (logged (lambda () (multiple-value-setq (status body headers) (request :get "/s/archive/export"))))))
+          (ok (search "[INFO ] <KOYA.ARCHIVE>: space archive exported" log) "and is logged")
+          (ng (search old-secret log) "without the webhook secret it holds"))
         (ok (= status 200))
         (ok (string= (getf headers :content-type) "application/zip"))
         (ok (search "attachment; filename=\"archive-" (getf headers :content-disposition)))
@@ -147,7 +151,10 @@
                               (declare (ignore url payload headers))
                               (incf sent))))
       (testing "import makes the space again"
-        (multiple-value-bind (status location) (import-archive octets)
+        (multiple-value-bind (status location) (values nil nil)
+          (let ((log (logged (lambda () (multiple-value-setq (status location) (import-archive octets))))))
+            (ok (search "[INFO ] <KOYA.ARCHIVE>: space archive imported" log) "and is logged")
+            (ng (search old-secret log) "without the webhook secret it brings"))
           (ok (= status 200))
           (ok (string= location "/s/archive")))
         (ok (search "Space archive imported." (nth-value 1 (request :get "/s/archive"))))

@@ -2,6 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server #:start #:stop)
   (:import-from #:koya-server/infra/env #:setting-error)
+  (:import-from #:koya-spec/server/logs #:logged)
   (:export #:with-env))
 (in-package #:koya-spec/server/main)
 
@@ -29,3 +30,12 @@
   (with-env (("KOYA_BASE_URL" "") ("KOYA_PORT" "abc"))
     (let ((message (or (refusal) "")))
       (ok (and (search "KOYA_BASE_URL" message) (search "KOYA_PORT" message)) "and every bad one is named at once"))))
+
+(deftest the-server-logs-its-start-and-stop
+  (with-env (("KOYA_BASE_URL" "http://localhost:39117") ("KOYA_PORT" "39117") ("KOYA_SECRET" "short-secret"))
+    (let ((log (logged (lambda () (start :db ":memory:") (stop)))))
+      (ok (search "[INFO ] <KOYA.DB>: applied migrations 1, 2," log) "the migrations a new database takes")
+      (ok (search "[INFO ] <KOYA.SERVER>: server starting on 127.0.0.1:39117" log))
+      (ok (search "[WARN ] <KOYA.SERVER>: KOYA_SECRET is shorter than 32 characters: logging in is off until it is replaced" log))
+      (ng (search "short-secret" log) "which is never logged")
+      (ok (search "[INFO ] <KOYA.SERVER>: server stopped" log)))))

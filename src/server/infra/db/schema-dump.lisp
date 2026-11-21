@@ -2,6 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection #:*db* #:connect-db #:disconnect-db #:fetch #:col)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
+  (:import-from #:koya-server/log #:log-info)
   (:export #:snapshot
            #:migrated-snapshot
            #:snapshot-path
@@ -43,5 +44,5 @@
     (with-open-file (out path :direction :output :if-exists :supersede
                               :if-does-not-exist :create :external-format :utf-8)
       (write-string text out))
-    (format t "~&[koya] wrote ~a~%" path)
+    (log-info :koya.db "wrote ~a" path)
     path))
