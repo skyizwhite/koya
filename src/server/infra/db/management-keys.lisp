@@ -1,6 +1,6 @@
 (defpackage #:koya-server/infra/db/management-keys
   (:use #:cl)
-  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:fetch-value #:col)
   (:import-from #:koya-server/domain/key #:make-key)
   (:import-from #:koya-server/usecases/ports/keys
                 #:insert-management-key #:stored-management-keys
@@ -24,12 +24,10 @@
   (exec "DELETE FROM management_keys WHERE space = ? AND id = ?" space id))
 
 (defmethod label-by-management-key-hash (hash)
-  (let ((row (fetch-one "SELECT label FROM management_keys WHERE key_hash = ?" hash)))
-    (and row (col row "label"))))
+  (fetch-value "SELECT label FROM management_keys WHERE key_hash = ?" hash))
 
 (defmethod space-by-management-key-hash (hash)
-  (let ((row (fetch-one "SELECT space FROM management_keys WHERE key_hash = ?" hash)))
-    (and row (col row "space"))))
+  (fetch-value "SELECT space FROM management_keys WHERE key_hash = ?" hash))
 
 (defmethod stored-management-keys (space)
   (mapcar (lambda (row) (make-key :id (col row "id") :hash (col row "key_hash")

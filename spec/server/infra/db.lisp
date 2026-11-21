@@ -5,7 +5,9 @@
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
                 #:connect-db #:disconnect-db #:exec #:fetch #:fetch-one #:col #:with-db-transaction
-                #:in-transaction-p)
+                #:in-transaction-p #:fetch-value)
+  (:import-from #:koya-server/infra/db/sql
+                #:sql #:sql-text #:sql-params #:bound #:fragment #:all-of #:any-of #:in-list #:like-pattern #:json-at)
   (:import-from #:koya-core/time #:iso-from-now)
   (:import-from #:koya-server/infra/db/migrations #:migrate #:current-version)
   (:import-from #:koya-server/infra/db/schema-dump #:migrated-snapshot #:read-snapshot)
@@ -858,3 +860,18 @@
     (ng (in-transaction-p))
     (ok (equal (value) "outer") "a failed transaction undoes everything in it, what is inside it too")
     (exec "DELETE FROM settings")))
+
+(deftest a-fragment-carries-its-values-in-the-order-of-its-text
+  (let ((where (fragment "~a = ~a AND id IN ~a"
+                         (json-at (sql "published") "seo" "title") (bound "x") (in-list '("a" "b")))))
+    (ok (equal (sql-text where) "json_extract(published, ?) = ? AND id IN (?, ?)")
+        "a field name is not written into the text, it is bound as a JSON path")
+    (ok (equal (sql-params where) '("$.seo.title" "x" "a" "b"))))
+  (let ((either (any-of (list (sql "a = ?" 1) nil (sql "b = ?" 2)))))
+    (ok (equal (sql-text either) "(a = ? OR b = ?)") "a condition left out is dropped")
+    (ok (equal (sql-params either) '(1 2))))
+  (ng (all-of (list nil nil)) "and none at all is no condition")
+  (ok (equal (like-pattern "50%_\\") "%50\\%\\_\\\\%") "a LIKE pattern escapes its wildcards and the escape")
+  (ok (equal (like-pattern "ab" :prefix t) "ab%"))
+  (ok (= (fetch-value (fragment "SELECT ~a" (json-at (bound "{\"seo\":{\"title\":7}}") "seo" "title"))) 7)
+      "and SQLite reads the bound path"))

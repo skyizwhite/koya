@@ -7,7 +7,8 @@
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec #:in-transaction-p)
   (:import-from #:koya-server/infra/db/webhook-deliveries #:+max-response-chars+)
   (:import-from #:koya-server/usecases/ports/webhooks #:+deliveries-kept+)
-  (:import-from #:koya-server/usecases/ports/webhooks #:list-deliveries #:count-deliveries)
+  (:import-from #:koya-server/usecases/ports/webhooks #:list-deliveries #:count-deliveries
+                #:record-delivery #:delivery-labels #:delivery-models)
   (:import-from #:koya-spec/server/fake-webhooks #:*webhook-sender* #:*address*)
   (:import-from #:koya-server/domain/webhook-delivery
                 #:delivery-ok #:delivery-status #:delivery-response #:delivery-error
@@ -156,6 +157,15 @@
     (dotimes (i 5)
       (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" (format nil "t~a" i)) "publish" t)))
     (ok (<= (count-deliveries "website") +deliveries-kept+) "the cap holds")))
+
+(deftest the-log-names-the-labels-and-models-it-holds
+  (exec "DELETE FROM webhook_deliveries")
+  (loop :for (label model) :in '(("zeta" "blog") ("alpha" "") ("zeta" "tag") ("" "blog"))
+        :do (record-delivery "website" :label label :model model :event "publish" :ok t))
+  (ok (equal (delivery-labels "website") '("alpha" "zeta")) "each label once, in order, with none for a blank one")
+  (ok (equal (delivery-models "website") '("blog" "tag")) "and so for models")
+  (ok (null (delivery-labels "elsewhere")) "a space's log holds only its own")
+  (exec "DELETE FROM webhook_deliveries"))
 
 (defvar *redirect* nil)
 

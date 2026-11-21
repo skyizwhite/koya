@@ -1,13 +1,12 @@
 (defpackage #:koya-server/infra/db/settings
   (:use #:cl)
-  (:import-from #:koya-server/infra/db/connection #:exec #:fetch-one #:col)
+  (:import-from #:koya-server/infra/db/connection #:exec #:fetch-value)
   (:import-from #:koya-core/time #:now-iso)
   (:import-from #:koya-server/usecases/ports/settings #:get-setting #:set-setting #:delete-setting))
 (in-package #:koya-server/infra/db/settings)
 
 (defmethod get-setting (key)
-  (let ((row (fetch-one "SELECT value FROM settings WHERE key = ?" key)))
-    (and row (col row "value"))))
+  (fetch-value "SELECT value FROM settings WHERE key = ?" key))
 
 (defmethod set-setting (key value)
   (exec "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)

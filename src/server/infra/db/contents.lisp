@@ -1,7 +1,9 @@
 (defpackage #:koya-server/infra/db/contents
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection
-                #:exec #:fetch #:fetch-one #:col)
+                #:exec #:fetch #:fetch-one #:fetch-value #:col)
+  (:import-from #:koya-server/infra/db/sql
+                #:sql #:bound #:fragment #:all-of #:in-list #:like-pattern #:json-at)
   (:import-from #:koya-server/infra/db/content-query #:build-where #:build-order-by)
   (:import-from #:koya-server/domain/query
                 #:query-limit #:query-offset #:query-orders #:query-filters #:query-search #:search-filters)
@@ -24,7 +26,7 @@
 (in-package #:koya-server/infra/db/contents)
 
 (defparameter +columns+
-  "id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at")
+  (sql "id, space, model, status, published, draft, draft_key, created_at, updated_at, published_at, revised_at"))
 
 (defun row->content (row)
   (flet ((json (name) (let ((v (col row name))) (and v (jvalue->data (parse-json v) :intern t)))))
@@ -51,14 +53,15 @@
   (let ((table (make-hash-table :test 'equal))
         (ids (remove-duplicates ids :test #'equal)))
     (when ids
-      (dolist (row (apply #'fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? AND id IN (~{~*?~^, ~})" +columns+ ids)
-                          space model ids))
+      (dolist (row (fetch (fragment "SELECT ~a FROM contents WHERE space = ~a AND model = ~a AND id IN ~a"
+                                    +columns+ (bound space) (bound model) (in-list ids))))
         (let ((content (row->content row)))
           (setf (gethash (content-id content) table) content))))
     table))
 
 (defmethod find-content (space model id)
-  (let ((row (fetch-one (format nil "SELECT ~a FROM contents WHERE id = ? AND space = ? AND model = ?" +columns+) id space model)))
+  (let ((row (fetch-one (fragment "SELECT ~a FROM contents WHERE id = ~a AND space = ~a AND model = ~a"
+                                  +columns+ (bound id) (bound space) (bound model)))))
     (and row (row->content row))))
 
 (defmethod insert-content (content published-slug draft-slug)
@@ -94,30 +97,30 @@
   (exec "DELETE FROM contents WHERE space = ? AND id = ?" space id))
 
 (defmethod contents-mentioning (space needle &key exclude-id)
-  (mapcar #'row->content
-          (apply #'fetch (format nil "SELECT ~a FROM contents WHERE space = ?~:[~; AND id <> ?~]
-                                        AND (published LIKE ? OR draft LIKE ?)"
-                                 +columns+ exclude-id)
-                 space (append (and exclude-id (list exclude-id))
-                               (let ((like (format nil "%~a%" needle))) (list like like))))))
+  (let ((like (like-pattern needle)))
+    (mapcar #'row->content
+            (fetch (fragment "SELECT ~a FROM contents WHERE ~a"
+                             +columns+
+                             (all-of (list (sql "space = ?" space)
+                                           (and exclude-id (sql "id <> ?" exclude-id))
+                                           (sql "(published LIKE ? ESCAPE '\\' OR draft LIKE ? ESCAPE '\\')" like like))))))))
 
 (defun by-slug (columns space model slug)
-  (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ?
-                        AND (published_slug = ? OR draft_slug = ?)" columns)
-         space model slug slug))
+  (fetch (fragment "SELECT ~a FROM contents WHERE space = ~a AND model = ~a AND (published_slug = ~a OR draft_slug = ~a)"
+                   columns (bound space) (bound model) (bound slug) (bound slug))))
 
 (defun object-row (columns space model)
-  (fetch-one (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at LIMIT 1" columns)
-             space model))
+  (fetch-one (fragment "SELECT ~a FROM contents WHERE space = ~a AND model = ~a ORDER BY created_at LIMIT 1"
+                       columns (bound space) (bound model))))
 
 (defmethod find-contents-by-slug (space model slug)
   (mapcar #'row->content (by-slug +columns+ space model slug)))
 
 (defmethod find-content-ids-by-slug (space model slug)
-  (mapcar (lambda (row) (col row "id")) (by-slug "id" space model slug)))
+  (mapcar (lambda (row) (col row "id")) (by-slug (sql "id") space model slug)))
 
 (defmethod find-object-content-id (space model)
-  (let ((row (object-row "id" space model)))
+  (let ((row (object-row (sql "id") space model)))
     (and row (col row "id"))))
 
 (defmethod find-object-content (space model)
@@ -126,40 +129,39 @@
 
 (defun status-clause (status)
   (ecase status
-    (:published "published IS NOT NULL")
-    (:all "1 = 1")))
+    (:published (sql "published IS NOT NULL"))
+    (:all nil)))
 
 (defun data-column (status)
   (ecase status
-    (:published (values "published" "published_text"))
-    (:all (values "COALESCE(draft, published)" "COALESCE(draft_text, published_text)"))))
+    (:published (values (sql "published") (sql "published_text")))
+    (:all (values (sql "COALESCE(draft, published)") (sql "COALESCE(draft_text, published_text)")))))
 
 (defmethod list-contents (space model schema-model query &key (status :published) only-status)
   (multiple-value-bind (column text-column) (data-column status)
-    (multiple-value-bind (where-sql where-params)
-        (build-where (query-filters query) schema-model column
-                     :and (and (query-search query) (search-filters schema-model (query-search query)))
-                     :text-column text-column)
-      (let* ((base (format nil "FROM contents WHERE space = ? AND model = ? AND ~a~@[~a~]~@[ AND ~a~]"
-                           (status-clause status) (and only-status " AND status = ?") where-sql))
-             (params (append (list space model) (and only-status (list only-status)) where-params))
-             (total (col (apply #'fetch-one (format nil "SELECT COUNT(*) AS n ~a" base) params) "n"))
-             (rows (apply #'fetch
-                          (format nil "SELECT ~a ~a ORDER BY ~a LIMIT ? OFFSET ?"
-                                  +columns+ base (build-order-by (query-orders query) schema-model column))
-                          (append params (list (or (query-limit query) -1) (query-offset query))))))
-        (values (mapcar #'row->content rows) total)))))
+    (let* ((where (all-of (list (sql "space = ? AND model = ?" space model)
+                                (status-clause status)
+                                (and only-status (sql "status = ?" only-status))
+                                (build-where (query-filters query) schema-model column
+                                             :and (and (query-search query)
+                                                       (search-filters schema-model (query-search query)))
+                                             :text-column text-column))))
+           (total (fetch-value (fragment "SELECT COUNT(*) FROM contents WHERE ~a" where)))
+           (rows (fetch (fragment "SELECT ~a FROM contents WHERE ~a ORDER BY ~a LIMIT ~a OFFSET ~a"
+                                  +columns+ where (build-order-by (query-orders query) schema-model column)
+                                  (bound (or (query-limit query) -1)) (bound (query-offset query))))))
+      (values (mapcar #'row->content rows) total))))
 
 (defmethod count-contents (space model)
-  (col (fetch-one "SELECT COUNT(*) AS n FROM contents WHERE space = ? AND model = ?" space model) "n"))
+  (fetch-value "SELECT COUNT(*) FROM contents WHERE space = ? AND model = ?" space model))
 
 (defmethod unique-value-taken-p (space model field value &key exclude-id)
-  (let ((expr (format nil "json_extract(~~a, '$.~a')" field)))
-    (and (fetch-one (format nil "SELECT 1 FROM contents WHERE space = ? AND model = ? AND id != ?
-                                 AND (~a = ? OR ~a = ?) LIMIT 1"
-                            (format nil expr "published") (format nil expr "draft"))
-                    space model (or exclude-id "") value value)
-         t)))
+  (and (fetch-one (fragment "SELECT 1 FROM contents WHERE space = ~a AND model = ~a AND id != ~a
+                               AND (~a = ~a OR ~a = ~a) LIMIT 1"
+                            (bound space) (bound model) (bound (or exclude-id ""))
+                            (json-at (sql "published") field) (bound value)
+                            (json-at (sql "draft") field) (bound value)))
+       t))
 
 (defmethod slug-taken-p (space model slug &key exclude-id)
   (and (fetch-one "SELECT 1 FROM contents WHERE space = ? AND model = ? AND id != ?
@@ -169,9 +171,10 @@
 
 (defmethod model-contents (space model)
   (mapcar #'row->content
-          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? AND model = ? ORDER BY created_at, rowid" +columns+)
-                 space model)))
+          (fetch (fragment "SELECT ~a FROM contents WHERE space = ~a AND model = ~a ORDER BY created_at, rowid"
+                           +columns+ (bound space) (bound model)))))
 
 (defmethod space-contents (space)
   (mapcar #'row->content
-          (fetch (format nil "SELECT ~a FROM contents WHERE space = ? ORDER BY created_at, rowid" +columns+) space)))
+          (fetch (fragment "SELECT ~a FROM contents WHERE space = ~a ORDER BY created_at, rowid"
+                           +columns+ (bound space)))))

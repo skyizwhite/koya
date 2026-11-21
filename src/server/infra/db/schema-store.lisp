@@ -1,7 +1,7 @@
 (defpackage #:koya-server/infra/db/schema-store
   (:use #:cl)
   (:import-from #:koya-server/infra/db/connection
-                #:*db* #:*on-rollback* #:exec #:fetch #:col #:with-db #:with-db-transaction)
+                #:*db* #:*on-rollback* #:exec #:fetch #:fetch-one #:fetch-value #:col #:with-db #:with-db-transaction)
   (:import-from #:koya-core/schema
                 #:make-schema #:schema-webhooks #:schema-models #:model-name #:model-kind
                 #:model-forget-renames #:schema-model #:schema-custom-fields #:field-path-parts)
@@ -15,6 +15,7 @@
   (:import-from #:koya-core/diff #:dropped-custom-fields)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
   (:import-from #:koya-server/infra/db/contents #:text-column)
+  (:import-from #:koya-server/infra/db/sql #:json-path)
   (:import-from #:koya-core/time
                 #:now-iso)
   (:import-from #:koya-server/usecases/ports/spaces
@@ -43,7 +44,7 @@
           (fetch "SELECT definition FROM models WHERE space = ? ORDER BY position, name" space-name)))
 
 (defun read-schema (space-name)
-  (let ((row (first (fetch "SELECT webhooks, custom_fields FROM spaces WHERE name = ?" space-name))))
+  (let ((row (fetch-one "SELECT webhooks, custom_fields FROM spaces WHERE name = ?" space-name)))
     (and row
          (make-schema :webhooks (map 'list #'jobject->webhook (parse-json (col row "webhooks")))
                       :custom-fields (map 'list #'jobject->custom-field (parse-json (col row "custom_fields")))
@@ -63,19 +64,18 @@
                   FROM spaces s ORDER BY s.position, s.name")))
 
 (defmethod find-space (name)
-  (and (first (fetch "SELECT name FROM spaces WHERE name = ?" name)) name))
+  (fetch-value "SELECT name FROM spaces WHERE name = ?" name))
 
 (defmethod space-webhooks (name)
-  (let ((row (first (fetch "SELECT webhooks FROM spaces WHERE name = ?" name))))
-    (and row (map 'list #'jobject->webhook (parse-json (col row "webhooks"))))))
+  (let ((webhooks (fetch-value "SELECT webhooks FROM spaces WHERE name = ?" name)))
+    (and webhooks (map 'list #'jobject->webhook (parse-json webhooks)))))
 
 (defmethod find-model (space-name model-name)
   (let ((schema (load-schema space-name)))
     (and schema (schema-model schema model-name))))
 
 (defmethod space-webhook-secret (space-name)
-  (let ((row (fetch "SELECT webhook_secret FROM spaces WHERE name = ?" space-name)))
-    (and row (col (first row) "webhook_secret"))))
+  (fetch-value "SELECT webhook_secret FROM spaces WHERE name = ?" space-name))
 
 (defmethod set-webhook-secret (space-name secret)
   (exec "UPDATE spaces SET webhook_secret = ? WHERE name = ?" secret space-name))
@@ -152,7 +152,7 @@
         (drop-top-field space model field))))
 
 (defun drop-top-field (space model field)
-  (let ((path (format nil "$.~a" field)))
+  (let ((path (json-path field)))
     (exec "UPDATE contents SET published = json_remove(published, ?), draft = json_remove(draft, ?),
                                 published_text = json_remove(published_text, ?), draft_text = json_remove(draft_text, ?)
            WHERE space = ? AND model = ?"

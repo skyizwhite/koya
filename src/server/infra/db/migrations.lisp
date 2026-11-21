@@ -9,6 +9,7 @@
   (:import-from #:koya-core/case #:jvalue->data)
   (:import-from #:koya-core/data #:without-nulls)
   (:import-from #:koya-server/infra/db/contents #:json-column #:text-column)
+  (:import-from #:koya-server/infra/db/sql #:sql #:fragment #:any-of)
   (:export #:migrate
            #:current-version))
 (in-package #:koya-server/infra/db/migrations)
@@ -246,12 +247,12 @@
   (without-nulls (jvalue->data (parse-json json) :intern t)))
 
 (defun holds-a-null (column)
-  (format nil "(~a LIKE '%null%' AND EXISTS (SELECT 1 FROM json_tree(~:*~a) WHERE type = 'null' AND fullkey NOT LIKE '%]'))"
-          column))
+  (fragment "(~a LIKE '%null%' AND EXISTS (SELECT 1 FROM json_tree(~a) WHERE type = 'null' AND fullkey NOT LIKE '%]'))"
+            column column))
 
 (defun drop-stored-nulls ()
-  (dolist (row (fetch (format nil "SELECT rowid AS r, published, draft FROM contents WHERE ~a OR ~a"
-                              (holds-a-null "published") (holds-a-null "draft"))))
+  (dolist (row (fetch (fragment "SELECT rowid AS r, published, draft FROM contents WHERE ~a"
+                                (any-of (list (holds-a-null (sql "published")) (holds-a-null (sql "draft")))))))
     (flet ((columns (json)
              (if json
                  (let ((data (stored-without-nulls json)))
@@ -259,7 +260,7 @@
                  (list nil nil))))
       (apply #'exec "UPDATE contents SET published = ?, published_text = ?, draft = ?, draft_text = ? WHERE rowid = ?"
              (append (columns (col row "published")) (columns (col row "draft")) (list (col row "r"))))))
-  (dolist (row (fetch (format nil "SELECT id, data FROM content_revisions WHERE ~a" (holds-a-null "data"))))
+  (dolist (row (fetch (fragment "SELECT id, data FROM content_revisions WHERE ~a" (holds-a-null (sql "data")))))
     (exec "UPDATE content_revisions SET data = ? WHERE id = ?"
           (json-column (stored-without-nulls (col row "data"))) (col row "id"))))
 

@@ -1,7 +1,8 @@
 (defpackage #:koya-server/infra/db/webhook-deliveries
   (:use #:cl)
   (:import-from #:koya-core/data #:blank-p)
-  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:fetch-value #:col)
+  (:import-from #:koya-server/infra/db/sql #:sql #:bound #:fragment #:all-of)
   (:import-from #:koya-server/domain/webhook-delivery
                 #:make-delivery)
   (:import-from #:koya-core/ulid
@@ -48,42 +49,30 @@
           space space +deliveries-kept+)
     id))
 
-(defun filter-clause (label model)
-  (let ((where "") (params '()))
-    (unless (blank-p label)
-      (setf where (concatenate 'string where " AND label = ?")
-            params (append params (list label))))
-    (unless (blank-p model)
-      (setf where (concatenate 'string where " AND model = ?")
-            params (append params (list model))))
-    (values where params)))
+(defun deliveries-where (space label model)
+  (all-of (list (sql "space = ?" space)
+                (unless (blank-p label) (sql "label = ?" label))
+                (unless (blank-p model) (sql "model = ?" model)))))
 
 (defmethod list-deliveries (space &key label model (limit 50) (offset 0))
-  (multiple-value-bind (where params) (filter-clause label model)
-    (mapcar #'row->delivery
-            (apply #'fetch
-                   (format nil "SELECT * FROM webhook_deliveries WHERE space = ?~a ORDER BY id DESC LIMIT ? OFFSET ?" where)
-                   space (append params (list limit offset))))))
+  (mapcar #'row->delivery
+          (fetch (fragment "SELECT * FROM webhook_deliveries WHERE ~a ORDER BY id DESC LIMIT ~a OFFSET ~a"
+                           (deliveries-where space label model) (bound limit) (bound offset)))))
 
 (defmethod count-deliveries (space &key label model)
-  (multiple-value-bind (where params) (filter-clause label model)
-    (or (col (apply #'fetch-one
-                    (format nil "SELECT COUNT(*) AS n FROM webhook_deliveries WHERE space = ?~a" where)
-                    space params)
-             "n")
-        0)))
+  (fetch-value (fragment "SELECT COUNT(*) FROM webhook_deliveries WHERE ~a" (deliveries-where space label model))))
 
 (defun distinct-column (space column)
-  (remove "" (mapcar (lambda (row) (col row column))
-                     (fetch (format nil "SELECT DISTINCT ~a AS ~:*~a FROM webhook_deliveries WHERE space = ? ORDER BY ~:*~a" column)
-                            space))
+  (remove "" (mapcar #'second
+                     (fetch (fragment "SELECT DISTINCT ~a FROM webhook_deliveries WHERE space = ~a ORDER BY ~a"
+                                      column (bound space) column)))
           :test #'string=))
 
 (defmethod delivery-labels (space)
-  (distinct-column space "label"))
+  (distinct-column space (sql "label")))
 
 (defmethod delivery-models (space)
-  (distinct-column space "model"))
+  (distinct-column space (sql "model")))
 
 (defmethod find-delivery (space id)
   (let ((row (fetch-one "SELECT * FROM webhook_deliveries WHERE space = ? AND id = ?" space id)))

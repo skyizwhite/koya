@@ -1,6 +1,7 @@
 (defpackage #:koya-server/infra/db/content-revisions
   (:use #:cl)
-  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:fetch-value #:col)
+  (:import-from #:koya-server/infra/db/sql #:sql #:bound #:fragment #:all-of)
   (:import-from #:koya-server/domain/revision
                 #:make-revision)
   (:import-from #:koya-core/time
@@ -26,19 +27,18 @@
   (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
         space content-id event (to-json (data->jobject data)) (or by "") (or created-at (now-iso))))
 
-(defun where (published-only)
-  (format nil "space = ? AND content_id = ?~:[~; AND event = 'publish'~]" published-only))
+(defun revisions-where (space content-id published-only)
+  (all-of (list (sql "space = ? AND content_id = ?" space content-id)
+                (and published-only (sql "event = 'publish'")))))
 
 (defmethod list-revisions (space content-id &key published-only (limit 20) (offset 0))
   (mapcar #'row->revision
-          (fetch (format nil "SELECT * FROM content_revisions WHERE ~a ORDER BY id DESC LIMIT ? OFFSET ?"
-                         (where published-only))
-                 space content-id limit offset)))
+          (fetch (fragment "SELECT * FROM content_revisions WHERE ~a ORDER BY id DESC LIMIT ~a OFFSET ~a"
+                           (revisions-where space content-id published-only) (bound limit) (bound offset)))))
 
 (defmethod count-revisions (space content-id &key published-only)
-  (col (fetch-one (format nil "SELECT COUNT(*) AS n FROM content_revisions WHERE ~a" (where published-only))
-                  space content-id)
-       "n"))
+  (fetch-value (fragment "SELECT COUNT(*) FROM content_revisions WHERE ~a"
+                         (revisions-where space content-id published-only))))
 
 (defmethod find-revision (space content-id id)
   (let ((row (fetch-one "SELECT * FROM content_revisions WHERE space = ? AND content_id = ? AND id = ?"

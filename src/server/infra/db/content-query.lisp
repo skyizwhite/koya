@@ -7,16 +7,18 @@
                 #:bad-query)
   (:import-from #:koya-server/domain/number
                 #:parse-decimal)
+  (:import-from #:koya-server/infra/db/sql
+                #:sql #:bound #:fragment #:separated #:all-of #:any-of #:like-pattern #:json-path #:json-at)
   (:export #:build-where
            #:build-order-by))
 (in-package #:koya-server/infra/db/content-query)
 
 (defun system-column (name)
-  (cond ((string= name "id") "id")
-        ((string= name "createdAt") "created_at")
-        ((string= name "updatedAt") "updated_at")
-        ((string= name "publishedAt") "published_at")
-        ((string= name "revisedAt") "revised_at")
+  (cond ((string= name "id") (sql "id"))
+        ((string= name "createdAt") (sql "created_at"))
+        ((string= name "updatedAt") (sql "updated_at"))
+        ((string= name "publishedAt") (sql "published_at"))
+        ((string= name "revisedAt") (sql "revised_at"))
         (t nil)))
 
 (defun field-expr (name model column)
@@ -24,13 +26,14 @@
       (let ((field (or (model-field model name) (bad-query "unknown field ~s" name))))
         (when (member (field-type field) '(:custom :repeater))
           (bad-query "~a holds fields of its own: only contains and not_contains read it" name))
-        (format nil (if (eq (field-type field) :boolean) "COALESCE(json_extract(~a, '$.~a'), 0)" "json_extract(~a, '$.~a')")
-                column name))))
+        (if (eq (field-type field) :boolean)
+            (fragment "COALESCE(~a, 0)" (json-at column name))
+            (json-at column name)))))
 
 (defun present-sql (expr many)
   (if many
-      (format nil "COALESCE(json_array_length(~a), 0) > 0" expr)
-      (format nil "(~a IS NOT NULL AND trim(~a, char(32, 9, 10, 13)) != '')" expr expr)))
+      (fragment "COALESCE(json_array_length(~a), 0) > 0" expr)
+      (fragment "(~a IS NOT NULL AND trim(~a, char(32, 9, 10, 13)) != '')" expr expr)))
 
 (defun coerce-value (name model value)
   (let ((field (model-field model name)))
@@ -44,55 +47,46 @@
 (defparameter +text-types+ '(:text :textarea :slug :richtext))
 
 (defun inner-expr (outer inner column text-column)
-  (format nil "json_extract(~a, '$.~a.~a')"
-          (if (and text-column (eq (field-type inner) :richtext)) text-column column)
-          (field-name outer) (field-name inner)))
+  (json-at (if (and text-column (eq (field-type inner) :richtext)) text-column column)
+           (field-name outer) (field-name inner)))
+
+(defun like-sql (expr like)
+  (fragment "~a LIKE ~a ESCAPE '\\'" expr like))
+
+(defun not-like-sql (expr like)
+  (fragment "(~a IS NULL OR ~a NOT LIKE ~a ESCAPE '\\')" expr expr like))
 
 (defun text-sql (name exprs op value)
-  (let ((like (format nil "%~a%" (escape-like value))))
+  (let ((like (bound (like-pattern value))))
     (cond ((string= op "contains")
-           (values (if exprs
-                       (format nil "(~{~a~^ OR ~})"
-                               (mapcar (lambda (e) (format nil "~a LIKE ? ESCAPE '\\'" e)) exprs))
-                       "0")
-                   (mapcar (constantly like) exprs)))
+           (or (any-of (mapcar (lambda (e) (like-sql e like)) exprs)) (sql "0")))
           ((string= op "not_contains")
-           (values (if exprs
-                       (format nil "(~{~a~^ AND ~})"
-                               (mapcar (lambda (e) (format nil "(~a IS NULL OR ~a NOT LIKE ? ESCAPE '\\')" e e)) exprs))
-                       "1")
-                   (mapcar (constantly like) exprs)))
+           (or (all-of (mapcar (lambda (e) (not-like-sql e like)) exprs)) (sql "1")))
           (t (bad-query "~a is inside a custom field: only contains and not_contains read it" name)))))
 
 (defun rows-matching-sql (field source like pick)
-  (let ((clauses '())
-        (params '()))
-    (dolist (kind (field-row-kinds field))
-      (let ((names (mapcar #'field-name (remove-if-not pick (custom-field-fields kind)))))
-        (when names
-          (push (format nil "(json_extract(each_row.value, '$.fieldId') = ? AND (~{~a~^ OR ~}))"
-                        (mapcar (lambda (n) (format nil "json_extract(each_row.value, '$.~a') LIKE ? ESCAPE '\\'" n))
-                                names))
-                clauses)
-          (setf params (append params (list (custom-field-name kind)) (mapcar (constantly like) names))))))
-    (and clauses
-         (list (format nil "EXISTS (SELECT 1 FROM json_each(~a, '$.~a') AS each_row WHERE ~{~a~^ OR ~})"
-                       source (field-name field) (reverse clauses))
-               params))))
+  (let* ((row (sql "each_row.value"))
+         (kinds (loop :for kind :in (field-row-kinds field)
+                      :for names := (mapcar #'field-name (remove-if-not pick (custom-field-fields kind)))
+                      :when names
+                        :collect (fragment "(~a = ~a AND ~a)"
+                                           (json-at row "fieldId") (bound (custom-field-name kind))
+                                           (any-of (mapcar (lambda (n) (like-sql (json-at row n) like)) names))))))
+    (and kinds
+         (fragment "EXISTS (SELECT 1 FROM json_each(~a, ~a) AS each_row WHERE ~a)"
+                   source (bound (json-path (field-name field))) (any-of kinds)))))
 
 (defun row-text-sql (field column text-column like)
-  (let ((parts (remove nil (list (rows-matching-sql field column like
-                                                    (lambda (f) (member (field-type f) '(:text :textarea :slug))))
-                                 (rows-matching-sql field (or text-column column) like
-                                                    (lambda (f) (eq (field-type f) :richtext)))))))
-    (if parts
-        (values (format nil "(~{~a~^ OR ~})" (mapcar #'first parts)) (loop :for part :in parts :append (second part)))
-        (values "0" '()))))
+  (or (any-of (list (rows-matching-sql field column like
+                                       (lambda (f) (member (field-type f) '(:text :textarea :slug))))
+                    (rows-matching-sql field (or text-column column) like
+                                       (lambda (f) (eq (field-type f) :richtext)))))
+      (sql "0")))
 
 (defun repeater-term-sql (name field op value column text-column)
-  (multiple-value-bind (sql params) (row-text-sql field column text-column (format nil "%~a%" (escape-like value)))
-    (cond ((string= op "contains") (values sql params))
-          ((string= op "not_contains") (values (format nil "NOT ~a" sql) params))
+  (let ((rows (row-text-sql field column text-column (bound (like-pattern value)))))
+    (cond ((string= op "contains") rows)
+          ((string= op "not_contains") (fragment "NOT ~a" rows))
           (t (bad-query "~a is a repeater: only contains and not_contains read it" name)))))
 
 (defun inside (model name)
@@ -123,62 +117,46 @@
            (many (and field (field-many-p field)))
            (expr (field-expr name model column))
            (text (if (and field text-column (eq (field-type field) :richtext))
-                     (format nil "json_extract(~a, '$.~a')" text-column name)
+                     (json-at text-column name)
                      expr)))
-      (flet ((cmp (operator)
-               (values (format nil "~a ~a ?" expr operator) (list (coerce-value name model value)))))
+      (flet ((cmp (control)
+               (fragment control expr (bound (coerce-value name model value))))
+             (has (control)
+               (fragment control expr (bound value))))
         (cond
           ((string= op "equals") (if many
-                                     (values (format nil "EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ?)" expr) (list value))
-                                     (cmp "=")))
+                                     (has "EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ~a)")
+                                     (cmp "~a = ~a")))
           ((string= op "not_equals") (if many
-                                         (values (format nil "NOT EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ?)" expr) (list value))
-                                         (values (format nil "(~a IS NULL OR ~a != ?)" expr expr) (list (coerce-value name model value)))))
-          ((string= op "less_than") (cmp "<"))
-          ((string= op "greater_than") (cmp ">"))
+                                         (has "NOT EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ~a)")
+                                         (fragment "(~a IS NULL OR ~a != ~a)" expr expr (bound (coerce-value name model value)))))
+          ((string= op "less_than") (cmp "~a < ~a"))
+          ((string= op "greater_than") (cmp "~a > ~a"))
           ((string= op "contains") (if many
-                                       (values (format nil "EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ?)" expr) (list value))
-                                       (values (format nil "~a LIKE ? ESCAPE '\\'" text) (list (format nil "%~a%" (escape-like value))))))
+                                       (has "EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ~a)")
+                                       (like-sql text (bound (like-pattern value)))))
           ((string= op "not_contains") (if many
-                                           (values (format nil "NOT EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ?)" expr) (list value))
-                                           (values (format nil "(~a IS NULL OR ~a NOT LIKE ? ESCAPE '\\')" text text) (list (format nil "%~a%" (escape-like value))))))
-          ((string= op "begins_with") (values (format nil "~a LIKE ? ESCAPE '\\'" text) (list (format nil "~a%" (escape-like value)))))
-          ((string= op "exists") (values (present-sql expr many) '()))
-          ((string= op "not_exists") (values (format nil "NOT ~a" (present-sql expr many)) '()))
+                                           (has "NOT EXISTS (SELECT 1 FROM json_each(~a) WHERE value = ~a)")
+                                           (not-like-sql text (bound (like-pattern value)))))
+          ((string= op "begins_with") (like-sql text (bound (like-pattern value :prefix t))))
+          ((string= op "exists") (present-sql expr many))
+          ((string= op "not_exists") (fragment "NOT ~a" (present-sql expr many)))
           (t (bad-query "unknown filter operator ~s" op)))))))
 
-(defun escape-like (string)
-  (with-output-to-string (out)
-    (loop :for c :across string
-          :do (when (member c '(#\% #\_ #\\)) (write-char #\\ out))
-              (write-char c out))))
-
 (defun groups-sql (filters model column text-column)
-  (let ((group-sqls '()) (params '()))
-    (dolist (group filters)
-      (let ((term-sqls '()))
-        (dolist (term group)
-          (multiple-value-bind (sql ps) (term-sql term model column text-column)
-            (push sql term-sqls)
-            (setf params (append params ps))))
-        (push (format nil "(~{~a~^ AND ~})" (nreverse term-sqls)) group-sqls)))
-    (values (format nil "(~{~a~^ OR ~})" (nreverse group-sqls)) params)))
+  (any-of (mapcar (lambda (group)
+                    (all-of (mapcar (lambda (term) (term-sql term model column text-column)) group)))
+                  filters)))
 
 (defun build-where (filters model column &key and text-column)
-  (let ((sqls '()) (params '()))
-    (dolist (set (list filters and))
-      (when set
-        (multiple-value-bind (sql ps) (groups-sql set model column text-column)
-          (push sql sqls)
-          (setf params (append params ps)))))
-    (when sqls
-      (values (format nil "~{~a~^ AND ~}" (nreverse sqls)) params))))
+  (separated " AND " (list (and filters (groups-sql filters model column text-column))
+                           (and and (groups-sql and model column text-column)))))
 
 (defun build-order-by (orders model column)
   (if (null orders)
-      "published_at DESC, created_at DESC, rowid DESC"
-      (format nil "~{~a~^, ~}, rowid DESC"
-              (mapcar (lambda (order)
-                        (format nil "~a ~a" (field-expr (car order) model column)
-                                (if (eq (cdr order) :desc) "DESC" "ASC")))
-                      orders))))
+      (sql "published_at DESC, created_at DESC, rowid DESC")
+      (fragment "~a, rowid DESC"
+                (separated ", " (mapcar (lambda (order)
+                                          (fragment (if (eq (cdr order) :desc) "~a DESC" "~a ASC")
+                                                    (field-expr (car order) model column)))
+                                        orders)))))
