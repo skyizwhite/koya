@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-fields #:model-label #:model-slug-field #:model-field #:field-type #:field-option
-                #:map-data-fields #:field-value)
+                #:map-data-fields #:field-value #:field-unique-p #:without-field)
   (:import-from #:koya-core/validate
                 #:blank-value-p #:datetime-string-p)
   (:import-from #:koya-core/data
@@ -42,6 +42,7 @@
            #:comparable-data
            #:default-data
            #:initial-data
+           #:duplicated-data
            #:to-the-minute
            #:slug-value
            #:held-ids
@@ -216,6 +217,10 @@
                     (lambda (field value found object outer)
                       (declare (ignore outer))
                       (keep-to-the-minute field value (fill-default field found object))))))
+
+(defun duplicated-data (model data)
+  (reduce (lambda (data field) (if (field-unique-p field) (without-field data field) data))
+          (model-fields model) :initial-value data))
 
 (defun to-the-minute (model data)
   (map-data-fields (model-fields model) (without-nulls data)
