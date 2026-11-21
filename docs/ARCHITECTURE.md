@@ -87,8 +87,9 @@ web  ──▶  usecases  ──▶  domain
 - `log` is under every layer: `log-info`, `log-warn` and `log-error` write a
   line to standard output with its time, level and category (`:koya.auth`,
   `:koya.http` and so on). It is the only layer that reaches verbose, and `main`
-  sets verbose up: no colours, and its thread stopped before the image is saved
-  and started again when the executable runs. A line names what happened and
+  sets verbose up: no colours, and its thread stopped, and waited for until it
+  has ended, before the image is saved, and started again when the executable
+  runs. A line names what happened and
   never a credential (see `adr/2026-11-21-the-log-never-holds-a-credential.md`).
   The access log is written through it too, so one thread writes every line.
 - `domain/` depends on `koya-core` alone, and on general libraries: randomness

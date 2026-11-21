@@ -50,3 +50,17 @@
       (ok (search "[WARN ] <KOYA.SERVER>: KOYA_SECRET is shorter than 32 characters: logging in is off until it is replaced" log))
       (ng (search "short-secret" log) "which is never logged")
       (ok (search "[INFO ] <KOYA.SERVER>: server stopped" log)))))
+
+(deftest the-log-thread-is-gone-once-logging-stops
+  (let* ((org.shirakumo.verbose:*global-controller* (make-instance 'org.shirakumo.verbose:controller))
+         (controller org.shirakumo.verbose:*global-controller*)
+         (thread (org.shirakumo.verbose:thread controller))
+         (held (bt2:make-thread (lambda ()
+                                  (bt:with-lock-held ((org.shirakumo.verbose:queue-lock controller))
+                                    (sleep 1.5))))))
+    (sleep 0.1)
+    (koya-server::stop-logging)
+    (ng (sb-thread:thread-alive-p thread)
+        "even when the thread is slow to end, as it is while its queue is held, so that the image can be saved")
+    (bt2:join-thread held)))
+
