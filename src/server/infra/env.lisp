@@ -34,7 +34,7 @@
 (defun archive-dir ()
   (merge-pathnames "archives/" (uiop:pathname-directory-pathname (db-path))))
 (defun server-port () (parse-integer (env "KOYA_PORT" "3100")))
-(defun server-workers () (parse-integer (env "KOYA_WORKERS" "2")))
+(defun server-workers () (parse-integer (env "KOYA_WORKERS" "4")))
 (defmethod public-url () (env "KOYA_BASE_URL"))
 
 (define-condition setting-error (error)
@@ -53,7 +53,7 @@
       (format nil "KOYA_PORT must be a port number from 1 to 65535, not ~s" value))))
 
 (defun workers-problem ()
-  (let* ((value (env "KOYA_WORKERS" "2"))
+  (let* ((value (env "KOYA_WORKERS" "4"))
          (workers (whole-number value)))
     (unless (and workers (<= 1 workers))
       (format nil "KOYA_WORKERS must be a whole number of 1 or more, not ~s" value))))

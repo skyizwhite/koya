@@ -197,9 +197,10 @@ A transaction holds the lock for its extent, so nothing reads while a write is
 under way -- an import of a large space is a pause for every request. This is
 the price of one process and no connection pool, and it is what lets a use
 case read and then write without another request slipping in between.
-Woo answers on `KOYA_WORKERS` threads (two by default), so the work around the
+Woo answers on `KOYA_WORKERS` threads (four by default), so the work around the
 database runs side by side: drawing a page, encoding JSON, sending a file or
-reading an upload. Logging in reads the two-factor count and the last code's
+reading an upload. That work, not the lock, is most of what a large delivery
+response or an admin page costs. Logging in reads the two-factor count and the last code's
 step and then writes them, so it is one transaction.
 A transaction is a SQLite savepoint, so one opened inside another can be undone
 alone, and every statement is freed once it has run.

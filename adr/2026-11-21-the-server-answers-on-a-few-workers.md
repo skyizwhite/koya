@@ -5,16 +5,20 @@
 ## Context
 
 Woo ran with one event loop, so a request ran only once the one before it had
-finished: a large media file being sent, or an upload being read, held up the
-admin UI and both APIs. The database is one SQLite connection behind one lock
-(`adr/2026-09-27-koya-stores-its-data-in-sqlite.md`), so more threads do not
-make it answer faster; what they let run side by side is the work around it.
-Several connections, so that reads need not wait for one another, would change
-what a transaction can rely on and is not taken up here.
+finished. The database is one SQLite connection behind one lock
+(`adr/2026-09-27-koya-stores-its-data-in-sqlite.md`), but most of what a large
+request costs is outside it: encoding a delivery response of a page of
+contents, drawing an admin page. Measured with 20 clients at once, a 100 KB
+delivery list went from 212 requests a second on one worker to 321 on two and
+436 on four, and no further on eight; an admin content list went from 83 to
+179 on four. A small delivery request stayed near 1,200 a second whatever the
+number, since there the lock is the limit. Several connections, so that reads
+need not wait for one another, would change what a transaction can rely on and
+is not taken up here.
 
 ## Decision
 
-- Woo runs `KOYA_WORKERS` worker threads, two when it is not set. One that is
+- Woo runs `KOYA_WORKERS` worker threads, four when it is not set. One that is
   not a whole number of 1 or more stops the server before it starts, as a bad
   port does (`adr/2026-10-04-a-bad-base-url-or-port-stops-the-server.md`).
 - It is an environment variable, not a setting in the admin UI: the server
@@ -28,10 +32,13 @@ what a transaction can rely on and is not taken up here.
 
 ## Consequences
 
-- A slow request no longer stops the others, except where they wait for the
-  database.
-- Past a few workers nothing is gained, since every request that reads data
-  queues on the same lock.
+- Large responses are made side by side, up to the host's cores; on a host
+  with fewer than four, the extra workers cost a little switching and gain
+  nothing.
+- Requests that are mostly reading data still queue on the one lock, and a long
+  transaction such as an import still pauses every request.
+- Woo hands connections to workers in turn, so a small request can wait behind
+  a large one on its worker.
 - Code that keeps state outside the database runs on several threads at once
   in production, as it already did under Hunchentoot in development, and holds
   a lock of its own.

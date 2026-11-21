@@ -36,11 +36,11 @@
       (ok (and (search "KOYA_BASE_URL" message) (search "KOYA_PORT" message) (search "KOYA_WORKERS" message))
           "and every bad one is named at once"))))
 
-(deftest a-number-of-workers-is-taken-or-two-by-default
+(deftest a-number-of-workers-is-taken-or-four-by-default
   (with-env (("KOYA_WORKERS" ""))
-    (ok (= (server-workers) 2)))
-  (with-env (("KOYA_WORKERS" "4"))
-    (ok (= (server-workers) 4))))
+    (ok (= (server-workers) 4)))
+  (with-env (("KOYA_WORKERS" "2"))
+    (ok (= (server-workers) 2))))
 
 (deftest the-server-logs-its-start-and-stop
   (with-env (("KOYA_BASE_URL" "http://localhost:39117") ("KOYA_PORT" "39117") ("KOYA_SECRET" "short-secret"))
