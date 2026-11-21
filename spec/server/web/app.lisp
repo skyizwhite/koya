@@ -7,6 +7,7 @@
                 #:bound #:edit #:*cookie* #:request #:request-url #:call-action #:location #:setup-pages #:log-in
                 #:count-matches)
   (:import-from #:koya-server/web/app #:app #:*page-app* #:*api-app*)
+  (:import-from #:koya-server/web/pages/index #:create-space-action)
   (:import-from #:koya-spec/server/logs #:logged)
   (:import-from #:koya-server/usecases/keys #:create-delivery-key)
   (:import-from #:jingle #:route)
@@ -149,11 +150,12 @@
     (ok (string= (get-output-stream-string out) "") "written by the log alone, so no two lines run into each other")))
 
 (deftest a-handled-error-is-no-error-in-the-log
-  (let ((log (logged (lambda ()
-                       (request :get "/s/website/m/nope")
-                       (edit "/s/website/m/blog/new" :form '(("action" . "delete")))))))
-    (ok (search "\"GET /s/website/m/nope HTTP/1.1\" 404" log))
-    (ng (search "<KOYA.HTTP>" log) "a page or an action that answers an error itself logs none")))
+  (let ((status nil))
+    (let ((log (logged (lambda ()
+                         (setf status (call-action :post (create-space-action) :form '(("name" . "Not A Slug"))))))))
+      (ok (= status 422) "the action signals the error and answers it itself")
+      (ok (search "<KOYA.ACCESS>" log))
+      (ng (search "<KOYA.HTTP>" log) "so it is no unhandled error"))))
 
 (deftest the-access-log-leaves-out-every-query
   (let ((access (logged (lambda ()
