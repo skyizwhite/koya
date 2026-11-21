@@ -88,9 +88,16 @@
   (log-info :koya.server "server stopped")
   (quit 0))
 
+(defun stop-logging ()
+  (let ((thread (and org.shirakumo.verbose:*global-controller*
+                     (org.shirakumo.verbose:thread org.shirakumo.verbose:*global-controller*))))
+    (org.shirakumo.verbose:remove-global-controller)
+    (when thread
+      (sb-thread:join-thread thread :default nil))))
+
 (defun save-executable (path)
   (setf ironclad::*os-prng-stream* nil)
-  (org.shirakumo.verbose:remove-global-controller)
+  (stop-logging)
   (sb-ext:save-lisp-and-die path :executable t :toplevel #'main
                                  :save-runtime-options t))
 
