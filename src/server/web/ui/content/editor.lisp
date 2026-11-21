@@ -49,26 +49,21 @@
 
 (defstruct (choices (:constructor make-choices (space &optional (media (make-hash-table :test 'equal))
                                                                  (contents (make-hash-table :test 'equal)))))
-  space media contents (models (make-hash-table :test 'equal)))
-
-(defun choices-model (choices name)
-  (let ((models (choices-models choices)))
-    (multiple-value-bind (model found) (gethash name models)
-      (if found
-          model
-          (setf (gethash name models) (find-model (choices-space choices) name))))))
+  space media contents)
 
 (defun references-for (choices field value)
   (when (eq (field-type field) :reference)
-    (let* ((target (field-option field :model))
-           (model (choices-model choices target))
-           (found (gethash target (choices-contents choices))))
-      (loop :for id :in (held-ids value (field-many-p field))
-            :for content := (and model found (gethash id found))
-            :collect (if content
-                         (list :id id :label (content-label content model) :status (content-status content)
-                               :href (editor-url (choices-space choices) model id))
-                         (list :id id :label (format nil "~a (missing)" id)))))))
+    (let ((ids (held-ids value (field-many-p field))))
+      (when ids
+        (let* ((target (field-option field :model))
+               (model (find-model (choices-space choices) target))
+               (found (gethash target (choices-contents choices))))
+          (loop :for id :in ids
+                :for content := (and model found (gethash id found))
+                :collect (if content
+                             (list :id id :label (content-label content model) :status (content-status content)
+                                   :href (editor-url (choices-space choices) model id))
+                             (list :id id :label (format nil "~a (missing)" id)))))))))
 
 (defun media-for (choices field value)
   (when (eq (field-type field) :media)
