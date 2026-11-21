@@ -4,7 +4,7 @@
   (:import-from #:koya-spec/server/schema #:with-schema)
   (:import-from #:koya-spec/server/web/api-support
                 #:*webhooks* #:test-schema #:admin #:webhook-events #:setup-api #:reset-api)
-  (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec #:*db*)
+  (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec #:in-transaction-p)
   (:import-from #:koya-server/infra/db/webhook-deliveries #:+max-response-chars+)
   (:import-from #:koya-server/usecases/ports/webhooks #:+deliveries-kept+)
   (:import-from #:koya-server/usecases/ports/webhooks #:list-deliveries #:count-deliveries)
@@ -218,7 +218,7 @@
   (let* ((inside '())
          (*webhook-sender* (lambda (url payload headers)
                              (declare (ignore url headers))
-                             (push (list (jget (parse-json payload) "event") (dbi:in-transaction *db*)) inside)
+                             (push (list (jget (parse-json payload) "event") (in-transaction-p)) inside)
                              (values 200 "" nil))))
     (with-schema ("website"
                   (make-schema :webhooks (list (make-webhook "hook" "https://example.com/hook"))

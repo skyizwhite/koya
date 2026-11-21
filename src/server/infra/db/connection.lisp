@@ -6,8 +6,7 @@
                 #:prepare
                 #:execute
                 #:fetch-all
-                #:do-sql
-                #:with-transaction)
+                #:free-query-resources)
   (:import-from #:bordeaux-threads-2
                 #:make-recursive-lock
                 #:with-recursive-lock-held)
@@ -19,6 +18,7 @@
            #:disconnect-db
            #:with-db
            #:with-db-transaction
+           #:in-transaction-p
            #:exec
            #:fetch
            #:fetch-one
@@ -33,9 +33,9 @@
   (unless (string= path ":memory:")
     (ensure-directories-exist path))
   (setf *db* (connect :sqlite3 :database-name path))
-  (do-sql *db* "PRAGMA journal_mode = WAL")
-  (do-sql *db* "PRAGMA foreign_keys = ON")
-  (do-sql *db* "PRAGMA busy_timeout = 5000")
+  (exec "PRAGMA journal_mode = WAL")
+  (exec "PRAGMA foreign_keys = ON")
+  (exec "PRAGMA busy_timeout = 5000")
   *db*)
 
 (defun disconnect-db ()
@@ -50,26 +50,48 @@
 
 (defvar *on-rollback* '())
 
+(defvar *transactions* 0)
+
+(defun in-transaction-p ()
+  (plusp *transactions*))
+
+(defun call-in-db-transaction (thunk)
+  (with-db
+    (let ((done nil))
+      (exec "SAVEPOINT koya")
+      (incf *transactions*)
+      (unwind-protect
+           (multiple-value-prog1 (funcall thunk)
+             (exec "RELEASE koya")
+             (setf done t))
+        (decf *transactions*)
+        (unless done
+          (mapc #'funcall *on-rollback*)
+          (exec "ROLLBACK TO koya")
+          (exec "RELEASE koya"))))))
+
 (defmacro with-db-transaction (&body body)
-  `(with-db
-     (let ((done nil))
-       (unwind-protect
-            (multiple-value-prog1 (with-transaction *db* ,@body)
-              (setf done t))
-         (unless done (mapc #'funcall *on-rollback*))))))
+  `(call-in-db-transaction (lambda () ,@body)))
 
 (defmethod call-with-transaction (thunk)
-  (with-db-transaction (funcall thunk)))
+  (call-in-db-transaction thunk))
 
 (defmethod store-reachable-p ()
   (handler-case (and (fetch-one "SELECT count(*) AS n FROM spaces") t)
     (error () nil)))
 
+(defun run (sql params)
+  (with-db
+    (let ((query (prepare *db* sql)))
+      (unwind-protect (fetch-all (execute query params))
+        (free-query-resources query)))))
+
 (defun exec (sql &rest params)
-  (with-db (do-sql *db* sql params)))
+  (run sql params)
+  nil)
 
 (defun fetch (sql &rest params)
-  (with-db (fetch-all (execute (prepare *db* sql) params))))
+  (run sql params))
 
 (defun fetch-one (sql &rest params)
   (first (apply #'fetch sql params)))

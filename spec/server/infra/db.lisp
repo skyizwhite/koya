@@ -4,7 +4,8 @@
   (:import-from #:koya-server/usecases/ports/deploys #:list-deploys #:count-deploys)
   (:import-from #:koya-server/usecases/schema #:replace-schema)
   (:import-from #:koya-server/infra/db/connection
-                #:connect-db #:disconnect-db #:exec #:fetch #:fetch-one #:col #:with-db-transaction)
+                #:connect-db #:disconnect-db #:exec #:fetch #:fetch-one #:col #:with-db-transaction
+                #:in-transaction-p)
   (:import-from #:koya-core/time #:iso-from-now)
   (:import-from #:koya-server/infra/db/migrations #:migrate #:current-version)
   (:import-from #:koya-server/infra/db/schema-dump #:migrated-snapshot #:read-snapshot)
@@ -532,7 +533,7 @@
                                             VALUES ('about', 'one', 'post', 'draft', '{\"title\":\"Again\"}',
                                                     '2026-01-03T00:00:00.000Z', '2026-01-03T00:00:00.000Z')")
                                      "")
-                  (dbi.error:dbi-database-error (e) (princ-to-string e))))
+                  (error (e) (princ-to-string e))))
         "a second content of the same id is refused by the key")
     (ok (string= (access (content-published (stored-content "one" "about")) :title) "One") "and the first is kept"))
   (migrated-fully))
@@ -802,3 +803,58 @@
       "and nothing is written for them")
   (delete-space "keyed")
   (delete-space "other"))
+
+(defun open-statements ()
+  (length (sqlite::sqlite-handle-statements (dbi:connection-handle koya-server/infra/db/connection:*db*))))
+
+(deftest a-query-leaves-no-statement-open
+  (exec "DELETE FROM settings")
+  (exec "INSERT INTO settings (key, value, updated_at) VALUES ('kept', '', '')")
+  (let ((before (open-statements)))
+    (dotimes (i 100)
+      (fetch "SELECT key FROM settings WHERE key = ?" "kept")
+      (fetch-one "SELECT value FROM settings WHERE key = ?" "kept")
+      (exec "UPDATE settings SET value = ? WHERE key = ?" (princ-to-string i) "kept"))
+    (ok (<= (open-statements) (+ before 3)) "a statement run again is the one already prepared")
+    (dotimes (i 100)
+      (apply #'fetch (format nil "SELECT key FROM settings WHERE key IN (~{~*?~^, ~})" (make-list (1+ i))) (make-list (1+ i) :initial-element "kept")))
+    (ok (<= (open-statements) (+ before 32)) "statements that differ do not pile up")
+    (dotimes (i 100)
+      (handler-case (exec "INSERT INTO settings (key, value, updated_at) VALUES ('kept', '', '')")
+        (error () nil)))
+    (ok (<= (open-statements) (+ before 32)) "nor does a statement that fails")
+    (dotimes (i 100)
+      (with-db-transaction
+        (with-db-transaction
+          (exec "UPDATE settings SET value = ? WHERE key = ?" (princ-to-string i) "kept"))))
+    (ok (<= (open-statements) (+ before 32)) "nor does a transaction inside another"))
+  (ok (equal (col (fetch-one "SELECT value FROM settings WHERE key = ?" "kept") "value") "99")
+      "and what was run did its work")
+  (exec "DELETE FROM settings"))
+
+(deftest a-transaction-keeps-all-or-nothing
+  (flet ((value () (col (fetch-one "SELECT value FROM settings WHERE key = 'kept'") "value"))
+         (put (value) (exec "UPDATE settings SET value = ? WHERE key = 'kept'" value)))
+    (exec "DELETE FROM settings")
+    (exec "INSERT INTO settings (key, value, updated_at) VALUES ('kept', 'before', '')")
+    (ng (in-transaction-p))
+    (with-db-transaction
+      (ok (in-transaction-p) "a transaction knows it is open")
+      (put "outer")
+      (handler-case (with-db-transaction
+                      (ok (in-transaction-p))
+                      (put "inner")
+                      (error "abandoned"))
+        (error () nil))
+      (ok (equal (value) "outer") "one inside another undoes only its own part")
+      (ok (in-transaction-p) "and leaves the outer one open"))
+    (ng (in-transaction-p))
+    (ok (equal (value) "outer") "the outer one is kept")
+    (handler-case (with-db-transaction
+                    (put "lost")
+                    (with-db-transaction (put "lost inside"))
+                    (error "abandoned"))
+      (error () nil))
+    (ng (in-transaction-p))
+    (ok (equal (value) "outer") "a failed transaction undoes everything in it, what is inside it too")
+    (exec "DELETE FROM settings")))
