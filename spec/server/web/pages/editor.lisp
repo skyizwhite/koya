@@ -407,6 +407,7 @@
             (ok (= status 200))
             (ok (search "A copy of Original, edited." body))
             (ok (search "koya.editor(this, true)" body) "a copy is unsaved until it is saved")
+            (ok (search (format nil "href=\"~a\" class=\"btn\"" url) body) "Cancel goes back to the original")
             (ok (search "value=\"Original, edited\"" body) "the draft, not the published version")
             (ok (search "name=\"f-body\" value=\"<p>Body</p>\"" body))
             (ok (search (format nil "name=\"f-related\" value=\"~a\"" target) body))
@@ -424,6 +425,11 @@
             (ok (equal (mapcar #'revision-event (list-revisions "website" copy)) '("draft")))
             (ok (string= (content-status (stored-content "website" id)) "published+draft"))
             (ok (string= (access (content-draft (stored-content "website" id)) :title) "Original, edited")))))
+      (testing "a content without a draft is copied from its published version"
+        (let ((body (nth-value 1 (request :get "/s/website/m/blog/new" :query (format nil "from=~a" target)))))
+          (ok (search "A copy of Target." body))
+          (ok (search "value=\"Target\"" body))
+          (ng (search "value=\"t\"" body))))
       (testing "a content that is not there, or not of this model, leaves the editor empty and says so"
         (let ((about (content-id (first (list-contents "website" "about" (nth-value 1 (resolve-model "website" "about"))
                                                        (parse-query nil) :status :all)))))

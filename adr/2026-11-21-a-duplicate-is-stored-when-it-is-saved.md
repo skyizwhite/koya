@@ -29,5 +29,4 @@ creates another with what it read.
   as on any new content.
 - A copy that is opened and left makes no content, no history and no webhook
   call.
-- The use cases have no duplicate: the editor fills the new form with
-  `duplicated-data` (`domain/content`), and saving it is `create`.
+- The use cases have no duplicate: saving a copy is creating a content.
