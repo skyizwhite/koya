@@ -1,7 +1,8 @@
 (defpackage #:koya-server/infra/db/media
   (:use #:cl)
   (:import-from #:koya-core/data #:blank-p)
-  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:fetch-value #:col)
+  (:import-from #:koya-server/infra/db/sql #:sql #:bound #:fragment #:all-of #:in-list #:like-pattern)
   (:import-from #:koya-server/domain/media
                 #:make-media #:media-id)
   (:import-from #:koya-core/time
@@ -33,33 +34,25 @@
   (let ((table (make-hash-table :test 'equal))
         (ids (remove-duplicates ids :test #'equal)))
     (when ids
-      (dolist (row (apply #'fetch (format nil "SELECT * FROM media WHERE space = ? AND id IN (~{~*?~^, ~})" ids)
-                          space ids))
+      (dolist (row (fetch (fragment "SELECT * FROM media WHERE space = ~a AND id IN ~a" (bound space) (in-list ids))))
         (let ((media (row->media row)))
           (setf (gethash (media-id media) table) media))))
     table))
 
-(defun search-clause (search)
-  (if (blank-p search)
-      (values "" '())
-      (values " AND filename LIKE ? ESCAPE '\\'"
-              (list (format nil "%~a%" (with-output-to-string (out)
-                                          (loop :for c :across search
-                                                :do (when (member c '(#\% #\_ #\\)) (write-char #\\ out))
-                                                    (write-char c out))))))))
+(defun media-where (space search)
+  (all-of (list (sql "space = ?" space)
+                (unless (blank-p search) (sql "filename LIKE ? ESCAPE '\\'" (like-pattern search))))))
 
 (defmethod list-media (space &key search (limit 60) (offset 0))
-  (multiple-value-bind (where params) (search-clause search)
-    (mapcar #'row->media
-            (apply #'fetch (format nil "SELECT * FROM media WHERE space = ?~a ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?" where)
-                   space (append params (list limit offset))))))
+  (mapcar #'row->media
+          (fetch (fragment "SELECT * FROM media WHERE ~a ORDER BY created_at DESC, id DESC LIMIT ~a OFFSET ~a"
+                           (media-where space search) (bound limit) (bound offset)))))
 
 (defmethod space-media (space)
   (mapcar #'row->media (fetch "SELECT * FROM media WHERE space = ? ORDER BY created_at, id" space)))
 
 (defmethod count-media (space &key search)
-  (multiple-value-bind (where params) (search-clause search)
-    (col (apply #'fetch-one (format nil "SELECT COUNT(*) AS n FROM media WHERE space = ?~a" where) space params) "n")))
+  (fetch-value (fragment "SELECT COUNT(*) FROM media WHERE ~a" (media-where space search))))
 
 (defmethod update-media (space id &key alt)
   (when alt

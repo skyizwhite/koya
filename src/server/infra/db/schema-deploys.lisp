@@ -1,6 +1,6 @@
 (defpackage #:koya-server/infra/db/schema-deploys
   (:use #:cl)
-  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-value #:col)
   (:import-from #:koya-core/ulid
                 #:make-ulid)
   (:import-from #:koya-core/time
@@ -55,4 +55,4 @@
                  space limit offset)))
 
 (defmethod count-deploys (space)
-  (or (col (fetch-one "SELECT COUNT(*) AS n FROM schema_deploys WHERE space = ?" space) "n") 0))
+  (fetch-value "SELECT COUNT(*) FROM schema_deploys WHERE space = ?" space))

@@ -50,7 +50,7 @@ src/
                       ; every one
     infra/            ; the ports, implemented: main (all of infra, as main loads it),
                       ; env, media-files, webhook-sender, archives, and
-      db/             ;   main, connection, migrations, schema.sql, schema-dump,
+      db/             ;   main, connection, sql, migrations, schema.sql, schema-dump,
                       ;   content-query, schema-store, and one file per table
     web/              ; the way in: app, which mounts the routers below behind the middlewares
       lib/            ;   middlewares, http, auth, presenters, forms, media, paging,
@@ -175,6 +175,11 @@ Ids are ULIDs, but a content's and a media's id is 12 lowercase letters and
 digits, koya's to make (one from before is a ULID, or for a content the id it
 was created with; a space imported from an archive keeps the archive's ids). A model's fields are not columns: they are keys in the JSON, so
 changing a schema never changes a table.
+
+The stores write SQL as text. Where a query is put together from parts — a
+condition that is there or not, a list of ids, a delivery query's filters — the
+parts are made with `infra/db/sql`, each carrying its values, so the text holds
+only what koya wrote and every value is bound, a field's JSON path among them.
 
 One connection, and one lock around every statement and every transaction
 (`infra/db/connection`): the process, not SQLite, is what serialises access.

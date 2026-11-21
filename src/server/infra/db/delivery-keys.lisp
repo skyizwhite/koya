@@ -1,6 +1,6 @@
 (defpackage #:koya-server/infra/db/delivery-keys
   (:use #:cl)
-  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:col)
+  (:import-from #:koya-server/infra/db/connection #:exec #:fetch #:fetch-one #:fetch-value #:col)
   (:import-from #:koya-server/domain/key #:make-key)
   (:import-from #:koya-server/usecases/ports/keys
                 #:insert-delivery-key #:stored-delivery-keys
@@ -23,8 +23,7 @@
   (exec "DELETE FROM delivery_keys WHERE space = ? AND id = ?" space id))
 
 (defmethod space-by-delivery-key-hash (hash)
-  (let ((row (fetch-one "SELECT space FROM delivery_keys WHERE key_hash = ?" hash)))
-    (and row (col row "space"))))
+  (fetch-value "SELECT space FROM delivery_keys WHERE key_hash = ?" hash))
 
 (defmethod stored-delivery-keys (space)
   (mapcar (lambda (row) (make-key :id (col row "id") :hash (col row "key_hash")

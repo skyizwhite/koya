@@ -10,6 +10,7 @@
   (:import-from #:bordeaux-threads-2
                 #:make-recursive-lock
                 #:with-recursive-lock-held)
+  (:import-from #:koya-server/infra/db/sql #:sql-text #:sql-params)
   (:import-from #:koya-server/usecases/ports/store
                 #:call-with-transaction #:store-reachable-p)
   (:export #:*db*
@@ -22,6 +23,7 @@
            #:exec
            #:fetch
            #:fetch-one
+           #:fetch-value
            #:col))
 (in-package #:koya-server/infra/db/connection)
 
@@ -80,21 +82,28 @@
   (handler-case (and (fetch-one "SELECT count(*) AS n FROM spaces") t)
     (error () nil)))
 
-(defun run (sql params)
-  (with-db
-    (let ((query (prepare *db* sql)))
-      (unwind-protect (fetch-all (execute query params))
-        (free-query-resources query)))))
+(defun run (statement params)
+  (multiple-value-bind (text params)
+      (if (consp statement)
+          (values (sql-text statement) (sql-params statement))
+          (values statement params))
+    (with-db
+      (let ((query (prepare *db* text)))
+        (unwind-protect (fetch-all (execute query params))
+          (free-query-resources query))))))
 
-(defun exec (sql &rest params)
-  (run sql params)
+(defun exec (statement &rest params)
+  (run statement params)
   nil)
 
-(defun fetch (sql &rest params)
-  (run sql params))
+(defun fetch (statement &rest params)
+  (run statement params))
 
-(defun fetch-one (sql &rest params)
-  (first (apply #'fetch sql params)))
+(defun fetch-one (statement &rest params)
+  (first (run statement params)))
+
+(defun fetch-value (statement &rest params)
+  (second (first (run statement params))))
 
 (defun col (row name)
   (getf row (intern name :keyword)))
