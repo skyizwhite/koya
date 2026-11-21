@@ -132,8 +132,8 @@ the same name, so the schema can be edited live from the REPL.
   `:preview-url`; a template using it needs the model to have one, and the link
   is not shown while it is blank.
 - **`:label`** names the `:text` or `:slug` field whose value the admin UI shows
-  for a content — in the list's reference previews, the reference cards and picker and
-  the history. It is taken literally, like a field name (`:label title`).
+  for a content — in the list's reference previews, the reference cards and
+  picker, and the history. It is taken literally, like a field name (`:label title`).
   Without it a content is shown by its id; no field is guessed at. It cannot name
   a field inside a custom field.
 
