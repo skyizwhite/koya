@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/ui/media/picker
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:js-string #:on-search #:on-pick)
+  (:import-from #:koya-server/web/lib/binds #:on-search #:on-pick)
   (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
@@ -10,6 +10,7 @@
   (:import-from #:koya-server/web/lib/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/media/grid #:~media-grid #:~pick-cards #:~upload-limit)
+  (:import-from #:koya-server/web/ui/picker #:~picker-dialog)
   (:export #:media-picker
            #:media-picker-search
            #:media-picker-more
@@ -79,19 +80,5 @@
                  (hsx (~picker-body :space space :error (koya-error-message e)))))))))
 
 (defcomp ~media-picker-dialog (&key space)
-  (hsx
-   (dialog :id "media-picker" :class "koya-dialog koya-dialog-wide max-w-3xl"
-           :nm-data (format nil "...koya.mediaPicker(this, ~a)" (js-string (media-picker :space space)))
-           :nm-bind "{ onclick: (e) => e.target === this && _close(), onopenpicker: (e) => _open(e.detail) }"
-     (div :class "flex items-center justify-between border-b border-line px-4 py-3"
-       (h2 :class "font-semibold" "Media")
-       (button :type "button" :class "btn btn-icon" :nm-bind "{ onclick: () => _close() }" :aria-label "Close"
-         (~icon :name :close)))
-     (div :id "media-picker-content" :class "max-h-[70vh] overflow-y-auto p-4"
-       (div :id "media-picker-body" :class "text-sm text-muted" "Loading…"))
-     (div :class "flex items-center justify-end gap-3 border-t border-line px-4 py-3" :hidden t
-          :nm-bind "{ hidden: () => !_many }"
-       (span :class "text-sm text-muted" :nm-bind "{ textContent: () => `${_chosen.length} chosen` }")
-       (button :type "button" :class "btn btn-primary"
-               :nm-bind "{ onclick: () => _done(), disabled: () => !_chosen.length }"
-         (~icon :name :check) "Add images")))))
+  (hsx (~picker-dialog :id "media-picker" :class "max-w-3xl" :title "Media" :factory "mediaPicker"
+                       :url (media-picker :space space) :add-label "Add images")))

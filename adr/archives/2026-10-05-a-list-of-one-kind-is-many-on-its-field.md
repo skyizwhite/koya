@@ -1,5 +1,7 @@
 # A list of one kind is `many` on its field
 
+Superseded by adr/2026-11-21-a-list-of-one-kind-is-many-on-its-field.md
+
 *2026-10-05*
 
 ## Context

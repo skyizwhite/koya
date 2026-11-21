@@ -24,7 +24,9 @@
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
   (:import-from #:koya-server/web/lib/forms #:form->data #:field-param-name #:row-prefix)
-  (:import-from #:koya-server/usecases/listing #:reference-options #:data-media #:find-object-content)
+  (:import-from #:koya-server/usecases/listing #:find-object-content)
+  (:import-from #:koya-server/usecases/held #:read-held)
+  (:import-from #:koya-server/usecases/schema #:find-model)
   (:import-from #:koya-server/web/lib/display #:short-time)
   (:import-from #:koya-server/web/lib/urls
                 #:expand-url-template #:content-url #:model-url #:history-url #:webhook-log-url #:editor-url)
@@ -37,6 +39,7 @@
   (:import-from #:koya-server/web/ui/content/field-input #:~field-input #:~field-error #:~custom-input #:~repeater-input)
   (:import-from #:koya-server/usecases/revisions #:restore-data #:find-revision)
   (:import-from #:koya-server/web/ui/media/picker #:~media-picker-dialog)
+  (:import-from #:koya-server/web/ui/content/reference-picker #:~reference-picker-dialog)
   (:import-from #:koya-server/domain/revision #:revision-data #:revision-created-at)
   (:import-from #:koya-server/usecases/webhooks #:space-webhooks)
   (:export #:new-p #:show-editor #:editor-action #:repeater-row))
@@ -44,17 +47,23 @@
 
 (defun new-p (id) (string= id "new"))
 
-(defstruct (choices (:constructor make-choices (space &optional (media (make-hash-table :test 'equal)))))
-  space media (references (make-hash-table :test 'equal)))
+(defstruct (choices (:constructor make-choices (space &optional (media (make-hash-table :test 'equal))
+                                                                 (contents (make-hash-table :test 'equal)))))
+  space media contents)
 
-(defun references-for (choices field)
+(defun references-for (choices field value)
   (when (eq (field-type field) :reference)
-    (let ((table (choices-references choices))
-          (target (field-option field :model)))
-      (multiple-value-bind (options found) (gethash target table)
-        (if found
-            options
-            (setf (gethash target table) (reference-options (choices-space choices) target)))))))
+    (let ((ids (held-ids value (field-many-p field))))
+      (when ids
+        (let* ((target (field-option field :model))
+               (model (find-model (choices-space choices) target))
+               (found (gethash target (choices-contents choices))))
+          (loop :for id :in ids
+                :for content := (and model found (gethash id found))
+                :collect (if content
+                             (list :id id :label (content-label content model) :status (content-status content)
+                                   :href (editor-url (choices-space choices) model id))
+                             (list :id id :label (format nil "~a (missing)" id)))))))))
 
 (defun media-for (choices field value)
   (when (eq (field-type field) :media)
@@ -102,7 +111,7 @@
                                   (field-value row inner)
                                   (and (eq (field-type inner) :boolean) (field-option inner :default) t))))
              (hsx (~field-input :field inner :parent prefix :value inner-value
-                                :references (references-for choices inner)
+                                :references (references-for choices inner inner-value)
                                 :media (media-for choices inner inner-value)
                                 :error (and index (field-error errors (row-path field index inner))))))))))))
 
@@ -126,12 +135,12 @@
                                         (field-value value inner)
                                         (and (eq (field-type inner) :boolean) (field-option inner :default) t))))
                    (hsx (~field-input :field inner :parent field :value inner-value
-                                      :references (references-for choices inner)
+                                      :references (references-for choices inner inner-value)
                                       :media (media-for choices inner inner-value)
                                       :error (field-error errors (inner-path field inner)))))))))
       (t
         (hsx (~field-input :field field :value value
-                           :references (references-for choices field)
+                           :references (references-for choices field value)
                            :media (media-for choices field value)
                            :error (field-error errors (field-name field))))))))
 
@@ -252,7 +261,7 @@
                                  :binds "oninput: () => _track(), onchange: () => _track()")
          (when content
            (hsx (input :type "hidden" :name "updated-at" :value (content-updated-at content))))
-         (let ((choices (make-choices space-name (data-media space-name model data))))
+         (let ((choices (multiple-value-call #'make-choices space-name (read-held space-name model (list data)))))
            (loop :for field :in (model-fields model) :collect
              (hsx (~editor-field :space space-name :model model-name :field field :data data :errors errors
                                  :choices choices)))))
@@ -289,7 +298,8 @@
                           (list (cons model-name (model-url space model-name))
                                 (cons (if content (content-label content model) "new") nil)))
        (~editor :space space :model model :content content :data data :errors errors :restoring restoring)
-       (~media-picker-dialog :space space)))))
+       (~media-picker-dialog :space space)
+       (~reference-picker-dialog :space space)))))
 
 (defun requested-revision (params content)
   (let ((raw (param params "revision")))

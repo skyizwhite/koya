@@ -20,8 +20,7 @@
 
   const changed = (el) => setTimeout(() => el.dispatchEvent(new Event("change", { bubbles: true })));
 
-  const pickMedia = (onpick) =>
-    document.getElementById("media-picker")?.dispatchEvent(new CustomEvent("openpicker", { detail: onpick }));
+  const openPicker = (id, detail) => document.getElementById(id)?.dispatchEvent(new CustomEvent("openpicker", { detail }));
 
   koya.form = (form) => {
     const data = new FormData(form);
@@ -146,10 +145,12 @@
             ],
             handlers: {
               image: () =>
-                pickMedia((item) => {
-                  const range = quill.getSelection(true);
-                  quill.insertEmbed(range.index, "image", item.url, "user");
-                  quill.setSelection(range.index + 1);
+                openPicker("media-picker", {
+                  onpick: (item) => {
+                    const range = quill.getSelection(true);
+                    quill.insertEmbed(range.index, "image", item.url, "user");
+                    quill.setSelection(range.index + 1);
+                  },
                 }),
             },
           },
@@ -195,21 +196,32 @@
     };
   }
 
-  koya.references = (el) => ({
-    _chosen: Array.from(el.querySelector("select[multiple]").selectedOptions, (option) => option.value),
-    _has(id) {
-      return this._chosen.includes(id);
-    },
-    _add(select) {
-      if (select.value && !this._has(select.value)) this._chosen = [...this._chosen, select.value];
-      select.value = "";
-      changed(this.$refs.select);
-    },
-    _remove(id) {
-      this._chosen = this._chosen.filter((chosen) => chosen !== id);
-      changed(this.$refs.select);
-    },
-  });
+  koya.references = (el, model, many) => {
+    const list = el.querySelector("[data-reference-list]");
+    list.addEventListener("click", (event) => {
+      const button = event.target.closest?.("[data-action]");
+      if (!button) return;
+      if (button.dataset.action === "remove") koya.removeRow(button);
+      else koya.moveRow(button, button.dataset.action === "up" ? -1 : 1);
+    });
+    return {
+      _choose() {
+        openPicker("reference-picker", {
+          many,
+          held: many ? Array.from(list.querySelectorAll("input"), (input) => input.value) : [],
+          query: { model, many },
+          onpick: (picked) => {
+            const cards = many ? picked : [picked];
+            if (!cards.length) return;
+            for (const card of cards) card.querySelector("input").name = list.id;
+            if (many) list.append(...cards);
+            else list.replaceChildren(...cards);
+            changed(list);
+          },
+        });
+      },
+    };
+  };
 
   koya.customField = (on) => ({
     _on: on,
@@ -297,44 +309,70 @@
     });
   };
 
-  koya.mediaPicker = (dialog, url) => ({
-    _onpick: null,
-    _many: false,
-    _chosen: [],
-    _open(detail) {
-      this._many = typeof detail !== "function";
-      this._onpick = this._many ? detail.onpick : detail;
-      this._chosen = [];
-      this.$get(url);
-      dialog.showModal();
-    },
-    _close() {
-      this._onpick = null;
-      this._chosen = [];
-      dialog.close();
-    },
-    _has(id) {
-      return this._chosen.some((item) => item.id === id);
-    },
-    _pick(card) {
-      const item = { id: card.pickId, url: card.pickUrl, alt: card.pickAlt, name: card.pickName };
-      if (this._many) {
-        this._chosen = this._has(item.id)
-          ? this._chosen.filter((chosen) => chosen.id !== item.id)
-          : [...this._chosen, item];
-        return;
-      }
-      const onpick = this._onpick;
-      this._close();
-      onpick?.(item);
-    },
-    _done() {
-      const onpick = this._onpick;
-      const chosen = this._chosen;
-      this._close();
-      onpick?.(chosen);
-    },
-  });
+  const picker = (dialog, url, itemOf) => {
+    const items = new Map();
+    return {
+      _onpick: null,
+      _many: false,
+      _held: [],
+      _chosen: [],
+      _open(detail) {
+        this._many = Boolean(detail.many);
+        this._onpick = detail.onpick;
+        this._held = detail.held ?? [];
+        this._chosen = [];
+        items.clear();
+        this.$get(url, detail.query ?? {});
+        dialog.showModal();
+      },
+      _close() {
+        this._onpick = null;
+        this._chosen = [];
+        items.clear();
+        dialog.close();
+      },
+      _has(id) {
+        return this._chosen.includes(id);
+      },
+      _taken(id) {
+        return this._held.includes(id);
+      },
+      _pick(button) {
+        const id = button.dataset.pickId;
+        if (this._many) {
+          if (this._has(id)) {
+            this._chosen = this._chosen.filter((chosen) => chosen !== id);
+            items.delete(id);
+          } else {
+            items.set(id, itemOf(button));
+            this._chosen = [...this._chosen, id];
+          }
+          return;
+        }
+        const onpick = this._onpick;
+        const item = itemOf(button);
+        this._close();
+        onpick?.(item);
+      },
+      _done() {
+        const onpick = this._onpick;
+        const chosen = this._chosen.map((id) => items.get(id));
+        this._close();
+        onpick?.(chosen);
+      },
+    };
+  };
+
+  koya.mediaPicker = (dialog, url) =>
+    picker(dialog, url, (button) => ({
+      id: button.dataset.pickId,
+      url: button.dataset.pickUrl,
+      alt: button.dataset.pickAlt,
+      name: button.dataset.pickName,
+    }));
+
+  koya.referencePicker = (dialog, url) =>
+    picker(dialog, url, (button) => button.nextElementSibling.content.firstElementChild.cloneNode(true));
 
   koya.mediaList = (el) => {
     const list = el.querySelector("[data-media-list]");
@@ -358,7 +396,8 @@
     });
     return {
       _add() {
-        pickMedia({
+        openPicker("media-picker", {
+          many: true,
           onpick: (items) => {
             items.forEach(add);
             if (items.length) changed(list);
@@ -374,7 +413,7 @@
     _alt: file.alt,
     _name: file.name,
     _choose() {
-      pickMedia((item) => this._set(item));
+      openPicker("media-picker", { onpick: (item) => this._set(item) });
     },
     _clear() {
       this._set(null);

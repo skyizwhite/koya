@@ -2,7 +2,7 @@
   (:use #:cl #:rove)
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-reveal #:on-pick)
   (:import-from #:koya-spec/server/web/pages/support
-                #:replaced-url #:bound #:post-login #:edit #:*secret* #:*cookie* #:blog-model #:request
+                #:replaced-url #:bound #:escaped #:count-matches #:post-login #:edit #:*secret* #:*cookie* #:blog-model #:request
                 #:request-url #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:koya-server/usecases/ports/contents #:list-contents)
@@ -20,14 +20,6 @@
   (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:import-from #:babel #:string-to-octets))
 (in-package #:koya-spec/server/web/pages/media)
-
-(defun escaped (url)
-  (cl-ppcre:regex-replace-all "&" url "&amp;"))
-
-(defun count-matches (needle haystack)
-  (loop :for start := 0 :then (+ found (length needle))
-        :for found := (search needle haystack :start2 start)
-        :while found :count t))
 
 (setup (setup-pages) (log-in))
 
@@ -93,7 +85,7 @@
         (ok (search "data-pick-id=" body))
         (ok (search "data-pick-url=\"/media/website/" body))
         (ok (not (search "<html" body)) "a fragment, not a page")
-        (ok (search "nm-bind=\"{ onclick: () => _pick(this.dataset), " body) "a card hands its file over")
+        (ok (search "nm-bind=\"{ onclick: () => _pick(this), " body) "a card hands its file over")
         (ok (search (bound (on-search (media-picker-search :space "website"))) body) "the box searches as the typing stops")
         (ok (search (bound (on-pick (media-picker-upload :space "website"))) body)))
       (multiple-value-bind (status body) (call-action :get (media-picker-search :space "website" :q "zzz-nothing"))
