@@ -62,14 +62,17 @@
 (defmethod count-deliveries (space &key label model)
   (fetch-value (fragment "SELECT COUNT(*) FROM webhook_deliveries WHERE ~a" (deliveries-where space label model))))
 
-(defun non-blank (values)
-  (remove "" values :test #'string=))
+(defun distinct-column (space column)
+  (remove "" (mapcar #'second
+                     (fetch (fragment "SELECT DISTINCT ~a FROM webhook_deliveries WHERE space = ~a ORDER BY ~a"
+                                      column (bound space) column)))
+          :test #'string=))
 
 (defmethod delivery-labels (space)
-  (non-blank (mapcar #'second (fetch "SELECT DISTINCT label FROM webhook_deliveries WHERE space = ? ORDER BY label" space))))
+  (distinct-column space (sql "label")))
 
 (defmethod delivery-models (space)
-  (non-blank (mapcar #'second (fetch "SELECT DISTINCT model FROM webhook_deliveries WHERE space = ? ORDER BY model" space))))
+  (distinct-column space (sql "model")))
 
 (defmethod find-delivery (space id)
   (let ((row (fetch-one "SELECT * FROM webhook_deliveries WHERE space = ? AND id = ?" space id)))
