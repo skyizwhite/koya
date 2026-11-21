@@ -28,6 +28,7 @@
                "koya-spec/server/infra/db"
                "koya-spec/server/infra/webhook-sender"
                "koya-spec/server/usecases/contents"
+               "koya-spec/server/usecases/spaces"
                "koya-spec/server/usecases/delivery"
                "koya-spec/server/usecases/revisions"
                "koya-spec/server/usecases/media"

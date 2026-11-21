@@ -36,7 +36,8 @@
   (:import-from #:koya-core/validate #:validation-error)
   (:import-from #:koya-core/schema #:make-field #:make-model #:make-schema #:model-name #:make-custom-field)
   (:import-from #:access #:access #:accesses)
-  (:import-from #:koya-spec/server/domain/id #:with-drawn-ids))
+  (:import-from #:koya-spec/server/domain/id #:with-drawn-ids)
+  (:import-from #:koya-spec/server/threads #:at-once))
 (in-package #:koya-spec/server/usecases/contents)
 
 (defun blog-model ()
@@ -233,6 +234,24 @@
     (let ((about (find-model "website" "about")))
       (ok (signals (publish-object "website" about) 'not-found) "though not with no data at all")
       (ok (string= (content-status (publish-object "website" about :data (list :body "live"))) "published")))))
+
+(deftest first-writes-to-an-object-at-once-make-one-content
+  (let ((about (find-model "website" "about")))
+    (flet ((one-made (outcomes)
+             (ok (= (count-if (lambda (o) (typep o 'error)) outcomes)
+                    (count-if (lambda (o) (and (typep o 'conflict) (string= (koya-error-code o) "object_exists")))
+                              outcomes))
+                 "what is refused is refused as object_exists")
+             (ok (= (length (remove-duplicates (mapcar #'content-id (remove-if (lambda (o) (typep o 'error)) outcomes))
+                                               :test #'string=))
+                    1)
+                 "and what is taken is one content")))
+      (testing "saves"
+        (exec "DELETE FROM contents")
+        (one-made (at-once 8 (lambda () (update-object "website" about (list :body "saved"))))))
+      (testing "publishes"
+        (exec "DELETE FROM contents")
+        (one-made (at-once 8 (lambda () (publish-object "website" about :data (list :body "live")))))))))
 
 (deftest an-object-content-is-not-deleted
   (let* ((about (find-model "website" "about"))

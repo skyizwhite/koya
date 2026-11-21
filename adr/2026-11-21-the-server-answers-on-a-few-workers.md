@@ -28,7 +28,10 @@ is not taken up here.
   holds the database lock until it ends. Logging in is one: the count of wrong
   two-factor codes and the step a code was last used in stay what
   `adr/2026-10-04-wrong-two-factor-codes-are-limited-each-step.md` says when
-  logins arrive together.
+  logins arrive together. Creating a space is another, so that two at once with
+  one name make one space and a conflict.
+- The image stops the server with SIGQUIT. Woo lets its workers finish on it,
+  and on SIGTERM kills them, which under load can leave the process hung.
 
 ## Consequences
 

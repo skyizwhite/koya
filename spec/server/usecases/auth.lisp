@@ -5,7 +5,8 @@
   (:import-from #:koya-server/infra/db/connection #:connect-db #:disconnect-db)
   (:import-from #:koya-server/infra/db/migrations #:migrate)
   (:import-from #:koya-server/domain/totp #:totp #:generate-totp-secret)
-  (:import-from #:koya-spec/server/logs #:logged))
+  (:import-from #:koya-spec/server/logs #:logged)
+  (:import-from #:koya-spec/server/threads #:at-once))
 (in-package #:koya-spec/server/usecases/auth)
 
 (defparameter *secret* "auth-spec-secret-long-enough-to-log-in")
@@ -83,15 +84,6 @@
         (dotimes (i 5) (check-login *secret* (wrong-code-at at) :time at))
         (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: too many wrong codes"
                     (logged (lambda () (check-login *secret* (code-at at) :time at)))))))))
-
-(defun at-once (count thunk)
-  (let* ((go nil)
-         (threads (loop :repeat count
-                        :collect (bt2:make-thread (lambda ()
-                                                    (loop :until go :do (bt2:thread-yield))
-                                                    (funcall thunk))))))
-    (setf go t)
-    (mapcar #'bt2:join-thread threads)))
 
 (deftest logins-at-once-spend-no-more-codes-than-one-after-another
   (testing "wrong codes sent together are counted as if they came one by one"

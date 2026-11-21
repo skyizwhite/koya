@@ -72,5 +72,9 @@ EXPOSE 3100
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -fsS "http://localhost:${KOYA_PORT}/health" || exit 1
 
+# Woo stops its workers cleanly on SIGQUIT; on SIGTERM it kills them, and a
+# worker killed in the middle of a request can leave the process hung.
+STOPSIGNAL SIGQUIT
+
 # Woo on all interfaces (koya-server:main), blocking.
 ENTRYPOINT ["koya"]
