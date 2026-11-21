@@ -4,7 +4,7 @@
   (:import-from #:clack)
   (:import-from #:ironclad)
   (:import-from #:koya-server/infra/main
-                #:db-path #:server-port #:open-store #:close-store #:write-snapshot
+                #:db-path #:server-port #:server-workers #:open-store #:close-store #:write-snapshot
                 #:check-settings #:setting-error #:setting-error-problems)
   (:import-from #:koya-server/web/app #:app #:*app* #:install-routes)
   (:import-from #:koya-server/web/lib/assets #:refresh-asset-version)
@@ -81,8 +81,9 @@
       (quit 1)))
   (open-store (db-path))
   (warn-about-a-short-secret)
-  (log-info :koya.server "server starting on 0.0.0.0:~a" (server-port))
-  (clack:clackup (app) :server :woo :address "0.0.0.0" :port (server-port) :debug nil :use-thread nil)
+  (log-info :koya.server "server starting on 0.0.0.0:~a with ~a workers" (server-port) (server-workers))
+  (clack:clackup (app) :server :woo :address "0.0.0.0" :port (server-port) :worker-num (server-workers)
+                       :debug nil :use-thread nil)
   (close-store)
   (log-info :koya.server "server stopped")
   (quit 0))

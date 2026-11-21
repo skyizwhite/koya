@@ -83,3 +83,25 @@
         (dotimes (i 5) (check-login *secret* (wrong-code-at at) :time at))
         (ok (search "[WARN ] <KOYA.AUTH>: a login was refused: too many wrong codes"
                     (logged (lambda () (check-login *secret* (code-at at) :time at)))))))))
+
+(defun at-once (count thunk)
+  (let* ((go nil)
+         (threads (loop :repeat count
+                        :collect (bt2:make-thread (lambda ()
+                                                    (loop :until go :do (bt2:thread-yield))
+                                                    (funcall thunk))))))
+    (setf go t)
+    (mapcar #'bt2:join-thread threads)))
+
+(deftest logins-at-once-spend-no-more-codes-than-one-after-another
+  (testing "wrong codes sent together are counted as if they came one by one"
+    (let* ((time 2000000000)
+           (outcomes (at-once 40 (lambda () (check-login *secret* (wrong-code-at time) :time time)))))
+      (ok (= (count :wrong-code outcomes) 5) "five are read as wrong codes")
+      (ok (= (count :too-many-codes outcomes) 35) "and every other is refused unread")))
+  (testing "the right code sent together logs in once"
+    (let* ((time 2000000300)
+           (outcomes (at-once 40 (lambda () (check-login *secret* (code-at time) :time time)))))
+      (ok (= (count t outcomes) 1) "one logs in")
+      (ok (= (count :wrong-code outcomes) 5) "the code, once used, is a wrong one for the next five")
+      (ok (= (count :too-many-codes outcomes) 34) "and every other is refused unread"))))

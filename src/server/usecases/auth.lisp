@@ -8,6 +8,7 @@
                 #:owner-secret)
   (:import-from #:koya-server/usecases/settings
                 #:totp-enabled-p #:totp-code-valid-p #:wrong-codes #:count-wrong-code)
+  (:import-from #:koya-server/usecases/ports/store #:with-transaction)
   (:import-from #:koya-server/usecases/ports/sessions
                 #:make-session-store #:delete-sessions #:+session-seconds+)
   (:import-from #:koya-server/domain/totp #:unix-now)
@@ -50,7 +51,7 @@
     (:wrong-code (log-warn :koya.auth "a login was refused: wrong code"))))
 
 (defun check-login (secret code &key (time (unix-now)))
-  (let ((outcome (login-outcome secret code time)))
+  (let ((outcome (with-transaction (login-outcome secret code time))))
     (log-login outcome)
     outcome))
 

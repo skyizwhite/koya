@@ -2,7 +2,7 @@
   (:nicknames #:koya-server/infra/main)
   (:use #:cl)
   (:import-from #:koya-server/infra/env
-                #:db-path #:server-port #:check-settings #:setting-error #:setting-error-problems)
+                #:db-path #:server-port #:server-workers #:check-settings #:setting-error #:setting-error-problems)
   (:import-from #:koya-server/infra/db/main #:open-store #:close-store #:write-snapshot)
   (:import-from #:koya-server/infra/media-files)
   (:import-from #:koya-server/infra/webhook-sender)
@@ -12,6 +12,7 @@
            #:setting-error-problems
            #:db-path
            #:server-port
+           #:server-workers
            #:open-store
            #:close-store
            #:write-snapshot))
