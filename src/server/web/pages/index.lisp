@@ -81,7 +81,7 @@
                 (p "No spaces yet.")
                 (p :class "mt-2" "Make one with " (strong "New space") ", then deploy its models with "
                    (code "(koya-sdk:deploy)") " from your project's REPL.")))
-         (hsx (<> (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+         (hsx (<> (ul :class "tiles tiles-3"
                     (loop :for space :in spaces :collect (hsx (~space-row :space space))))
                   (loop :for space :in spaces :collect (hsx (~delete-space-dialog :name (getf space :name))))))))))
 
