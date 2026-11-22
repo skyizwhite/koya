@@ -241,11 +241,11 @@
     (hsx
      (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring original))
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
-         (div :class "flex items-start justify-between gap-3"
+         (div :class "flex items-center justify-between gap-3"
            (div :class "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
-             (h1 :class "text-2xl font-bold" model-name
+             (h1 :class "flex min-w-0 flex-wrap items-baseline gap-x-3 text-2xl font-bold" model-name
                (unless object-p
-                 (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
+                 (hsx (span :class "font-mono text-sm font-normal text-muted" id))))
              (when content (hsx (~status-badge :status (content-status content)))))
            (button :type "button" :class "btn btn-icon editor-fold-toggle" :aria-label "Menu"
                    :aria-controls "editor-meta editor-actions" :aria-expanded "false"
