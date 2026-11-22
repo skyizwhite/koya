@@ -76,7 +76,7 @@
          (div :class "text-muted" :nm-bind "{ textContent: () => _name }" label)
          (div :class "flex gap-2"
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _choose() }"
-             (~icon :name :media) "Choose")
+             (~icon :name :media) "Select")
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
              (~icon :name :close) "Clear")))))))
 

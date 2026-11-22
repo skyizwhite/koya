@@ -18,7 +18,7 @@
        (div :id (format nil "~a-body" id) :class "text-sm text-muted" "Loading…"))
      (div :class "flex items-center justify-end gap-3 border-t border-line px-4 py-3" :hidden t
           :nm-bind "{ hidden: () => !_many }"
-       (span :class "text-sm text-muted" :nm-bind "{ textContent: () => `${_chosen.length} chosen` }")
+       (span :class "text-sm text-muted" :nm-bind "{ textContent: () => `${_chosen.length} selected` }")
        (button :type "button" :class "btn btn-primary"
                :nm-bind "{ onclick: () => _done(), disabled: () => !_chosen.length }"
          (~icon :name :check) add-label)))))
