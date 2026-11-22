@@ -22,6 +22,7 @@
     (ok (= status 200))
     (ok (search "<html lang=\"en\"" body) "the admin UI is in English")
     (ok (search "website" body))
+    (ok (search "<ul class=\"tiles tiles-3\">" body) "the spaces in tiles, three to a row on a wide screen")
     (ok (search "commandfor=\"new-space\"" body) "the form is behind a button")
     (ok (search "<dialog id=\"new-space\"" body) "and lives in a dialog on the page")
     (ok (search (bound (on-submit (create-space-action))) body)))

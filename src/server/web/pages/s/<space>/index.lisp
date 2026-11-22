@@ -34,7 +34,7 @@
                 (h2 :class "mb-2 text-sm font-semibold text-muted" "Models")
                 (if (null (schema-models schema))
                     (hsx (~empty-state "This space has no models."))
-                    (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                    (hsx (ul :class "tiles tiles-3"
                            (loop :for model :in (schema-models schema) :collect
                              (hsx (li (a :href (model-url name (model-name model))
                                          :class "flex items-center justify-between gap-3 px-4 py-3 hover:bg-base"
@@ -52,7 +52,7 @@
                             "View log →"))
                        (if (null hooks)
                            (hsx (~empty-state "This space has no webhooks."))
-                           (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
+                           (hsx (ul :class "tiles"
                                   (loop :for hook :in hooks :collect
                                     (hsx (li (a :href (webhook-log-url name :label (webhook-label hook))
                                                 :class "flex flex-col gap-1 px-4 py-3 hover:bg-base sm:flex-row sm:items-center sm:justify-between sm:gap-3"
