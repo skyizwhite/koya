@@ -38,6 +38,10 @@ started with — and, when two-factor login is on, for the current **one-time
 code** from an authenticator app. There are no user accounts: whoever knows the
 secret is the owner.
 
+- Above the secret stands a fixed **Account**, `owner`, which cannot be changed
+  and is not read. It is there for password managers, which keep a password
+  under an account name: the secret is saved as the password of `owner` on the
+  server's address, and the one-time code can be saved with it.
 - A failed attempt never says which of the two was wrong. A wrong secret locks
   nobody out: the secret is at least 32 characters, too long to guess.
 - A one-time code is short enough to guess, so after five wrong codes within
