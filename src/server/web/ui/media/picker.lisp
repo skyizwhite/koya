@@ -37,7 +37,7 @@
        (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
      (form :nm-bind (on-pick (media-picker-upload :space space))
            :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
-       (label :class "btn" (~icon :name :upload) "Upload…"
+       (label :class "btn" (~icon :name :upload) "Upload"
          (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
        (span :class "text-muted" "PNG, JPEG, GIF or WebP. Uploaded files are added to the library.")
        (~upload-limit)

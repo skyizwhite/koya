@@ -621,7 +621,7 @@
       (ok (search "aria-label=\"Move Second up\" data-action=\"up\"" body) "and moved by its arrows")
       (ok (search "data-drag-handle" body) "or dragged")
       (ok (search (bound "{ onclick: () => _choose() }") body) "the field adds from the picker")
-      (ok (search "Add…" body))
+      (ok (search "</svg>Add</button>" body) "its button says what it does, with no ellipsis")
       (ok (search "<dialog id=\"reference-picker\"" body) "which the editor holds")
       (ok (search (format nil "nm-data=\"...koya.referencePicker(this, &quot;~a&quot;)\""
                           (reference-picker :space "website"))
@@ -638,7 +638,7 @@
           (ok (search "aria-label=\"Remove Target\"" body) "and is removed by its ×")
           (ng (search "data-drag-handle" body) "but neither dragged")
           (ng (search "Move Target up" body) "nor moved")
-          (ok (search "Select…" body) "the field selects from the picker")
+          (ok (search "</svg>Select</button>" body) "the field selects from the picker")
           (edit (format nil "/s/website/m/note/~a" id) :form '(("action" . "save") ("f-title" . "N")))
           (ok (null (access (content-draft (stored-content "website" id)) :link))
               "a removed card sends nothing, which is no value"))))))
