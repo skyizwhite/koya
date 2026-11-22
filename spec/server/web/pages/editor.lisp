@@ -164,6 +164,8 @@
         (ok (search "</svg>Published page</a>" body) "its icon before its label, as every button has")
         (ok (cl-ppcre:scan (format nil ">~a</span></h1><span class=\"badge[^\"]*\">published</span>" id) body)
             "the status stands right of the id")
+        (ok (search (format nil "<div class=\"flex items-center justify-between gap-3\"><div class=\"flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1\"><h1 class=\"flex min-w-0 flex-wrap items-baseline gap-x-3 text-2xl font-bold\">blog<span class=\"font-mono text-sm font-normal text-muted\">~a</span></h1>" id) body)
+            "the model and its id together, on one baseline, centred on one line with the status and the toggle")
         (ng (search "<span class=\"badge bg-ok/10 text-ok\">published</span><span>created at" body)
             "not beside the times")
         (ok (search "<div id=\"editor-meta\" class=\"editor-fold mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted\" nm-bind=\"{ 'class.open': () => _unfolded }\"><span>created at" body)
