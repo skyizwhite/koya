@@ -51,8 +51,10 @@
           "a toggle showing three lines while they are folded")
       (ok (and close (< close (search "<path d=\"M4.2 4.2l7.6 7.6\"></path>" body :start2 close)))
           "and a cross while they are shown"))
-    (ok (search "<div id=\"editor-actions\" class=\"editor-fold mt-3 flex flex-wrap items-center justify-between gap-2\" nm-bind=\"{ 'class.open': () => _unfolded }\">" body)
+    (ok (search "<div id=\"editor-actions\" class=\"editor-fold mt-3 flex items-start justify-between gap-2 sm:flex-wrap sm:items-center\" nm-bind=\"{ 'class.open': () => _unfolded }\">" body)
         "which opens them")
+    (ok (search "<div class=\"flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center\"></div><div class=\"flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center\">" body)
+        "on a phone in two columns of one width, the links down the left and the actions down the right, each button as wide as its column")
     (ok (search (format nil "<form id=\"editor-form\" class=\"space-y-6\" nm-ref=\"form\" ~a"
                         (bound (on-submit (editor-action :space "website" :model "blog" :id "new" :op "save")
                                           :binds "oninput: () => _track(), onchange: () => _track()")))

@@ -81,6 +81,9 @@ select {
   .editor-fold:not(.open) {
     display: none;
   }
+  .editor-fold > div > .btn {
+    justify-content: center;
+  }
 }
 .label {
   @apply block text-sm font-medium text-fg;
