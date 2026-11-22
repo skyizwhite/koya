@@ -399,6 +399,9 @@
                         ("updated-at" . ,(content-updated-at (stored-content "website" id)))))
       (testing "the editor of a list content links to its duplicate"
         (ok (search (format nil "href=\"~a\"" (escaped copy-url)) (nth-value 1 (request :get url))))
+        (ok (cl-ppcre:scan "</svg>Duplicate</a><button type=\"button\" class=\"btn\" nm-bind=\"[^\"]*op=save&quot;"
+                           (nth-value 1 (request :get url)))
+            "among the buttons on the right, just before Save draft")
         (ng (search "?from=" (nth-value 1 (request :get "/s/website/m/blog/new"))) "a new content has nothing to duplicate")
         (edit "/s/website/m/about" :form '(("action" . "save") ("f-body" . "only")))
         (ng (search "?from=" (nth-value 1 (request :get "/s/website/m/about"))) "nor has an object, which is one"))

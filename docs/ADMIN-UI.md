@@ -227,9 +227,9 @@ content can be seen on the left, what can be done to it on the right:
 | **Preview draft** | opens the model's preview URL for this draft — shown when the schema gives the model a `previewUrl` and a draft exists, and, when the URL uses `{CONTENT_SLUG}`, the draft's slug is not blank |
 | **Published page** | opens the content on the site — shown when the schema gives the model a `publicUrl` and the content is published, and, when the URL uses `{CONTENT_SLUG}`, the published slug is not blank |
 | **History** | the content's revisions, and where an old version is restored from — see [History](#history) |
-| **Duplicate** | opens a new content's editor holding this content's draft, or its published version when it has no draft, with its `slug` and `unique` fields left empty — not on an object model's content |
 | **Webhooks** | an object model's delivery log — shown while a webhook covers the model |
 | **Discard draft** | throws the draft away and goes back to the published version — asks first |
+| **Duplicate** | opens a new content's editor holding this content's draft, or its published version when it has no draft, with its `slug` and `unique` fields left empty — not on an object model's content |
 | **Save draft** | saves the form as a draft, leaving what is published untouched — on only while the form holds a change |
 | **Publish** | validates and publishes the form as it stands — asks first |
 
