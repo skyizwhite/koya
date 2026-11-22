@@ -170,6 +170,7 @@
             "not beside the times")
         (ok (search "<div id=\"editor-meta\" class=\"editor-fold mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted\" nm-bind=\"{ 'class.open': () => _unfolded }\"><span>created at" body)
             "the times fold on a phone with the buttons")
+        (ok (search "aria-controls=\"editor-meta editor-actions\"" body) "under the toggle that names them both")
         (ng (search "Preview draft" body) "no draft, no preview link"))
       (multiple-value-bind (status) (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "unpublish")))
         (ok (= status 200)))

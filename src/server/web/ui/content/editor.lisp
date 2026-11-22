@@ -248,7 +248,7 @@
                  (hsx (span :class "font-mono text-sm font-normal text-muted" id))))
              (when content (hsx (~status-badge :status (content-status content)))))
            (button :type "button" :class "btn btn-icon editor-fold-toggle" :aria-label "Menu"
-                   :aria-controls "editor-meta editor-actions" :aria-expanded "false"
+                   :aria-controls (if content "editor-meta editor-actions" "editor-actions") :aria-expanded "false"
                    :nm-bind "{ onclick: () => _unfolded = !_unfolded, ariaExpanded: () => String(_unfolded) }"
              (span :nm-bind "{ hidden: () => _unfolded }" (~icon :name :menu))
              (span :hidden t :nm-bind "{ hidden: () => !_unfolded }" (~icon :name :close))))

@@ -169,6 +169,9 @@ dialog.koya-dialog::backdrop {
     font-size: 1rem;
   }
 }
+.ql-snow .ql-tooltip input[type="text"]:focus {
+  @apply border-accent outline-none;
+}
 .richtext:focus-within .ql-toolbar.ql-snow,
 .richtext:focus-within .ql-container.ql-snow {
   @apply border-accent;
