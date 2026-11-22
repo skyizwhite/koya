@@ -195,8 +195,8 @@
 
 (defcomp ~meta (&key content)
   (hsx
-   (div :class "mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"
-     (~status-badge :status (content-status content))
+   (div :id "editor-meta" :class "editor-fold mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"
+        :nm-bind "{ 'class.open': () => _unfolded }"
      (span "created at " (short-time (content-created-at content)))
      (span "updated at " (short-time (content-updated-at content))))))
 
@@ -241,11 +241,20 @@
     (hsx
      (div :id "editor" :nm-data (format nil "...koya.editor(this, ~:[false~;true~])" (or restoring original))
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
-         (h1 :class "text-2xl font-bold" model-name
-           (unless object-p
-             (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
+         (div :class "flex items-start justify-between gap-3"
+           (div :class "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+             (h1 :class "text-2xl font-bold" model-name
+               (unless object-p
+                 (hsx (span :class "ml-3 font-mono text-sm font-normal text-muted" id))))
+             (when content (hsx (~status-badge :status (content-status content)))))
+           (button :type "button" :class "btn btn-icon editor-fold-toggle" :aria-label "Menu"
+                   :aria-controls "editor-meta editor-actions" :aria-expanded "false"
+                   :nm-bind "{ onclick: () => _unfolded = !_unfolded, ariaExpanded: () => String(_unfolded) }"
+             (span :nm-bind "{ hidden: () => _unfolded }" (~icon :name :menu))
+             (span :hidden t :nm-bind "{ hidden: () => !_unfolded }" (~icon :name :close))))
          (when content (hsx (~meta :content content)))
-         (div :class "mt-3 flex flex-wrap items-center justify-between gap-2"
+         (div :id "editor-actions" :class "editor-fold mt-3 flex flex-wrap items-center justify-between gap-2"
+              :nm-bind "{ 'class.open': () => _unfolded }"
            (div :class "flex flex-wrap items-center gap-2"
              (when preview-url (hsx (~external-link :href preview-url "Preview draft")))
              (when public-url (hsx (~external-link :href public-url "Published page")))
