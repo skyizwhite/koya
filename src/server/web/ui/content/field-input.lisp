@@ -187,7 +187,7 @@
           (hsx (textarea :id id :name name :rows 5 :class "input" string)))
          (:richtext
           (hsx
-           (div
+           (div :class "richtext"
              (input :type "hidden" :id id :name name :value string)
              (div :class "quill-editor" :data-quill-for id
                   :nm-bind "{ oninit: () => koya.quill(this) }"))))

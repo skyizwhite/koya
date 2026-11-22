@@ -41,6 +41,8 @@
     (ok (search "datetime-local" body))
     (ok (search "data-quill-for=\"f-body\" nm-bind=\"{ oninit: () => koya.quill(this) }\"" body)
         "rich text gets a Quill holder")
+    (ok (search "<div class=\"richtext\"><input type=\"hidden\" id=\"f-body\"" body)
+        "in a box that marks the editor and its toolbar while either has the focus, as an input is marked")
     (ok (search (format nil "<form id=\"editor-form\" class=\"space-y-6\" nm-ref=\"form\" ~a"
                         (bound (on-submit (editor-action :space "website" :model "blog" :id "new" :op "save")
                                           :binds "oninput: () => _track(), onchange: () => _track()")))
