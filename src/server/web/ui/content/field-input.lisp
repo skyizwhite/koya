@@ -106,7 +106,7 @@
        (loop :for (id . media) :in entries :collect (hsx (~media-entry :name name :id id :media media))))
      (template (~media-entry :name name))
      (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add() }"
-       (~icon :name :media) "Add images"))))
+       (~icon :name :media) "Add"))))
 
 (defcomp ~field-error (&key field parent error)
   (hsx (p :id (format nil "~a-error" (field-param-name field parent)) :class "text-xs text-danger" :hidden (null error) error)))
