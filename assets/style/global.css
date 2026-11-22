@@ -125,6 +125,15 @@ dialog.koya-dialog::backdrop {
 .ql-container.ql-snow {
   @apply border border-t-0 border-line;
 }
+/* iOS zooms into a field whose text is under 16px when it takes the focus. */
+@media (pointer: coarse) {
+  .input,
+  select,
+  .quill-editor,
+  .ql-snow .ql-tooltip input[type="text"] {
+    font-size: 1rem;
+  }
+}
 .richtext:focus-within .ql-toolbar.ql-snow,
 .richtext:focus-within .ql-container.ql-snow {
   @apply border-accent;
