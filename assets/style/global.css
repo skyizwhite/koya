@@ -50,22 +50,25 @@ body {
 select {
   all: revert;
 }
-/* A list of rows in one box; on a wide screen, two to a row (tiles-3: three), each in its own box. */
-.tiles {
-  @apply overflow-hidden rounded-md border border-line bg-panel;
-}
-.tiles > li + li {
-  @apply border-t border-line;
-}
-@media (width >= 64rem) {
+/* In components, so that a row's own utilities, such as its hover, win. */
+@layer components {
+  /* A list of rows in one box; on a wide screen, two to a row (tiles-3: three), each in its own box. */
   .tiles {
-    @apply grid grid-cols-2 gap-3 overflow-visible rounded-none border-0 bg-transparent;
-  }
-  .tiles.tiles-3 {
-    @apply grid-cols-3;
-  }
-  .tiles > li {
     @apply overflow-hidden rounded-md border border-line bg-panel;
+  }
+  .tiles > li + li {
+    @apply border-t border-line;
+  }
+  @media (width >= 64rem) {
+    .tiles {
+      @apply grid grid-cols-2 gap-3 overflow-visible rounded-none border-0 bg-transparent;
+    }
+    .tiles.tiles-3 {
+      @apply grid-cols-3;
+    }
+    .tiles > li {
+      @apply overflow-hidden rounded-md border border-line bg-panel;
+    }
   }
 }
 .label {
