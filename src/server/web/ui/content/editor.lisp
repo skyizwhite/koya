@@ -253,9 +253,9 @@
              (span :nm-bind "{ hidden: () => _unfolded }" (~icon :name :menu))
              (span :hidden t :nm-bind "{ hidden: () => !_unfolded }" (~icon :name :close))))
          (when content (hsx (~meta :content content)))
-         (div :id "editor-actions" :class "editor-fold mt-3 flex flex-wrap items-center justify-between gap-2"
+         (div :id "editor-actions" :class "editor-fold mt-3 flex items-start justify-between gap-2 sm:flex-wrap sm:items-center"
               :nm-bind "{ 'class.open': () => _unfolded }"
-           (div :class "flex flex-wrap items-center gap-2"
+           (div :class "flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center"
              (when preview-url (hsx (~external-link :href preview-url "Preview draft")))
              (when public-url (hsx (~external-link :href public-url "Published page")))
              (when content
@@ -264,7 +264,7 @@
              (when (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))
                (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
                        (~icon :name :webhook) "Webhooks"))))
-           (div :class "flex flex-wrap items-center gap-2"
+           (div :class "flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center"
              (when (and published draft)
                (hsx (~action-button :space space-name :model model-name :id id :op "discard"
                                     :icon :discard :class "btn btn-danger" :title "Discard draft"
