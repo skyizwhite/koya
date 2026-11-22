@@ -61,8 +61,8 @@ secret is the owner.
 
 ## Spaces
 
-The first page lists the spaces with the number of models in each, and is where
-they are made and deleted.
+The first page lists the spaces, each with its number of models and media files
+beside its name, and is where they are made and deleted.
 
 ![The spaces, and where a new one is made](img/spaces.png)
 

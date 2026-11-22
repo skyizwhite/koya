@@ -5,6 +5,8 @@
                 #:bound #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/index #:create-space-action #:delete-space-action)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
+  (:import-from #:koya-server/usecases/ports/media #:insert-media)
+  (:import-from #:koya-server/domain/id #:new-id)
   (:import-from #:koya-server/usecases/ports/spaces #:find-space)
   (:import-from #:koya-server/usecases/keys
                 #:create-delivery-key #:list-delivery-keys #:create-management-key
@@ -23,6 +25,15 @@
     (ok (search "commandfor=\"new-space\"" body) "the form is behind a button")
     (ok (search "<dialog id=\"new-space\"" body) "and lives in a dialog on the page")
     (ok (search (bound (on-submit (create-space-action))) body)))
+  (testing "each space shows how many models and media it holds"
+    (ok (= 200 (call-action :post (create-space-action) :form '(("name" . "counted")))))
+    (let ((body (nth-value 1 (request :get "/"))))
+      (ok (search ">0 models</span>" body))
+      (ok (search ">0 media</span>" body)))
+    (insert-media "counted" (new-id) :filename "a.png" :mime "image/png" :size 1)
+    (ok (search ">1 media</span>" (nth-value 1 (request :get "/"))))
+    (ok (= 200 (call-action :post (delete-space-action)
+                            :form '(("name" . "counted") ("confirm" . "delete counted"))))))
   (testing "a space is made here, and starts empty"
     (ok (= 200 (call-action :post (create-space-action) :form '(("name" . "shop")))))
     (ok (find-space "shop"))

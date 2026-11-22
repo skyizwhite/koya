@@ -15,6 +15,8 @@
                 #:load-schema #:find-model #:list-spaces #:delete-space #:space-webhooks
                 #:find-space)
   (:import-from #:koya-server/usecases/spaces #:create-space)
+  (:import-from #:koya-server/usecases/ports/media #:insert-media)
+  (:import-from #:koya-server/domain/id #:new-id)
   (:import-from #:koya-server/domain/deploy
                 #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by
                 #:change-description #:change-op)
@@ -121,6 +123,11 @@
   (ok (equal (mapcar (lambda (s) (getf s :name)) (list-spaces)) '("website" "shop"))
       "in the order they were made")
   (ok (= (getf (first (list-spaces)) :models) 0))
+  (ok (= (getf (first (list-spaces)) :media) 0))
+  (testing "each space counts its own media"
+    (insert-media "shop" (new-id) :filename "a.png" :mime "image/png" :size 1)
+    (insert-media "shop" (new-id) :filename "b.png" :mime "image/png" :size 1)
+    (ok (equal (mapcar (lambda (s) (getf s :media)) (list-spaces)) '(0 2))))
   (testing "bad and taken names are refused"
     (ok (signals (create-space "My Space") 'error))
     (ok (signals (create-space "website") 'error)))
