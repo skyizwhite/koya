@@ -106,6 +106,27 @@
         (ok (= 302 (request :get "/")) "and the owner's id is no longer a session"))))
   (log-in))
 
+(defun input-tag (body name)
+  (let ((at (search (format nil "name=\"~a\"" name) body)))
+    (and at (subseq body (search "<input" body :end2 at :from-end t) (position #\> body :start at)))))
+
+(deftest the-login-form-is-one-a-password-manager-knows
+  (let ((*cookie* nil))
+    (let ((body (nth-value 1 (request :get "/login"))))
+      (testing "it names an account, owner, since a password manager keeps a password under one"
+        (let ((tag (input-tag body "username")))
+          (ok tag)
+          (ok (search "autocomplete=\"username\"" tag))
+          (ok (search "value=\"owner\"" tag))
+          (ok (search "readonly" tag) "which cannot be changed"))
+        (ok (search "Account" body)))
+      (ok (search "autocomplete=\"current-password\"" (input-tag body "secret"))
+          "and asks for the secret as the account's current password"))
+    (testing "the account sent is not read"
+      (ok (= 200 (post-login :form `(("username" . "someone") ("secret" . ,*secret*)))))
+      (let ((*cookie* nil))
+        (ok (= 401 (post-login :form '(("username" . "owner") ("secret" . "nope")))))))))
+
 (deftest login-returns-to-the-page
   (let ((*cookie* nil))
     (multiple-value-bind (status body headers) (request :get "/s/website/media" :query "page=2")

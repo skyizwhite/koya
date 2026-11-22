@@ -32,8 +32,13 @@
          :nm-bind (on-submit (log-in))
      (when next (hsx (input :type "hidden" :name "next" :value next)))
      (div
+       (label :for "username" :class "label" "Account")
+       (input :type "text" :id "username" :name "username" :value "owner" :autocomplete "username"
+              :readonly t :tabindex "-1" :class "input mt-1.5"))
+     (div
        (label :for "secret" :class "label" "Owner secret")
-       (input :type "password" :id "secret" :name "secret" :required t :autofocus t :class "input mt-1.5"))
+       (input :type "password" :id "secret" :name "secret" :autocomplete "current-password"
+              :required t :autofocus t :class "input mt-1.5"))
      (when (totp-enabled-p)
        (hsx (div
               (label :for "code" :class "label" "One-time code")
