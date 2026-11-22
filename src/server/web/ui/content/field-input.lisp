@@ -77,7 +77,8 @@
          (div :class "flex gap-2"
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _choose() }"
              (~icon :name :media) "Select")
-           (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
+           (button :type "button" :class "btn" :hidden (blank-p value)
+                   :nm-bind "{ onclick: () => _clear(), hidden: () => !_id }"
              (~icon :name :close) "Clear")))))))
 
 (defcomp ~media-entry (&key name id media)

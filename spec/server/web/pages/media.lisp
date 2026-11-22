@@ -250,3 +250,15 @@
     (ok (search "Uploaded 1 file." body))
     (ok (search "searched.png" body) "and the library shows it, with no search to hide it")
     (ng (search "q.txt" body) "the file's name is not taken for one")))
+
+(deftest clear-is-offered-only-for-a-field-holding-a-file
+  (let ((clear "<button type=\"button\" class=\"btn\" hidden nm-bind=\"{ onclick: () => _clear(), hidden: () => !_id }\"")
+        (file (media-id (store-upload "website" (png-bytes 1 1) :filename "clearable.png"))))
+    (ok (search clear (nth-value 1 (request :get "/s/website/m/blog/new")))
+        "a field with no image has no Clear, until one is selected")
+    (multiple-value-bind (space model) (resolve-model "website" "blog")
+      (dolist (cover (list file "gone"))
+        (let* ((id (content-id (create space model (list :title "Cleared" :cover cover))))
+               (body (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" id)))))
+          (ok (search "nm-bind=\"{ onclick: () => _clear(), hidden: () => !_id }\"" body))
+          (ng (search clear body) "one holding a file, or one that is missing, can be cleared"))))))
