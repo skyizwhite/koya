@@ -173,7 +173,7 @@
         }
       };
       if (input.value) {
-        quill.clipboard.dangerouslyPasteHTML(protect(input.value));
+        quill.setContents(quill.clipboard.convert({ html: protect(input.value), text: "" }));
         settle();
       }
       const empty = () =>
