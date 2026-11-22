@@ -65,9 +65,10 @@
   (let ((name (getf space :name)))
     (hsx
      (li :class "relative flex items-center gap-3 px-4 py-3 hover:bg-base"
-       (a :href (space-url name) :class "min-w-0 flex-1 after:absolute after:inset-0"
-         (span :class "block font-semibold" name)
-         (span :class "block text-sm text-muted" (format nil "~a model~:p" (getf space :models))))
+       (a :href (space-url name) :class "flex min-w-0 flex-1 flex-wrap items-baseline gap-x-4 gap-y-1 after:absolute after:inset-0"
+         (span :class "font-semibold" name)
+         (span :class "text-sm text-muted" (format nil "~a model~:p" (getf space :models)))
+         (span :class "text-sm text-muted" (format nil "~a media" (getf space :media))))
        (button :type "button" :class "btn btn-danger btn-icon relative z-10 shrink-0" :aria-label "Delete space"
                :commandfor (delete-dialog-id name) :command "show-modal"
          (~icon :name :delete))))))

@@ -59,8 +59,9 @@
 
 (defmethod list-spaces ()
   (mapcar (lambda (row)
-            (list :name (col row "name") :models (col row "models")))
-          (fetch "SELECT s.name, (SELECT COUNT(*) FROM models m WHERE m.space = s.name) AS models
+            (list :name (col row "name") :models (col row "models") :media (col row "media")))
+          (fetch "SELECT s.name, (SELECT COUNT(*) FROM models m WHERE m.space = s.name) AS models,
+                         (SELECT COUNT(*) FROM media f WHERE f.space = s.name) AS media
                   FROM spaces s ORDER BY s.position, s.name")))
 
 (defmethod find-space (name)
