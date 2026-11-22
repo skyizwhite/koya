@@ -252,9 +252,6 @@
              (when content
                (hsx (a :href (history-url space-name model-name id) :class "btn"
                        (~icon :name :history) "History")))
-             (when (and content (not object-p))
-               (hsx (a :href (duplicate-url space-name model-name id) :class "btn"
-                       (~icon :name :duplicate) "Duplicate")))
              (when (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))
                (hsx (a :href (webhook-log-url space-name :model model-name) :class "btn"
                        (~icon :name :webhook) "Webhooks"))))
@@ -264,6 +261,9 @@
                                     :icon :discard :class "btn btn-danger" :title "Discard draft"
                                     :confirm "Discard the draft and go back to the published version?"
                                     "Discard draft")))
+             (when (and content (not object-p))
+               (hsx (a :href (duplicate-url space-name model-name id) :class "btn"
+                       (~icon :name :duplicate) "Duplicate")))
              (~action-button :space space-name :model model-name :id id :op "save" :icon :save "Save draft")
              (~action-button :space space-name :model model-name :id id :op "publish" :icon :publish
                              :class "btn btn-primary" :title "Publish content"
