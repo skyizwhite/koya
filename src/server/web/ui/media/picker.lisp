@@ -81,4 +81,4 @@
 
 (defcomp ~media-picker-dialog (&key space)
   (hsx (~picker-dialog :id "media-picker" :class "max-w-3xl" :title "Media" :factory "mediaPicker"
-                       :url (media-picker :space space) :add-label "Add images")))
+                       :url (media-picker :space space) :add-label "Add")))
