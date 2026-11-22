@@ -125,3 +125,7 @@ dialog.koya-dialog::backdrop {
 .ql-container.ql-snow {
   @apply border border-t-0 border-line;
 }
+.richtext:focus-within .ql-toolbar.ql-snow,
+.richtext:focus-within .ql-container.ql-snow {
+  @apply border-accent;
+}
