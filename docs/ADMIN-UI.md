@@ -218,9 +218,11 @@ by its model's `label` field, or by its id.
   message under each offending field, inside a custom field or a repeater's
   row too; nothing is saved.
 
-The sticky bar at the top of the editor carries the model's name and the
-content's id, the status badge and the created/updated times, then — where the
-content can be seen on the left, what can be done to it on the right:
+The sticky bar at the top of the editor carries the model's name, the
+content's id and its status badge, the created/updated times, then — where the
+content can be seen on the left, what can be done to it on the right. On a phone
+the times and those buttons are folded away until the toggle at the bar's
+right shows them:
 
 | Button | What it does |
 |---|---|

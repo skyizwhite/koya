@@ -71,6 +71,17 @@ select {
     }
   }
 }
+/* On a phone the editor's bar folds its times and buttons under a toggle. */
+@media (width >= 40rem) {
+  .editor-fold-toggle {
+    display: none;
+  }
+}
+@media (width < 40rem) {
+  .editor-fold:not(.open) {
+    display: none;
+  }
+}
 .label {
   @apply block text-sm font-medium text-fg;
 }

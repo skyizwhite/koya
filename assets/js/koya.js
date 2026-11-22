@@ -483,6 +483,7 @@
     });
     return {
       _current: drawn,
+      _unfolded: false,
       _track() {
         this._current = snapshot();
         current = this._current;
