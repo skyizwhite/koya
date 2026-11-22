@@ -164,7 +164,7 @@
 
 (defun upload (space files)
   (handler-case
-      (cond ((null files) (values "Choose at least one image." :error))
+      (cond ((null files) (values "Select at least one image." :error))
             (t (values (format nil "Uploaded ~a file~:p." (length (store-uploads space files))) :ok)))
     (koya-error (e) (values (koya-error-message e) :error))))
 
