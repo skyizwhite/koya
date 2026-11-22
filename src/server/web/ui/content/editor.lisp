@@ -174,7 +174,7 @@
         (action-refusal "No such row." 404))))
 
 (defcomp ~external-link (&key href children)
-  (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" children (~icon :name :external))))
+  (hsx (a :href href :target "_blank" :rel "noopener" :class "btn" (~icon :name :external) children)))
 
 (defcomp ~action-button (&key space model id op (class "btn") title confirm icon children)
   (let ((dialog (and confirm (format nil "confirm-~a" op))))
