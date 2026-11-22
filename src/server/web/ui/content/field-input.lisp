@@ -55,7 +55,7 @@
                                  :id (getf reference :id) :label (getf reference :label)
                                  :status (getf reference :status) :href (getf reference :href)))))
        (button :type "button" :class "btn" :nm-bind "{ onclick: () => _choose() }"
-         (~icon :name :plus) (if many "Add…" "Select…"))))))
+         (~icon :name :plus) (if many "Add" "Select"))))))
 
 (defcomp ~media-control (&key name value media)
   (let ((url (if media (media-url media :absolute nil) ""))
@@ -76,7 +76,7 @@
          (div :class "text-muted" :nm-bind "{ textContent: () => _name }" label)
          (div :class "flex gap-2"
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _choose() }"
-             (~icon :name :media) "Choose…")
+             (~icon :name :media) "Choose")
            (button :type "button" :class "btn" :nm-bind "{ onclick: () => _clear() }"
              (~icon :name :close) "Clear")))))))
 

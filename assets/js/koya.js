@@ -133,7 +133,7 @@
       const input = document.getElementById(holder.dataset.quillFor);
       const quill = new Quill(holder, {
         theme: "snow",
-        placeholder: "Write here...",
+        placeholder: "Write here",
         modules: {
           toolbar: {
             container: [
