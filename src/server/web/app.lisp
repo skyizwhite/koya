@@ -15,7 +15,7 @@
   (:import-from #:koya-server/web/lib/media #:media-app)
   (:import-from #:koya-server/web/lib/health #:health-app)
   (:import-from #:koya-server/web/lib/http
-                #:make-json-app #:set-content-type)
+                #:make-json-app #:set-response-header)
   (:import-from #:koya-server/web/lib/request-log #:*mw-error-log* #:*mw-access-log*)
   (:import-from #:koya-server/web/lib/middlewares
                 #:*mw-temporary-file* #:*mw-max-body* #:*mw-session-cookie-renewal*
@@ -53,12 +53,12 @@
   (if (and (consp result) (integerp (first result)))
       (call-next-method)
       (progn
-        (set-content-type "text/html; charset=utf-8")
+        (set-response-header :content-type "text/html; charset=utf-8")
         (call-next-method app (and result (hsx:render-to-string
                                            (hsx:hsx (~document :title (page-title) result))))))))
 
 (defmethod process-response :around ((app (eql *actions-app*)) result)
-  (set-content-type "text/html; charset=utf-8")
+  (set-response-header :content-type "text/html; charset=utf-8")
   (call-next-method app (and result (hsx:render-to-string (hsx:hsx result)))))
 
 (defun session-cookie-state ()

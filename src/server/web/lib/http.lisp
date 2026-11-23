@@ -45,8 +45,8 @@
            #:error-object
            #:json-response
            #:error-status
-           #:set-status
-           #:set-content-type
+           #:set-response-status
+           #:set-response-header
            #:request-octets))
 (in-package #:koya-server/web/lib/http)
 
@@ -115,17 +115,17 @@
       (json-response 422 (error-object "validation_failed" "Content is invalid"
                                        (validation-details (validation-error-errors e)))))))
 
-(defun set-status (status)
+(defun set-response-status (status)
   (setf (response-status *response*) status))
 
-(defun set-content-type (type)
-  (setf (getf (response-headers *response*) :content-type) type))
+(defun set-response-header (name value)
+  (setf (getf (response-headers *response*) name) value))
 
 (defun request-octets ()
   (request-content *request*))
 
 (defmethod process-response :around ((app json-app) result)
-  (set-content-type "application/json; charset=utf-8")
+  (set-response-header :content-type "application/json; charset=utf-8")
   (call-next-method app (if (stringp result) result (to-json result))))
 
 (defun read-json-body ()
@@ -153,8 +153,8 @@
   (integer-text (param params name)))
 
 (defun redirect-to (path &optional (status 303))
-  (setf (getf (response-headers *response*) :location) path)
-  (set-status status)
+  (set-response-header :location path)
+  (set-response-status status)
   nil)
 
 (defun body-field (body name &optional default)

@@ -14,7 +14,7 @@
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by
                 #:revision-created-at #:changed-keys)
-  (:import-from #:koya-server/web/lib/http #:path-param #:param #:set-status)
+  (:import-from #:koya-server/web/lib/http #:path-param #:param #:set-response-status)
   (:import-from #:koya-server/domain/errors #:not-found)
   (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-server/web/lib/assets #:asset-url)
@@ -187,7 +187,7 @@
       (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
         (let ((content (find-content space (model-name model) (path-param params :id))))
           (cond ((null content)
-                 (set-status 404)
+                 (set-response-status 404)
                  (hsx (~layout :space space (h1 :class "text-xl font-bold" "Content not found"))))
                 (t
                  (set-title (format nil "History · ~a · ~a · koya" (model-name model) space))
@@ -195,5 +195,5 @@
                                      :published-only (equal (param params "view") "published")
                                      :page (page-number params)))))))
     (not-found ()
-      (set-status 404)
+      (set-response-status 404)
       (hsx (~layout (h1 :class "text-xl font-bold" "Model not found"))))))

@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/admin-api/<space>/lists/<model>/index
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject #:json-null)
-  (:import-from #:koya-server/web/lib/http #:read-json-body #:body-field #:fail-api #:set-status #:body-data)
+  (:import-from #:koya-server/web/lib/http #:read-json-body #:body-field #:fail-api #:set-response-status #:body-data)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
   (:import-from #:koya-server/usecases/contents #:create)
   (:import-from #:koya-server/usecases/listing #:all-contents)
@@ -30,5 +30,5 @@
                              :updated-at (body-field body "updatedAt")
                              :published-at (body-field body "publishedAt")
                              :revised-at (body-field body "revisedAt"))))
-        (set-status 201)
+        (set-response-status 201)
         (admin-content->jobject content model)))))

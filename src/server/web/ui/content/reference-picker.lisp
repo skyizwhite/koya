@@ -2,7 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-reveal)
-  (:import-from #:koya-server/web/lib/http #:param #:set-status)
+  (:import-from #:koya-server/web/lib/http #:param #:set-response-status)
   (:import-from #:koya-server/web/lib/paging #:page-number)
   (:import-from #:koya-server/web/lib/urls #:editor-url)
   (:import-from #:koya-core/schema #:model-name)
@@ -77,7 +77,7 @@
     (and space name (find-model space name))))
 
 (defun unknown ()
-  (set-status 404)
+  (set-response-status 404)
   (hsx (div :id "reference-picker-body" :class "text-sm text-danger" "Unknown model.")))
 
 (defun many-p (params)

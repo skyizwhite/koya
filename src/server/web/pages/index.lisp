@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/pages/index
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/http #:param #:integer-param #:set-status #:request-octets)
+  (:import-from #:koya-server/web/lib/http #:param #:integer-param #:set-response-status #:request-octets)
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
@@ -175,7 +175,7 @@
 (defaction create-space-action :post (params)
   (multiple-value-bind (message error) (make-space params)
     (cond (error
-           (set-status 422)
+           (set-response-status 422)
            (hsx (~new-space-error :message error)))
           (t
            (hsx (<> (~new-space-dialog)
@@ -184,7 +184,7 @@
 
 (defun delete-refusal (name message status)
   (cond ((null name) (action-refusal message status))
-        (t (set-status status)
+        (t (set-response-status status)
            (hsx (~delete-error :name name :message message)))))
 
 (defaction delete-space-action :post (params)

@@ -6,7 +6,7 @@
   (:import-from #:koya-server/domain/errors
                 #:koya-error-message)
   (:import-from #:koya-server/web/lib/http
-                #:error-status #:set-status)
+                #:error-status #:set-response-status)
   (:import-from #:koya-server/web/lib/toast
                 #:~toast #:~toast-message)
   (:export #:set-toast
@@ -29,7 +29,7 @@
       (values (aref toast 0) (if (equal (aref toast 1) "error") :error :ok)))))
 
 (defun action-refusal (message &optional (status 400))
-  (set-status status)
+  (set-response-status status)
   (hsx (~toast :message message :kind :error)))
 
 (defun action-refused (condition)

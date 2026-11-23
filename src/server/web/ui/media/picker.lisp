@@ -4,7 +4,7 @@
   (:import-from #:koya-server/web/lib/binds #:on-search #:on-pick)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
-  (:import-from #:koya-server/web/lib/http #:uploaded-files #:param #:set-status)
+  (:import-from #:koya-server/web/lib/http #:uploaded-files #:param #:set-response-status)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/web/lib/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/ui/icon #:~icon)
@@ -44,7 +44,7 @@
      (~picker-grid :space space :search search))))
 
 (defun forbidden (message)
-  (set-status 403)
+  (set-response-status 403)
   (hsx (div :id "media-picker-body" :class "text-sm text-danger" message)))
 
 (defun picker-space (params)
