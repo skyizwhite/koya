@@ -2,67 +2,7 @@
  (:class qlot/source/dist:source-dist
   :initargs (:distribution "https://beta.quicklisp.org/dist/quicklisp.txt" :%version :latest)
   :version "2026-01-01"))
-("clack" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
-("lack" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2026-01-01"))
-("hsx" .
- (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/hsx.git")
-  :version "git-16c85a2f5d77e1285e427e7659efe7b40dfc17d8"))
-("ningle-fbr" .
- (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/ningle-fbr.git")
-  :version "git-2829bb24ca54ced927c3f56c5fdd723f4f90cdc9"))
-("ningle-actions" .
- (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/ningle-actions.git")
-  :version "git-dded9e78b94113dd64ab341c586b93ac7b9dcc9f"))
-("lack-mw" .
- (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git" :tag "v0.4.0")
-  :version "git-3fa9e3019b7c3af4133e9f44461874e8ca4f8b76"))
-("okite" .
- (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/okite.git" :tag "0.4.0")
-  :version "git-05947fd37249c3069d73a76c62cf30881f9b6f70"))
-("woo" .
- (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/fukamachi/woo.git")
-  :version "git-51b8cb2653116cd05f6a8d0029719ce6ce106711"))
-("cl-dotenv" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2018-10-18"))
-("cl-dbi" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2026-01-01"))
-("jzon" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2024-10-12"))
-("dexador" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2026-01-01"))
-("quri" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2026-01-01"))
-("ironclad" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2024-10-12"))
-("local-time" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2026-01-01"))
-("cl-ppcre" .
+("access" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2025-06-22"))
@@ -70,19 +10,55 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2024-10-12"))
-("zippy" .
+("babel" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2026-01-01"))
-("rove" .
- (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/fukamachi/rove")
-  :version "git-52b04eaa4a079d753fdf49e793a52d5fe1f61836"))
-("access" .
+("bordeaux-threads" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2024-10-12"))
+("cl-dbi" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2026-01-01"))
+("cl-dotenv" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2018-10-18"))
+("cl-ppcre" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2025-06-22"))
-("verbose" .
+("clack" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2025-06-22"))
+("dexador" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2026-01-01"))
+("hsx" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/skyizwhite/hsx.git")
+  :version "git-16c85a2f5d77e1285e427e7659efe7b40dfc17d8"))
+("ironclad" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2024-10-12"))
+("jzon" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2024-10-12"))
+("lack" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2026-01-01"))
+("lack-mw" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git" :tag "v0.4.0")
+  :version "git-3fa9e3019b7c3af4133e9f44461874e8ca4f8b76"))
+("local-time" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2026-01-01"))
@@ -90,3 +66,51 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2024-10-12"))
+("ningle-actions" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/skyizwhite/ningle-actions.git")
+  :version "git-dded9e78b94113dd64ab341c586b93ac7b9dcc9f"))
+("ningle-fbr" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/skyizwhite/ningle-fbr.git")
+  :version "git-2829bb24ca54ced927c3f56c5fdd723f4f90cdc9"))
+("okite" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/skyizwhite/okite.git" :tag "0.4.0")
+  :version "git-05947fd37249c3069d73a76c62cf30881f9b6f70"))
+("piping" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2026-01-01"))
+("quri" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2026-01-01"))
+("smart-buffer" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/fukamachi/smart-buffer.git")
+  :version "git-619759d8a6f821773bbc65c0bda553d30e51e6f3"))
+("usocket" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2026-01-01"))
+("verbose" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2026-01-01"))
+("woo" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/fukamachi/woo.git")
+  :version "git-51b8cb2653116cd05f6a8d0029719ce6ce106711"))
+("zippy" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2026-01-01"))
+("flexi-streams" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2024-10-12"))
+("rove" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/fukamachi/rove")
+  :version "git-52b04eaa4a079d753fdf49e793a52d5fe1f61836"))
