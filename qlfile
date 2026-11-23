@@ -20,3 +20,9 @@ git rove https://github.com/fukamachi/rove
 ql access
 ql verbose
 ql ningle
+ql babel
+ql bordeaux-threads
+ql flexi-streams
+ql piping
+ql smart-buffer
+ql usocket
