@@ -1,6 +1,5 @@
 (defpackage #:koya-server/web/ui/content/editor
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:import-from #:koya-core/schema
@@ -21,7 +20,7 @@
                 #:content-published-p #:content-draft-p
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
                 #:default-data #:duplicated-data #:content-label #:slug-value #:held-ids)
-  (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list)
+  (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list #:set-status)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
   (:import-from #:koya-server/web/lib/forms #:form->data #:field-param-name #:row-prefix)
@@ -373,7 +372,7 @@
            (~toast :message message))))
 
 (defun changed-elsewhere (url)
-  (set-response-status 409)
+  (set-status 409)
   (hsx (~toast :kind :error :clickable t
                :message (hsx (<> "This content was changed elsewhere after you opened it. "
                                  (a :href url :class "font-semibold underline" "Open it again")
@@ -430,7 +429,7 @@
                                             (:published "Back to the published version: the draft is gone.")
                                             (t "Draft saved."))))))
            (validation-error (e)
-             (set-response-status 422)
+             (set-status 422)
              (let ((errors (validation-error-errors e)))
                (hsx (<> (~errors :id "editor-errors" :errors errors)
                         (loop :for field :in (model-fields model) :collect

@@ -10,7 +10,7 @@
   (:import-from #:koya-server/web/pages/index #:create-space-action)
   (:import-from #:koya-spec/server/logs #:logged)
   (:import-from #:koya-server/usecases/keys #:create-delivery-key)
-  (:import-from #:jingle #:route)
+  (:import-from #:ningle #:route)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db)
   (:import-from #:alexandria #:alist-hash-table)
   (:import-from #:babel #:string-to-octets)

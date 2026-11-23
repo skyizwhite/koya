@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/lib/document
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:context)
+  (:import-from #:ningle #:context)
   (:import-from #:koya-server/web/lib/assets #:asset-url)
   (:export #:~document
            #:set-title

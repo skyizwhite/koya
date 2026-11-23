@@ -1,6 +1,5 @@
 ql clack
 ql lack
-git cl-jingle https://github.com/dnaeon/cl-jingle.git
 git hsx https://github.com/skyizwhite/hsx.git
 git ningle-fbr https://github.com/skyizwhite/ningle-fbr.git
 git ningle-actions https://github.com/skyizwhite/ningle-actions.git
@@ -20,3 +19,4 @@ ql zippy
 git rove https://github.com/fukamachi/rove
 ql access
 ql verbose
+ql ningle

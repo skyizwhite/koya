@@ -1,6 +1,6 @@
 (defpackage #:koya-server/web/pages/settings
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status #:context)
+  (:import-from #:ningle #:context)
   (:import-from #:koya-server/usecases/settings
                 #:totp-enabled-p #:totp-code-valid-p #:enable-totp #:disable-totp
                 #:display-timezone-name #:display-timezone #:set-display-timezone)
@@ -9,7 +9,7 @@
   (:import-from #:koya-server/domain/totp #:generate-totp-secret #:otpauth-uri)
   (:import-from #:koya-server/domain/timezone #:timezone-names #:format-local)
   (:import-from #:koya-core/time #:now-iso)
-  (:import-from #:koya-server/web/lib/http #:param)
+  (:import-from #:koya-server/web/lib/http #:param #:set-status)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/icon #:~icon)
@@ -147,7 +147,7 @@
       card))
 
 (defun refuse (part)
-  (set-response-status 422)
+  (set-status 422)
   part)
 
 (defaction save-timezone-action :post (params)

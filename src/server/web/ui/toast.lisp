@@ -1,13 +1,12 @@
 (defpackage #:koya-server/web/ui/toast
   (:use #:cl #:hsx)
-  (:import-from #:jingle
-                #:set-response-status #:context)
+  (:import-from #:ningle #:context)
   (:import-from #:koya-core/json
                 #:json-array)
   (:import-from #:koya-server/domain/errors
                 #:koya-error-message)
   (:import-from #:koya-server/web/lib/http
-                #:error-status)
+                #:error-status #:set-status)
   (:import-from #:koya-server/web/lib/toast
                 #:~toast #:~toast-message)
   (:export #:set-toast
@@ -30,7 +29,7 @@
       (values (aref toast 0) (if (equal (aref toast 1) "error") :error :ok)))))
 
 (defun action-refusal (message &optional (status 400))
-  (set-response-status status)
+  (set-status status)
   (hsx (~toast :message message :kind :error)))
 
 (defun action-refused (condition)

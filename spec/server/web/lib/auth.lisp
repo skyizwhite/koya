@@ -6,7 +6,7 @@
   (:import-from #:koya-server/usecases/spaces #:create-space)
   (:import-from #:koya-server/usecases/keys #:create-management-key)
   (:import-from #:koya-server/web/app #:*page-app* #:*app* #:build-app)
-  (:import-from #:jingle #:route)
+  (:import-from #:ningle #:route)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db))
 (in-package #:koya-spec/server/web/lib/auth)
 

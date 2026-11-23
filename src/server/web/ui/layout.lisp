@@ -1,7 +1,6 @@
 (defpackage #:koya-server/web/ui/layout
   (:use #:cl #:hsx)
-  (:import-from #:jingle
-                #:set-response-status)
+  (:import-from #:koya-server/web/lib/http #:set-status)
   (:import-from #:ningle-actions
                 #:defaction)
   (:import-from #:koya-server/web/lib/auth
@@ -77,5 +76,5 @@
      (~footer))))
 
 (defcomp ~missing (&key what space)
-  (set-response-status 404)
+  (set-status 404)
   (hsx (~layout :space space (h1 :class "text-xl font-bold" (format nil "~a not found" what)))))

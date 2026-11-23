@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/admin-api/<space>/keys/index
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject)
-  (:import-from #:koya-server/web/lib/http #:path-param #:read-json-body #:body-field #:ok-status #:fail-api)
+  (:import-from #:koya-server/web/lib/http #:path-param #:read-json-body #:body-field #:set-status #:fail-api)
   (:import-from #:koya-server/usecases/keys
                 #:space-webhook-secret #:create-delivery-key #:list-delivery-keys)
   (:import-from #:koya-server/domain/key #:key-id #:key-label #:key-created-at)
@@ -22,5 +22,5 @@
         (label (body-field (read-json-body) "label" "")))
     (unless (stringp label) (fail-api 400 "bad_request" "\"label\" must be a string"))
     (multiple-value-bind (key id) (create-delivery-key space :label label)
-      (ok-status 201)
+      (set-status 201)
       (jobject "id" id "label" label "key" key))))
