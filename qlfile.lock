@@ -87,9 +87,9 @@
   :initargs (:%version :latest)
   :version "ql-2026-01-01"))
 ("smart-buffer" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2021-10-20"))
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/fukamachi/smart-buffer.git")
+  :version "git-619759d8a6f821773bbc65c0bda553d30e51e6f3"))
 ("usocket" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)

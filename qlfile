@@ -19,7 +19,7 @@ git ningle-fbr https://github.com/skyizwhite/ningle-fbr.git
 git okite https://github.com/skyizwhite/okite.git :tag 0.4.0
 ql piping
 ql quri
-ql smart-buffer
+git smart-buffer https://github.com/fukamachi/smart-buffer.git
 ql usocket
 ql verbose
 git woo https://github.com/fukamachi/woo.git
