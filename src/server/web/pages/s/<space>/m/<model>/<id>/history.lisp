@@ -1,7 +1,6 @@
 (defpackage #:koya-server/web/pages/s/<space>/m/<model>/<id>/history
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-follow)
   (:import-from #:koya-core/schema
@@ -15,7 +14,7 @@
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by
                 #:revision-created-at #:changed-keys)
-  (:import-from #:koya-server/web/lib/http #:path-param #:param)
+  (:import-from #:koya-server/web/lib/http #:path-param #:param #:set-response-status)
   (:import-from #:koya-server/domain/errors #:not-found)
   (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-server/web/lib/assets #:asset-url)

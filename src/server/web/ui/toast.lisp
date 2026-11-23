@@ -1,13 +1,12 @@
 (defpackage #:koya-server/web/ui/toast
   (:use #:cl #:hsx)
-  (:import-from #:jingle
-                #:set-response-status #:context)
+  (:import-from #:ningle #:context)
   (:import-from #:koya-core/json
                 #:json-array)
   (:import-from #:koya-server/domain/errors
                 #:koya-error-message)
   (:import-from #:koya-server/web/lib/http
-                #:error-status)
+                #:error-status #:set-response-status)
   (:import-from #:koya-server/web/lib/toast
                 #:~toast #:~toast-message)
   (:export #:set-toast

@@ -1,9 +1,8 @@
 (defpackage #:koya-server/web/pages/s/<space>/m/<model>/<id>
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:koya-core/schema #:model-kind #:model-name)
   (:import-from #:koya-server/usecases/contents #:find-content)
-  (:import-from #:koya-server/web/lib/http #:path-param)
+  (:import-from #:koya-server/web/lib/http #:path-param #:set-response-status)
   (:import-from #:koya-server/domain/errors #:not-found)
   (:import-from #:koya-server/web/ui/layout #:~layout)
   (:import-from #:koya-server/web/ui/content/editor #:new-p #:show-editor)

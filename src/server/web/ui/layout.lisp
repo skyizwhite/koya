@@ -1,7 +1,6 @@
 (defpackage #:koya-server/web/ui/layout
   (:use #:cl #:hsx)
-  (:import-from #:jingle
-                #:set-response-status)
+  (:import-from #:koya-server/web/lib/http #:set-response-status)
   (:import-from #:ningle-actions
                 #:defaction)
   (:import-from #:koya-server/web/lib/auth

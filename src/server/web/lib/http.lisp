@@ -1,8 +1,9 @@
 (defpackage #:koya-server/web/lib/http
   (:use #:cl)
-  (:import-from #:jingle
-                #:set-response-header #:set-response-status #:get-request-header #:redirect
-                #:*request* #:process-response #:request-content)
+  (:import-from #:ningle
+                #:*request* #:*response* #:process-response)
+  (:import-from #:lack/request #:request-content)
+  (:import-from #:lack/response #:response-status #:response-headers)
   (:import-from #:koya-core/json
                 #:parse-json #:to-json #:jobject #:json-null #:json-null-p)
   (:import-from #:koya-core/data #:blank-p)
@@ -40,12 +41,13 @@
            #:form-values
            #:form-list
            #:uploaded-files
-           #:header
            #:origin-allowed-p
            #:error-object
            #:json-response
            #:error-status
-           #:ok-status))
+           #:set-response-status
+           #:set-response-header
+           #:request-octets))
 (in-package #:koya-server/web/lib/http)
 
 (define-condition api-error (error)
@@ -80,7 +82,7 @@
   (map 'vector (lambda (e) (jobject "field" (getf e :field) "code" (getf e :code) "message" (getf e :message)))
        errors))
 
-(defclass json-app (jingle:app) ())
+(defclass json-app (ningle:app) ())
 
 (defun make-json-app ()
   (make-instance 'json-app))
@@ -113,15 +115,21 @@
       (json-response 422 (error-object "validation_failed" "Content is invalid"
                                        (validation-details (validation-error-errors e)))))))
 
+(defun set-response-status (status)
+  (setf (response-status *response*) status))
+
+(defun set-response-header (name value)
+  (setf (getf (response-headers *response*) name) value))
+
+(defun request-octets ()
+  (request-content *request*))
+
 (defmethod process-response :around ((app json-app) result)
   (set-response-header :content-type "application/json; charset=utf-8")
   (call-next-method app (if (stringp result) result (to-json result))))
 
-(defun ok-status (status)
-  (set-response-status status))
-
 (defun read-json-body ()
-  (let* ((octets (request-content *request*))
+  (let* ((octets (request-octets))
          (text (octets-to-string octets :encoding :utf-8))
          (value (if (zerop (length (string-trim '(#\Space #\Newline #\Return #\Tab) text)))
                     (jobject)
@@ -145,7 +153,9 @@
   (integer-text (param params name)))
 
 (defun redirect-to (path &optional (status 303))
-  (redirect path status))
+  (set-response-header :location path)
+  (set-response-status status)
+  nil)
 
 (defun body-field (body name &optional default)
   (multiple-value-bind (v found) (gethash name body)
@@ -176,10 +186,6 @@
         :when (and (equal k name) (consp v) (streamp (first v)))
           :collect (destructuring-bind (stream &optional filename content-type) v
                      (list (read-stream-content-into-byte-vector stream) filename content-type))))
-
-(defun header (name)
-  (let ((values (get-request-header name)))
-    (and values (string-trim " " (first values)))))
 
 (defun origin-key (url)
   (let ((u (handler-case (uri (string-trim " " url)) (uri-error () nil))))

@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/json #:jobject)
   (:import-from #:koya-server/web/lib/http
-                #:path-param #:param #:fail-api #:ok-status #:uploaded-files #:form-field)
+                #:path-param #:param #:fail-api #:set-response-status #:uploaded-files #:form-field)
   (:import-from #:koya-server/domain/query #:parse-query #:query-limit #:query-offset)
   (:import-from #:koya-server/web/lib/presenters #:media->jobject)
   (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
@@ -25,5 +25,5 @@
         (alt (or (form-field params "alt") "")))
     (when (null files) (fail-api 400 "bad_request" "Send the image as a multipart field named \"file\""))
     (let ((stored (store-uploads space files :alt alt)))
-      (ok-status 201)
+      (set-response-status 201)
       (jobject "media" (map 'vector #'media->jobject stored)))))

@@ -1,9 +1,7 @@
 (defpackage #:koya-server/web/pages/index
   (:use #:cl #:hsx)
-  (:import-from #:jingle
-                #:set-response-status #:*request* #:request-content)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/http #:param #:integer-param)
+  (:import-from #:koya-server/web/lib/http #:param #:integer-param #:set-response-status #:request-octets)
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
@@ -206,7 +204,7 @@
   (let ((offset (integer-param params "offset")))
     (handler-case
         (hsx (<> (princ-to-string (continue-import (param params "id") offset
-                                                   (request-content *request*)))))
+                                                   (request-octets)))))
       (koya-error (e) (action-refused e)))))
 
 (defaction finish-import-action :post (params)

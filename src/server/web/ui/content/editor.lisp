@@ -1,6 +1,5 @@
 (defpackage #:koya-server/web/ui/content/editor
   (:use #:cl #:hsx)
-  (:import-from #:jingle #:set-response-status)
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:import-from #:koya-core/schema
@@ -21,7 +20,7 @@
                 #:content-published-p #:content-draft-p
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
                 #:default-data #:duplicated-data #:content-label #:slug-value #:held-ids)
-  (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list)
+  (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list #:set-response-status)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
   (:import-from #:koya-server/web/lib/forms #:form->data #:field-param-name #:row-prefix)

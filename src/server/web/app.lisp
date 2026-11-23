@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/app
   (:use #:cl)
-  (:import-from #:jingle
-                #:make-app #:set-response-header #:process-response)
+  (:import-from #:ningle
+                #:process-response)
   (:import-from #:ningle-fbr
                 #:set-routes)
   (:import-from #:ningle-actions
@@ -15,7 +15,7 @@
   (:import-from #:koya-server/web/lib/media #:media-app)
   (:import-from #:koya-server/web/lib/health #:health-app)
   (:import-from #:koya-server/web/lib/http
-                #:make-json-app)
+                #:make-json-app #:set-response-header)
   (:import-from #:koya-server/web/lib/request-log #:*mw-error-log* #:*mw-access-log*)
   (:import-from #:koya-server/web/lib/middlewares
                 #:*mw-temporary-file* #:*mw-max-body* #:*mw-session-cookie-renewal*
@@ -40,7 +40,7 @@
 
 (defparameter *admin-api-app* (make-json-app))
 
-(defparameter *page-app* (make-app))
+(defparameter *page-app* (make-instance 'ningle:app))
 
 (defun install-routes ()
   (set-routes *api-app* :system :koya-server :dir "web/api")

@@ -147,9 +147,9 @@ the pages `ui/`), and nothing uses them, another route included. A URL two pages
 [okite](https://github.com/skyizwhite/okite) -- in `web/`, each router a layer
 of its own, isolated, outside `ui/` outside the rest -- and fails when a file
 imports from a layer further out or a route from another route, from a library
-that belongs to another layer (`cl-dbi` outside `infra/`, `jingle` outside
-`web/`), from a library it does not list at all, or from `koya-sdk` or `ningle`
--- ningle is reached through jingle, which re-exports it. `lack` is the web's,
+that belongs to another layer (`cl-dbi` outside `infra/`, `ningle` outside
+`web/`), from a library it does not list at all, or from `koya-sdk`. `lack` is
+the web's,
 and its session middleware, `lack-middleware-session`, infra's, since the
 session store infra keeps in the database speaks its protocol. `verbose` is
 `log`'s and `main`'s, and `piping`, which `main` uses to reach verbose's output,
@@ -221,7 +221,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 |---|---|
 | HTTP | Clack / Lack; Hunchentoot in development, Woo with `KOYA_WORKERS` threads in production |
 | Middlewares | lack-mw: Lack's own, and the guards combined with `mw-every` / `mw-except` |
-| Router | jingle (a ningle extension) + ningle-fbr |
+| Router | ningle + ningle-fbr |
 | Templates | hsx; ningle-actions for everything done on a page |
 | Browser | Nomini (requests, swaps and a page's state), `koya.js` (what a page holds) |
 | DB | cl-dbi + dbd-sqlite3 |

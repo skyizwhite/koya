@@ -8,8 +8,8 @@
                 #:check-login)
   (:import-from #:koya-server/usecases/actor
                 #:*actor* #:+owner+ #:key-actor)
-  (:import-from #:jingle
-                #:*request* #:context #:request-env)
+  (:import-from #:ningle #:*request* #:context)
+  (:import-from #:lack/request #:request-env)
   (:import-from #:lack-mw
                 #:mw-every #:mw-except)
   (:import-from #:quri #:uri #:uri-path #:uri-query #:make-uri #:render-uri #:url-decode #:uri-error)

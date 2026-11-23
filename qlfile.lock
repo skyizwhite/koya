@@ -10,10 +10,6 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2026-01-01"))
-("cl-jingle" .
- (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/dnaeon/cl-jingle.git")
-  :version "git-10e10bb749b46b944f0d1daf95540f9dc806b41a"))
 ("hsx" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/hsx.git")
@@ -90,3 +86,7 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2026-01-01"))
+("ningle" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version :latest)
+  :version "ql-2024-10-12"))
