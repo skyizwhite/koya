@@ -14,7 +14,7 @@
                 #:custom-field-name #:custom-field-fields #:make-custom-field
                 #:webhook-label #:webhook-url #:webhook-only #:make-webhook
                 #:model-name #:model-kind #:model-fields #:model-preview-url #:model-public-url
-                #:model-label #:model-was #:make-model
+                #:model-label #:model-history-p #:model-was #:make-model
                 #:schema-webhooks #:schema-custom-fields #:schema-models #:make-schema #:check-schema)
   (:import-from #:koya-core/diff
                 #:change-path #:destructive-change-p #:format-change)
@@ -67,6 +67,7 @@
     (when (model-preview-url model) (setf (gethash "previewUrl" obj) (model-preview-url model)))
     (when (model-public-url model) (setf (gethash "publicUrl" obj) (model-public-url model)))
     (when (model-label model) (setf (gethash "label" obj) (model-label model)))
+    (when (model-history-p model) (setf (gethash "history" obj) t))
     (when (model-was model) (setf (gethash "was" obj) (model-was model)))
     obj))
 
@@ -145,6 +146,7 @@
                 :preview-url (model-value obj name "previewUrl")
                 :public-url (model-value obj name "publicUrl")
                 :label (model-value obj name "label")
+                :history (model-value obj name "history")
                 :was (model-value obj name "was"))))
 
 (defun jobject->schema (obj)

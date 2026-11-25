@@ -82,7 +82,9 @@ beside its name, and is where they are made and deleted.
   cannot be undone.
 - **Import**, beside **New space**, takes a zip made by a space's **Export** and
   makes that space again under its own name with everything as it was: its
-  models and webhooks, every content with its draft and history, its media, its
+  models and webhooks, every content with its draft and, for a model that keeps
+  one, its history (an archive exported before models asked for a history is
+  read as every model keeping one), its media, its
   keys and its webhook secret. A site's `.env` keeps working against the new
   instance. The name must be free, or the space must be empty; otherwise the
   import is refused and nothing changes. So is an archive whose `space.json` is
@@ -232,7 +234,7 @@ right shows them:
 |---|---|
 | **Preview draft** | opens the model's preview URL for this draft — shown when the schema gives the model a `previewUrl` and a draft exists, and, when the URL uses `{CONTENT_SLUG}`, the draft's slug is not blank |
 | **Published page** | opens the content on the site — shown when the schema gives the model a `publicUrl` and the content is published, and, when the URL uses `{CONTENT_SLUG}`, the published slug is not blank |
-| **History** | the content's revisions, and where an old version is restored from — see [History](#history) |
+| **History** | the content's revisions, and where an old version is restored from — shown when the model keeps a history, see [History](#history) |
 | **Webhooks** | an object model's delivery log — shown while a webhook covers the model |
 | **Discard draft** | throws the draft away and goes back to the published version — asks first |
 | **Duplicate** | opens a new content's editor holding this content's draft, or its published version when it has no draft, with its `slug` and `unique` fields left empty — not on an object model's content |
@@ -248,7 +250,8 @@ with a link that opens the content again to see the change.
 **Duplicate** stores nothing by itself: the new editor says whose copy it holds,
 under a banner with **Cancel**, which goes back to the original, and the copy
 becomes a content only when it is saved or published, as any new one does —
-with its own history, and the webhooks told of a `draft` or a `publish`. Until
+with its own history when the model keeps one, and the webhooks told of a
+`draft` or a `publish`. Until
 then **Save draft** is on and leaving the page asks first. A copy asked for of
 a content the model does not have opens an empty editor that says so.
 
@@ -279,17 +282,25 @@ A content is in one of three states, shown as its badge:
 - The editor offers only what the status allows: **Unpublish** while published,
   **Discard draft** while published with a draft. The full table is in
   [API.md](API.md#managing-content).
-- Every entry the history keeps notifies the webhooks that cover the model,
-  as its kind: a draft save, a publish, an unpublish, a discard. So does
+- Every write notifies the webhooks that cover the model, as its kind: a draft
+  save, a publish, an unpublish, a discard, whether the model keeps a history or
+  not. So does
   deleting a content: as a delete when it was published, as a discard when it
   was only a draft.
 
 ## History
 
-Every write to a content is kept — each draft save, publish, unpublish and
-discard — with who made it (the owner, or a management key by its label) and
-when. A save that changes nothing makes no entry, so every entry has a change to
-show. Nothing is ever pruned; deleting the content deletes its history with it.
+A model keeps a history when the schema says so (`"history": true`, `:history t`
+in `defmodel` — see [SCHEMA.md](SCHEMA.md#model)). For its contents every write
+is kept — each draft save, publish, unpublish and discard — with who made it
+(the owner, or a management key by its label) and when. A save that changes
+nothing makes no entry, so every entry has a change to show. Nothing is pruned
+by itself; **Clear history** deletes a content's history (see below), deleting
+the content deletes its history with it, and a deploy that
+takes `history` away from the model deletes the history of all its contents.
+
+A model without `history` keeps none: its editor has no **History** button, and
+the history page of one of its contents answers *Not found*.
 
 **History** in the editor shows it newest first, 20 to a page, in two views:
 
@@ -308,6 +319,11 @@ inside as a `name: value` line, and a repeater each row as a
 `customField: field: value; field: value` line. Rich text is shown formatted,
 and as plain text inside a custom field or a repeater row;
 references and media carry their label or file name while they still exist.
+
+**Clear history**, beside the tabs while there is any, deletes every version of
+the content after asking first. The content, published and drafted, stays as
+it is, and its next write starts its history again. It cannot be undone, and
+sends no webhook.
 
 **Restore** opens the editor with that version in the form, under a banner
 saying which version it is. Nothing is stored until **Save draft** or

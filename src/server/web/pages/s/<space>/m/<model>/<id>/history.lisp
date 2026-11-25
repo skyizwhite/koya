@@ -2,11 +2,11 @@
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:on-follow)
+  (:import-from #:koya-server/web/lib/binds #:on-follow #:on-click)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-name #:model-field #:field-type #:field-value)
+                #:model-kind #:model-name #:model-field #:model-history-p #:field-type #:field-value)
   (:import-from #:koya-core/validate #:blank-value-p)
-  (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions)
+  (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions #:clear-history)
   (:import-from #:koya-server/usecases/held #:held-names #:held-entry)
   (:import-from #:koya-server/usecases/contents #:find-content)
   (:import-from #:koya-server/web/lib/target #:target-model #:target-content)
@@ -23,11 +23,11 @@
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:history-url #:editor-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url #:~confirm-dialog)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/ui/toast #:action-refusal)
+  (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
-  (:export #:@get #:browse-history))
+  (:export #:@get #:browse-history #:clear-history-action))
 (in-package #:koya-server/web/pages/s/<space>/m/<model>/<id>/history)
 
 (defun restore-url (space model id revision-id)
@@ -121,9 +121,20 @@
 (defun page-count (space id published-only)
   (last-page (count-revisions space id :published-only published-only)))
 
+(defcomp ~clear-button (&key space model id)
+  (hsx
+   (<> (button :type "button" :class "btn btn-danger ml-auto mb-1" :commandfor "confirm-clear-history" :command "show-modal"
+         (~icon :name :delete) "Clear history")
+       (~confirm-dialog :id "confirm-clear-history" :title "Clear history"
+                        :message "Clear this content's history? Every saved version is deleted for good; the content stays as it is."
+         (button :type "button" :class "btn btn-danger" :commandfor "confirm-clear-history" :command "close"
+                 :nm-bind (on-click (clear-history-action :space space :model model :id id))
+           (~icon :name :delete) "Clear history")))))
+
 (defcomp ~revisions (&key space model content published-only page)
   (let* ((model-name (model-name model))
          (id (content-id content))
+         (total (count-revisions space id))
          (pages (page-count space id published-only))
          (page (min page pages))
          (rows (list-revisions space id :published-only published-only
@@ -137,12 +148,14 @@
          (~tab :href (history-url space model-name id)
                :browse (browse-history :space space :model model-name :id id :view "" :page 1)
                :active (not published-only)
-               (format nil "All changes (~a)" (count-revisions space id)))
+               (format nil "All changes (~a)" total))
          (span :class "text-sm text-muted" :aria-hidden "true" "/")
          (~tab :href (history-url space model-name id :published-only t)
                :browse (browse-history :space space :model model-name :id id :view "published" :page 1)
                :active published-only
-               (format nil "Published (~a)" (count-revisions space id :published-only t))))
+               (format nil "Published (~a)" (count-revisions space id :published-only t)))
+         (when (plusp total)
+           (hsx (~clear-button :space space :model model-name :id id))))
        (if (null items)
            (hsx (~empty-state (if published-only "This content has never been published." "No history yet.")))
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
@@ -172,7 +185,7 @@
 (defaction browse-history :get (params)
   (let* ((space (param params "space"))
          (model (target-model params))
-         (content (and model (target-content params model))))
+         (content (and model (model-history-p model) (target-content params model))))
     (cond ((null content) (action-refusal "Content not found." 404))
           (t
            (let* ((published-only (equal (param params "view") "published"))
@@ -182,6 +195,17 @@
                       (~replace-url :url (history-url space (model-name model) (content-id content)
                                                       :published-only published-only :page page)))))))))
 
+(defaction clear-history-action :post (params)
+  (let* ((space (param params "space"))
+         (model (target-model params))
+         (content (and model (model-history-p model) (target-content params model))))
+    (cond ((null content) (action-refusal "Content not found." 404))
+          (t
+           (clear-history space model (content-id content))
+           (hsx (<> (~revisions :space space :model model :content content :published-only nil :page 1)
+                    (~replace-url :url (history-url space (model-name model) (content-id content)))
+                    (~toast :message "History cleared.")))))))
+
 (defun @get (params)
   (handler-case
       (multiple-value-bind (space model) (resolve-model (path-param params :space) (path-param params :model))
@@ -189,6 +213,10 @@
           (cond ((null content)
                  (set-response-status 404)
                  (hsx (~layout :space space (h1 :class "text-xl font-bold" "Content not found"))))
+                ((not (model-history-p model))
+                 (set-response-status 404)
+                 (hsx (~layout :space space
+                        (h1 :class "text-xl font-bold" (format nil "~a keeps no history" (model-name model))))))
                 (t
                  (set-title (format nil "History · ~a · ~a · koya" (model-name model) space))
                  (hsx (~history-page :space space :model model :content content

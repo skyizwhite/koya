@@ -1,5 +1,7 @@
 # Each history entry is sent as its kind
 
+Superseded by adr/2026-11-25-each-write-to-a-content-is-sent-as-its-kind.md
+
 *2026-09-28, restating a decision of the same day*
 
 ## Context

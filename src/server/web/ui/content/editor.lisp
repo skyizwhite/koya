@@ -4,7 +4,7 @@
   (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-type #:webhook-covers-p
-                #:model-name #:model-preview-url #:model-public-url #:field-fields #:field-option
+                #:model-name #:model-preview-url #:model-public-url #:model-history-p #:field-fields #:field-option
                 #:field-row-kind #:row-kind #:custom-field-name #:custom-field-fields #:model-field
                 #:field-many-p #:field-value)
   (:import-from #:koya-core/data #:array-p)
@@ -257,7 +257,7 @@
            (div :class "flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center"
              (when preview-url (hsx (~external-link :href preview-url "Preview draft")))
              (when public-url (hsx (~external-link :href public-url "Published page")))
-             (when content
+             (when (and content (model-history-p model))
                (hsx (a :href (history-url space-name model-name id) :class "btn"
                        (~icon :name :history) "History")))
              (when (and object-p (some (lambda (h) (webhook-covers-p h model-name)) (space-webhooks space)))

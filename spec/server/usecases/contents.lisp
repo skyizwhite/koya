@@ -17,7 +17,7 @@
   (:import-from #:koya-server/usecases/contents
                 #:create #:update-draft #:publish #:unpublish #:discard #:destroy #:draft-key
                 #:object-content #:update-object #:publish-object #:content-references #:content-by-slug
-                #:apply-to-each)
+                #:apply-to-each #:object-content-id #:find-content)
   (:import-from #:koya-spec/server/reads #:reads-of)
   (:import-from #:koya-server/usecases/actor #:*actor*)
   (:import-from #:koya-server/domain/content
@@ -46,7 +46,8 @@
                                  (make-field :count :number)
                                  (make-field :featured :boolean)
                                  (make-field :tags :reference :model "tag" :many t)
-                                 (make-field :day :date))))
+                                 (make-field :day :date))
+              :history t))
 
 (setup
   (connect-db ":memory:")
@@ -55,7 +56,7 @@
   (replace-schema "website"
                (make-schema :models (list (blog-model)
                                           (make-model "tag" :list (list (make-field :name :text)))
-                                          (make-model "event" :list (list (make-field :at :datetime)))
+                                          (make-model "event" :list (list (make-field :at :datetime)) :history t)
                                           (make-model "page" :list (list (make-field :title :text)
                                                                          (make-field :slug :slug)))
                                           (make-model "about" :object (list (make-field :body :richtext)))))))
@@ -191,6 +192,20 @@
     (testing "deleting the content deletes its history"
       (destroy "website" (blog) id)
       (ok (zerop (col (fetch-one "SELECT COUNT(*) AS n FROM content_revisions WHERE content_id = ?" id) "n"))))))
+
+(deftest a-model-without-a-history-keeps-none
+  (let* ((page (find-model "website" "page"))
+         (id (content-id (create "website" page (list :title "One")))))
+    (update-draft "website" page id (list :title "Two"))
+    (publish "website" page id)
+    (update-draft "website" page id (list :title "Three"))
+    (discard "website" page id)
+    (unpublish "website" page id)
+    (ok (string= (access (content-draft (find-content "website" "page" id)) :title) "Two") "every write is made")
+    (ok (zerop (count-revisions "website" id)) "and none is kept"))
+  (let ((about (find-model "website" "about")))
+    (publish-object "website" about :data (list :body "<p>Hi</p>"))
+    (ok (zerop (count-revisions "website" (object-content-id "website" about))) "nor for an object")))
 
 (deftest draft-keys
   (let* ((c (make (list :title "x")))
@@ -551,7 +566,7 @@
                                                                                   (make-field :note :text))))
                              :models (list (blog-model)
                                            (make-model "tag" :list (list (make-field :name :text)))
-                                           (make-model "event" :list (list (make-field :at :datetime)))
+                                           (make-model "event" :list (list (make-field :at :datetime)) :history t)
                                            (make-model "page" :list (list (make-field :title :text)
                                                                           (make-field :card :custom :custom-field "card")))
                                            (make-model "about" :object (list (make-field :body :richtext))))))
@@ -599,7 +614,7 @@
                                                                                   (make-field :note :text))))
                              :models (list (blog-model)
                                            (make-model "tag" :list (list (make-field :name :text)))
-                                           (make-model "event" :list (list (make-field :at :datetime)))
+                                           (make-model "event" :list (list (make-field :at :datetime)) :history t)
                                            (make-model "page" :list (list (make-field :title :text)
                                                                           (make-field :cards :repeater :custom-fields '(card))))
                                            (make-model "about" :object (list (make-field :body :richtext))))))

@@ -45,6 +45,7 @@
                                  (make-field :cover :media :help "1200x630, shown when the post is shared")
                                  (make-field :related :reference :model "blog" :many t))
               :label :title
+              :history t
               :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
               :public-url "https://site.test/blog/{CONTENT_ID}"))
 
@@ -161,7 +162,7 @@
   (create-space "website")
   (replace-schema "website"
                (make-schema :models (list (blog-model)
-                                          (make-model "about" :object (list (make-field :body :richtext)))))))
+                                          (make-model "about" :object (list (make-field :body :richtext)) :history t)))))
 
 (defun post-login (&rest args &key form headers)
   (declare (ignore form headers))

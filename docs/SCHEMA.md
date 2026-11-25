@@ -100,6 +100,7 @@ to:
   "previewUrl": "https://example.com/blog/{CONTENT_SLUG}?draft-key={DRAFT_KEY}",
   "publicUrl": "https://example.com/blog/{CONTENT_SLUG}",
   "label": "title",
+  "history": true,
   "fields": [ …field… ]
 }
 ```
@@ -112,6 +113,7 @@ to:
 | `previewUrl` | string | optional; template for the editor's *Preview draft* link, starting with `http://` or `https://` |
 | `publicUrl` | string | optional; template for the editor's *Published page* link, starting with `http://` or `https://` |
 | `label` | string | optional; a `text` or `slug` field of this model (not one inside a custom field), whose value the admin UI shows for a content. Without it a content is shown by its id |
+| `history` | boolean | optional; `true` keeps every write to the model's contents as a revision, for the admin UI's [History](ADMIN-UI.md#history). Without it, or `false`, no revision is kept and the admin UI has no history for its contents |
 | `was` | string | optional; the name this model had, see [Renames](#renames) |
 
 The URL templates substitute `{CONTENT_ID}`, `{CONTENT_SLUG}` and `{DRAFT_KEY}`.
@@ -343,7 +345,7 @@ the difference between the space's stored schema and the one sent as a list of
 | `change_kind` | a model's `kind` changed; its contents and their history are deleted | **yes** |
 | `change_field_type` | a field's `type` changed, the `model` a `reference` points at, or the `customField` a `custom` field uses | **yes** |
 | `change_field_options` | a field's options changed | no, unless a custom field is dropped from a repeater's `customFields`; when tightened, refused while stored content does not fit, see below |
-| `change_model_options` | `previewUrl` / `publicUrl` / `label` changed | no |
+| `change_model_options` | `previewUrl` / `publicUrl` / `label` / `history` changed | no, unless `history` is taken away: the model's history is deleted |
 | `change_webhooks` | the space's webhooks changed | no |
 | `change_custom_fields` | the definitions in `customFields` changed | no |
 
@@ -391,7 +393,12 @@ history holds none of them if it is added back with other fields; the published
 objects and drafts hold none already, as above. Changing a model's `kind` makes it anew: its
 contents and their history are deleted, as if the model were removed and added
 again under the same name. A field added later under that name starts
-empty.
+empty. Taking `history` away from a model deletes the revisions of its contents;
+giving it one starts its history with the next write.
+
+A space whose server was upgraded to a koya that asks models for `history` had
+`"history": true` given to every model it held then, since their history had
+been kept until that upgrade.
 
 ## Example
 
@@ -408,6 +415,7 @@ empty.
       "kind": "list",
       "publicUrl": "https://example.com/blog/{CONTENT_SLUG}",
       "label": "title",
+      "history": true,
       "previewUrl": "https://example.com/blog/{CONTENT_SLUG}?draft-key={DRAFT_KEY}",
       "fields": [
         {"name": "title",   "type": "text", "required": true},

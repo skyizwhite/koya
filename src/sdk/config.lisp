@@ -87,7 +87,7 @@ list of them; without it the webhook fires for every model of the space."
 narrows it. Re-evaluating replaces the whole list."
   `(register-webhooks (list ,@webhooks)))
 
-(defmacro defmodel (name (&key kind preview-url public-url label was) &body fields)
+(defmacro defmodel (name (&key kind preview-url public-url label was history) &body fields)
   "Define (or redefine) model NAME. KIND is :list or :object and must be given.
 Each field is (NAME TYPE . OPTIONS) and is taken literally, e.g.
 (tags :reference :model tag :many t).
@@ -108,7 +108,10 @@ draft's in PREVIEW-URL; a template using it needs one, and no link is shown
 while it is blank.
 LABEL names the :text or :slug field whose value the admin UI shows for a
 content -- in lists, reference pickers and the history. Without one a content
-is shown by its id."
+is shown by its id.
+HISTORY, when true, keeps every write to the model's contents for the admin
+UI's history and its restore. Without it no history is kept, and deploying a
+model that had one deletes its history, which is destructive."
   (unless (member kind '(:list :object))
     (error "defmodel ~(~a~): :kind must be given as :list or :object, got ~s" name kind))
   `(register-model
@@ -117,6 +120,7 @@ is shown by its id."
                 :preview-url ,preview-url
                 :public-url ,public-url
                 :label ',label
+                :history ,history
                 :was ',was)))
 
 (defun current-schema ()

@@ -39,7 +39,7 @@
 (defun archive-file (name)
   (ensure-directories-exist (merge-pathnames name (archive-dir))))
 
-(defparameter +archive-version+ 1)
+(defparameter +archive-version+ 2)
 
 (defparameter +max-document-bytes+ (* 100 1024 1024))
 
@@ -75,6 +75,14 @@
       (map nil #'forget-slug-options models)))
   schema)
 
+(defun with-history (schema)
+  (let ((models (and (hash-table-p schema) (jget schema "models"))))
+    (when (array-p models)
+      (loop :for model :across models
+            :when (hash-table-p model)
+              :do (setf (gethash "history" model) t))))
+  schema)
+
 (defun false-as-null (object keys)
   (when (hash-table-p object)
     (dolist (key keys)
@@ -94,9 +102,11 @@
   (let ((document (handler-case (parse-json json)
                     (error () (fail 'invalid-input "space.json is not valid JSON")))))
     (unless (hash-table-p document) (fail 'invalid-input "space.json must be an object"))
-    (unless (eql (jget document "koyaExport") +archive-version+)
+    (unless (member (jget document "koyaExport") (list 1 +archive-version+))
       (fail 'invalid-input (format nil "Unsupported archive version ~s (expected ~a)"
                                    (jget document "koyaExport") +archive-version+)))
+    (when (eql (jget document "koyaExport") 1)
+      (with-history (jget document "schema")))
     (let ((schema (jobject->schema (without-slug-options (jget document "schema")))))
       (remhash "schema" document)
       (false-as-null document '("contents" "media" "deliveryKeys" "managementKeys"))

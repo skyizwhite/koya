@@ -91,6 +91,7 @@ the same name, so the schema can be edited live from the REPL.
 
 (defmodel blog (:kind :list
                 :label       title
+                :history     t
                 :public-url  "https://example.com/blog/{CONTENT_SLUG}"
                 :preview-url "https://example.com/blog/{CONTENT_SLUG}?draft-key={DRAFT_KEY}")
   (title   :text :required t)
@@ -113,7 +114,7 @@ the same name, so the schema can be edited live from the REPL.
 
 - **`(defwebhooks &rest webhooks)`** — each form is evaluated and must produce a
   `(webhook label url &key only)`. Re-evaluating replaces the whole list.
-- **`(defmodel name (&key kind preview-url public-url label was) &body fields)`** —
+- **`(defmodel name (&key kind preview-url public-url label was history) &body fields)`** —
   `:kind` is required and is `:list` (many contents) or `:object` (exactly one).
   The URL templates are evaluated; each field form `(name type . options)` is
   taken literally. A model carries no webhooks: they all live in `defwebhooks`.
@@ -136,6 +137,10 @@ the same name, so the schema can be edited live from the REPL.
   picker, and the history. It is taken literally, like a field name (`:label title`).
   Without it a content is shown by its id; no field is guessed at. It cannot name
   a field inside a custom field.
+- **`:history t`** keeps every write to the model's contents, for the admin UI's
+  history and its restore. Without it no history is kept, and the admin UI has
+  none for the model's contents. Taking it away from a deployed model deletes
+  that model's history, which is destructive.
 
 Naming rules, checked as the schema is built:
 
@@ -264,8 +269,9 @@ asking, so a script never applies a destructive change by accident.
 
 Destructive means a change that can hide or invalidate content already stored:
 removing a model or field, changing a kind or a field type (for a reference,
-the model it points at; for a `:custom` field, the custom field it uses), or
-dropping a custom field from a repeater's `:custom-fields`. Deleting the space
+the model it points at; for a `:custom` field, the custom field it uses),
+dropping a custom field from a repeater's `:custom-fields`, or taking `:history`
+away from a model, which deletes its history. Deleting the space
 itself is not among them — that is done in the admin UI, with its own
 confirmation. The exact list, and the shape of each change, is in
 [SCHEMA.md, "Changes"](SCHEMA.md#changes). A rename declared with `:was` carries

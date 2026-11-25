@@ -62,6 +62,7 @@
            #:model-preview-url
            #:model-public-url
            #:model-label
+           #:model-history-p
            #:schema
            #:make-schema
            #:schema-webhooks
@@ -378,7 +379,7 @@
         ((and value (symbolp value)) (string-downcase (symbol-name value)))
         (t value)))
 
-(defun make-model (name kind fields &key preview-url public-url label was)
+(defun make-model (name kind fields &key preview-url public-url label was history)
   (let ((name (string-downcase (string name)))
         (was (name-designator was))
         (label (if (and label (symbolp label)) (camel-name label) label)))
@@ -389,6 +390,8 @@
         (fail "model ~s: URL template ~s must start with http:// or https://" name url)))
     (unless (or (null label) (stringp label))
       (fail "model ~s: :label must name a field" name))
+    (unless (member history '(t nil))
+      (fail "model ~s: :history must be true or false, got ~s" name history))
     (unless (slug-name-p name)
       (fail "model name ~s must be lowercase letters, digits and hyphens" name))
     (when was
@@ -406,6 +409,7 @@
                  :options (append (and preview-url (list :preview-url preview-url))
                                   (and public-url (list :public-url public-url))
                                   (and label (list :label label))
+                                  (and history (list :history t))
                                   (and was (list :was was))))))
 
 (defun model-preview-url (model) (getf (model-options model) :preview-url))
@@ -413,6 +417,9 @@
 
 (defun model-label (model)
   (getf (model-options model) :label))
+
+(defun model-history-p (model)
+  (getf (model-options model) :history))
 
 (defun model-was (model)
   (getf (model-options model) :was))

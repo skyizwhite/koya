@@ -13,7 +13,8 @@ A small, self-hosted headless CMS for one owner and any number of sites.
   destructive.
 - **An admin UI built from it.** List pages and an editor for every model: rich
   text, media, references, custom fields and repeating blocks, drafts, previews
-  and the history of every version.
+  and, for the models that ask for it with `history: true`, the history of every
+  version.
 - **A typed client.** [koya-ts-sdk](https://github.com/skyizwhite/koya-ts-sdk)
   reads content with types generated from your schema, references embedded on
   request.
@@ -89,6 +90,7 @@ export default defineConfig({
         name: "blog",
         kind: "list",
         label: "title",
+        history: true,
         publicUrl: "https://example.com/blog/{CONTENT_SLUG}",
         previewUrl: "https://example.com/blog/{CONTENT_SLUG}?draftKey={DRAFT_KEY}",
         fields: [

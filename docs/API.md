@@ -348,7 +348,8 @@ its `only` names — and the payload says which:
 | `discard` | a content that is only a draft is deleted | the draft / `null` |
 | `deploy` | a deploy changes what the delivery API serves of a model | `null` / `null` |
 
-Each entry a content's history keeps is sent as its kind. Deleting a content
+Each write to a content is sent as its kind, whether its model keeps a history
+or not. Deleting a content
 is sent as what it changes: `delete` when it was published, `discard` when it
 was only a draft. A write that changes nothing sends nothing, and neither does
 importing a space. The bodies have the delivery API's shape. `draft` and

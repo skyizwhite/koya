@@ -11,7 +11,7 @@
   (:import-from #:koya-core/case
                 #:jvalue->data #:data->jobject)
   (:import-from #:koya-server/usecases/ports/contents
-                #:record-revision #:list-revisions #:count-revisions #:find-revision
+                #:record-revision #:delete-revisions #:list-revisions #:count-revisions #:find-revision
                 #:content-history))
 (in-package #:koya-server/infra/db/content-revisions)
 
@@ -26,6 +26,9 @@
 (defmethod record-revision (space content-id event data &key (by "") created-at)
   (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
         space content-id event (to-json (data->jobject data)) (or by "") (or created-at (now-iso))))
+
+(defmethod delete-revisions (space content-id)
+  (exec "DELETE FROM content_revisions WHERE space = ? AND content_id = ?" space content-id))
 
 (defun revisions-where (space content-id published-only)
   (all-of (list (sql "space = ? AND content_id = ?" space content-id)
