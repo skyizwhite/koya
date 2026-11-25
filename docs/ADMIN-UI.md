@@ -83,7 +83,8 @@ beside its name, and is where they are made and deleted.
 - **Import**, beside **New space**, takes a zip made by a space's **Export** and
   makes that space again under its own name with everything as it was: its
   models and webhooks, every content with its draft and, for a model that keeps
-  one, its history, its media, its
+  one, its history (an archive exported before models asked for a history is
+  read as every model keeping one), its media, its
   keys and its webhook secret. A site's `.env` keeps working against the new
   instance. The name must be free, or the space must be empty; otherwise the
   import is refused and nothing changes. So is an archive whose `space.json` is

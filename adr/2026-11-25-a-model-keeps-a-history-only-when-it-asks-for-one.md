@@ -22,16 +22,26 @@ models whose editors need one, and the table grew with each of them.
 - Every model a space had before this decision was given `history: true` when
   the server was upgraded, since its history had been kept until then.
 - An import keeps the revisions of a model only when the archive's schema gives
-  it `history`.
+  it `history`. An archive koya wrote before this decision has no `history` in
+  its schema, though every model of it kept one, so archives are written as
+  version 2 (`"koyaExport": 2`), and every model of a version 1 archive is read
+  as giving `history`, as the upgrade gave the models of a space.
 
 Hiding the revisions of a model that no longer keeps a history, instead of
 deleting them, was weighed. It leaves rows nothing reads, and turning `history`
 back on would bring back a past with a gap in it as if it were whole.
 
+Keeping archives at version 1 was weighed too, writing `history` in them as
+`true` or `false` and reading a missing one as `true`. An older koya could then
+import them, but the same schema document would mean the opposite in an archive
+and in a deploy when `history` is left out. Neither a server nor an archive is
+promised to go back to an older koya.
+
 ## Consequences
 
 A site asks for a history where its editors need one, and other models cost
-nothing for it. Upgrading changes nothing by itself; the first deploy of a
-schema that leaves `history` out of a model asks before its history goes. What a
-write sends to webhooks does not depend on it
+nothing for it. Upgrading changes nothing by itself, and an archive made before
+it imports with its history; the first deploy of a schema that leaves `history`
+out of a model asks before its history goes. An archive written from now on is
+refused by an older koya. What a write sends to webhooks does not depend on it
 (`adr/2026-11-25-each-write-to-a-content-is-sent-as-its-kind.md`).
