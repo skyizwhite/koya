@@ -146,7 +146,7 @@
       (multiple-value-bind (status) (admin :get (format nil "/admin/api/website/lists/blog/~a" post-id))
         (ok (= status 404)))
       (ok (equal (webhook-events) '("publish" "draft" "publish" "draft" "draft" "discard" "draft" "discard" "unpublish" "discard"))
-          "every entry the history records is sent with its kind; a delete as delete while published, as discard when only a draft"))))
+          "every write is sent as its kind; a delete as delete while published, as discard when only a draft"))))
 
 (deftest import-style-create
   (testing "explicit dates"

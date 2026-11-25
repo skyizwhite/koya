@@ -96,8 +96,8 @@ web  ──▶  usecases  ──▶  domain
   and hashes, times, patterns, URLs, text encodings, locks and `access`. What a
   write makes of a content -- drafted, published, unpublished, discarded -- is
   a function there that returns the content as it then is; a use case hands
-  that to the store and records the event in the history, and the store keeps
-  what it is handed.
+  that to the store and, for a model that keeps a history, records the event
+  in it, and the store keeps what it is handed.
 - `usecases/` uses `domain/` and its ports. It raises the errors in
   `domain/errors`, which say what went wrong without an HTTP status, and names
   who is making a change from `*actor*` (`usecases/actor`).
@@ -175,7 +175,7 @@ it is stale.
 | `spaces` | a space, its webhooks, its custom fields and its webhook secret |
 | `models` | a deployed model, as the schema document's own JSON |
 | `contents` | every model's contents; `status` says which versions it has, `published` and `draft` are JSON, `published_text` and `draft_text` hold the text of their string values, tags taken out, for searching rich text, and `published_slug` and `draft_slug` the value of the model's slug field, for finding a content by it |
-| `content_revisions` | what each write left a content with, kept until the content is deleted |
+| `content_revisions` | what each write left a content with, for a model with `history`, kept until the content is deleted or the model's `history` is taken away |
 | `schema_deploys` | what each deploy changed |
 | `delivery_keys` `management_keys` | keys, as SHA-256 |
 | `media` | an uploaded file's metadata; the file itself is on disk |

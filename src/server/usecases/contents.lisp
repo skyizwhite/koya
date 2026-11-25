@@ -2,7 +2,7 @@
   (:use #:cl)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-fields #:field-name #:field-unique-p #:model-name #:model-slug-field
-                #:field-value)
+                #:field-value #:model-history-p)
   (:import-from #:koya-core/validate
                 #:validate-content #:unknown-fields #:validation-error #:blank-value-p #:datetime-string-p
                 #:validation-error-errors)
@@ -93,9 +93,13 @@
                    :old old
                    :new new))
 
+(defun keep (model content event data)
+  (when (model-history-p model)
+    (record-revision (content-space content) (content-id content) event data :by *actor*)))
+
 (defun store (model content event data)
   (apply #'update-content content (content-slugs model content))
-  (record-revision (content-space content) (content-id content) event data :by *actor*)
+  (keep model content event data)
   content)
 
 (defun create (space model data &key publish created-at updated-at published-at revised-at)
@@ -119,7 +123,7 @@
                                                                 :published-at published-at :revised-at revised-at)
                                    :when (apply #'insert-content content (content-slugs model content))
                                      :return content)))
-                (record-revision space-name (content-id content) (if publish "publish" "draft") data :by *actor*)
+                (keep model content (if publish "publish" "draft") data)
                 content))))
       (if publish
           (notify space model (content-id content) :publish :new (published-view space model content))

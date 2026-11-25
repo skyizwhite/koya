@@ -1,6 +1,6 @@
-# Every write to a content is kept
+# A kept history holds every write
 
-*2026-09-27, restating a decision of 2026-09-23*
+*2026-11-25, restating a decision of 2026-09-23*
 
 ## Context
 
@@ -10,6 +10,9 @@ was live, so a paragraph deleted by mistake is gone, and nobody can say what an
 entry looked like last month.
 
 ## Decision
+
+For a model that keeps a history
+(`adr/2026-11-25-a-model-keeps-a-history-only-when-it-asks-for-one.md`):
 
 - Every write to a content leaves a row in `content_revisions`, in the same
   transaction as the write: the data it left the content with, the event
@@ -26,6 +29,6 @@ entry looked like last month.
 
 ## Consequences
 
-The table grows with every save, one full copy of the data each time. For the
-contents of a small site in SQLite that is small; if it stops being, a cap can
-be added.
+The table grows with every save of such a model, one full copy of the data each
+time. For the contents of a small site in SQLite that is small; if it stops
+being, a cap can be added.

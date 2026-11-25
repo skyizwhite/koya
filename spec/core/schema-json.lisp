@@ -3,7 +3,7 @@
   (:import-from #:koya-core/schema
                 #:make-field #:make-model #:make-schema #:field-name #:field-type #:field-option
                 #:field-was #:model-field #:model-was #:schema-model #:schema-webhooks
-                #:model-preview-url #:model-public-url #:model-label #:model-options #:schema-error
+                #:model-preview-url #:model-public-url #:model-label #:model-history-p #:model-options #:schema-error
                 #:custom-field-name #:field-fields #:field-row-kinds #:field-key)
   (:import-from #:koya-core/schema-json
                 #:schema->jobject #:jobject->schema #:change->jobject)
@@ -102,6 +102,20 @@
                                        "models") 0)
                            "label"))
         "absent when there is none")))
+
+(deftest a-history-on-the-wire
+  (flet ((model-json (&rest options)
+           (aref (jget (schema->jobject (make-schema :models (list (apply #'make-model "m" :list nil options)))) "models") 0))
+         (read-model (json)
+           (schema-model (jobject->schema (parse-json (format nil "{\"koyaSchema\": 1, \"models\": [~a]}" json))) "m")))
+    (ok (eq (jget (model-json :history t) "history") t))
+    (ng (nth-value 1 (jget (model-json) "history")) "absent when the model keeps none")
+    (ok (model-history-p (read-model "{\"name\": \"m\", \"kind\": \"list\", \"history\": true}")))
+    (ng (model-history-p (read-model "{\"name\": \"m\", \"kind\": \"list\", \"history\": false}")))
+    (ng (model-history-p (read-model "{\"name\": \"m\", \"kind\": \"list\"}")))
+    (ok (signals (read-model "{\"name\": \"m\", \"kind\": \"list\", \"history\": \"true\"}") 'schema-error)
+        "a string is not true")
+    (ok (signals (read-model "{\"name\": \"m\", \"kind\": \"list\", \"history\": null}") 'schema-error))))
 
 (deftest options-are-written-in-one-order
   (flet ((json (field)

@@ -53,12 +53,12 @@
 
 (defun archive-schema ()
   (make-schema :webhooks (list (make-webhook "site" "https://site.test/hook"))
-               :models (list (make-model "tag" :list (list (make-field :name :text)))
+               :models (list (make-model "tag" :list (list (make-field :name :text)) :history t)
                              (make-model "post" :list (list (make-field :title :text)
                                                             (make-field :cover :media)
                                                             (make-field :body :richtext)
                                                             (make-field :tags :reference :model "tag" :many t))
-                                         :label :title))))
+                                         :label :title :history t))))
 
 (defparameter +from-the-page+ '(("origin" . "http://localhost:3000") ("nm-request" . "true")))
 
@@ -466,7 +466,8 @@
                              :models (list (make-model "tag" :list
                                                        (list (make-field :name :text :required t :unique t)
                                                              (make-field :rank :number)
-                                                             (make-field :blocks :repeater :custom-fields '(heading))))))))
+                                                             (make-field :blocks :repeater :custom-fields '(heading)))
+                                                       :history t)))))
     (ok (string= (nth-value 1 (import-archive
                                (odd-archive :schema schema
                                             :contents (list (list :id "t1" :draft (tag "lisp"))
@@ -502,12 +503,12 @@
   (let ((path (zip-of "space.json" (string-to-octets json :encoding :utf-8))))
     (prog1 (read-file-bytes path) (delete-file path))))
 
-(defun tag-archive (space rest)
+(defun tag-archive (space rest &key (history t))
   (archive-of (format nil "{\"koyaExport\": 1, \"space\": \"~a\",
-                            \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\",
+                            \"schema\": {\"koyaSchema\": 1, \"models\": [{\"name\": \"tag\", \"kind\": \"list\", \"history\": ~:[false~;true~],
                                                                       \"fields\": [{\"name\": \"name\", \"type\": \"text\"}]}]},
                             ~a}"
-                      space rest)))
+                      space history rest)))
 
 (deftest a-version-written-as-false-is-none
   (setf *cookie* nil)
@@ -525,11 +526,23 @@
       "and a revision whose data is false has none")
   (ng (find-space "falsy")))
 
-(defun one-tag-archive (revisions)
+(defun one-tag-archive (revisions &key (history t))
   (tag-archive "falsy" (format nil "\"contents\": [{\"id\": \"t1\", \"model\": \"tag\", \"draft\": {\"name\": \"x\"},
                                                      \"createdAt\": \"2024-01-01T00:00:00.000Z\", \"updatedAt\": \"2024-01-01T00:00:00.000Z\",
                                                      \"revisions\": ~a}]"
-                                   revisions)))
+                                   revisions)
+               :history history))
+
+(deftest an-import-keeps-no-revisions-for-a-model-without-a-history
+  (setf *cookie* nil)
+  (post-login :form `(("secret" . ,*secret*)))
+  (ok (string= (nth-value 1 (import-archive (one-tag-archive "[{\"event\": \"draft\", \"data\": {\"name\": \"x\"}, \"createdAt\": \"2024-01-01T00:00:00.000Z\"}]"
+                                                             :history nil)))
+               "/s/falsy")
+      "an archive with revisions for it is imported")
+  (ok (stored-content "falsy" "t1") "with its content")
+  (ok (zerop (count-revisions "falsy" "t1")) "and without them")
+  (delete-space "falsy"))
 
 (deftest the-revisions-of-a-content-are-an-array
   (setf *cookie* nil)

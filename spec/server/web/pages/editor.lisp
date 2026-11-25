@@ -344,7 +344,7 @@
                                                                                   (make-field :category :select :options '("tech" "other"))
                                                                                   f))
                                                                             (model-fields (blog-model))))
-                                                         :label :title
+                                                         :label :title :history t
                                                          :preview-url "https://site.test/blog/{CONTENT_ID}?draft-key={DRAFT_KEY}"
                                                          :public-url "https://site.test/blog/{CONTENT_ID}")
                                              (make-model "about" :object (list (make-field :body :richtext))))))
@@ -398,7 +398,7 @@
                 (make-schema :models (list (make-model "blog" :list
                                                        (append (model-fields (blog-model))
                                                                (list (make-field :code :text :required t :unique t)))
-                                                       :label :title)
+                                                       :label :title :history t)
                                            (make-model "about" :object (list (make-field :body :richtext))))))
     (let* ((target (new-blog '(("action" . "publish") ("f-title" . "Target") ("f-code" . "t"))))
            (id (new-blog `(("action" . "publish") ("f-title" . "Original") ("f-slug" . "original")
@@ -534,6 +534,23 @@
         (ng (search "Draft saved" body) "the published versions alone")
         (ok (string= (replaced-url body) (format nil "~a?view=published" path)))))
     (ok (= 404 (call-action :get (browse-history :space "website" :model "blog" :id "nope"))))))
+
+(deftest a-model-without-a-history-has-no-history-page
+  (with-schema ("website" (make-schema :models (list (blog-model)
+                                                     (make-model "memo" :list (list (make-field :text :text)))
+                                                     (make-model "about" :object (list (make-field :body :richtext))))))
+    (let* ((id (moved-to (nth-value 1 (edit "/s/website/m/memo/new" :form '(("action" . "publish") ("f-text" . "Once"))))))
+           (id (subseq id (1+ (position #\/ id :from-end t))))
+           (url (format nil "/s/website/m/memo/~a" id)))
+      (edit url :form '(("action" . "save") ("f-text" . "Twice")))
+      (ok (zerop (count-revisions "website" id)) "nothing is kept")
+      (ng (search (format nil "href=\"~a/history\"" url) (nth-value 1 (request :get url))) "the editor has no link to a history")
+      (multiple-value-bind (status body) (request :get (format nil "~a/history" url))
+        (ok (= status 404) "and the history page is not there")
+        (ok (search "keeps no history" body)))
+      (ok (= 404 (call-action :get (browse-history :space "website" :model "memo" :id id :view "" :page 1)))
+          "nor are its tabs")
+      (edit url :form '(("action" . "delete"))))))
 
 (deftest a-draft-that-changes-nothing-is-none
   (exec "DELETE FROM contents")
@@ -786,7 +803,8 @@
                :models (list (blog-model)
                              (make-model "about" :object (list (make-field :body :richtext)))
                              (make-model "page" :list (list (make-field :title :text)
-                                                            (make-field :card :custom :custom-field "card" :help "The card")))
+                                                            (make-field :card :custom :custom-field "card" :help "The card"))
+                                         :history t)
                              (make-model "badge" :list (list (make-field :card :custom :custom-field "card" :required t))))))
 
 (deftest a-custom-field-is-edited-as-its-fields
@@ -847,7 +865,8 @@
                :models (list (blog-model)
                              (make-model "about" :object (list (make-field :body :richtext)))
                              (make-model "doc" :list (list (make-field :title :text)
-                                                           (make-field :blocks :repeater :custom-fields '(heading body) :help "The page"))))))
+                                                           (make-field :blocks :repeater :custom-fields '(heading body) :help "The page"))
+                                         :history t))))
 
 (deftest a-repeater-is-edited-row-by-row
   (exec "DELETE FROM contents")
@@ -905,7 +924,8 @@
   (with-schema ("website" (make-schema :models (list (blog-model)
                                                      (make-model "about" :object (list (make-field :body :richtext)))
                                                      (make-model "album" :list (list (make-field :title :text)
-                                                                                     (make-field :photos :media :many t))))))
+                                                                                     (make-field :photos :media :many t))
+                                                                 :history t))))
     (let ((a (media-id (insert-media "website" (new-id) :filename "a.png" :mime "image/png" :size 1)))
           (b (media-id (insert-media "website" (new-id) :filename "b.png" :mime "image/png" :size 1))))
       (let ((body (nth-value 1 (request :get "/s/website/m/album/new"))))
@@ -990,7 +1010,8 @@
                                                             (make-field :sequel :reference :model "series")
                                                             (make-field :frame :custom :custom-field "frame")
                                                             (make-field :gallery :media :many t)
-                                                            (make-field :cards :repeater :custom-fields '(card)))))))
+                                                            (make-field :cards :repeater :custom-fields '(card)))
+                                         :history t))))
 
 (deftest a-form-reads-what-its-fields-hold-once
   (exec "DELETE FROM contents")

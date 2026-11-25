@@ -11,6 +11,7 @@
   (:export #:diff-schemas
            #:destructive-change-p
            #:dropped-custom-fields
+           #:dropped-history-p
            #:destructive-changes-p
            #:tightened-change-p
            #:format-change
@@ -36,9 +37,15 @@
        (set-difference (getf (getf change :from) :custom-fields) (getf (getf change :to) :custom-fields)
                        :test #'equal)))
 
+(defun dropped-history-p (change)
+  (and (eq (getf change :op) :change-model-options)
+       (getf (getf change :from) :history)
+       (not (getf (getf change :to) :history))))
+
 (defun destructive-change-p (change)
   (or (and (member (getf change :op) *destructive-ops*) t)
-      (and (dropped-custom-fields change) t)))
+      (and (dropped-custom-fields change) t)
+      (dropped-history-p change)))
 
 (defun tightened-change-p (change)
   (and (eq (getf change :op) :change-field-options)
@@ -241,7 +248,9 @@
                        (getf change :to) (getf change :to-target)))
               (:change-field-options
                (options-detail change (if (tightened-change-p change) "options tightened" "options changed")))
-              (:change-model-options (options-detail change "options changed"))
+              (:change-model-options
+               (format nil "~a~:[~;, its history is deleted~]"
+                       (options-detail change "options changed") (dropped-history-p change)))
               ((:change-webhooks :change-custom-fields) "changed")
               (t nil))
             (misfit-note change))))

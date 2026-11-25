@@ -4,7 +4,7 @@
   (:import-from #:ningle-actions #:defaction)
   (:import-from #:koya-server/web/lib/binds #:on-follow)
   (:import-from #:koya-core/schema
-                #:model-kind #:model-name #:model-field #:field-type #:field-value)
+                #:model-kind #:model-name #:model-field #:model-history-p #:field-type #:field-value)
   (:import-from #:koya-core/validate #:blank-value-p)
   (:import-from #:koya-server/usecases/revisions #:list-revisions #:count-revisions)
   (:import-from #:koya-server/usecases/held #:held-names #:held-entry)
@@ -172,7 +172,7 @@
 (defaction browse-history :get (params)
   (let* ((space (param params "space"))
          (model (target-model params))
-         (content (and model (target-content params model))))
+         (content (and model (model-history-p model) (target-content params model))))
     (cond ((null content) (action-refusal "Content not found." 404))
           (t
            (let* ((published-only (equal (param params "view") "published"))
@@ -189,6 +189,10 @@
           (cond ((null content)
                  (set-response-status 404)
                  (hsx (~layout :space space (h1 :class "text-xl font-bold" "Content not found"))))
+                ((not (model-history-p model))
+                 (set-response-status 404)
+                 (hsx (~layout :space space
+                        (h1 :class "text-xl font-bold" (format nil "~a keeps no history" (model-name model))))))
                 (t
                  (set-title (format nil "History · ~a · ~a · koya" (model-name model) space))
                  (hsx (~history-page :space space :model model :content content

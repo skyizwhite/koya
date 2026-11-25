@@ -4,7 +4,7 @@
                 #:make-field #:make-model #:make-schema #:make-webhook #:make-custom-field)
   (:import-from #:koya-core/diff
                 #:diff-schemas
-                #:destructive-changes-p #:dropped-custom-fields
+                #:destructive-changes-p #:dropped-custom-fields #:dropped-history-p
                 #:tightened-change-p
                 #:format-change
                 #:change-path
@@ -49,6 +49,28 @@
     (ok (equal (ops changes) '(:change-model-options)))
     (ng (destructive-changes-p changes) "it changes what the admin UI shows, not what is stored")
     (ok (search "label" (format-change (first changes))))))
+
+(deftest dropping-a-history-is-destructive
+  (flet ((blog (&rest options)
+           (make-schema :models (list (apply #'make-model "blog" :list (list (make-field :title :text)) options)))))
+    (let ((changes (diff-schemas (blog :history t) (blog))))
+      (ok (equal (ops changes) '(:change-model-options)))
+      (ok (destructive-changes-p changes) "the model's history is deleted")
+      (ok (dropped-history-p (first changes)))
+      (ok (search "its history is deleted" (format-change (first changes)))))
+    (let ((changes (diff-schemas (blog) (blog :history t))))
+      (ok (equal (ops changes) '(:change-model-options)))
+      (ng (destructive-changes-p changes) "asking for one loses nothing")
+      (ng (dropped-history-p (first changes)))
+      (ok (search "history none -> true" (format-change (first changes)))))
+    (let ((changes (diff-schemas (blog :history t) (blog :history t :label :title))))
+      (ng (destructive-changes-p changes) "another option changed beside a kept history"))
+    (let ((changes (diff-schemas (blog :history t)
+                                 (make-schema :models (list (make-model "post" :list (list (make-field :title :text))
+                                                                        :was "blog"))))))
+      (ok (equal (ops changes) '(:rename-model :change-model-options)))
+      (ok (destructive-changes-p changes) "a renamed model drops its history too"))
+    (ng (destructive-changes-p (diff-schemas nil (blog))) "a new model has none to lose")))
 
 (deftest a-reference-pointed-at-another-model-is-retyped
   (flet ((blog (target &rest options)

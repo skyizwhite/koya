@@ -24,7 +24,7 @@
                 #:make-field #:make-model #:make-schema #:make-webhook
                 #:schema-webhooks #:schema-models #:model-name #:model-field
                 #:make-custom-field #:schema-custom-fields #:custom-field-name
-                #:field-fields #:field-name)
+                #:field-fields #:field-name #:model-history-p #:model-public-url #:schema-model)
   (:import-from #:koya-core/schema-json #:schema->jobject)
   (:import-from #:koya-core/case #:jvalue->data #:data->jobject)
   (:import-from #:koya-core/data #:data-equal)
@@ -84,7 +84,7 @@
   (migrate))
 
 (deftest migrations
-  (ok (= (current-version) 17))
+  (ok (= (current-version) 18))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -95,7 +95,7 @@
         "legacy" "about" "object"
         "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
         0)
-  (ok (equal (migrate) '(10 11 12 13 14 15 16 17)))
+  (ok (equal (migrate) '(10 11 12 13 14 15 16 17 18)))
   (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
     (ng (search "previewUrl" definition))
     (ok (search "https://x/about" definition) "a web address is kept"))
@@ -106,9 +106,23 @@
   (create-space "legacy")
   (exec "UPDATE spaces SET webhooks = ? WHERE name = 'legacy'"
         "[{\"label\":\"bare\",\"url\":\"example.com/hook\"},{\"label\":\"site\",\"url\":\"https://x/hook\"},{\"label\":\"ftp\",\"url\":\"ftp://x/hook\"}]")
-  (ok (equal (migrate) '(11 12 13 14 15 16 17)))
+  (ok (equal (migrate) '(11 12 13 14 15 16 17 18)))
   (ok (equal (mapcar (lambda (hook) (getf hook :label)) (space-webhooks "legacy")) '("site"))
       "the space still reads, with the one hook that can be sent")
+  (migrated-fully))
+
+(deftest models-made-before-a-history-was-asked-for-keep-theirs
+  (migrated-to 17)
+  (create-space "older")
+  (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
+        "older" "post" "list" "{\"name\":\"post\",\"kind\":\"list\",\"fields\":[{\"name\":\"title\",\"type\":\"text\"}]}" 0)
+  (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
+        "older" "about" "object" "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"publicUrl\":\"https://x/about\"}" 1)
+  (ok (equal (migrate) '(18)))
+  (ok (every #'model-history-p (schema-models (load-schema "older")))
+      "every model there was keeps the history it was keeping")
+  (ok (string= (model-public-url (schema-model (load-schema "older") "about")) "https://x/about")
+      "and the rest of its definition is left as it was")
   (migrated-fully))
 
 (deftest schema-snapshot-matches-the-migrations
@@ -238,12 +252,13 @@
 (deftest a-change-of-kind-makes-the-model-anew
   (create-space "catalog")
   (flet ((deploy-kind (kind)
-           (replace-schema "catalog" (make-schema :models (list (make-model "item" kind (list (make-field :title :text)))))))
+           (replace-schema "catalog" (make-schema :models (list (make-model "item" kind (list (make-field :title :text)) :history t)))))
          (contents () (fetch "SELECT id FROM contents WHERE space = ?" "catalog"))
          (revisions () (col (fetch-one "SELECT COUNT(*) AS n FROM content_revisions r JOIN contents c ON c.id = r.content_id WHERE c.space = ?" "catalog") "n")))
     (deploy-kind :list)
     (create "catalog" (find-model "catalog" "item") (list :title "One") :publish t)
     (create "catalog" (find-model "catalog" "item") (list :title "Two"))
+    (ok (= (revisions) 2))
     (let ((changes (deploy-kind :object)))
       (ok (equal (mapcar (lambda (c) (getf c :op)) changes) '(:change-kind)))
       (ok (null (contents)) "a list turned into an object keeps none of its contents")
@@ -258,14 +273,15 @@
   (create-space "magazine")
   (replace-schema "magazine"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text)
-                                                                        (make-field :lede :text))))))
+                                                                        (make-field :lede :text))
+                                                      :history t))))
   (let ((published (create "magazine" (find-model "magazine" "post") (list :title "One" :lede "First words") :publish t))
         (drafted (create "magazine" (find-model "magazine" "post") (list :title "Two" :lede "Later words"))))
     (let ((changes (replace-schema "magazine"
                                 (make-schema :models (list (make-model "article" :list
                                                                        (list (make-field :title :text)
                                                                              (make-field :subtitle :text :was :lede))
-                                                                       :was 'post))))))
+                                                                       :was 'post :history t))))))
       (ok (equal (mapcar (lambda (c) (getf c :op)) changes) '(:rename-model :rename-field)))
       (ng (destructive-changes-p changes) "a rename loses nothing, so it needs no force"))
     (ok (equal (mapcar #'model-name (schema-models (load-schema "magazine"))) '("article")))
@@ -293,7 +309,7 @@
                              (make-schema :models (list (make-model "article" :list
                                                                     (list (make-field :title :text)
                                                                           (make-field :subtitle :text :was :lede))
-                                                                    :was 'post)))))
+                                                                    :was 'post :history t)))))
           "deploying the same source again changes nothing"))))
 
 (deftest a-removed-field-takes-its-values-with-it
@@ -301,7 +317,8 @@
   (replace-schema "trimmed"
                (make-schema :models (list (make-model "post" :list (list (make-field :title :text)
                                                                         (make-field :summary :text)
-                                                                        (make-field :rank :text))))))
+                                                                        (make-field :rank :text))
+                                                      :history t))))
   (let* ((content (create "trimmed" (find-model "trimmed" "post")
                           (list :title "One" :summary "Short" :rank "high") :publish t))
          (id (content-id content)))
@@ -309,7 +326,8 @@
     (let ((changes (replace-schema "trimmed"
                                 (make-schema :models (list (make-model "post" :list
                                                                        (list (make-field :title :text)
-                                                                             (make-field :rank :number))))))))
+                                                                             (make-field :rank :number))
+                                                                       :history t))))))
       (ok (equal (mapcar (lambda (c) (getf c :op)) changes) '(:remove-field :change-field-type))))
     (testing "the published data loses the removed field and the retyped one"
       (let ((published (content-published (stored-content "trimmed" id))))
@@ -322,6 +340,7 @@
         (ng (nth-value 1 (access draft :rank)))
         (ok (string= (access draft :title) "One, again"))))
     (testing "and the history"
+      (ok (= (length (list-revisions "trimmed" id)) 2))
       (dolist (revision (list-revisions "trimmed" id))
         (ng (nth-value 1 (access (revision-data revision) :summary)))
         (ng (nth-value 1 (access (revision-data revision) :rank)))))
@@ -373,7 +392,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('kept', 'publish', '{\"title\":\"Old\",\"gone\":{\"a\":1}}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(12 13 14 15 16 17)))
+  (ok (equal (migrate) '(12 13 14 15 16 17 18)))
   (let ((content (stored-content "leftover" "kept")))
     (ng (nth-value 1 (access (content-published content) :gone)))
     (ng (nth-value 1 (access (content-draft content) :gone)))
@@ -446,7 +465,7 @@
     (row "live" "published" "{\"body\":\"<p>live</p>\"}" nil)
     (row "both" "published+draft" "{\"body\":\"<p>old</p>\"}" "{\"body\":\"<p>new</p>\"}")
     (row "bare" "draft" nil "{\"n\":1}"))
-  (ok (equal (migrate) '(14 15 16 17)))
+  (ok (equal (migrate) '(14 15 16 17 18)))
   (ok (texts-fit-p "older") "every content gets the text of its data")
   (ok (string= (col (fetch-one "SELECT draft_text FROM contents WHERE id = 'drafted'") "draft_text")
                "{\"body\":\"new & bold\"}"))
@@ -516,7 +535,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('about', 'publish', '{\"title\":\"One\"}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(13 14 15 16 17)))
+  (ok (equal (migrate) '(13 14 15 16 17 18)))
   (testing "what was stored moves into its space, history and all"
     (ok (string= (access (content-published (stored-content "one" "about")) :title) "One"))
     (ok (equal (mapcar #'revision-event (list-revisions "one" "about")) '("publish"))))
@@ -579,7 +598,8 @@
 (defun seo-schema (&rest seo-fields)
   (make-schema :custom-fields (list (make-custom-field "seo" seo-fields))
                :models (list (make-model "post" :list (list (make-field :title :text)
-                                                          (make-field :meta :custom :custom-field "seo"))))))
+                                                          (make-field :meta :custom :custom-field "seo"))
+                                         :history t))))
 
 (deftest custom-fields-are-kept-with-the-space
   (create-space "kept")
@@ -606,6 +626,7 @@
       (ng (nth-value 1 (access meta :note)) "the value inside is gone")
       (ok (string= (access meta :title) "Searchable") "and the rest stays"))
     (ok (null (search "Gone soon" (fetch-text "inner" id))) "and so is its text")
+    (ok (= (length (list-revisions "inner" id)) 1))
     (dolist (revision (list-revisions "inner" id))
       (ng (nth-value 1 (access (access (revision-data revision) :meta) :note)) "and the history's")))
   (delete-space "inner"))
@@ -617,7 +638,8 @@
   (make-schema :custom-fields (list (make-custom-field "heading" heading-fields)
                                     (make-custom-field "quote" (list (make-field :text :text) (make-field :note :text))))
                :models (list (make-model "post" :list (list (make-field :title :text)
-                                                          (make-field :blocks :repeater :custom-fields '(heading quote)))))))
+                                                          (make-field :blocks :repeater :custom-fields '(heading quote)))
+                                         :history t))))
 
 (deftest a-field-removed-from-a-row-kind-leaves-the-other-rows
   (create-space "rows")
@@ -634,6 +656,7 @@
       (ok (string= (access (aref rows 0) :text) "Head")))
     (ng (search "Gone" (fetch-text "rows" id)) "its text goes too")
     (ok (search "Quoted" (fetch-text "rows" id)) "the text of every row is kept")
+    (ok (= (length (list-revisions "rows" id)) 1))
     (dolist (revision (list-revisions "rows" id))
       (ng (nth-value 1 (access (aref (access (revision-data revision) :blocks) 0) :note)) "and the history's")))
   (delete-space "rows"))
@@ -643,7 +666,8 @@
   (flet ((kinds-schema (&rest kinds)
            (make-schema :custom-fields (list (make-custom-field "heading" (list (make-field :text :text)))
                                              (make-custom-field "quote" (list (make-field :text :text))))
-                        :models (list (make-model "post" :list (list (make-field :blocks :repeater :custom-fields kinds)))))))
+                        :models (list (make-model "post" :list (list (make-field :blocks :repeater :custom-fields kinds))
+                                                  :history t)))))
     (replace-schema "kinds" (kinds-schema 'heading 'quote))
     (let ((id (content-id (create "kinds" (find-model "kinds" "post")
                                   (list :blocks (vector (list :field-id "heading" :text "Head")
@@ -729,7 +753,7 @@
     (row "second" "page" nil "{\"slug\":\"same\"}")
     (row "only" "page" "{\"slug\":\"only\"}" nil)
     (row "pair" "twin" "{\"a\":\"x\",\"b\":\"y\"}" nil))
-  (ok (equal (migrate) '(16 17)))
+  (ok (equal (migrate) '(16 17 18)))
   (testing "the schema loses what a slug no longer takes, and is read"
     (dolist (row (fetch "SELECT definition FROM models WHERE space = 'older'"))
       (ng (search "\"from\"" (col row "definition")))
@@ -780,7 +804,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at)
          VALUES ('older', 'nulled', 'draft', '{\"title\":null,\"rows\":[{\"fieldId\":\"h\",\"text\":null}]}', '', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(17)))
+  (ok (equal (migrate) '(17 18)))
   (let ((content (stored-content "older" "nulled")))
     (ok (string= (content-status content) "published+draft") "the content is as it was")
     (ok (equal (content-published content) '(:title "Live")) "less the nulls of its published data")

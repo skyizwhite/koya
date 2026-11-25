@@ -4,11 +4,11 @@
                 #:make-field #:make-model #:make-schema #:field-name #:field-type #:field-option
                 #:field-was #:model-field #:model-kind #:model-was #:model-forget-renames
                 #:schema-model #:model-public-url
-                #:model-label #:make-webhook #:webhook-only #:webhook-covers-p #:schema-error
+                #:model-label #:model-history-p #:make-webhook #:webhook-only #:webhook-covers-p #:schema-error
                 #:schema-errors #:check-schema
                 #:check-deployable
                 #:make-custom-field #:custom-field-name #:custom-field-fields #:field-fields
-                #:field-row-kinds #:field-row-kind #:model-fields #:map-data-fields #:field-key
+                #:field-row-kinds #:field-row-kind #:model-fields #:model-options #:map-data-fields #:field-key
                 #:field-value #:without-field #:row-kind #:row-field-id #:row-fields #:key-name)
   (:import-from #:access
                 #:access #:accesses)
@@ -199,6 +199,16 @@
     (ok (= (length (errors (list (make-field :body :richtext)) :body)) 1)
         "a field whose value is not a line of text")
     (ok (= (length (errors (list (make-field :tags :select :options '("a")) ) :tags)) 1))))
+
+(deftest a-history-is-asked-for
+  (ok (model-history-p (make-model "blog" :list nil :history t)) "a model keeps a history when it says so")
+  (ng (model-history-p (make-model "blog" :list nil)) "and none without")
+  (ng (model-history-p (make-model "blog" :list nil :history nil)))
+  (ok (eq (getf (model-options (make-model "blog" :list nil :history nil)) :history '%none) '%none)
+      "a model without one has no option for it, so it is the same model as one that leaves it out")
+  (ok (signals (make-model "blog" :list nil :history "yes") 'schema-error) "it is true or false")
+  (ok (model-history-p (model-forget-renames (make-model "post" :list nil :history t :was "blog")))
+      "and it stays when a rename is forgotten"))
 
 (deftest help
   (testing "every type takes a help text for the editor"

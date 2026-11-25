@@ -12,7 +12,7 @@
   (:import-from #:koya-core/json
                 #:parse-json #:to-json)
   (:import-from #:koya-core/data #:array-p)
-  (:import-from #:koya-core/diff #:dropped-custom-fields)
+  (:import-from #:koya-core/diff #:dropped-custom-fields #:dropped-history-p)
   (:import-from #:koya-server/infra/db/schema-deploys #:record-deploy)
   (:import-from #:koya-server/infra/db/contents #:text-column)
   (:import-from #:koya-server/infra/db/sql #:json-path)
@@ -171,6 +171,11 @@
                                  (setf (gethash field data) (remove-if #'gone-p rows))
                                  t))))))
 
+(defun drop-model-history (space model)
+  (exec "DELETE FROM content_revisions
+         WHERE space = ? AND content_id IN (SELECT id FROM contents WHERE space = ? AND model = ?)"
+        space space model))
+
 (defun drop-model-contents (space model)
   (exec "DELETE FROM contents WHERE space = ? AND model = ?" space model))
 
@@ -185,6 +190,8 @@
       (:change-field-options
        (let ((gone (dropped-custom-fields change)))
          (when gone (drop-row-kinds space-name (getf change :model) (getf change :field) gone))))
+      (:change-model-options
+       (when (dropped-history-p change) (drop-model-history space-name (getf change :model))))
       (:change-kind (drop-model-contents space-name (getf change :model))))))
 
 (defmethod save-schema (space-name schema changes &key (by ""))

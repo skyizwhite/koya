@@ -228,7 +228,9 @@
                GROUP BY m.space, m.name HAVING COUNT(*) = 1) AS s
        WHERE contents.space = s.space AND contents.model = s.model")
     (17
-     drop-stored-nulls)))
+     drop-stored-nulls)
+    (18
+     "UPDATE models SET definition = json_set(definition, '$.history', json('true'))")))
 
 (defun drop-slug-options ()
   (dolist (row (fetch "SELECT space, name, definition FROM models"))

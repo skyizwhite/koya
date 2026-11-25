@@ -229,8 +229,9 @@ paths:
         through, a removed or retyped field's values are taken out of every
         published object, draft and revision (inside a custom field or a
         repeater's rows too), a custom field dropped from a repeater's
-        `customFields` takes its rows out of every revision, and a model removed,
-        or whose `kind` changes, loses its contents and their history. The
+        `customFields` takes its rows out of every revision, a model removed,
+        or whose `kind` changes, loses its contents and their history, and a
+        model whose `history` is taken away loses its history. The
         space must already exist — it is made in the admin UI — and a deploy to
         another name, one that does not exist included, is a 403.
       security: [{ managementKey: [] }]
@@ -1243,6 +1244,13 @@ components:
             A text or slug field of this model, not one inside a custom
             field, whose value the admin UI
             shows for a content. Absent, a content is shown by its id.
+        history:
+          type: boolean
+          description: |
+            `true` keeps every write to the model's contents as a revision,
+            for the admin UI's history. Absent or `false`, none is kept, and a
+            GET leaves it out. Taking it away from a deployed model deletes
+            its history and is destructive.
         was:
           type: string
           pattern: "^[a-z][a-z0-9-]*$"

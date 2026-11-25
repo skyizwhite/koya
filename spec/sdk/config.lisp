@@ -6,7 +6,7 @@
                 #:schema-models #:schema-webhooks #:schema-model #:model-field #:model-kind
                 #:field-option #:field-type #:schema-error #:model-preview-url #:model-public-url
                 #:model-label #:model-name #:webhook-url #:model-was #:field-was #:webhook-label
-                #:webhook-only #:field-name #:field-fields))
+                #:webhook-only #:field-name #:field-fields #:model-history-p))
 (in-package #:koya-spec/sdk/config)
 
 (defhook :before (clear-schema))
@@ -19,7 +19,7 @@
     (tags         :reference :model tag :many t)
     (category     :select :options ("news" "tech"))
     (event-at :datetime :help "When the event starts"))
-  (defmodel tag (:kind :list :label name)
+  (defmodel tag (:kind :list :label name :history t)
     (name :text :required t))
   (defmodel about (:kind :object
                    :preview-url (format nil "~a/about?draft-key={DRAFT_KEY}" "https://x")
@@ -38,6 +38,8 @@
     (ok (null (model-preview-url blog)))
     (ok (string= (model-label (schema-model schema "tag")) "name") ":label is taken literally, as a field name")
     (ok (null (model-label blog)))
+    (ok (model-history-p (schema-model schema "tag")) "a model asks for a history")
+    (ng (model-history-p blog) "and keeps none without asking")
     (ok (= (field-option (model-field blog "title") :max-length) 100))
     (ok (string= (field-option (model-field blog "tags") :model) "tag"))
     (ok (equal (field-option (model-field blog "category") :options) '("news" "tech")))
