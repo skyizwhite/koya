@@ -3,7 +3,7 @@
   (:import-from #:koya-spec/server/stored #:stored-content)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
   (:import-from #:koya-spec/server/schema #:with-schema)
-  (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id>/history #:browse-history)
+  (:import-from #:koya-server/web/pages/s/<space>/m/<model>/<id>/history #:browse-history #:clear-history-action)
   (:import-from #:koya-server/web/lib/binds #:on-click #:on-search #:on-reveal)
   (:import-from #:koya-spec/server/web/pages/support
                 #:replaced-url #:bound #:call-action #:edit #:moved-to #:blog-model #:request #:setup-pages
@@ -535,6 +535,27 @@
         (ok (string= (replaced-url body) (format nil "~a?view=published" path)))))
     (ok (= 404 (call-action :get (browse-history :space "website" :model "blog" :id "nope"))))))
 
+(deftest a-history-is-cleared-in-place
+  (exec "DELETE FROM contents")
+  (let* ((id (new-blog '(("action" . "publish") ("f-title" . "Once"))))
+         (path (format nil "/s/website/m/blog/~a/history" id))
+         (clear (clear-history-action :space "website" :model "blog" :id id)))
+    (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "save") ("f-title" . "Twice")))
+    (let ((page (nth-value 1 (request :get path))))
+      (ok (search "Clear history" page) "the history page offers it")
+      (ok (asked-first page "confirm-clear-history" clear) "in a dialog that does it")
+      (ng (search "confirm(" page) "not the browser's own confirm"))
+    (multiple-value-bind (status body) (call-action :post clear)
+      (ok (= status 200))
+      (ok (search "id=\"revisions\"" body) "it draws #revisions again")
+      (ok (search "No history yet." body))
+      (ok (search "History cleared." body))
+      (ok (string= (replaced-url body) path)))
+    (ok (zerop (count-revisions "website" id)))
+    (ok (string= (content-status (stored-content "website" id)) "published+draft") "and leaves the content as it was")
+    (ng (search "Clear history" (nth-value 1 (request :get path))) "an empty history has nothing to clear")
+    (ok (= 404 (call-action :post (clear-history-action :space "website" :model "blog" :id "nope"))))))
+
 (deftest a-model-without-a-history-has-no-history-page
   (with-schema ("website" (make-schema :models (list (blog-model)
                                                      (make-model "memo" :list (list (make-field :text :text)))
@@ -550,6 +571,8 @@
         (ok (search "keeps no history" body)))
       (ok (= 404 (call-action :get (browse-history :space "website" :model "memo" :id id :view "" :page 1)))
           "nor are its tabs")
+      (ok (= 404 (call-action :post (clear-history-action :space "website" :model "memo" :id id)))
+          "nor is there one to clear")
       (edit url :form '(("action" . "delete"))))))
 
 (deftest a-draft-that-changes-nothing-is-none

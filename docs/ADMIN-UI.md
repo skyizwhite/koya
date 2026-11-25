@@ -293,8 +293,9 @@ A model keeps a history when the schema says so (`"history": true`, `:history t`
 in `defmodel` — see [SCHEMA.md](SCHEMA.md#model)). For its contents every write
 is kept — each draft save, publish, unpublish and discard — with who made it
 (the owner, or a management key by its label) and when. A save that changes
-nothing makes no entry, so every entry has a change to show. Nothing is ever
-pruned; deleting the content deletes its history with it, and a deploy that
+nothing makes no entry, so every entry has a change to show. Nothing is pruned
+by itself; **Clear history** deletes a content's history (see below), deleting
+the content deletes its history with it, and a deploy that
 takes `history` away from the model deletes the history of all its contents.
 
 A model without `history` keeps none: its editor has no **History** button, and
@@ -317,6 +318,11 @@ inside as a `name: value` line, and a repeater each row as a
 `customField: field: value; field: value` line. Rich text is shown formatted,
 and as plain text inside a custom field or a repeater row;
 references and media carry their label or file name while they still exist.
+
+**Clear history**, beside the tabs while there is any, deletes every version of
+the content after asking first. The content, published and drafted, stays as
+it is, and its next write starts its history again. It cannot be undone, and
+sends no webhook.
 
 **Restore** opens the editor with that version in the form, under a banner
 saying which version it is. Nothing is stored until **Save draft** or

@@ -1,16 +1,19 @@
 (defpackage #:koya-server/usecases/revisions
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:model-fields #:field-name #:field-type #:field-unique-p
+                #:model-name #:model-history-p #:model-fields #:field-name #:field-type #:field-unique-p
                 #:field-required-p #:map-data-fields #:field-value #:without-field #:field-key)
   (:import-from #:koya-core/validate #:validate-content #:blank-value-p)
   (:import-from #:koya-core/data #:array-p)
   (:import-from #:koya-server/usecases/ports/contents
-                #:list-revisions #:count-revisions #:find-revision)
+                #:list-revisions #:count-revisions #:find-revision #:delete-revisions)
+  (:import-from #:koya-server/usecases/ports/store #:with-transaction)
+  (:import-from #:koya-server/domain/errors #:fail #:not-found)
   (:import-from #:koya-server/domain/content #:content-published-p)
-  (:import-from #:koya-server/usecases/contents #:value-taken-p)
+  (:import-from #:koya-server/usecases/contents #:value-taken-p #:find-content)
   (:import-from #:koya-server/usecases/held #:read-held #:held-entry)
   (:export #:restore-data
+           #:clear-history
            #:list-revisions
            #:count-revisions
            #:find-revision))
@@ -84,3 +87,9 @@
                        (keep-current field))
                       (t (keep field value)))))))))
       (values data (nreverse notes)))))
+
+(defun clear-history (space model id)
+  (with-transaction
+    (unless (and (model-history-p model) (find-content space (model-name model) id))
+      (fail 'not-found (format nil "Content ~a has no history" id)))
+    (delete-revisions space id)))

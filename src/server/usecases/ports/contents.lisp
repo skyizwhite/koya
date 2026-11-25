@@ -17,6 +17,7 @@
            #:slug-taken-p
            #:contents-mentioning
            #:record-revision
+           #:delete-revisions
            #:list-revisions
            #:count-revisions
            #:find-revision
@@ -56,6 +57,8 @@
 (defgeneric contents-mentioning (space needle &key exclude-id))
 
 (defgeneric record-revision (space content-id event data &key by created-at))
+
+(defgeneric delete-revisions (space content-id))
 
 (defgeneric list-revisions (space content-id &key published-only limit offset))
 
