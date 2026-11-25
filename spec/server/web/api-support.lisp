@@ -36,7 +36,7 @@
                              (make-model "about" :object (list (make-field :body :richtext))))))
 
 (defun request (method path &key query body headers)
-  (let ((env (list :request-method method :script-name "" :path-info path :query-string (or query "")
+  (let ((env (list :request-method method :script-name "" :path-info path :query-string query
                    :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                    :request-uri (format nil "~a~@[?~a~]" path query) :url-scheme "http" :remote-addr "127.0.0.1"
                    :headers (alist-hash-table headers :test 'equal)
@@ -58,7 +58,7 @@
 
 (defun admin-upload (path parts)
   (multiple-value-bind (octets content-type) (multipart-body parts)
-    (let ((env (list :request-method :post :script-name "" :path-info path :query-string ""
+    (let ((env (list :request-method :post :script-name "" :path-info path :query-string nil
                      :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                      :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
                      :headers (alist-hash-table `(("authorization" . ,(format nil "Bearer ~a" *management-key*))) :test 'equal)

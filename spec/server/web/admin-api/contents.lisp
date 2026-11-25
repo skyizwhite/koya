@@ -356,7 +356,7 @@
         (ok (null *webhooks*) "and nothing is sent")))))
 
 (defun admin-octets (method path octets)
-  (let ((env (list :request-method method :script-name "" :path-info path :query-string ""
+  (let ((env (list :request-method method :script-name "" :path-info path :query-string nil
                    :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                    :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
                    :headers (alist-hash-table `(("authorization" . ,(format nil "Bearer ~a" *management-key*)))

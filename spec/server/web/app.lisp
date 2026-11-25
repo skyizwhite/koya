@@ -227,6 +227,7 @@
     (declare (ignore body))
     (ok (= status 301) "a page is sent to its URL")
     (ok (string= (location headers) "/s/website")))
+  (ok (= (request :get "//evil.example/x/") 404) "a path that would lead off the site is not sent anywhere")
   (let* ((url (media-picker :space "website"))
          (q (position #\? url))
          (slashed (format nil "~a/~a" (subseq url 0 q) (subseq url q))))
@@ -248,7 +249,7 @@
 
 (deftest body-size-limit
   (flet ((huge-post (headers &key (path "/login") (mb 3000) (content-type "multipart/form-data; boundary=x"))
-           (funcall (app) (list :request-method :post :script-name "" :path-info path :query-string ""
+           (funcall (app) (list :request-method :post :script-name "" :path-info path :query-string nil
                                 :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                                 :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
                                 :headers (alist-hash-table (acons "host" "localhost:3000" headers) :test 'equal)

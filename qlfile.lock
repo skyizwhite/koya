@@ -41,7 +41,7 @@
 ("hsx" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/hsx.git")
-  :version "git-16c85a2f5d77e1285e427e7659efe7b40dfc17d8"))
+  :version "git-6ee425e2e5dcecd730ba5738f9d9703dd0273b28"))
 ("ironclad" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
@@ -56,8 +56,8 @@
   :version "ql-2026-01-01"))
 ("lack-mw" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git" :tag "v0.4.0")
-  :version "git-3fa9e3019b7c3af4133e9f44461874e8ca4f8b76"))
+  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git")
+  :version "git-517fa5d235540e71e38f4b71e3ddef8dc592d254"))
 ("local-time" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
@@ -69,14 +69,14 @@
 ("ningle-actions" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/ningle-actions.git")
-  :version "git-dded9e78b94113dd64ab341c586b93ac7b9dcc9f"))
+  :version "git-bf7f1541b972b2d20c07a68bef0f1e98bfb34042"))
 ("ningle-fbr" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/skyizwhite/ningle-fbr.git")
-  :version "git-2829bb24ca54ced927c3f56c5fdd723f4f90cdc9"))
+  :version "git-efd0f07c5f843d5ac5abdf3d9dd6c6c526981cea"))
 ("okite" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/okite.git" :tag "0.4.0")
+  :initargs (:remote-url "https://github.com/skyizwhite/okite.git")
   :version "git-05947fd37249c3069d73a76c62cf30881f9b6f70"))
 ("piping" .
  (:class qlot/source/ql:source-ql
@@ -113,4 +113,4 @@
 ("rove" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/fukamachi/rove")
-  :version "git-52b04eaa4a079d753fdf49e793a52d5fe1f61836"))
+  :version "git-ad016fa6762debe0dbf8f131c63555353ae5dd42"))

@@ -80,7 +80,7 @@
   (multiple-value-bind (status json raw) (delivery "/api/v1/website/lists/blog")
     (declare (ignore json raw))
     (ok (= status 200)))
-  (let ((env (list :request-method :get :script-name "" :path-info "/api/v1/website/lists/blog" :query-string ""
+  (let ((env (list :request-method :get :script-name "" :path-info "/api/v1/website/lists/blog" :query-string nil
                    :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                    :request-uri "/api/v1/website/lists/blog" :url-scheme "http" :remote-addr "127.0.0.1"
                    :headers (alist-hash-table `(("x-koya-delivery-key" . ,*api-key*)) :test 'equal)
@@ -110,7 +110,7 @@
     (ok (string= (jget json "error" "code") "not_found"))))
 
 (defun raw-request (method path headers)
-  (funcall (app) (list :request-method method :script-name "" :path-info path :query-string ""
+  (funcall (app) (list :request-method method :script-name "" :path-info path :query-string nil
                        :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                        :request-uri path :url-scheme "http" :remote-addr "127.0.0.1"
                        :headers (alist-hash-table headers :test 'equal)
@@ -191,7 +191,7 @@
   (ok (= 401 (delivery "/api/v1/website/lists/blog/" :key nil)) "but not without a key")
   (destructuring-bind (status headers body)
       (funcall (app) (list :request-method :options :script-name "" :path-info "/api/v1/website/lists/blog/"
-                           :query-string "" :request-uri "/api/v1/website/lists/blog/"
+                           :query-string nil :request-uri "/api/v1/website/lists/blog/"
                            :server-name "localhost" :server-port 3000 :server-protocol :http/1.1
                            :url-scheme "http" :remote-addr "127.0.0.1"
                            :headers (alist-hash-table '(("origin" . "https://example.com")
