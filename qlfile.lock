@@ -56,8 +56,8 @@
   :version "ql-2026-01-01"))
 ("lack-mw" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git" :tag "v0.4.0")
-  :version "git-3fa9e3019b7c3af4133e9f44461874e8ca4f8b76"))
+  :initargs (:remote-url "https://github.com/skyizwhite/lack-mw.git")
+  :version "git-517fa5d235540e71e38f4b71e3ddef8dc592d254"))
 ("local-time" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
@@ -76,7 +76,7 @@
   :version "git-2829bb24ca54ced927c3f56c5fdd723f4f90cdc9"))
 ("okite" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/skyizwhite/okite.git" :tag "0.4.0")
+  :initargs (:remote-url "https://github.com/skyizwhite/okite.git")
   :version "git-05947fd37249c3069d73a76c62cf30881f9b6f70"))
 ("piping" .
  (:class qlot/source/ql:source-ql
