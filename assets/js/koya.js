@@ -108,8 +108,10 @@
         this.busy = false;
         const message = `Uploaded ${done} of ${files.length} file${files.length === 1 ? "" : "s"}.`;
         if (refused.length || stopped) {
+          const reasons = [...refused, ...(stopped ? [stopped] : [])];
           this.status = message;
-          this.error = [...refused, ...(stopped ? [stopped] : [])].join("\n");
+          this.error = reasons.join("\n");
+          if (!this.$refs.dialog.open) drawToast("toast-failed", `${message} ${reasons.join(" ")}`);
         } else {
           this.$refs.dialog.close();
           drawToast("toast-done", `Uploaded ${done} file${done === 1 ? "" : "s"}.`);

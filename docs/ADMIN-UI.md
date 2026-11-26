@@ -410,7 +410,9 @@ newest 100 of a space are kept.
   that is, as an import's does. Once all are added it closes and the toast says
   so; otherwise it stays open and lists each file not added and why. A file that
   is refused does not stop the rest; anything else, such as a lost connection,
-  stops the sending, and the dialog says the rest were not sent. The grid is
+  stops the sending, and the dialog says the rest were not sent. Closing the
+  dialog does not stop the sending, and what was not added is then told in the
+  toast. The grid is
   then drawn again at its first page, for what the search box says. A photo's
   metadata, its GPS position included, is not kept; its orientation is.
 - The grid is thumbnails, newest first, with paging underneath. The search box

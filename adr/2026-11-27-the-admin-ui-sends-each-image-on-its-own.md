@@ -41,4 +41,5 @@ after another with it.
 - Files added before a refusal or a stop stay added.
 - After an upload the library is at its first page, where the new files are,
   rather than at the page it was on.
-- Closing the dialog hides it and does not stop the sending.
+- Closing the dialog hides it and does not stop the sending; what was not added
+  is then told in the toast.
