@@ -17,6 +17,8 @@ and moves the browser or replaces its URL when an answer's headers say so.
   placeholder as it comes into view, a file as it is picked.
 - A form sends what the browser would: it is handed to `$post` as the event
   that submits it, or as the form itself.
+- An upload's form is a scope of its own, so sending a file cancels no read of
+  the part of the page around it.
 - An answer that sends the browser to another page, or replaces the page's URL,
   says so in Nagi's `n-redirect` or `n-replace-url` header.
 - The actions take only what Nagi sends, `n-request: true` among it.
@@ -28,5 +30,8 @@ and moves the browser or replaces its URL when an answer's headers say so.
   is overtaken is not drawn; a write is never cancelled, and the same write is
   not sent again while it is in flight.
 - An editor with unsaved changes asks before a move the server sends, as it
-  asks before any other; the editor and Log out say with `n-on-fetchredirect`
-  that a move after their own request needs no asking.
+  asks before any other, unless the move is one the page asked for on purpose:
+  the editor says with `n-on-fetchredirect.window` that a move the server sends
+  while it is open is its own, even when the element that asked has been drawn
+  again since, and Log out says so with `n-on-fetchredirect`.
+- A page the browser brings back from its history asks again.

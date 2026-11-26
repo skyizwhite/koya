@@ -44,8 +44,7 @@
 (defaction logout :post (params)
   (declare (ignore params))
   (session-logout)
-  (send-to "/login")
-  (hsx (<>)))
+  (send-to "/login"))
 
 (defcomp ~layout (&key space crumbs children)
   (hsx

@@ -239,7 +239,7 @@
                                                          :id id :slug (slug-value model (content-published content))))))
     (hsx
      (div :id "editor" :n-scope (format nil "koya.editor(this, ~:[false~;true~])" (or restoring original))
-          :n-on-fetchredirect "koya.leave()"
+          :n-on-fetchredirect.window "koya.leave()"
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (div :class "flex items-center justify-between gap-3"
            (div :class "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
@@ -381,8 +381,7 @@
 
 (defun move-on (url message)
   (set-toast message)
-  (send-to url)
-  (hsx (<>)))
+  (send-to url))
 
 (defaction editor-action :post (params)
   (let* ((space (param params "space"))

@@ -131,7 +131,7 @@
   (format nil "n-on-init=\"koya.reveal(e)\" ~a" (bound "n-on-revealed" (koya-server/web/lib/binds:ask url))))
 
 (defun moved-to (headers)
-  (or (getf headers :n-redirect) (getf headers :n-replace-url)))
+  (getf headers :n-redirect))
 
 (defun replaced-url (headers)
   (getf headers :n-replace-url))

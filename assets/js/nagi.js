@@ -143,7 +143,6 @@
                 const isEvent = typeof data?.preventDefault === "function";
                 const isBlob = (value) => typeof value?.arrayBuffer === "function";
                 if (typeof data === "string") body = new URLSearchParams(data);
-                else if (typeof data?.append === "function" && typeof data[Symbol.iterator] === "function") body = data;
                 else if (isEvent || data?.nodeType === 1) {
                     const node = isEvent ? data.target : data;
                     const button = node?.closest?.("button, input[type=submit], input[type=image]");
@@ -156,7 +155,8 @@
                         console.warn("[Nagi] no form to send for:", data);
                         body = new URLSearchParams();
                     }
-                } else {
+                } else if (typeof data?.append === "function" && typeof data[Symbol.iterator] === "function") body = data;
+                else {
                     const pairs = Object.entries(data ?? {}).flatMap(([key, value]) =>
                         [value]
                             .flat()

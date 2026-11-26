@@ -1,5 +1,6 @@
 (defpackage #:koya-server/web/lib/http
   (:use #:cl)
+  (:import-from #:hsx #:hsx)
   (:import-from #:ningle
                 #:*request* #:*response* #:process-response)
   (:import-from #:lack/request #:request-content)
@@ -133,7 +134,7 @@
 
 (defun send-to (url)
   (set-response-header :n-redirect (header-url url))
-  nil)
+  (hsx (<>)))
 
 (defun replace-url (url)
   (set-response-header :n-replace-url (header-url url))

@@ -77,7 +77,7 @@
          (q (or search "")))
     (hsx
      (div :id "library" :n-scope "koya.bulk(this)"
-       (form :n-on-change (upload-picked (upload-media :space space :q q :page page))
+       (form :n-scope "" :n-on-change (upload-picked (upload-media :space space :q q :page page))
              :class "mb-8 flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
          (label :class "btn" (~icon :name :upload) "Upload"
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp"

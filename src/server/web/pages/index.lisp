@@ -208,8 +208,7 @@
       (koya-error (e) (action-refused e)))))
 
 (defaction finish-import-action :post (params)
-  (send-to (import-archive (param params "id")))
-  (hsx (<>)))
+  (send-to (import-archive (param params "id"))))
 
 (defun @get (params)
   (declare (ignore params))

@@ -30,6 +30,9 @@
   koya.leave = () => {
     leaving = true;
   };
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) leaving = false;
+  });
 
   koya.search = () => ({
     asked: null,

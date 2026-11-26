@@ -140,7 +140,7 @@
           (ok (search "value=\"Edited\"" body)))
         (multiple-value-bind (status body headers) (edit (format nil "/s/website/m/blog/~a" id) :form '(("action" . "discard")) :headers origin)
           (ok (= status 200))
-          (ok (string= (moved-to headers) (format nil "/s/website/m/blog/~a" id)))
+          (ok (string= (replaced-url headers) (format nil "/s/website/m/blog/~a" id)))
           (ok (search "id=\"editor\"" body) "the editor is drawn again")
           (ok (search "Draft discarded." body) "with the toast out of band")
           (ok (search "value=\"Hello World\"" body) "and the published data back in it"))
@@ -155,7 +155,7 @@
                     :form '(("action" . "publish") ("f-title" . "Hello World") ("f-slug" . "hello-world") ("f-body" . "# Hi")))
         (ok (= status 200))
         (ok (search "Published." body) "toast after publish")
-        (ok (string= (moved-to headers) (format nil "/s/website/m/blog/~a" id)) "the URL loses any query noise"))
+        (ok (string= (replaced-url headers) (format nil "/s/website/m/blog/~a" id)) "the URL loses any query noise"))
       (let ((content (first (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))
         (ok (string= (content-status content) "published"))
         (ok (null (access (content-published content) :featured)) "unchecked box stored as false"))
@@ -191,7 +191,7 @@
     (multiple-value-bind (status body headers) (edit "/s/website/m/about" :form '(("action" . "publish") ("f-body" . "about")))
       (declare (ignore body))
       (ok (= status 200))
-      (ok (string= (moved-to headers) "/s/website/m/about")))
+      (ok (string= (replaced-url headers) "/s/website/m/about")))
     (multiple-value-bind (status body) (request :get "/s/website/m/about")
       (ok (= status 200))
       (ok (search "about" body)))))
@@ -208,7 +208,7 @@
       (multiple-value-bind (status body headers) (edit "/s/website/m/about" :form '(("action" . "save") ("f-body" . "first")))
         (ok (= status 200))
         (ok (search "Draft saved." body))
-        (ok (string= (moved-to headers) "/s/website/m/about")))
+        (ok (string= (replaced-url headers) "/s/website/m/about")))
       (setf id (content-id (first (list-contents "website" "about" (nth-value 1 (resolve-model "website" "about")) (parse-query nil) :status :all)))))
     (testing "a later save changes that content"
       (edit "/s/website/m/about" :form `(("action" . "save") ("f-body" . "second")
@@ -259,7 +259,14 @@
         (ok (string= (access (content-draft (stored-content "website" id)) :body) spaced))))
     (testing "an edited one is stored as the editor wrote it"
       (edit path :form '(("action" . "save") ("f-title" . "Renamed") ("f-body" . "<p>c</p><p>d</p>")))
-      (ok (string= (access (content-draft (stored-content "website" id)) :body) "<p>c</p><p>d</p>")))))
+      (ok (string= (access (content-draft (stored-content "website" id)) :body) "<p>c</p><p>d</p>")))
+    (testing "a form sent in parts, as the browser sends it, is read the same"
+      (call-action :post (editor-action :space "website" :model "blog" :id id :op "save")
+                   :multipart `(("f-title" "Renamed") ("f-body" ,(format nil "<p>e</p>~c~%<p>f</p>" #\Return))
+                                ("f-labels" "a") ("f-labels" "b")))
+      (let ((draft (content-draft (stored-content "website" id))))
+        (ok (string= (access draft :body) (format nil "<p>e</p>~%<p>f</p>")) "less the CRLF of the form")
+        (ok (data-equal (access draft :labels) #("a" "b")) "and a list with its name for each value")))))
 
 (deftest url-templates-fill-in-the-slug
   (with-schema ("website"
@@ -589,7 +596,7 @@
       (let ((body (nth-value 1 (request :get path))))
         (ok (search "<div id=\"editor\" n-scope=\"koya.editor(this, false)\"" body)
             "what is shown is what is stored")
-        (ok (search "n-scope=\"koya.editor(this, false)\" n-on-fetchredirect=\"koya.leave()\">" body)
+        (ok (search "n-scope=\"koya.editor(this, false)\" n-on-fetchredirect.window=\"koya.leave()\">" body)
             "and moving on after its own write leaves without asking")
         (ok (search "n-on-input=\"track()\" n-on-change=\"track()\"" body)
             "the form tells it of every change")

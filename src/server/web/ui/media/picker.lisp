@@ -35,7 +35,7 @@
    (div :id "media-picker-body" :class "space-y-4"
      (~search-form :url (media-picker-search :space space) :class "flex gap-2"
        (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
-     (form :n-on-change (upload-picked (media-picker-upload :space space))
+     (form :n-scope "" :n-on-change (upload-picked (media-picker-upload :space space))
            :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
        (label :class "btn" (~icon :name :upload) "Upload"
          (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
