@@ -170,9 +170,12 @@
     (let ((d (first (list-deliveries "website"))))
       (ok (< (length (delivery-response d)) (* 2 +max-response-chars+)) "stored clipped, not whole")
       (ok (search "characters in all" (delivery-response d)) "and says it was clipped"))
-    (dotimes (i 5)
-      (admin :post "/admin/api/website/lists/tag" :body (jobject "data" (jobject "name" (format nil "t~a" i)) "publish" t)))
-    (ok (<= (count-deliveries "website") +deliveries-kept+) "the cap holds")))
+    (exec "DELETE FROM webhook_deliveries")
+    (dotimes (i 25)
+      (declare (ignorable i))
+      (record-delivery "website" :label "hook" :model "tag" :event "publish" :ok t))
+    (ok (= +deliveries-kept+ 20) "a space keeps its newest 20 calls")
+    (ok (= (count-deliveries "website") 20) "and no more")))
 
 (deftest the-log-names-the-labels-and-models-it-holds
   (exec "DELETE FROM webhook_deliveries")

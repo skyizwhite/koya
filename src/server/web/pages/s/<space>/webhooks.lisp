@@ -13,12 +13,11 @@
                 #:delivery-content-id #:delivery-ok #:delivery-status #:delivery-response
                 #:delivery-error #:delivery-duration-ms #:delivery-created-at)
   (:import-from #:koya-server/web/lib/http #:path-param #:param)
-  (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/lib/display #:short-time)
   (:import-from #:koya-server/web/lib/urls #:space-url #:content-url #:editor-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~replace-url)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:import-from #:koya-server/usecases/schema #:load-schema #:find-model)
@@ -142,12 +141,8 @@
                          (t " match"))
                    +deliveries-kept+)))))
 
-(defcomp ~deliveries (&key space label model page)
-  (let* ((total (count-deliveries space :label label :model model))
-         (pages (last-page total))
-         (page (min page pages))
-         (items (list-deliveries space :label label :model model
-                                       :limit +page-size+ :offset (page-offset page))))
+(defcomp ~deliveries (&key space label model)
+  (let ((items (list-deliveries space :label label :model model :limit +deliveries-kept+)))
     (hsx
      (div :id "deliveries"
        (if (null items)
@@ -156,31 +151,26 @@
                                   "Nothing has been delivered yet.")))
            (hsx (ul :class "divide-y divide-line overflow-hidden rounded-md border border-line bg-panel"
                   (loop :for delivery :in items :collect
-                    (hsx (li (~delivery :space space :delivery delivery)))))))
-       (~pager :page page :pages pages
-               :href (lambda (n) (webhook-log-url space :label label :model model :page n))
-               :browse (lambda (n) (browse-deliveries :space space :label (or label "") :model (or model "") :page n)))))))
+                    (hsx (li (~delivery :space space :delivery delivery)))))))))))
 
-(defcomp ~log-page (&key space schema label model page)
+(defcomp ~log-page (&key space schema label model)
   (hsx
    (~layout :space space :crumbs (list (cons "Webhooks" nil))
      (h1 :class "mb-2 text-2xl font-bold" "Webhooks")
      (~delivery-count :space space :label label :model model)
      (~filters :space space :schema schema :label label :model model)
-     (~deliveries :space space :label label :model model :page page))))
+     (~deliveries :space space :label label :model model))))
 
 (defaction browse-deliveries :get (params)
   (let* ((space (param params "space"))
          (schema (and space (load-schema space)))
          (clear (equal (param params "clear") "1"))
          (label (and (not clear) (param params "label")))
-         (model (and (not clear) (param params "model")))
-         (pages (and schema (last-page (count-deliveries space :label label :model model))))
-         (page (and schema (min (page-number params) pages))))
+         (model (and (not clear) (param params "model"))))
     (cond ((null schema) (action-refusal "Space not found." 404))
           (t
-           (hsx (<> (~deliveries :space space :label label :model model :page page)
-                    (~replace-url :url (webhook-log-url space :label label :model model :page page))
+           (hsx (<> (~deliveries :space space :label label :model model)
+                    (~replace-url :url (webhook-log-url space :label label :model model))
                     (~delivery-count :space space :label label :model model)
                     (if clear
                         (hsx (~filters :space space :schema schema))
@@ -195,5 +185,4 @@
            (hsx (~log-page :space name
                            :schema schema
                            :label (param params "label")
-                           :model (param params "model")
-                           :page (page-number params)))))))
+                           :model (param params "model")))))))

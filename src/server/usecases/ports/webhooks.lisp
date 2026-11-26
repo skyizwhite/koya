@@ -27,4 +27,4 @@
 
 (defgeneric delivery-models (space))
 
-(defparameter +deliveries-kept+ 200)
+(defparameter +deliveries-kept+ 20)

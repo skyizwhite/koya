@@ -33,11 +33,10 @@
   (render-uri (make-uri :path (format nil "~a/deploys" (space-url space))
                         :query (when (and page (> page 1)) `(("page" . ,page))))))
 
-(defun webhook-log-url (space &key label model page)
+(defun webhook-log-url (space &key label model)
   (render-uri (make-uri :path (format nil "~a/webhooks" (space-url space))
                         :query (append (unless (blank-p label) `(("label" . ,label)))
-                                       (unless (blank-p model) `(("model" . ,model)))
-                                       (when (and page (> page 1)) `(("page" . ,page)))))))
+                                       (unless (blank-p model) `(("model" . ,model)))))))
 
 (defun expand-url-template (template &key id draft-key slug)
   (and template
