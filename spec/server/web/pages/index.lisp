@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/index
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:on-submit)
+  (:import-from #:koya-server/web/lib/binds #:submit)
   (:import-from #:koya-spec/server/web/pages/support
                 #:bound #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/index #:create-space-action #:delete-space-action)
@@ -25,7 +25,7 @@
     (ok (search "<ul class=\"tiles tiles-3\">" body) "the spaces in tiles, three to a row on a wide screen")
     (ok (search "commandfor=\"new-space\"" body) "the form is behind a button")
     (ok (search "<dialog id=\"new-space\"" body) "and lives in a dialog on the page")
-    (ok (search (bound (on-submit (create-space-action))) body)))
+    (ok (search (bound "n-on-submit.prevent" (submit (create-space-action))) body)))
   (testing "each space shows how many models and media it holds"
     (ok (= 200 (call-action :post (create-space-action) :form '(("name" . "counted")))))
     (let ((body (nth-value 1 (request :get "/"))))
@@ -89,7 +89,7 @@
     (let ((body (nth-value 1 (request :get "/"))))
       (ok (search "commandfor=\"delete-space-blog\" command=\"show-modal\"" body))
       (ok (search "<dialog id=\"delete-space-blog\" closedby=\"any\"" body))
-      (ok (search "<dialog id=\"delete-space-blog\" closedby=\"any\" class=\"koya-dialog max-w-sm\" nm-data=\"...koya.phrase(this)\"" body)
+      (ok (search "<dialog id=\"delete-space-blog\" closedby=\"any\" class=\"koya-dialog max-w-sm\" n-scope=\"koya.phrase(this)\"" body)
           "the dialog holds what is typed")
       (ok (search "data-confirm-phrase=\"delete blog\"" body))
       (ok (search "<input type=\"text\" id=\"delete-phrase-blog\"" body))

@@ -108,12 +108,12 @@
 
 (deftest deploys-are-paged-in-place
   (log-in)
-  (multiple-value-bind (status body) (call-action :get (browse-deploys :space "website" :page 1))
+  (multiple-value-bind (status body headers) (call-action :get (browse-deploys :space "website" :page 1))
     (ok (= status 200))
     (ok (search "id=\"deploys\"" body))
     (ng (search "<html" body))
-    (ok (string= (replaced-url body) "/s/website/deploys")))
-  (ok (string= (replaced-url (nth-value 1 (call-action :get (browse-deploys :space "website" :page 9))))
+    (ok (string= (replaced-url headers) "/s/website/deploys")))
+  (ok (string= (replaced-url (nth-value 2 (call-action :get (browse-deploys :space "website" :page 9))))
                "/s/website/deploys")
       "a page past the end is the last one")
   (ok (= 404 (call-action :get (browse-deploys :space "nope")))))

@@ -1,5 +1,7 @@
 # Nomini is handed each answer whole, and drawable
 
+Superseded by adr/2026-11-27-what-an-answer-cannot-draw-is-a-toast.md
+
 *2026-10-02*
 
 ## Context

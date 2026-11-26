@@ -1,12 +1,12 @@
 (defpackage #:koya-server/web/pages/index
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/http #:param #:integer-param #:set-response-status #:request-octets)
+  (:import-from #:koya-server/web/lib/http #:param #:integer-param #:set-response-status #:request-octets #:send-to)
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~go-to)
-  (:import-from #:koya-server/web/lib/binds #:on-submit)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state)
+  (:import-from #:koya-server/web/lib/binds #:submit)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
@@ -29,16 +29,16 @@
   (hsx (button :type "button" :commandfor dialog :command "close" :class "btn" children)))
 
 (defcomp ~delete-error (&key name message)
-  (hsx (p :id (delete-error-id name) :nm-ref "error" :class "mt-2 text-sm text-danger" message)))
+  (hsx (p :id (delete-error-id name) :n-ref "error" :class "mt-2 text-sm text-danger" message)))
 
 (defcomp ~delete-space-dialog (&key name)
   (let ((id (delete-dialog-id name))
         (phrase (delete-phrase name))
         (input (delete-phrase-id name)))
     (hsx
-     (dialog :id id :closedby "any" :class "koya-dialog max-w-sm" :nm-data "...koya.phrase(this)"
-             :nm-bind "{ onclose: () => _reset() }"
-       (form :nm-bind (on-submit (delete-space-action))
+     (dialog :id id :closedby "any" :class "koya-dialog max-w-sm" :n-scope "koya.phrase(this)"
+             :n-on-close "reset()"
+       (form :n-on-submit.prevent (submit (delete-space-action))
          (input :type "hidden" :name "name" :value name)
          (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
            (h2 :class "font-semibold" "Delete space")
@@ -51,12 +51,12 @@
            (label :for input :class "label mt-4" "Type " (code (format nil "\"~a\"" phrase)) " to confirm")
            (input :type "text" :id input :name "confirm" :required t :autocomplete "off"
                   :spellcheck "false" :data-confirm-phrase phrase :class "input mt-1.5"
-                  :nm-bind "{ value: () => _typed, oninput: () => _typed = this.value }")
+                  :n-bind-value "typed" :n-on-input "typed = this.value")
            (~delete-error :name name))
          (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
            (~dialog-close :dialog id "Cancel")
            (button :type "submit" :class "btn btn-danger" :disabled t
-                   :nm-bind "{ disabled: () => _typed !== _phrase }"
+                   :n-bind-disabled "typed !== phrase"
              (~icon :name :delete) "Delete space")))))))
 
 (defcomp ~space-row (&key space)
@@ -89,7 +89,7 @@
 (defcomp ~new-space-dialog ()
   (hsx
    (dialog :id "new-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :nm-bind (on-submit (create-space-action))
+     (form :n-on-submit.prevent (submit (create-space-action))
        (div :class "flex items-center justify-between gap-4 border-b border-line px-4 py-3"
          (h2 :class "font-semibold" "New space")
          (button :type "button" :commandfor "new-space" :command "close" :class "btn btn-icon" :aria-label "Close"
@@ -111,7 +111,7 @@
 (defcomp ~import-space-dialog ()
   (hsx
    (dialog :id "import-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :nm-data "...koya.importer(this)" :nm-bind "{ 'onsubmit.prevent': () => _start() }"
+     (form :n-scope "koya.importer(this)" :n-on-submit.prevent "start()"
            :data-import-begin (begin-import-action)
            :data-import-continue (continue-import-action)
            :data-import-finish (finish-import-action)
@@ -123,27 +123,27 @@
        (div :class "px-4 py-4"
          (label :for "archive" :class "label" "Archive")
          (input :type "file" :id "archive" :name "file" :required t :accept ".zip,application/zip"
-                :nm-ref "file" :class "input mt-1.5")
+                :n-ref "file" :class "input mt-1.5")
          (p :class "mt-2 text-xs text-muted"
             "A zip from a space's " (strong "Export") ". The space is made again under its own name, "
             "with its models, webhooks, contents, history, media and keys. A space of that name must not "
             "exist yet, or must be empty: no models, media or keys. Nothing is sent to the webhooks.")
-         (div :class "mt-4" :hidden t :nm-bind "{ hidden: () => !_busy }"
-           (progress :class "w-full" :max "100" :nm-ref "bar"
-                     :nm-bind "{ max: () => _total || 1, value: () => _sent }")
-           (p :class "mt-1 text-xs text-muted" :nm-bind "{ textContent: () => _status }")))
+         (div :class "mt-4" :hidden t :n-bind-hidden "!busy"
+           (progress :class "w-full" :max "100" :n-ref "bar"
+                     :n-bind-max "total || 1" :n-bind-value "sent")
+           (p :class "mt-1 text-xs text-muted" :n-bind-textcontent "status")))
        (p :class "px-4 pb-3 text-sm text-danger" :hidden t
-          :nm-bind "{ hidden: () => !_error, textContent: () => _error }")
-       (p :class "px-4 pb-3 text-sm" :hidden t :nm-bind "{ hidden: () => !_login }"
+          :n-bind-hidden "!error" :n-bind-textcontent "error")
+       (p :class "px-4 pb-3 text-sm" :hidden t :n-bind-hidden "!login"
          (a :target "_blank" :rel "noopener" :class "font-semibold text-danger underline"
-            :nm-bind "{ href: () => _login }"
+            :n-bind-href "login"
             "Log in in a new tab")
          ", then import again.")
        (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
          (~dialog-close :dialog "import-space" "Cancel")
-         (button :type "submit" :class "btn btn-primary" :nm-bind "{ disabled: () => _busy }"
+         (button :type "submit" :class "btn btn-primary" :n-bind-disabled "busy"
            (~icon :name :import)
-           (span :nm-bind "{ textContent: () => _busy ? 'Importing…' : 'Import' }" "Import")))))))
+           (span :n-bind-textcontent "busy ? 'Importing…' : 'Import'" "Import")))))))
 
 (defcomp ~spaces-page (&key spaces)
   (hsx
@@ -208,7 +208,7 @@
       (koya-error (e) (action-refused e)))))
 
 (defaction finish-import-action :post (params)
-  (hsx (~go-to :url (import-archive (param params "id")))))
+  (send-to (import-archive (param params "id"))))
 
 (defun @get (params)
   (declare (ignore params))

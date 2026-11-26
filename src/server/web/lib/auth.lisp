@@ -112,7 +112,7 @@
   (and (gethash path *public-paths*) t))
 
 (defun page-request-p (env)
-  (equal (gethash "nm-request" (getf env :headers)) "true"))
+  (equal (gethash "n-request" (getf env :headers)) "true"))
 
 (defun login-location (env)
   (let* ((referer (gethash "referer" (getf env :headers)))
@@ -137,7 +137,7 @@
 
 (defun session-ended (login)
   (render-to-string
-   (hsx (~toast :kind :error :clickable t :binds "{ oninit: () => koya.closeDialogs() }"
+   (hsx (~toast :kind :error :clickable t :on-init "koya.closeDialogs()"
                 :message (hsx (<> "The session has ended. "
                                   (a :href login :target "_blank" :rel "noopener" :class "font-semibold underline"
                                      "Log in in a new tab")

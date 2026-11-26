@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/app
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:on-submit)
+  (:import-from #:koya-server/web/lib/binds #:submit)
   (:import-from #:koya-server/web/ui/content/editor #:editor-action)
   (:import-from #:koya-server/web/ui/media/picker #:media-picker)
   (:import-from #:koya-spec/server/web/pages/support
@@ -39,25 +39,25 @@
     (ok (search "name=\"f-body\"" body))
     (ok (search "type=\"checkbox\"" body))
     (ok (search "datetime-local" body))
-    (ok (search "data-quill-for=\"f-body\" nm-bind=\"{ oninit: () => koya.quill(this) }\"" body)
+    (ok (search "data-quill-for=\"f-body\" n-on-init=\"koya.quill(this)\"" body)
         "rich text gets a Quill holder")
     (ok (search "<div class=\"richtext\"><input type=\"hidden\" id=\"f-body\"" body)
         "in a box that marks the editor and its toolbar while either has the focus, as an input is marked")
-    (ok (search "<button type=\"button\" class=\"btn btn-icon editor-fold-toggle\" aria-label=\"Menu\" aria-controls=\"editor-actions\" aria-expanded=\"false\" nm-bind=\"{ onclick: () => _unfolded = !_unfolded, ariaExpanded: () => String(_unfolded) }\">" body)
+    (ok (search "<button type=\"button\" class=\"btn btn-icon editor-fold-toggle\" aria-label=\"Menu\" aria-controls=\"editor-actions\" aria-expanded=\"false\" n-on-click=\"unfolded = !unfolded\" n-bind-ariaexpanded=\"String(unfolded)\">" body)
         "on a phone the bar's buttons fold under a toggle, folded at first; a new content has no times to fold")
-    (let ((menu (search "<span nm-bind=\"{ hidden: () => _unfolded }\"><svg" body))
-          (close (search "<span hidden nm-bind=\"{ hidden: () => !_unfolded }\"><svg" body)))
+    (let ((menu (search "<span n-bind-hidden=\"unfolded\"><svg" body))
+          (close (search "<span hidden n-bind-hidden=\"!unfolded\"><svg" body)))
       (ok (and menu close (< menu (search "<path d=\"M2.5 4h11\"></path><path d=\"M2.5 8h11\"></path><path d=\"M2.5 12h11\"></path>" body :start2 menu) close))
           "a toggle showing three lines while they are folded")
       (ok (and close (< close (search "<path d=\"M4.2 4.2l7.6 7.6\"></path>" body :start2 close)))
           "and a cross while they are shown"))
-    (ok (search "<div id=\"editor-actions\" class=\"editor-fold mt-3 flex items-start justify-between gap-2 sm:flex-wrap sm:items-center\" nm-bind=\"{ 'class.open': () => _unfolded }\">" body)
+    (ok (search "<div id=\"editor-actions\" class=\"editor-fold mt-3 flex items-start justify-between gap-2 sm:flex-wrap sm:items-center\" n-bind-class.open=\"unfolded\">" body)
         "which opens them")
     (ok (search "<div class=\"flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center\"></div><div class=\"flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center\">" body)
         "on a phone in two columns of one width, the links down the left and the actions down the right, each button as wide as its column")
-    (ok (search (format nil "<form id=\"editor-form\" class=\"space-y-6\" nm-ref=\"form\" ~a"
-                        (bound (on-submit (editor-action :space "website" :model "blog" :id "new" :op "save")
-                                          :binds "oninput: () => _track(), onchange: () => _track()")))
+    (ok (search (format nil "<form id=\"editor-form\" class=\"space-y-6\" n-ref=\"form\" ~a n-on-input=\"track()\" n-on-change=\"track()\""
+                        (bound "n-on-submit.prevent"
+                               (submit (editor-action :space "website" :model "blog" :id "new" :op "save"))))
                 body)
         "the form is an action"))
   (multiple-value-bind (status) (request :get "/s/nope")
@@ -71,19 +71,18 @@
   (multiple-value-bind (status) (request :get "/s/website/m/blog/01ARZ3NDEKTSV4RRFFQ69G5FAV")
     (ok (= status 404))))
 
-(deftest every-page-runs-on-nomini
+(deftest every-page-runs-on-nagi
   (dolist (path '("/s/website" "/login"))
     (let ((*cookie* (if (string= path "/login") nil *cookie*)))
       (let ((body (nth-value 1 (request :get path))))
         (testing path
-          (ok (search "/assets/js/nomini.js?" body))
-          (ok (< (search "/assets/js/nomini.js?" body) (search "/assets/js/koya.js?" body))
+          (ok (search "/assets/js/nagi.js?" body))
+          (ok (< (search "/assets/js/nagi.js?" body) (search "/assets/js/koya.js?" body))
               "then what the pages do with it")
           (ng (search "htmx" body))
-          (ng (search "nm-data" (subseq body 0 (search "<body" body))) "the page itself is no scope")
+          (ng (search "n-scope" (subseq body 0 (search "<body" body))) "the page itself is no scope")
           (ok (search "<body class=" body))
-          (ok (search "<div id=\"location\" hidden></div>" body)
-              "an answer that moves the browser is drawn here")
+          (ng (search "id=\"location\"" body) "an answer moves the browser with its headers, not with an element")
           (ng (search "onfetcherr" body) "a refusal is drawn as any answer is, with nothing on the element"))))))
 
 (deftest every-page-offers-the-source
@@ -259,7 +258,7 @@
       (declare (ignore headers))
       (ok (= status 413) "a huge Content-Length is refused before the body is read")
       (ok (search "too_large" (first body))))
-    (destructuring-bind (status headers body) (huge-post '(("nm-request" . "true")))
+    (destructuring-bind (status headers body) (huge-post '(("n-request" . "true")))
       (ok (= status 413))
       (ok (search "text/html" (getf headers :content-type)) "the page shows it, so it is HTML")
       (ok (search "limited to" (first body)))

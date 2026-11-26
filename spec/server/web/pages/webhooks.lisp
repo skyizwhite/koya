@@ -1,9 +1,8 @@
 (defpackage #:koya-spec/server/web/pages/webhooks
   (:use #:cl #:rove)
   (:import-from #:koya-spec/server/schema #:with-schema)
-  (:import-from #:koya-server/web/lib/binds #:on-search)
   (:import-from #:koya-spec/server/web/pages/support
-                #:replaced-url #:bound #:blog-model #:request #:call-action #:setup-pages #:log-in)
+                #:replaced-url #:searching #:blog-model #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/webhooks #:browse-deliveries)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/webhooks #:record-delivery)
@@ -135,12 +134,12 @@
                                :ok t :status 200 :response "" :error "" :duration-ms 1))
   (testing "the selects call the action as they are picked"
     (let ((body (nth-value 1 (request :get "/s/website/webhooks"))))
-      (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (on-search (browse-deliveries :space "website") :typing nil)))
+      (ok (search (searching (browse-deliveries :space "website") :changes-only t)
                   body)
           "either select, as its change bubbles")
       (ng (search ">Filter<" body) "so there is no button to press")))
   (testing "a filter draws #deliveries and the count, and puts itself in the URL"
-    (multiple-value-bind (status body)
+    (multiple-value-bind (status body headers)
         (call-action :get (browse-deliveries :space "website" :label "" :model "about"))
       (ok (= status 200))
       (ok (search "id=\"deliveries\"" body))
@@ -148,18 +147,18 @@
       (ok (search "id=\"filters-clear\"" body) "and the Clear button")
       (ok (search ">Clear<" body))
       (ng (search "id=\"filters\"" body) "the selects stay as they are")
-      (ok (string= (replaced-url body) "/s/website/webhooks?model=about"))))
+      (ok (string= (replaced-url headers) "/s/website/webhooks?model=about"))))
   (testing "nothing filtered takes the Clear button away"
     (let ((body (nth-value 1 (call-action :get (browse-deliveries :space "website" :label "" :model "")))))
       (ok (search "id=\"filters-clear\"" body))
       (ng (search ">Clear<" body))))
   (testing "clearing puts the selects back"
-    (multiple-value-bind (status body) (call-action :get (browse-deliveries :space "website" :clear "1"))
+    (multiple-value-bind (status body headers) (call-action :get (browse-deliveries :space "website" :clear "1"))
       (ok (= status 200))
       (ok (search "id=\"filters\"" body))
       (ng (search ">Clear<" body))
       (ok (search "3 calls." body))
-      (ok (string= (replaced-url body) "/s/website/webhooks"))))
+      (ok (string= (replaced-url headers) "/s/website/webhooks"))))
   (ok (= 404 (call-action :get (browse-deliveries :space "nope")))))
 
 (deftest every-call-kept-is-on-one-page
@@ -175,10 +174,10 @@
     (ok (search "20 calls. The newest 20 of the space are kept." body))
     (ng (search "Page 1 of" body) "with no pager")
     (ng (search "Next" body)))
-  (multiple-value-bind (status body) (call-action :get (browse-deliveries :space "website" :label "" :model "blog"))
+  (multiple-value-bind (status body headers) (call-action :get (browse-deliveries :space "website" :label "" :model "blog"))
     (ok (= status 200))
     (ok (= 20 (length (cl-ppcre:all-matches-as-strings "<details" body))) "a filter draws them all as well")
-    (ok (string= (replaced-url body) "/s/website/webhooks?model=blog") "and puts no page in the URL"))
+    (ok (string= (replaced-url headers) "/s/website/webhooks?model=blog") "and puts no page in the URL"))
   (exec "DELETE FROM webhook_deliveries"))
 
 (deftest a-delivery-links-to-where-its-content-is-edited

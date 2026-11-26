@@ -7,13 +7,13 @@
   (:import-from #:koya-server/domain/deploy
                 #:deploy-changes #:deploy-change-count #:deploy-destructive #:deploy-by
                 #:deploy-created-at #:change-op #:change-destructive #:change-description)
-  (:import-from #:koya-server/web/lib/http #:path-param #:param)
+  (:import-from #:koya-server/web/lib/http #:path-param #:param #:replace-url)
   (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/lib/display #:short-time #:caller-name)
   (:import-from #:koya-server/web/lib/urls #:deploys-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:export #:@get #:browse-deploys))
 (in-package #:koya-server/web/pages/s/<space>/deploys)
@@ -73,8 +73,8 @@
   (let ((space (param params "space")))
     (cond ((not (and space (find-space space))) (action-refusal "Space not found." 404))
           (t (let ((page (min (page-number params) (last-page (count-deploys space)))))
-               (hsx (<> (~deploys :space space :page page)
-                        (~replace-url :url (deploys-url space :page page)))))))))
+               (replace-url (deploys-url space :page page))
+               (hsx (~deploys :space space :page page)))))))
 
 (defun @get (params)
   (let ((space (path-param params :space)))

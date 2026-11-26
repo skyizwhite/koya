@@ -6,7 +6,7 @@
   (:import-from #:koya-server/web/ui/toast #:~toast)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
-  (:import-from #:koya-server/web/lib/binds #:on-reveal)
+  (:import-from #:koya-server/web/lib/binds #:ask)
   (:export #:~media-grid
            #:~upload-limit
            #:~pick-cards
@@ -41,7 +41,7 @@
              :data-pick-url (media-url media :absolute nil)
              :data-pick-alt (media-alt media)
              :data-pick-name (media-filename media)
-             :nm-bind "{ onclick: () => _pick(this), 'class.ring-2': () => _has(this.dataset.pickId), ariaPressed: () => _many ? String(_has(this.dataset.pickId)) : null }"
+             :n-on-click "pick(this)" :n-bind-class.ring-2 "has(this.dataset.pickId)" :n-bind-ariapressed "many ? String(has(this.dataset.pickId)) : null"
        (~thumb :media media)
        (div :class "truncate" :title (media-filename media) (media-filename media))
        (div :class "text-muted" (dimensions media))))))
@@ -51,7 +51,7 @@
    (<> (loop :for media :in items :collect (hsx (~pick-card :media media)))
        (when more
          (hsx (li :id more :class "col-span-full py-2 text-center text-xs text-muted"
-                  :nm-bind (on-reveal more)
+                  :n-on-init "koya.reveal(e)" :n-on-revealed (ask more)
                 "Loading…"))))))
 
 (defcomp ~media-grid (&key items more)

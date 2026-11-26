@@ -14,9 +14,8 @@
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
   (:import-from #:quri #:url-encode-params)
-  (:import-from #:cl-ppcre #:scan-to-strings)
   (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in
-           #:asked-first #:count-ids #:replaced-url #:bound #:escaped #:count-matches))
+           #:asked-first #:count-ids #:replaced-url #:bound #:searching #:revealing #:escaped #:count-matches))
 (in-package #:koya-spec/server/web/pages/support)
 
 (defparameter *secret* "ui-secret-long-enough-to-log-in-with-it")
@@ -118,19 +117,24 @@
 (defun attribute (string)
   (uiop:frob-substrings (uiop:frob-substrings string '("&") "&amp;") '("\"") "&quot;"))
 
-(defun bound (bind)
-  (format nil "nm-bind=\"~a\"" (attribute bind)))
+(defun bound (name js)
+  (format nil "~a=\"~a\"" name (attribute js)))
 
-(defun location-url (body attribute)
-  (multiple-value-bind (match groups)
-      (scan-to-strings (format nil "<div id=\"location\" hidden ~a=\"([^\"]*)\"" attribute) body)
-    (and match (uiop:frob-substrings (aref groups 0) '("&amp;") "&"))))
+(defun searching (url &key changes-only)
+  (let ((url (koya-server/web/lib/binds:js-string url)))
+    (format nil "n-scope=\"koya.search()\" ~a~@[ ~a~] ~a"
+            (bound "n-on-submit.prevent" (format nil "ask(~a, this, true)" url))
+            (and (not changes-only) (bound "n-on-input.debounce300" (format nil "ask(~a, this)" url)))
+            (bound "n-on-change" (format nil "ask(~a, this)" url)))))
 
-(defun moved-to (body)
-  (or (location-url body "data-go") (location-url body "data-replace")))
+(defun revealing (url)
+  (format nil "n-on-init=\"koya.reveal(e)\" ~a" (bound "n-on-revealed" (koya-server/web/lib/binds:ask url))))
 
-(defun replaced-url (body)
-  (location-url body "data-replace"))
+(defun moved-to (headers)
+  (getf headers :n-redirect))
+
+(defun replaced-url (headers)
+  (getf headers :n-replace-url))
 
 (defun count-ids (html)
   (loop :for start := (search " id=\"" html) :then (search " id=\"" html :start2 (1+ start))
@@ -147,7 +151,7 @@
 
 (defun call-action (method url &rest args &key headers &allow-other-keys)
   (apply #'request-url method url
-         :headers (append headers '(("nm-request" . "true") ("origin" . "http://localhost:3000")))
+         :headers (append headers '(("n-request" . "true") ("origin" . "http://localhost:3000")))
          (loop :for (k v) :on args :by #'cddr :unless (eq k :headers) :append (list k v))))
 
 (defun setup-pages ()

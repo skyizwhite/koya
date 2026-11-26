@@ -1,13 +1,14 @@
 (defpackage #:koya-server/web/ui/media/picker
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:on-search #:on-pick)
+  (:import-from #:koya-server/web/lib/binds #:upload-picked)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
   (:import-from #:koya-server/web/lib/http #:uploaded-files #:param #:set-response-status)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/web/lib/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/ui/icon #:~icon)
+  (:import-from #:koya-server/web/ui/elements #:~search-form)
   (:import-from #:koya-server/web/ui/media/grid #:~media-grid #:~pick-cards #:~upload-limit)
   (:import-from #:koya-server/web/ui/picker #:~picker-dialog)
   (:export #:media-picker
@@ -32,9 +33,9 @@
 (defcomp ~picker-body (&key space search error)
   (hsx
    (div :id "media-picker-body" :class "space-y-4"
-     (form :nm-data "...koya.search()" :nm-bind (on-search (media-picker-search :space space)) :class "flex gap-2"
+     (~search-form :url (media-picker-search :space space) :class "flex gap-2"
        (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
-     (form :nm-bind (on-pick (media-picker-upload :space space))
+     (form :n-scope "" :n-on-change (upload-picked (media-picker-upload :space space))
            :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
        (label :class "btn" (~icon :name :upload) "Upload"
          (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
@@ -64,7 +65,7 @@
     (if space
         (multiple-value-bind (items more) (picker-items space (param params "q") (page-number params))
           (let ((asked (media-picker-more :space space :q (or (param params "q") "") :page (page-number params))))
-            (hsx (<> (ul :id asked :nm-swap "before" (~pick-cards :items items :more more))
+            (hsx (<> (ul :id asked :n-swap "before" (~pick-cards :items items :more more))
                      (li :id asked :hidden t)))))
         (forbidden "Unknown space."))))
 

@@ -60,7 +60,7 @@
                                                             (make-field :tags :reference :model "tag" :many t))
                                          :label :title :history t))))
 
-(defparameter +from-the-page+ '(("origin" . "http://localhost:3000") ("nm-request" . "true")))
+(defparameter +from-the-page+ '(("origin" . "http://localhost:3000") ("n-request" . "true")))
 
 (defun post-piece (url &optional (octets (make-array 0 :element-type '(unsigned-byte 8))) (headers +from-the-page+))
   (let ((q (position #\? url)))
@@ -78,8 +78,9 @@
         (size (max 1 (ceiling (length octets) pieces))))
     (loop :for offset :from 0 :below (length octets) :by size
           :do (post-piece (piece-url id offset) (subseq octets offset (min (length octets) (+ offset size)))))
-    (multiple-value-bind (status body) (post-piece (format nil "~a?id=~a" (finish-import-action) id))
-      (values status (moved-to body)))))
+    (multiple-value-bind (status body headers) (post-piece (format nil "~a?id=~a" (finish-import-action) id))
+      (declare (ignore body))
+      (values status (moved-to headers)))))
 
 (defun declare-sizes (octets size)
   (let ((copy (copy-seq octets)))
@@ -309,16 +310,16 @@
       (delete-space "archive")
       (remove-space-media "archive"))
     (testing "an import from another site is refused"
-      (ok (= 403 (post-piece (begin-import-action) nil '(("origin" . "https://evil.test") ("nm-request" . "true")))))
+      (ok (= 403 (post-piece (begin-import-action) nil '(("origin" . "https://evil.test") ("n-request" . "true")))))
       (ok (= 400 (post-piece (begin-import-action) nil '(("origin" . "http://localhost:3000"))))
           "nor is a plain post: an action answers the admin UI only")
       (ng (find-space "archive")))
     (testing "the import dialog is on the spaces page"
       (let ((page (nth-value 1 (request :get "/"))))
-        (ok (search "nm-data=\"...koya.importer(this)\"" page) "the form holds how far the import is")
+        (ok (search "n-scope=\"koya.importer(this)\"" page) "the form holds how far the import is")
         (ok (search (format nil "data-import-begin=\"~a\"" (begin-import-action)) page))
         (ok (search "data-import-piece-bytes=" page))
-        (ok (search "nm-bind=\"{ href: () => _login }\"" page)
+        (ok (search "n-bind-href=\"login\"" page)
             "and the dialog, which hides the page's toast, has its own way to log in again"))))))
 
 (deftest an-import-refuses-a-content-id-the-admin-ui-cannot-open

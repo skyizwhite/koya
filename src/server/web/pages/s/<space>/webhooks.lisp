@@ -2,7 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:koya-core/data #:blank-p)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:on-search #:on-follow)
+  (:import-from #:koya-server/web/lib/binds #:follow)
   (:import-from #:koya-core/schema
                 #:schema-models #:schema-webhooks #:model-name #:webhook-label)
   (:import-from #:koya-server/usecases/webhooks
@@ -12,12 +12,12 @@
                 #:delivery-label #:delivery-url #:delivery-model #:delivery-event
                 #:delivery-content-id #:delivery-ok #:delivery-status #:delivery-response
                 #:delivery-error #:delivery-duration-ms #:delivery-created-at)
-  (:import-from #:koya-server/web/lib/http #:path-param #:param)
+  (:import-from #:koya-server/web/lib/http #:path-param #:param #:replace-url)
   (:import-from #:koya-server/web/lib/display #:short-time)
   (:import-from #:koya-server/web/lib/urls #:space-url #:content-url #:editor-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~replace-url)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~search-form)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:action-refusal)
   (:import-from #:koya-server/usecases/schema #:load-schema #:find-model)
@@ -66,7 +66,7 @@
    (span :id "filters-clear" :class "inline-flex min-h-[2.125rem] items-center"
      (when (filtered-p label model)
        (hsx (a :href (webhook-log-url space)
-               :nm-bind (on-follow (browse-deliveries :space space :clear "1"))
+               :n-on-click (follow (browse-deliveries :space space :clear "1"))
                :class "btn"
               "Clear"))))))
 
@@ -76,8 +76,8 @@
     (hsx
      (<> (unless (and (null labels) (null models))
            (hsx
-            (form :id "filters" :method "get" :action (format nil "~a/webhooks" (space-url space))
-                  :nm-data "...koya.search()" :nm-bind (on-search (browse-deliveries :space space) :typing nil)
+            (~search-form :id "filters" :method "get" :action (format nil "~a/webhooks" (space-url space))
+                  :url (browse-deliveries :space space) :changes-only t
                   :class "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
               (~filter-select :name "label" :label "Webhook" :all "All webhooks"
                               :options labels :selected label)
@@ -169,8 +169,8 @@
          (model (and (not clear) (param params "model"))))
     (cond ((null schema) (action-refusal "Space not found." 404))
           (t
+           (replace-url (webhook-log-url space :label label :model model))
            (hsx (<> (~deliveries :space space :label label :model model)
-                    (~replace-url :url (webhook-log-url space :label label :model model))
                     (~delivery-count :space space :label label :model model)
                     (if clear
                         (hsx (~filters :space space :schema schema))

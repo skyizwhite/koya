@@ -6,12 +6,11 @@
   (:import-from #:koya-server/usecases/settings #:totp-enabled-p)
   (:import-from #:koya-server/usecases/auth #:owner-secret-long-enough-p #:+min-secret-length+)
   (:import-from #:koya-server/web/lib/assets #:asset-url)
-  (:import-from #:koya-server/web/lib/http #:redirect-to #:param #:set-response-status)
+  (:import-from #:koya-server/web/lib/http #:redirect-to #:param #:set-response-status #:send-to)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~footer)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/ui/elements #:~go-to)
-  (:import-from #:koya-server/web/lib/binds #:on-submit)
+    (:import-from #:koya-server/web/lib/binds #:submit)
   (:export #:@get #:log-in))
 (in-package #:koya-server/web/pages/login)
 
@@ -27,7 +26,7 @@
 (defcomp ~login-fields (&key error next)
   (hsx
    (form :id "login" :class "space-y-4"
-         :nm-bind (on-submit (log-in))
+         :n-on-submit.prevent (submit (log-in))
      (when next (hsx (input :type "hidden" :name "next" :value next)))
      (div
        (label :for "username" :class "label" "Account")
@@ -75,7 +74,7 @@
              (set-response-status status)
              (hsx (~login-fields :error error :next next)))
            (go-on ()
-             (hsx (~go-to :url (or next "/")))))
+             (send-to (or next "/"))))
       (if (session-owner-p)
           (go-on)
           (ecase (session-login (or (param params "secret") "") (param params "code"))

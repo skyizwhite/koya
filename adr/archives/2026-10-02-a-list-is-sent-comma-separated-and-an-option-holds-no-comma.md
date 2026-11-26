@@ -1,5 +1,7 @@
 # A list is sent comma-separated, and a select option holds no comma
 
+Superseded by adr/2026-11-27-a-list-is-sent-with-its-name-for-each-value.md
+
 *2026-10-02*
 
 ## Context

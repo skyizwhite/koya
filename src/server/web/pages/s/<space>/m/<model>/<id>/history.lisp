@@ -2,7 +2,7 @@
   (:use #:cl #:hsx)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:on-follow #:on-click)
+  (:import-from #:koya-server/web/lib/binds #:follow #:post)
   (:import-from #:koya-core/schema
                 #:model-kind #:model-name #:model-field #:model-history-p #:field-type #:field-value)
   (:import-from #:koya-core/validate #:blank-value-p)
@@ -14,7 +14,7 @@
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by
                 #:revision-created-at #:changed-keys)
-  (:import-from #:koya-server/web/lib/http #:path-param #:param #:set-response-status)
+  (:import-from #:koya-server/web/lib/http #:path-param #:param #:set-response-status #:replace-url)
   (:import-from #:koya-server/domain/errors #:not-found)
   (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-server/web/lib/assets #:asset-url)
@@ -23,7 +23,7 @@
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:history-url #:editor-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url #:~confirm-dialog)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~confirm-dialog)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
@@ -59,7 +59,7 @@
 
 (defcomp ~richtext (&key html)
   (hsx (iframe :sandbox "allow-same-origin" :srcdoc (richtext-document html) :title "rich text"
-               :nm-bind "{ oninit: () => koya.fitContent(this) }" :class "block h-16 w-full")))
+               :n-on-init "koya.fitContent(this)" :class "block h-16 w-full")))
 
 (defcomp ~value (&key label field value found class)
   (let* ((richtext (and (eq (field-type field) :richtext) (stringp value)))
@@ -113,7 +113,7 @@
                :after (revision-data revision)))))
 
 (defcomp ~tab (&key href browse active children)
-  (hsx (a :href href :nm-bind (on-follow browse)
+  (hsx (a :href href :n-on-click (follow browse)
           :class (clsx "border-b-2 px-3 py-2 text-sm"
                        (if active "border-accent font-medium text-fg" "border-transparent text-muted hover:text-fg"))
           children)))
@@ -128,7 +128,7 @@
        (~confirm-dialog :id "confirm-clear-history" :title "Clear history"
                         :message "Clear this content's history? Every saved version is deleted for good; the content stays as it is."
          (button :type "button" :class "btn btn-danger" :commandfor "confirm-clear-history" :command "close"
-                 :nm-bind (on-click (clear-history-action :space space :model model :id id))
+                 :n-on-click (post (clear-history-action :space space :model model :id id))
            (~icon :name :delete) "Clear history")))))
 
 (defcomp ~revisions (&key space model content published-only page)
@@ -190,10 +190,10 @@
           (t
            (let* ((published-only (equal (param params "view") "published"))
                   (page (min (page-number params) (page-count space (content-id content) published-only))))
-             (hsx (<> (~revisions :space space :model model :content content
-                                  :published-only published-only :page page)
-                      (~replace-url :url (history-url space (model-name model) (content-id content)
-                                                      :published-only published-only :page page)))))))))
+             (replace-url (history-url space (model-name model) (content-id content)
+                                       :published-only published-only :page page))
+             (hsx (~revisions :space space :model model :content content
+                              :published-only published-only :page page)))))))
 
 (defaction clear-history-action :post (params)
   (let* ((space (param params "space"))
@@ -202,8 +202,8 @@
     (cond ((null content) (action-refusal "Content not found." 404))
           (t
            (clear-history space model (content-id content))
+           (replace-url (history-url space (model-name model) (content-id content)))
            (hsx (<> (~revisions :space space :model model :content content :published-only nil :page 1)
-                    (~replace-url :url (history-url space (model-name model) (content-id content)))
                     (~toast :message "History cleared.")))))))
 
 (defun @get (params)
