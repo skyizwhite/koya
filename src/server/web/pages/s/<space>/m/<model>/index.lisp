@@ -157,8 +157,8 @@
           :nm-bind (on-follow (browse-url space model state :sort-key next :page 1))
           :class (clsx "flex items-center gap-1 hover:text-fg" (column-width field))
          (if direction
-             (hsx (span :class "shrink-0 text-accent" (if (eq direction :asc) "↑" "↓")))
-             (hsx (span :class "shrink-0 opacity-50" :aria-hidden "true" "↕")))
+             (hsx (span :class "shrink-0 text-accent" (~icon :name (if (eq direction :asc) :up :down))))
+             (hsx (span :class "shrink-0 opacity-50" (~icon :name :sort))))
          (span :class "truncate" name)))))))
 
 (defcomp ~bulk-bar (&key space model state)
