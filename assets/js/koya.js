@@ -426,6 +426,10 @@
 
   const unsavedEdits = new Set();
 
+  window.addEventListener("beforeunload", (event) => {
+    if (!leaving && [...unsavedEdits].some((unsaved) => unsaved())) event.preventDefault();
+  });
+
   koya.mayLeave = () =>
     ![...unsavedEdits].some((unsaved) => unsaved()) ||
     window.confirm("This page has changes that are not saved. Leave it anyway?");
@@ -439,11 +443,9 @@
     const snapshot = () => new URLSearchParams(new FormData(form)).toString();
     const drawn = snapshot();
     let current = drawn;
-    const pending = () => el.isConnected && (unsaved || current !== drawn);
+    const pending = () => unsaved || current !== drawn;
     unsavedEdits.add(pending);
-    window.addEventListener("beforeunload", (event) => {
-      if (!leaving && pending()) event.preventDefault();
-    });
+    el.addEventListener("destroy", () => unsavedEdits.delete(pending));
     return {
       current: drawn,
       unfolded: false,
