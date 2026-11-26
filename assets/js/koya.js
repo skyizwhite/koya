@@ -424,14 +424,15 @@
     },
   });
 
-  const unsavedEdits = new Set();
+  const unsavedEdits = new Map();
+  const anyUnsaved = () => [...unsavedEdits.values()].some((unsaved) => unsaved());
 
   window.addEventListener("beforeunload", (event) => {
-    if (!leaving && [...unsavedEdits].some((unsaved) => unsaved())) event.preventDefault();
+    if (!leaving && anyUnsaved()) event.preventDefault();
   });
 
   koya.mayLeave = () =>
-    ![...unsavedEdits].some((unsaved) => unsaved()) ||
+    !anyUnsaved() ||
     window.confirm("This page has changes that are not saved. Leave it anyway?");
 
   koya.closeDialogs = () => {
@@ -443,9 +444,8 @@
     const snapshot = () => new URLSearchParams(new FormData(form)).toString();
     const drawn = snapshot();
     let current = drawn;
-    const pending = () => unsaved || current !== drawn;
-    unsavedEdits.add(pending);
-    el.addEventListener("destroy", () => unsavedEdits.delete(pending));
+    unsavedEdits.forEach((_, editor) => editor.isConnected || unsavedEdits.delete(editor));
+    unsavedEdits.set(el, () => el.isConnected && (unsaved || current !== drawn));
     return {
       current: drawn,
       unfolded: false,
