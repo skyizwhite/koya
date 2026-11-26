@@ -1,14 +1,11 @@
 (defpackage #:koya-server/web/ui/media/grid
   (:use #:cl #:hsx)
   (:import-from #:koya-server/domain/media
-                #:media-id #:media-filename #:media-width #:media-height #:media-alt #:+max-upload-bytes+)
-  (:import-from #:koya-server/usecases/media #:upload-limit-message)
-  (:import-from #:koya-server/web/ui/toast #:~toast)
+                #:media-id #:media-filename #:media-width #:media-height #:media-alt)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/web/ui/elements #:~empty-state)
   (:import-from #:koya-server/web/lib/binds #:ask)
   (:export #:~media-grid
-           #:~upload-limit
            #:~pick-cards
            #:~thumb
            #:dimensions
@@ -24,10 +21,6 @@
   (if (and (media-width media) (media-height media))
       (format nil "~a×~a" (media-width media) (media-height media))
       "?"))
-
-(defcomp ~upload-limit ()
-  (hsx (template :data-upload-limit (princ-to-string +max-upload-bytes+)
-         (~toast :message (upload-limit-message) :kind :error))))
 
 (defcomp ~thumb (&key media)
   (hsx (img :src (media-url media :absolute nil) :alt (media-alt media) :loading "lazy" :decoding "async"

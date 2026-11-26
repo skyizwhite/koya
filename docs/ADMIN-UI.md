@@ -405,9 +405,16 @@ newest 100 of a space are kept.
 
 ![The media library](img/media.png)
 
-- **Upload** takes PNG, JPEG, GIF and WebP, several at once, up to 20 MB each
-  and 20 MB in one go. A photo's metadata, its GPS position included, is not
-  kept; its orientation is.
+- **Upload** takes PNG, JPEG, GIF and WebP, as many at once as are chosen, up
+  to 20 MB each. They are sent one after another, and a dialog shows how far
+  that is, as an import's does. Once all are added it closes and the toast says
+  so; otherwise it stays open and lists each file not added and why. A file that
+  is refused does not stop the rest; anything else, such as a lost connection,
+  stops the sending, and the dialog says the rest were not sent. Closing the
+  dialog does not stop the sending, and what was not added is then told in the
+  toast. The grid is
+  then drawn again at its first page, for what the search box says. A photo's
+  metadata, its GPS position included, is not kept; its orientation is.
 - The grid is thumbnails, newest first, with paging underneath. The search box
   matches file names as the typing stops.
 - Clicking a thumbnail opens a preview with the file's name, dimensions, size
@@ -425,8 +432,8 @@ The same library opens as a picker inside the editor — from a `media` field's
 **Select** button and from the rich text editor's image button, where a click
 picks the file, and from a `many` media field's **Add**, where clicks mark
 several files and **Add** adds them in the order they were marked. The
-picker searches, scrolls through the library and uploads too, so an image can go
-straight from the desktop into a content.
+picker searches, scrolls through the library and uploads too, the same way, so
+an image can go straight from the desktop into a content.
 
 ## Keys
 

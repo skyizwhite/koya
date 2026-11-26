@@ -5,8 +5,7 @@
            #:post
            #:submit
            #:follow
-           #:ask
-           #:upload-picked))
+           #:ask))
 (in-package #:koya-server/web/lib/binds)
 
 (defun js-string (string) (to-json string))
@@ -23,6 +22,3 @@
 
 (defun ask (url)
   (format nil "$get(~a)" (js-string url)))
-
-(defun upload-picked (url)
-  (format nil "koya.fits(e.target) && $post(~a, e)" (js-string url)))

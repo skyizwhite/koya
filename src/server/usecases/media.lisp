@@ -16,7 +16,6 @@
   (:import-from #:koya-server/domain/id #:new-id)
   (:export #:store-upload
            #:store-uploads
-           #:upload-limit-message
            #:remove-media
            #:remove-each
            #:remove-space-media

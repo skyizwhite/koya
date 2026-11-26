@@ -3,16 +3,16 @@
   (:import-from #:koya-core/data #:blank-p)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:submit #:follow #:upload-picked)
+  (:import-from #:koya-server/web/lib/binds #:submit #:follow)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/usecases/media
-                #:remove-media #:store-uploads #:remove-each #:list-media #:count-media
+                #:remove-media #:remove-each #:list-media #:count-media
                 #:find-media #:update-media #:media-reference-counts #:media-references)
   (:import-from #:koya-server/web/lib/http
-                #:path-param #:uploaded-files #:param #:form-list #:replace-url)
+                #:path-param #:param #:form-list #:replace-url)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/web/lib/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/lib/display #:short-time)
@@ -22,9 +22,10 @@
   (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~referrers #:~search-form)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
-  (:import-from #:koya-server/web/ui/media/grid #:~thumb #:dimensions #:human-size #:~upload-limit)
+  (:import-from #:koya-server/web/ui/media/grid #:~thumb #:dimensions #:human-size)
+  (:import-from #:koya-server/web/ui/media/upload #:~upload-form)
   (:export #:@get #:media-page-url
-           #:browse-media #:upload-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt))
+           #:browse-media #:delete-media-action #:delete-selected-media #:preview-media #:save-alt))
 (in-package #:koya-server/web/pages/s/<space>/media)
 
 (defparameter +library-size+ 24)
@@ -77,13 +78,6 @@
          (q (or search "")))
     (hsx
      (div :id "library" :n-scope "koya.bulk(this)"
-       (form :n-scope "" :n-on-change (upload-picked (upload-media :space space :q q :page page))
-             :class "mb-8 flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
-         (label :class "btn" (~icon :name :upload) "Upload"
-           (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp"
-                  :multiple t :class "hidden"))
-         (span :class "text-muted" "PNG, JPEG, GIF or WebP, several at once.")
-         (~upload-limit))
        (if (null items)
            (hsx (~empty-state (if (blank-p q) "No media yet. Upload an image above." "No file matches.")))
            (hsx
@@ -116,7 +110,7 @@
   (hsx
    (div :class "mb-6 flex flex-wrap items-center justify-between gap-4"
      (h1 :class "text-2xl font-bold" "Media" (~media-count :space space :search search))
-     (~search-form :method "get" :action (media-page-url space) :class "flex gap-2"
+     (~search-form :id "media-search-form" :method "get" :action (media-page-url space) :class "flex gap-2"
            :url (browse-media :space space)
        (input :type "search" :name "q" :value (or search "") :placeholder "Search file names"
               :aria-label "Search" :class "input")))))
@@ -162,12 +156,6 @@
               (hsx (div :class "border-t border-line px-4 py-3"
                      (~referrers :space space :heading "Used by" :references references)))))))))))
 
-(defun upload (space files)
-  (handler-case
-      (cond ((null files) (values "Select at least one image." :error))
-            (t (values (format nil "Uploaded ~a file~:p." (length (store-uploads space files))) :ok)))
-    (koya-error (e) (values (koya-error-message e) :error))))
-
 (defun delete-one (space id)
   (let ((media (find-media space id)))
     (handler-case
@@ -199,13 +187,6 @@
       (if close-preview
           (hsx (<> library count (~media-preview-dialog) toast))
           (hsx (<> library count toast))))))
-
-(defaction upload-media :post (params)
-  (let ((space (action-space params)))
-    (if space
-        (multiple-value-bind (message kind) (upload space (uploaded-files params "file"))
-          (answer params space :message message :kind kind))
-        (action-refusal "Space not found." 404))))
 
 (defaction delete-media-action :post (params)
   (let ((space (action-space params)))
@@ -246,5 +227,7 @@
           (t (set-title (format nil "Media · ~a · koya" space))
              (hsx (~layout :space space :crumbs (list (cons "Media" nil))
                     (~library-header :space space :search (param params "q"))
+                    (~upload-form :space space :class "mb-8" :redraw (browse-media :space space)
+                                  :search "media-search-form" :hint "PNG, JPEG, GIF or WebP, several at once.")
                     (~library :space space :search (param params "q") :page (page-number params))
                     (~media-preview-dialog)))))))
