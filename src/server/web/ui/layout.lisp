@@ -70,6 +70,8 @@
          (hsx (~toast :message message :kind kind)))
        (template :id "toast-failed"
          (~toast-message :message "The server could not be reached." :kind :error))
+       (template :id "toast-done"
+         (~toast-message :message "" :kind :ok))
        children)
      (~footer))))
 

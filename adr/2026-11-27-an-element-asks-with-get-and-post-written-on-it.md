@@ -1,4 +1,4 @@
-# An element asks with Nagi's own $get and $post
+# An element asks with Nagi's $get and $post, written on it
 
 *2026-11-27, restating a decision of 2026-10-02*
 
@@ -14,11 +14,9 @@ and moves the browser or replaces its URL when an answer's headers say so.
 - An element asks with `$get` or `$post` in one of its `n-on-*` attributes,
   which `web/lib/binds` writes from the action's URL: a form on submit, a button
   on click, a link as it is followed, a search as the typing stops, a
-  placeholder as it comes into view, a file as it is picked.
+  placeholder as it comes into view.
 - A form sends what the browser would: it is handed to `$post` as the event
   that submits it, or as the form itself.
-- An upload's form is a scope of its own, so sending a file cancels no read of
-  the part of the page around it.
 - An answer that sends the browser to another page, or replaces the page's URL,
   says so in Nagi's `n-redirect` or `n-replace-url` header.
 - The actions take only what Nagi sends, `n-request: true` among it.
@@ -35,3 +33,6 @@ and moves the browser or replaces its URL when an answer's headers say so.
   while it is open is its own, even when the element that asked has been drawn
   again since, and Log out says so with `n-on-fetchredirect`.
 - A page the browser brings back from its history asks again.
+- What must wait for one answer before it sends the next, the import's pieces
+  and the images of an upload, is sent by `koya.js` with a fetch of its own
+  (`adr/2026-11-27-the-admin-ui-sends-each-image-on-its-own.md`).

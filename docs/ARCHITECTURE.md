@@ -284,7 +284,7 @@ of a page that holds state in the browser is a Nagi scope made by a factory in
 `n-bind-*` and `n-on-*`. See
 `adr/2026-11-27-nagi-replaces-nomini.md`,
 `adr/2026-11-21-a-scope-adds-elements-the-server-drew.md`,
-`adr/2026-11-27-an-element-asks-with-nagis-get-and-post.md` and
+`adr/2026-11-27-an-element-asks-with-get-and-post-written-on-it.md` and
 `adr/2026-11-27-what-an-answer-cannot-draw-is-a-toast.md`.
 
 A space's archive moves whatever its size. The export writes it to a file under
@@ -292,7 +292,9 @@ A space's archive moves whatever its size. The export writes it to a file under
 answer with `+temporary-file-header+`, and `*mw-temporary-file*` deletes
 the file once the server has it. The import dialog uploads the zip in pieces to
 three actions, which add each to the end of a file there and then import it in
-one transaction. Searching, filtering, sorting and
+one transaction. Images chosen together are sent one to a request, by
+`koya.uploader` in `koya.js`, so a request body stays within one image however
+many are chosen (`adr/2026-11-27-the-admin-ui-sends-each-image-on-its-own.md`). Searching, filtering, sorting and
 paging a list are actions as well, whose answers replace the page's URL so it still
 carries that state for its GET to draw. See
 `adr/2026-10-01-pages-answer-get-and-every-change-is-an-action.md` and

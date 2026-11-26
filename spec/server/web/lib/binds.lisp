@@ -1,7 +1,7 @@
 (defpackage #:koya-spec/server/web/lib/binds
   (:use #:cl #:rove)
   (:import-from #:koya-server/web/lib/binds
-                #:js-string #:post #:submit #:follow #:ask #:upload-picked))
+                #:js-string #:post #:submit #:follow #:ask))
 (in-package #:koya-spec/server/web/lib/binds)
 
 (deftest js-string
@@ -42,8 +42,3 @@
   (ok (string= (ask "/more")
                "$get(\"/more\")")
       "a placeholder gets what it stands for"))
-
-(deftest upload-picked
-  (ok (string= (upload-picked "/upload")
-               "koya.fits(e.target) && $post(\"/upload\", e)")
-      "files are posted with their form as they are picked, unless they are over the limit"))

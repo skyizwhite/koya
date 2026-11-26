@@ -1,20 +1,17 @@
 (defpackage #:koya-server/web/ui/media/picker
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:upload-picked)
   (:import-from #:koya-server/usecases/spaces #:find-space)
-  (:import-from #:koya-server/usecases/media #:store-uploads #:list-media #:count-media)
-  (:import-from #:koya-server/web/lib/http #:uploaded-files #:param #:set-response-status)
-  (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
+  (:import-from #:koya-server/usecases/media #:list-media #:count-media)
+  (:import-from #:koya-server/web/lib/http #:param #:set-response-status)
   (:import-from #:koya-server/web/lib/paging #:page-number #:last-page #:page-offset)
-  (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/elements #:~search-form)
-  (:import-from #:koya-server/web/ui/media/grid #:~media-grid #:~pick-cards #:~upload-limit)
+  (:import-from #:koya-server/web/ui/media/grid #:~media-grid #:~pick-cards)
+  (:import-from #:koya-server/web/ui/media/upload #:~upload-form)
   (:import-from #:koya-server/web/ui/picker #:~picker-dialog)
   (:export #:media-picker
            #:media-picker-search
            #:media-picker-more
-           #:media-picker-upload
            #:~media-picker-dialog))
 (in-package #:koya-server/web/ui/media/picker)
 
@@ -30,18 +27,13 @@
   (multiple-value-bind (items more) (picker-items space search 1)
     (hsx (div :id "media-picker-grid" (~media-grid :items items :more more)))))
 
-(defcomp ~picker-body (&key space search error)
+(defcomp ~picker-body (&key space search)
   (hsx
    (div :id "media-picker-body" :class "space-y-4"
-     (~search-form :url (media-picker-search :space space) :class "flex gap-2"
+     (~search-form :id "media-picker-search-form" :url (media-picker-search :space space) :class "flex gap-2"
        (input :type "search" :name "q" :value (or search "") :placeholder "Search file names" :class "input" :aria-label "Search"))
-     (form :n-scope "" :n-on-change (upload-picked (media-picker-upload :space space))
-           :class "flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
-       (label :class "btn" (~icon :name :upload) "Upload"
-         (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp" :multiple t :class "hidden"))
-       (span :class "text-muted" "PNG, JPEG, GIF or WebP. Uploaded files are added to the library.")
-       (~upload-limit)
-       (when error (hsx (span :class "text-danger" error))))
+     (~upload-form :space space :redraw (media-picker-search :space space) :search "media-picker-search-form"
+                   :hint "PNG, JPEG, GIF or WebP. Uploaded files are added to the library.")
      (~picker-grid :space space :search search))))
 
 (defun forbidden (message)
@@ -68,16 +60,6 @@
             (hsx (<> (ul :id asked :n-swap "before" (~pick-cards :items items :more more))
                      (li :id asked :hidden t)))))
         (forbidden "Unknown space."))))
-
-(defaction media-picker-upload :post (params)
-  (cond ((null (picker-space params)) (forbidden "Unknown space."))
-        (t (let ((space (picker-space params))
-                 (files (uploaded-files params "file")))
-             (handler-case
-                 (progn (store-uploads space files)
-                        (hsx (~picker-body :space space)))
-               (koya-error (e)
-                 (hsx (~picker-body :space space :error (koya-error-message e)))))))))
 
 (defcomp ~media-picker-dialog (&key space)
   (hsx (~picker-dialog :id "media-picker" :class "max-w-3xl" :title "Media" :factory "mediaPicker"

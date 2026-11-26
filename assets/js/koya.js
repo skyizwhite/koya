@@ -13,17 +13,22 @@
 
   const textOf = (html) => new DOMParser().parseFromString(html, "text/html").body.textContent.trim();
 
-  document.addEventListener("fetcherr", (event) => {
-    if (event.detail.swapped) return;
+  const unreachable = () => document.getElementById("toast-failed")?.content.textContent.trim() ?? "";
+
+  const drawToast = (templateId, message) => {
     const toast = document.getElementById("toast");
-    const template = document.getElementById("toast-failed");
+    const template = document.getElementById(templateId);
     if (!toast || !template) return;
     const alert = template.content.firstElementChild.cloneNode(true);
-    const message = textOf(event.detail.text ?? "");
     if (message) alert.textContent = message;
     const drawn = toast.cloneNode(false);
     drawn.append(alert);
     toast.replaceWith(drawn);
+  };
+
+  document.addEventListener("fetcherr", (event) => {
+    if (event.detail.swapped) return;
+    drawToast("toast-failed", textOf(event.detail.text ?? ""));
   });
 
   let leaving = false;
@@ -55,16 +60,64 @@
     observer.observe(el);
   };
 
-  koya.fits = (input) => {
-    if (input.type !== "file" || input.files.length === 0) return false;
-    const limit = input.form.querySelector("template[data-upload-limit]");
-    const total = Array.from(input.files).reduce((sum, file) => sum + file.size, 0);
-    if (limit && total > Number(limit.dataset.uploadLimit)) {
-      input.value = "";
-      document.getElementById("toast")?.replaceWith(limit.content.cloneNode(true));
-      return false;
-    }
-    return true;
+  koya.uploader = (form) => {
+    const limit = Number(form.dataset.uploadLimit);
+    const send = async (file) => {
+      const body = new FormData();
+      body.append("file", file);
+      try {
+        const response = await fetch(form.dataset.uploadUrl, { method: "POST", body, headers: { "n-request": "true" } });
+        return { status: response.status, reason: textOf(await response.text()) };
+      } catch {
+        return { status: 0, reason: unreachable() };
+      }
+    };
+    const refusedFile = (status) => status === 413 || status === 422;
+    return {
+      busy: false,
+      sent: 0,
+      total: 0,
+      status: "",
+      error: "",
+      async upload(input) {
+        if (input.type !== "file" || input.files.length === 0 || this.busy) return;
+        const files = Array.from(input.files);
+        input.value = "";
+        this.busy = true;
+        this.error = "";
+        this.sent = 0;
+        this.total = files.length;
+        this.$refs.dialog.showModal();
+        let done = 0;
+        const refused = [];
+        let stopped = null;
+        for (const [i, file] of files.entries()) {
+          this.status = `Uploading ${file.name} (${i + 1} of ${files.length})`;
+          if (file.size > limit) refused.push(`${file.name}: ${form.dataset.uploadLimitMessage}`);
+          else {
+            const answer = await send(file);
+            if (answer.status >= 200 && answer.status < 300) done++;
+            else if (refusedFile(answer.status)) refused.push(`${file.name}: ${answer.reason}`);
+            else {
+              stopped = `The rest were not sent: ${answer.reason || `the upload was refused (${answer.status})`}`;
+              break;
+            }
+          }
+          this.sent = i + 1;
+        }
+        this.busy = false;
+        const message = `Uploaded ${done} of ${files.length} file${files.length === 1 ? "" : "s"}.`;
+        if (refused.length || stopped) {
+          this.status = message;
+          this.error = [...refused, ...(stopped ? [stopped] : [])].join("\n");
+        } else {
+          this.$refs.dialog.close();
+          drawToast("toast-done", `Uploaded ${done} file${done === 1 ? "" : "s"}.`);
+        }
+        const search = form.dataset.uploadSearch && document.getElementById(form.dataset.uploadSearch);
+        this.$get(form.dataset.uploadRedraw, search || undefined);
+      },
+    };
   };
 
   {
