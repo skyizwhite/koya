@@ -66,7 +66,7 @@
         "an option with a comma is a field still, so a schema stored with one is read")
     (ok (signals (check-deployable (make-schema :models (list (make-model "m" :list (list (make-field :x :select :options '("a, b" "c")))))))
                  'schema-error)
-        "but it is not deployed: the admin UI sends a list of options comma-separated")
+        "but it is not deployed: a list joined with commas is read split at them")
     (ok (check-deployable (make-schema :models (list (make-model "m" :list (list (make-field :x :select :options '("a" "b")))))))
         "options without commas are")
     (ok (equal (field-option (make-field :x :select :options '(news tech)) :options) '("news" "tech"))

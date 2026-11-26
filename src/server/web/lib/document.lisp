@@ -25,5 +25,4 @@
        (script :src (asset-url "js/qrcode.min.js") :defer t)
        (script :src (asset-url "js/koya.js") :defer t))
      (body :class "flex min-h-screen flex-col bg-base text-fg antialiased"
-       (div :id "location" :hidden t)
        children))))

@@ -41,7 +41,7 @@
              :data-pick-url (media-url media :absolute nil)
              :data-pick-alt (media-alt media)
              :data-pick-name (media-filename media)
-             :n-on-click "_pick(this)" :n-bind-class.ring-2 "_has(this.dataset.pickId)" :n-bind-ariapressed "_many ? String(_has(this.dataset.pickId)) : null"
+             :n-on-click "pick(this)" :n-bind-class.ring-2 "has(this.dataset.pickId)" :n-bind-ariapressed "many ? String(has(this.dataset.pickId)) : null"
        (~thumb :media media)
        (div :class "truncate" :title (media-filename media) (media-filename media))
        (div :class "text-muted" (dimensions media))))))

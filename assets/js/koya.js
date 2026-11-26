@@ -1,36 +1,9 @@
 {
   const koya = (window.koya ||= {});
 
-  const fetchWhole = window.fetch;
-  window.fetch = async (input, init) => {
-    if (!init?.headers?.["n-request"]) return fetchWhole(input, init);
-    let ok = false;
-    let html = "";
-    try {
-      const response = await fetchWhole(input, init);
-      html = await response.text();
-      ok = response.ok;
-    } catch (error) {
-      if (error.name === "AbortError") throw error;
-    }
-    return new Response(ok || drawable(html) ? html : asToast(textOf(html)), {
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-  };
-
-  const changed = (el) => setTimeout(() => el.dispatchEvent(new Event("change", { bubbles: true })));
+  const changed = (el) => el.dispatchEvent(new Event("change", { bubbles: true }));
 
   const openPicker = (id, detail) => document.getElementById(id)?.dispatchEvent(new CustomEvent("openpicker", { detail }));
-
-  koya.form = (form) => {
-    const data = new FormData(form);
-    const fields = {};
-    for (const name of new Set(data.keys())) {
-      const values = data.getAll(name);
-      fields[name] = values.length > 1 ? values : values[0];
-    }
-    return fields;
-  };
 
   koya.follow = (event) => {
     if (event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
@@ -38,36 +11,33 @@
     return true;
   };
 
-  const drawable = (html) => {
-    const template = document.createElement("template");
-    template.innerHTML = html;
-    return Array.from(template.content.children).some((el) => el.id);
-  };
-
   const textOf = (html) => new DOMParser().parseFromString(html, "text/html").body.textContent.trim();
 
-  const asToast = (message) => {
-    const toast = document.getElementById("toast")?.cloneNode(false);
+  document.addEventListener("fetcherr", (event) => {
+    if (event.detail.swapped) return;
+    const toast = document.getElementById("toast");
     const template = document.getElementById("toast-failed");
-    if (!toast || !template) return "";
+    if (!toast || !template) return;
     const alert = template.content.firstElementChild.cloneNode(true);
+    const message = textOf(event.detail.text ?? "");
     if (message) alert.textContent = message;
-    toast.append(alert);
-    return toast.outerHTML;
-  };
+    const drawn = toast.cloneNode(false);
+    drawn.append(alert);
+    toast.replaceWith(drawn);
+  });
 
-  const dataUrl = (html) => {
-    const answer = drawable(html) ? html : asToast(textOf(html));
-    return answer && `data:text/html;charset=utf-8,${encodeURIComponent(answer)}`;
+  let leaving = false;
+  koya.leave = () => {
+    leaving = true;
   };
 
   koya.search = () => ({
-    _asked: null,
-    _ask(url, form, always) {
-      const data = koya.form(form);
-      const asked = `${url}?${new URLSearchParams(data)}`;
-      if (!always && asked === this._asked) return;
-      this._asked = asked;
+    asked: null,
+    ask(url, form, always) {
+      const data = new URLSearchParams(new FormData(form));
+      const asked = `${url}?${data}`;
+      if (!always && asked === this.asked) return;
+      this.asked = asked;
       this.$get(url, data);
     },
   });
@@ -82,20 +52,16 @@
     observer.observe(el);
   };
 
-  koya.upload = async (input, url, draw) => {
-    if (input.type !== "file" || input.files.length === 0) return;
+  koya.fits = (input) => {
+    if (input.type !== "file" || input.files.length === 0) return false;
     const limit = input.form.querySelector("template[data-upload-limit]");
     const total = Array.from(input.files).reduce((sum, file) => sum + file.size, 0);
     if (limit && total > Number(limit.dataset.uploadLimit)) {
       input.value = "";
       document.getElementById("toast")?.replaceWith(limit.content.cloneNode(true));
-      return;
+      return false;
     }
-    const answer = await fetchWhole(url, { method: "POST", body: new FormData(input.form), headers: { "n-request": "true" } })
-      .then((response) => response.text())
-      .catch(() => "");
-    const drawn = dataUrl(answer);
-    if (drawn) draw(drawn);
+    return true;
   };
 
   {
@@ -205,7 +171,7 @@
       else koya.moveRow(button, button.dataset.action === "up" ? -1 : 1);
     });
     return {
-      _choose() {
+      choose() {
         openPicker("reference-picker", {
           many,
           held: many ? Array.from(list.querySelectorAll("input"), (input) => input.value) : [],
@@ -224,19 +190,19 @@
   };
 
   koya.customField = (on) => ({
-    _on: on,
-    _add() {
-      this._on = true;
+    on,
+    add() {
+      this.on = true;
       changed(this.$refs.marker);
     },
-    _remove() {
-      this._on = false;
+    remove() {
+      this.on = false;
       changed(this.$refs.marker);
     },
   });
 
   koya.repeater = (url) => ({
-    _add(select) {
+    add(select) {
       if (select.value) this.$get(url, { kind: select.value });
     },
   });
@@ -312,52 +278,52 @@
   const picker = (dialog, url, itemOf) => {
     const items = new Map();
     return {
-      _onpick: null,
-      _many: false,
-      _held: [],
-      _chosen: [],
-      _open(detail) {
-        this._many = Boolean(detail.many);
-        this._onpick = detail.onpick;
-        this._held = detail.held ?? [];
-        this._chosen = [];
+      onpick: null,
+      many: false,
+      held: [],
+      chosen: [],
+      open(detail) {
+        this.many = Boolean(detail.many);
+        this.onpick = detail.onpick;
+        this.held = detail.held ?? [];
+        this.chosen = [];
         items.clear();
         this.$get(url, detail.query ?? {});
         dialog.showModal();
       },
-      _close() {
-        this._onpick = null;
-        this._chosen = [];
+      close() {
+        this.onpick = null;
+        this.chosen = [];
         items.clear();
         dialog.close();
       },
-      _has(id) {
-        return this._chosen.includes(id);
+      has(id) {
+        return this.chosen.includes(id);
       },
-      _taken(id) {
-        return this._held.includes(id);
+      taken(id) {
+        return this.held.includes(id);
       },
-      _pick(button) {
+      pick(button) {
         const id = button.dataset.pickId;
-        if (this._many) {
-          if (this._has(id)) {
-            this._chosen = this._chosen.filter((chosen) => chosen !== id);
+        if (this.many) {
+          if (this.has(id)) {
+            this.chosen = this.chosen.filter((chosen) => chosen !== id);
             items.delete(id);
           } else {
             items.set(id, itemOf(button));
-            this._chosen = [...this._chosen, id];
+            this.chosen = [...this.chosen, id];
           }
           return;
         }
-        const onpick = this._onpick;
+        const onpick = this.onpick;
         const item = itemOf(button);
-        this._close();
+        this.close();
         onpick?.(item);
       },
-      _done() {
-        const onpick = this._onpick;
-        const chosen = this._chosen.map((id) => items.get(id));
-        this._close();
+      done() {
+        const onpick = this.onpick;
+        const chosen = this.chosen.map((id) => items.get(id));
+        this.close();
         onpick?.(chosen);
       },
     };
@@ -395,7 +361,7 @@
       else koya.moveRow(button, button.dataset.action === "left" ? -1 : 1);
     });
     return {
-      _add() {
+      add() {
         openPicker("media-picker", {
           many: true,
           onpick: (items) => {
@@ -408,21 +374,21 @@
   };
 
   koya.mediaField = (file) => ({
-    _id: file.id,
-    _url: file.url,
-    _alt: file.alt,
-    _name: file.name,
-    _choose() {
-      openPicker("media-picker", { onpick: (item) => this._set(item) });
+    id: file.id,
+    url: file.url,
+    alt: file.alt,
+    name: file.name,
+    choose() {
+      openPicker("media-picker", { onpick: (item) => this.set(item) });
     },
-    _clear() {
-      this._set(null);
+    clear() {
+      this.set(null);
     },
-    _set(item) {
-      this._id = item ? item.id : "";
-      this._url = item ? item.url : "";
-      this._alt = item ? item.alt : "";
-      this._name = item ? item.name : "No image";
+    set(item) {
+      this.id = item ? item.id : "";
+      this.url = item ? item.url : "";
+      this.alt = item ? item.alt : "";
+      this.name = item ? item.name : "No image";
       changed(this.$refs.input);
     },
   });
@@ -433,35 +399,29 @@
   };
 
   koya.bulk = (el) => ({
-    _ids: Array.from(el.querySelectorAll("[data-bulk-item]"), (box) => box.value),
-    _chosen: [],
-    _count() {
-      return this._chosen.length;
+    ids: Array.from(el.querySelectorAll("[data-bulk-item]"), (box) => box.value),
+    chosen: [],
+    count() {
+      return this.chosen.length;
     },
-    _picked(id) {
-      return this._chosen.includes(id);
+    picked(id) {
+      return this.chosen.includes(id);
     },
-    _pick(id, on) {
-      this._chosen = on ? [...this._chosen, id] : this._chosen.filter((chosen) => chosen !== id);
+    pick(id, on) {
+      this.chosen = on ? [...this.chosen, id] : this.chosen.filter((chosen) => chosen !== id);
     },
-    _all() {
-      return this._ids.length > 0 && this._chosen.length === this._ids.length;
+    all() {
+      return this.ids.length > 0 && this.chosen.length === this.ids.length;
     },
-    _partly() {
-      return this._chosen.length > 0 && this._chosen.length < this._ids.length;
+    partly() {
+      return this.chosen.length > 0 && this.chosen.length < this.ids.length;
     },
-    _pickAll(on) {
-      this._chosen = on ? [...this._ids] : [];
+    pickAll(on) {
+      this.chosen = on ? [...this.ids] : [];
     },
   });
 
-  let leaving = false;
   const unsavedEdits = new Set();
-
-  koya.go = (url) => {
-    leaving = true;
-    window.location.assign(url);
-  };
 
   koya.mayLeave = () =>
     ![...unsavedEdits].some((unsaved) => unsaved()) ||
@@ -482,23 +442,23 @@
       if (!leaving && pending()) event.preventDefault();
     });
     return {
-      _current: drawn,
-      _unfolded: false,
-      _track() {
-        this._current = snapshot();
-        current = this._current;
+      current: drawn,
+      unfolded: false,
+      track() {
+        this.current = snapshot();
+        current = this.current;
       },
-      _unchanged() {
-        return !unsaved && this._current === drawn;
+      unchanged() {
+        return !unsaved && this.current === drawn;
       },
     };
   };
 
   koya.phrase = (dialog) => ({
-    _typed: "",
-    _phrase: dialog.querySelector("[data-confirm-phrase]").dataset.confirmPhrase,
-    _reset() {
-      this._typed = "";
+    typed: "",
+    phrase: dialog.querySelector("[data-confirm-phrase]").dataset.confirmPhrase,
+    reset() {
+      this.typed = "";
       if (this.$refs.error) this.$refs.error.textContent = "";
     },
   });
@@ -519,57 +479,59 @@
   koya.importer = (form) => {
     const pieceBytes = Number(form.dataset.importPieceBytes);
     const post = async (url, body) => {
-      const response = await fetchWhole(url, {
+      const response = await fetch(url, {
         method: "POST",
         body,
         headers: { "Content-Type": "application/octet-stream", "n-request": "true" },
       });
       const text = await response.text();
-      if (!response.ok) throw Object.assign(new Error(textOf(text)), { answer: text });
-      return text;
+      const redirect = response.headers.get("n-redirect");
+      if (!response.ok) throw Object.assign(new Error(textOf(text)), { answer: text, redirect });
+      return { text, redirect };
     };
     const megabytes = (n) => `${(n / 1048576).toFixed(1)} MB`;
     return {
-      _busy: false,
-      _sent: 0,
-      _total: 0,
-      _status: "",
-      _error: "",
-      _login: "",
-      async _start() {
+      busy: false,
+      sent: 0,
+      total: 0,
+      status: "",
+      error: "",
+      login: "",
+      async start() {
         const file = this.$refs.file.files[0];
-        if (!file || this._busy) return;
-        this._error = "";
-        this._login = "";
-        this._total = file.size;
-        this._sent = 0;
-        this._busy = true;
+        if (!file || this.busy) return;
+        this.error = "";
+        this.login = "";
+        this.total = file.size;
+        this.sent = 0;
+        this.busy = true;
         try {
-          const id = (await post(form.dataset.importBegin)).trim();
+          const id = (await post(form.dataset.importBegin)).text.trim();
           for (let offset = 0; offset < file.size; offset += pieceBytes) {
-            this._status = `Uploading ${megabytes(offset)} of ${megabytes(file.size)}`;
+            this.status = `Uploading ${megabytes(offset)} of ${megabytes(file.size)}`;
             const url = `${form.dataset.importContinue}?id=${encodeURIComponent(id)}&offset=${offset}`;
             await post(url, file.slice(offset, offset + pieceBytes));
-            this._sent = Math.min(offset + pieceBytes, file.size);
+            this.sent = Math.min(offset + pieceBytes, file.size);
           }
           this.$refs.bar.removeAttribute("value");
-          this._status = "Making the space. The server answers nothing else until it is done.";
-          this.$fetch(dataUrl(await post(`${form.dataset.importFinish}?id=${encodeURIComponent(id)}`)), "GET");
+          this.status = "Making the space. The server answers nothing else until it is done.";
+          const { redirect } = await post(`${form.dataset.importFinish}?id=${encodeURIComponent(id)}`);
+          if (redirect) window.location.assign(redirect);
         } catch (e) {
-          const answer = e.answer && new DOMParser().parseFromString(e.answer, "text/html");
-          if (answer && answer.getElementById("location")) {
-            this.$fetch(dataUrl(e.answer), "GET");
+          if (e.redirect) {
+            window.location.assign(e.redirect);
             return;
           }
+          const answer = e.answer && new DOMParser().parseFromString(e.answer, "text/html");
           const login = answer && answer.querySelector("#toast a[href]");
           if (login) {
-            this._error = "The session has ended.";
-            this._login = login.getAttribute("href");
-            this._busy = false;
+            this.error = "The session has ended.";
+            this.login = login.getAttribute("href");
+            this.busy = false;
             return;
           }
-          this._error = e.message || "The import could not be sent.";
-          this._busy = false;
+          this.error = e.message || "The import could not be sent.";
+          this.busy = false;
         }
       },
     };

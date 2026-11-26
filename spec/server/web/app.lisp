@@ -43,19 +43,19 @@
         "rich text gets a Quill holder")
     (ok (search "<div class=\"richtext\"><input type=\"hidden\" id=\"f-body\"" body)
         "in a box that marks the editor and its toolbar while either has the focus, as an input is marked")
-    (ok (search "<button type=\"button\" class=\"btn btn-icon editor-fold-toggle\" aria-label=\"Menu\" aria-controls=\"editor-actions\" aria-expanded=\"false\" n-on-click=\"_unfolded = !_unfolded\" n-bind-ariaexpanded=\"String(_unfolded)\">" body)
+    (ok (search "<button type=\"button\" class=\"btn btn-icon editor-fold-toggle\" aria-label=\"Menu\" aria-controls=\"editor-actions\" aria-expanded=\"false\" n-on-click=\"unfolded = !unfolded\" n-bind-ariaexpanded=\"String(unfolded)\">" body)
         "on a phone the bar's buttons fold under a toggle, folded at first; a new content has no times to fold")
-    (let ((menu (search "<span n-bind-hidden=\"_unfolded\"><svg" body))
-          (close (search "<span hidden n-bind-hidden=\"!_unfolded\"><svg" body)))
+    (let ((menu (search "<span n-bind-hidden=\"unfolded\"><svg" body))
+          (close (search "<span hidden n-bind-hidden=\"!unfolded\"><svg" body)))
       (ok (and menu close (< menu (search "<path d=\"M2.5 4h11\"></path><path d=\"M2.5 8h11\"></path><path d=\"M2.5 12h11\"></path>" body :start2 menu) close))
           "a toggle showing three lines while they are folded")
       (ok (and close (< close (search "<path d=\"M4.2 4.2l7.6 7.6\"></path>" body :start2 close)))
           "and a cross while they are shown"))
-    (ok (search "<div id=\"editor-actions\" class=\"editor-fold mt-3 flex items-start justify-between gap-2 sm:flex-wrap sm:items-center\" n-bind-class.open=\"_unfolded\">" body)
+    (ok (search "<div id=\"editor-actions\" class=\"editor-fold mt-3 flex items-start justify-between gap-2 sm:flex-wrap sm:items-center\" n-bind-class.open=\"unfolded\">" body)
         "which opens them")
     (ok (search "<div class=\"flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center\"></div><div class=\"flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center\">" body)
         "on a phone in two columns of one width, the links down the left and the actions down the right, each button as wide as its column")
-    (ok (search (format nil "<form id=\"editor-form\" class=\"space-y-6\" n-ref=\"form\" ~a n-on-input=\"_track()\" n-on-change=\"_track()\""
+    (ok (search (format nil "<form id=\"editor-form\" class=\"space-y-6\" n-ref=\"form\" ~a n-on-input=\"track()\" n-on-change=\"track()\""
                         (bound "n-on-submit.prevent"
                                (submit (editor-action :space "website" :model "blog" :id "new" :op "save"))))
                 body)
@@ -82,8 +82,7 @@
           (ng (search "htmx" body))
           (ng (search "n-scope" (subseq body 0 (search "<body" body))) "the page itself is no scope")
           (ok (search "<body class=" body))
-          (ok (search "<div id=\"location\" hidden></div>" body)
-              "an answer that moves the browser is drawn here")
+          (ng (search "id=\"location\"" body) "an answer moves the browser with its headers, not with an element")
           (ng (search "onfetcherr" body) "a refusal is drawn as any answer is, with nothing on the element"))))))
 
 (deftest every-page-offers-the-source

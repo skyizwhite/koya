@@ -14,7 +14,6 @@
   (:import-from #:babel #:string-to-octets)
   (:import-from #:flexi-streams #:make-in-memory-input-stream)
   (:import-from #:quri #:url-encode-params)
-  (:import-from #:cl-ppcre #:scan-to-strings)
   (:export #:*secret* #:*cookie* #:*set-cookie* #:blog-model #:request #:location #:request-url #:call-action #:edit #:moved-to #:post-login #:setup-pages #:log-in
            #:asked-first #:count-ids #:replaced-url #:bound #:searching #:revealing #:escaped #:count-matches))
 (in-package #:koya-spec/server/web/pages/support)
@@ -124,23 +123,18 @@
 (defun searching (url &key changes-only)
   (let ((url (koya-server/web/lib/binds:js-string url)))
     (format nil "n-scope=\"koya.search()\" ~a~@[ ~a~] ~a"
-            (bound "n-on-submit.prevent" (format nil "_ask(~a, this, true)" url))
-            (and (not changes-only) (bound "n-on-input.debounce300" (format nil "_ask(~a, this)" url)))
-            (bound "n-on-change" (format nil "_ask(~a, this)" url)))))
+            (bound "n-on-submit.prevent" (format nil "ask(~a, this, true)" url))
+            (and (not changes-only) (bound "n-on-input.debounce300" (format nil "ask(~a, this)" url)))
+            (bound "n-on-change" (format nil "ask(~a, this)" url)))))
 
 (defun revealing (url)
   (format nil "n-on-init=\"koya.reveal(e)\" ~a" (bound "n-on-revealed" (koya-server/web/lib/binds:ask url))))
 
-(defun location-url (body attribute)
-  (multiple-value-bind (match groups)
-      (scan-to-strings (format nil "<div id=\"location\" hidden ~a=\"([^\"]*)\"" attribute) body)
-    (and match (uiop:frob-substrings (aref groups 0) '("&amp;") "&"))))
+(defun moved-to (headers)
+  (or (getf headers :n-redirect) (getf headers :n-replace-url)))
 
-(defun moved-to (body)
-  (or (location-url body "data-go") (location-url body "data-replace")))
-
-(defun replaced-url (body)
-  (location-url body "data-replace"))
+(defun replaced-url (headers)
+  (getf headers :n-replace-url))
 
 (defun count-ids (html)
   (loop :for start := (search " id=\"" html) :then (search " id=\"" html :start2 (1+ start))

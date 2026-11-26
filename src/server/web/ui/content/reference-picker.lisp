@@ -37,7 +37,7 @@
        (button :type "button"
                :class "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm ring-accent hover:bg-accent/5 disabled:opacity-50"
                :data-pick-id id
-               :n-on-click "_pick(this)" :n-bind-class.ring-2 "_has(this.dataset.pickId)" :n-bind-disabled "_taken(this.dataset.pickId)" :n-bind-ariapressed "_many ? String(_has(this.dataset.pickId)) : null"
+               :n-on-click "pick(this)" :n-bind-class.ring-2 "has(this.dataset.pickId)" :n-bind-disabled "taken(this.dataset.pickId)" :n-bind-ariapressed "many ? String(has(this.dataset.pickId)) : null"
          (span :class "min-w-0 flex-1 truncate" label)
          (~status-badge :status (content-status content)))
        (template

@@ -20,7 +20,7 @@
                 #:content-published-p #:content-draft-p
                 #:content-created-at #:content-updated-at #:content-draft-key #:content-data
                 #:default-data #:duplicated-data #:content-label #:slug-value #:held-ids)
-  (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list #:set-response-status)
+  (:import-from #:koya-server/web/lib/http #:param #:integer-text #:form-list #:set-response-status #:send-to #:replace-url)
   (:import-from #:koya-server/domain/errors
                 #:koya-error #:koya-error-code)
   (:import-from #:koya-server/web/lib/forms #:form->data #:field-param-name #:row-prefix)
@@ -32,7 +32,7 @@
                 #:expand-url-template #:content-url #:model-url #:history-url #:webhook-log-url #:editor-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors #:~confirm-dialog #:~go-to #:~replace-url #:~referrers)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~errors #:~confirm-dialog #:~referrers)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast
                 #:set-toast #:~toast #:action-refusal #:action-refused)
@@ -181,8 +181,8 @@
              (hsx (button :type "button" :class class
                           :commandfor dialog :command (and dialog "close")
                           :n-on-click (post (editor-action :space space :model model :id id :op op)
-                                            :data "koya.form($refs.form)")
-                          :n-bind-disabled (and (equal op "save") "_unchanged()")
+                                            :data "$refs.form")
+                          :n-bind-disabled (and (equal op "save") "unchanged()")
                     (when icon (hsx (~icon :name icon)))
                     children))))
       (if dialog
@@ -195,7 +195,7 @@
 (defcomp ~meta (&key content)
   (hsx
    (div :id "editor-meta" :class "editor-fold mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted"
-        :n-bind-class.open "_unfolded"
+        :n-bind-class.open "unfolded"
      (span "created at " (short-time (content-created-at content)))
      (span "updated at " (short-time (content-updated-at content))))))
 
@@ -239,6 +239,7 @@
                                                          :id id :slug (slug-value model (content-published content))))))
     (hsx
      (div :id "editor" :n-scope (format nil "koya.editor(this, ~:[false~;true~])" (or restoring original))
+          :n-on-fetchredirect "koya.leave()"
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (div :class "flex items-center justify-between gap-3"
            (div :class "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
@@ -248,12 +249,12 @@
              (when content (hsx (~status-badge :status (content-status content)))))
            (button :type "button" :class "btn btn-icon editor-fold-toggle" :aria-label "Menu"
                    :aria-controls (if content "editor-meta editor-actions" "editor-actions") :aria-expanded "false"
-                   :n-on-click "_unfolded = !_unfolded" :n-bind-ariaexpanded "String(_unfolded)"
-             (span :n-bind-hidden "_unfolded" (~icon :name :menu))
-             (span :hidden t :n-bind-hidden "!_unfolded" (~icon :name :close))))
+                   :n-on-click "unfolded = !unfolded" :n-bind-ariaexpanded "String(unfolded)"
+             (span :n-bind-hidden "unfolded" (~icon :name :menu))
+             (span :hidden t :n-bind-hidden "!unfolded" (~icon :name :close))))
          (when content (hsx (~meta :content content)))
          (div :id "editor-actions" :class "editor-fold mt-3 flex items-start justify-between gap-2 sm:flex-wrap sm:items-center"
-              :n-bind-class.open "_unfolded"
+              :n-bind-class.open "unfolded"
            (div :class "flex flex-1 flex-col gap-2 sm:flex-initial sm:flex-row sm:flex-wrap sm:items-center"
              (when preview-url (hsx (~external-link :href preview-url "Preview draft")))
              (when public-url (hsx (~external-link :href public-url "Published page")))
@@ -283,7 +284,7 @@
        (when original (hsx (~duplicating :space space-name :model model :original original)))
        (form :id "editor-form" :class "space-y-6" :n-ref "form"
              :n-on-submit.prevent (submit (editor-action :space space-name :model model-name :id id :op "save"))
-             :n-on-input "_track()" :n-on-change "_track()"
+             :n-on-input "track()" :n-on-change "track()"
          (when content
            (hsx (input :type "hidden" :name "updated-at" :value (content-updated-at content))))
          (let ((choices (multiple-value-call #'make-choices space-name (read-held space-name model (list data)))))
@@ -367,8 +368,8 @@
            (hsx (~editor-page :space space :model model :content content :data current))))))))
 
 (defun done (space model content message)
+  (replace-url (editor-url space model (content-id content)))
   (hsx (<> (~editor :space space :model model :content content :data (content-data content :draft t))
-           (~replace-url :url (editor-url space model (content-id content)))
            (~toast :message message))))
 
 (defun changed-elsewhere (url)
@@ -380,7 +381,8 @@
 
 (defun move-on (url message)
   (set-toast message)
-  (hsx (~go-to :url url :on-purpose t)))
+  (send-to url)
+  (hsx (<>)))
 
 (defaction editor-action :post (params)
   (let* ((space (param params "space"))

@@ -10,24 +10,24 @@
 
 (deftest submit
   (ok (string= (submit "/act")
-               "$post(\"/act\", koya.form(this))")
-      "a form posts its fields")
-  (ok (string= (submit "/act" :data "{ id: _chosen }")
-               "$post(\"/act\", { id: _chosen })")
+               "$post(\"/act\", e)")
+      "a form posts its fields, sent as the event that submits it")
+  (ok (string= (submit "/act" :data "{ id: chosen }")
+               "$post(\"/act\", { id: chosen })")
       "or what it is given")
   (ok (string= (submit "/act" :confirm "Delete \"it\"?")
-               "confirm(\"Delete \\\"it\\\"?\") && $post(\"/act\", koya.form(this))")
+               "confirm(\"Delete \\\"it\\\"?\") && $post(\"/act\", e)")
       "a question asked first stops it unless it is answered yes")
   (ok (string= (submit "/act" :guard "koya.mayLeave()")
-               "koya.mayLeave() && $post(\"/act\", koya.form(this))")
+               "koya.mayLeave() && $post(\"/act\", e)")
       "and so does a guard, asked before the question"))
 
 (deftest post
   (ok (string= (post "/act")
                "$post(\"/act\")")
       "a button posts, sending nothing of its own")
-  (ok (string= (post "/act" :data "{ id: _chosen }")
-               "$post(\"/act\", { id: _chosen })")
+  (ok (string= (post "/act" :data "{ id: chosen }")
+               "$post(\"/act\", { id: chosen })")
       "or what it is given")
   (ok (string= (post "/act" :confirm "Sure?")
                "confirm(\"Sure?\") && $post(\"/act\")")
@@ -45,5 +45,5 @@
 
 (deftest upload-picked
   (ok (string= (upload-picked "/upload")
-               "koya.upload(e.target, \"/upload\", (url) => $fetch(url, 'GET'))")
-      "files are uploaded as they are picked, and the answer is drawn through the scope's fetch"))
+               "koya.fits(e.target) && $post(\"/upload\", e)")
+      "files are posted with their form as they are picked, unless they are over the limit"))

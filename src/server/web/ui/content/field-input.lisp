@@ -54,7 +54,7 @@
            (hsx (~reference-card :name name :many many
                                  :id (getf reference :id) :label (getf reference :label)
                                  :status (getf reference :status) :href (getf reference :href)))))
-       (button :type "button" :class "btn" :n-on-click "_choose()"
+       (button :type "button" :class "btn" :n-on-click "choose()"
          (~icon :name :plus) (if many "Add" "Select"))))))
 
 (defcomp ~media-control (&key name value media)
@@ -68,17 +68,17 @@
           :n-scope (format nil "koya.mediaField(~a)"
                            (to-json (jobject "id" (or value "") "url" url "alt" alt "name" label)))
        (input :type "hidden" :id name :name name :value (or value "") :n-ref "input"
-              :n-bind-value "_id")
+              :n-bind-value "id")
        (img :src url :alt alt
             :class (clsx "h-24 w-24 rounded-md border border-line bg-panel object-contain" (unless media "hidden"))
-            :n-bind-src "_url" :n-bind-alt "_alt" :n-bind-class.hidden "!_url")
+            :n-bind-src "url" :n-bind-alt "alt" :n-bind-class.hidden "!url")
        (div :class "space-y-2 text-sm"
-         (div :class "text-muted" :n-bind-textcontent "_name" label)
+         (div :class "text-muted" :n-bind-textcontent "name" label)
          (div :class "flex gap-2"
-           (button :type "button" :class "btn" :n-on-click "_choose()"
+           (button :type "button" :class "btn" :n-on-click "choose()"
              (~icon :name :media) "Select")
            (button :type "button" :class "btn" :hidden (blank-p value)
-                   :n-on-click "_clear()" :n-bind-hidden "!_id"
+                   :n-on-click "clear()" :n-bind-hidden "!id"
              (~icon :name :close) "Clear")))))))
 
 (defcomp ~media-entry (&key name id media)
@@ -106,7 +106,7 @@
          :n-on-init "koya.sortable(this)"
        (loop :for (id . media) :in entries :collect (hsx (~media-entry :name name :id id :media media))))
      (template (~media-entry :name name))
-     (button :type "button" :class "btn" :n-on-click "_add()"
+     (button :type "button" :class "btn" :n-on-click "add()"
        (~icon :name :media) "Add"))))
 
 (defcomp ~field-error (&key field parent error)
@@ -128,19 +128,19 @@
                     (field-option field :help)))))
          (unless required
            (hsx (button :type "button" :class "btn" :hidden (not on)
-                        :n-bind-hidden "!_on" :n-on-click "_remove()"
+                        :n-bind-hidden "!on" :n-on-click "remove()"
                   (~icon :name :close) (format nil "Remove ~a" (field-name field))))))
        (input :type "hidden" :name name :value "on" :disabled (not on) :n-ref "marker"
-              :n-bind-disabled "!_on")
+              :n-bind-disabled "!on")
        (unless required
          (hsx (div :class "rounded-md border border-dashed border-line p-4" :hidden on
-                   :n-bind-hidden "_on"
-                (button :type "button" :class "btn" :n-on-click "_add()"
+                   :n-bind-hidden "on"
+                (button :type "button" :class "btn" :n-on-click "add()"
                   (~icon :name :plus) (format nil "Add ~a" (field-name field))))))
        (fieldset :id name :aria-labelledby (format nil "~a-label" name)
                  :class "space-y-4 rounded-md border border-line p-4"
                  :hidden (not on) :disabled (not on)
-                 :n-bind-hidden "!_on" :n-bind-disabled "!_on"
+                 :n-bind-hidden "!on" :n-bind-disabled "!on"
          children)
        (~field-error :field field :error error)))))
 
@@ -163,7 +163,7 @@
            (select :aria-label (format nil "Custom field of a new ~a row" (field-name field)) :n-ref "kind" :class "w-auto"
              (loop :for kind :in (field-row-kinds field) :collect
                (hsx (option :value (custom-field-name kind) (custom-field-name kind)))))
-           (button :type "button" :class "btn" :n-on-click "_add($refs.kind)"
+           (button :type "button" :class "btn" :n-on-click "add($refs.kind)"
              (~icon :name :plus) "Add row")))
        (~field-error :field field :error error)))))
 

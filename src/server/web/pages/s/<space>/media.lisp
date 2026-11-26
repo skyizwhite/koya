@@ -12,14 +12,14 @@
                 #:remove-media #:store-uploads #:remove-each #:list-media #:count-media
                 #:find-media #:update-media #:media-reference-counts #:media-references)
   (:import-from #:koya-server/web/lib/http
-                #:path-param #:uploaded-files #:param #:form-list)
+                #:path-param #:uploaded-files #:param #:form-list #:replace-url)
   (:import-from #:koya-server/domain/errors #:koya-error #:koya-error-message)
   (:import-from #:koya-server/web/lib/paging #:page-number #:last-page #:page-offset)
   (:import-from #:koya-server/web/lib/display #:short-time)
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url #:~referrers #:~search-form)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~referrers #:~search-form)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:koya-server/web/ui/media/grid #:~thumb #:dimensions #:human-size #:~upload-limit)
@@ -50,7 +50,7 @@
     (hsx
      (li :class "relative"
        (input :type "checkbox" :name "id" :value id :form +bulk-form+ :data-bulk-item t
-              :n-bind-checked "_picked(this.value)" :n-on-change "_pick(this.value, this.checked)"
+              :n-bind-checked "picked(this.value)" :n-on-change "pick(this.value, this.checked)"
               :class "absolute left-1 top-1 z-10 h-4 w-4 cursor-pointer"
               :aria-label (format nil "Select ~a" (media-filename media)))
        (button :type "button" :class "block w-full cursor-zoom-in"
@@ -91,14 +91,14 @@
               (div :class "mb-4 flex flex-wrap items-center gap-3"
                 (label :class "flex items-center gap-2 text-sm text-muted"
                   (input :type "checkbox" :form +bulk-form+
-                         :n-bind-checked "_all()" :n-bind-indeterminate "_partly()" :n-on-change "_pickAll(this.checked)")
+                         :n-bind-checked "all()" :n-bind-indeterminate "partly()" :n-on-change "pickAll(this.checked)")
                   "Select all on this page")
                 (form :id +bulk-form+
                       :n-on-submit.prevent (submit (delete-selected-media :space space :q q :page page)
-                                          :data "{ id: _chosen }"
+                                          :data "{ id: chosen }"
                                           :confirm "Delete the selected files? This cannot be undone.")
-                  (div :hidden t :n-bind-hidden "!_count()" :class "flex flex-wrap items-center gap-2 text-sm"
-                    (span :class "mr-1 text-muted" :n-bind-textcontent "`${_count()} selected`" "0 selected")
+                  (div :hidden t :n-bind-hidden "!count()" :class "flex flex-wrap items-center gap-2 text-sm"
+                    (span :class "mr-1 text-muted" :n-bind-textcontent "`${count()} selected`" "0 selected")
                     (button :type "submit" :class "btn btn-danger" (~icon :name :delete) "Delete"))))
               (ul :class "grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6"
                 (loop :for media :in items :collect
@@ -192,8 +192,8 @@
   (let* ((search (param params "q"))
          (pages (last-page (count-media space :search search) +library-size+))
          (page (min (page-number params) pages)))
-    (let ((library (hsx (<> (~library :space space :search search :page page)
-                            (~replace-url :url (library-url space :search search :page page)))))
+    (replace-url (library-url space :search search :page page))
+    (let ((library (hsx (~library :space space :search search :page page)))
           (count (hsx (~media-count :space space :search search)))
           (toast (if message (hsx (~toast :message message :kind kind)) (hsx (<>)))))
       (if close-preview

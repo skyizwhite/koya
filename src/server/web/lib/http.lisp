@@ -21,7 +21,7 @@
   (:import-from #:quri
                 #:uri #:uri-scheme #:uri-host #:uri-port #:uri-error)
   (:import-from #:babel
-                #:octets-to-string)
+                #:octets-to-string #:string-to-octets)
   (:import-from #:alexandria
                 #:read-stream-content-into-byte-vector)
   (:export #:json-app
@@ -47,6 +47,8 @@
            #:error-status
            #:set-response-status
            #:set-response-header
+           #:send-to
+           #:replace-url
            #:request-octets))
 (in-package #:koya-server/web/lib/http)
 
@@ -120,6 +122,22 @@
 
 (defun set-response-header (name value)
   (setf (getf (response-headers *response*) name) value))
+
+(defun header-url (url)
+  (with-output-to-string (out)
+    (loop :for char :across url
+          :do (if (< (char-code char) 128)
+                  (write-char char out)
+                  (loop :for octet :across (string-to-octets (string char) :encoding :utf-8)
+                        :do (format out "%~2,'0X" octet))))))
+
+(defun send-to (url)
+  (set-response-header :n-redirect (header-url url))
+  nil)
+
+(defun replace-url (url)
+  (set-response-header :n-replace-url (header-url url))
+  nil)
 
 (defun request-octets ()
   (request-content *request*))

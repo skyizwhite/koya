@@ -111,11 +111,12 @@
           (ok (string= (display-timezone-name) "Asia/Tokyo"))
           (testing "the editor takes and shows datetimes in that zone"
             (let ((id nil))
-              (multiple-value-bind (status body)
+              (multiple-value-bind (status body headers)
                   (edit "/s/website/m/blog/new"
                             :form '(("action" . "save") ("f-title" . "Tokyo time") ("f-when" . "2026-09-21T08:30")) :headers origin)
+                (declare (ignore body))
                 (ok (= status 200))
-                (let* ((loc (moved-to body)) (path (subseq loc 0 (position #\? loc))))
+                (let* ((loc (moved-to headers)) (path (subseq loc 0 (position #\? loc))))
                   (setf id (subseq path (1+ (position #\/ path :from-end t))))))
               (let ((content (find-if (lambda (c) (string= (content-id c) id))
                                       (list-contents "website" "blog" (blog-model) (parse-query nil) :status :all))))

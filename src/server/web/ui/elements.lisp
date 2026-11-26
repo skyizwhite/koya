@@ -10,9 +10,7 @@
            #:~status-badge
            #:~pager
            #:~search-form
-           #:~confirm-dialog
-           #:~go-to
-           #:~replace-url))
+           #:~confirm-dialog))
 (in-package #:koya-server/web/ui/elements)
 
 (defcomp ~errors (&key id errors)
@@ -65,9 +63,9 @@
     (hsx
      (form (append rest
                    (list :n-scope "koya.search()"
-                         :n-on-submit.prevent (format nil "_ask(~a, this, true)" url)
-                         :n-on-input.debounce300 (and (not changes-only) (format nil "_ask(~a, this)" url))
-                         :n-on-change (format nil "_ask(~a, this)" url)))
+                         :n-on-submit.prevent (format nil "ask(~a, this, true)" url)
+                         :n-on-input.debounce300 (and (not changes-only) (format nil "ask(~a, this)" url))
+                         :n-on-change (format nil "ask(~a, this)" url)))
        children))))
 
 (defcomp ~confirm-dialog (&key id title message children)
@@ -81,13 +79,3 @@
      (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
        (button :type "button" :commandfor id :command "close" :class "btn" "Cancel")
        children))))
-
-(defcomp ~go-to (&key url on-purpose)
-  (hsx (div :id "location" :hidden t :data-go url
-            :n-on-init (if on-purpose
-                           "koya.go(this.dataset.go)"
-                           "window.location.assign(this.dataset.go)"))))
-
-(defcomp ~replace-url (&key url)
-  (hsx (div :id "location" :hidden t :data-replace url
-            :n-on-init "history.replaceState(history.state, '', this.dataset.replace)")))

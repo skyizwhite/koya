@@ -1,5 +1,7 @@
 # A scope's members start with an underscore
 
+Superseded by adr/2026-11-27-nagi-replaces-nomini.md
+
 *2026-11-21*
 
 ## Context

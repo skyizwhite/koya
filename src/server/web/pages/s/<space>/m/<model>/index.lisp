@@ -10,12 +10,12 @@
   (:import-from #:koya-server/web/lib/target #:target-model)
   (:import-from #:koya-server/domain/content
                 #:content-id #:content-status #:content-data #:+statuses+ #:content-label #:held-ids)
-  (:import-from #:koya-server/web/lib/http #:path-param #:redirect-to #:param #:form-list)
+  (:import-from #:koya-server/web/lib/http #:path-param #:redirect-to #:param #:form-list #:replace-url)
   (:import-from #:koya-server/web/lib/paging #:+page-size+ #:page-number)
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager #:~confirm-dialog #:~replace-url #:~search-form)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager #:~confirm-dialog #:~search-form)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
@@ -175,12 +175,12 @@
                               label))
                         (~confirm-dialog :id dialog :title title :message message
                           (button :type "button" :class class :commandfor dialog :command "close"
-                                  :n-on-click (post (url op) :data "{ id: _chosen }")
+                                  :n-on-click (post (url op) :data "{ id: chosen }")
                             (~icon :name icon) label)))))))
     (hsx
-     (div :hidden t :n-bind-hidden "!_count()"
+     (div :hidden t :n-bind-hidden "!count()"
           :class "sticky bottom-4 z-20 mt-3 flex flex-col gap-2 rounded-md border border-line bg-panel px-4 py-2 text-sm shadow-lg sm:flex-row sm:items-center sm:gap-4"
-       (span :class "text-muted" :n-bind-textcontent "`${_count()} selected`" "0 selected")
+       (span :class "text-muted" :n-bind-textcontent "`${count()} selected`" "0 selected")
        (div :class "flex flex-1 items-center justify-between gap-2"
          (div :class "flex items-center gap-2"
            (action "publish" "btn" :publish "Publish" "Publish contents"
@@ -232,7 +232,7 @@
                       (thead (tr :class "border-b border-line text-left text-muted"
                                (th :class "py-2 pl-4 pr-2"
                                  (input :type "checkbox"
-                                        :n-bind-checked "_all()" :n-bind-indeterminate "_partly()" :n-on-change "_pickAll(this.checked)"
+                                        :n-bind-checked "all()" :n-bind-indeterminate "partly()" :n-on-change "pickAll(this.checked)"
                                         :aria-label "Select every content on this page"))
                                (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
                                (loop :for field :in fields :collect
@@ -243,7 +243,7 @@
                           (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
                                  (td :class "relative z-10 py-2 pl-4 pr-2"
                                    (input :type "checkbox" :name "id" :value (content-id content) :data-bulk-item t
-                                          :n-bind-checked "_picked(this.value)" :n-on-change "_pick(this.value, this.checked)"
+                                          :n-bind-checked "picked(this.value)" :n-on-change "pick(this.value, this.checked)"
                                           :aria-label (format nil "Select ~a" (content-label content model))))
                                  (td :class "py-2 pr-4 whitespace-nowrap"
                                    (~status-badge :status (content-status content)))
@@ -281,8 +281,8 @@
       (setf (getf state :page) pages)
       (multiple-value-setq (contents total pages) (fetch-page space model state)))
     (let ((model-name (model-name model)))
+      (replace-url (list-url space model-name state))
       (hsx (<> (~content-list :space space :model model :state state :contents contents :pages pages)
-               (~replace-url :url (list-url space model-name state))
                (~content-count :space space :model model :state state :total total)
                (if clear
                    (hsx (~filters :space space :model model-name :state (list :sort-key (getf state :sort-key))))

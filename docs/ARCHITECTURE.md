@@ -262,11 +262,12 @@ owner's session and this origin, and answers a request that has lost its session
 a toast linking to the login page in a new tab, so the page and what was typed in it
 stay. An action answers each part of the page it changed, under that part's id,
 the toast (`#toast`) among them, with its status; a refusal answers the toast alone, and
-a result on another page is an element for `#location` that sends the browser there,
+a result on another page sends the browser there with the `n-redirect` header,
 with the toast in the session. An editor with unsaved changes asks before the page
-is left, so a move the server sends asks too, unless it goes through `koya.go`: the
-editor moving on after its own write, and Log out, which asks (`koya.mayLeave`)
-before it ends the session rather than after. The toast for a lost session closes
+is left, so a move the server sends asks too, unless the element that asked says it
+needs no asking with `n-on-fetchredirect="koya.leave()"`: the editor moving on after
+its own write, and Log out, which asks (`koya.mayLeave`) before it ends the session
+rather than after. The toast for a lost session closes
 any open dialog, which would otherwise hide it. A path declared with `public-path` (`web/lib/auth`)
 needs no session: the login page and its action. `/assets/` and
 `/media/` are served outside the session and the guards, so the login page is
@@ -274,15 +275,17 @@ drawn with the assets and no file fetched reads the session.
 
 In the browser, an element asks for an action with Nagi's `$get` or `$post` in one of
 its `n-on-*` attributes, written by `web/lib/binds`, and Nagi swaps each element of the
-answer in where the element of its id is. `koya.js` wraps `window.fetch` so that Nagi
-draws a refused answer as any other. A list is sent with its name once for each value,
-and the actions read a value joined with commas as a list too. A part of a page that
-holds state in the browser is a Nagi scope made by a factory in `assets/js/koya.js`
-(`n-scope="koya.bulk(this)"`), and its elements bind with `n-bind-*` and `n-on-*`. See
+answer in where the element of its id is, a refused answer too; what it cannot draw,
+`koya.js` puts in the toast. A list's URL follows it with the `n-replace-url` header.
+A form is sent as the browser would send it, files included, and a list with its name
+once for each value; the actions read a value joined with commas as a list too. A part
+of a page that holds state in the browser is a Nagi scope made by a factory in
+`assets/js/koya.js` (`n-scope="koya.bulk(this)"`), and its elements bind with
+`n-bind-*` and `n-on-*`. See
 `adr/2026-11-27-nagi-replaces-nomini.md`,
 `adr/2026-11-21-a-scope-adds-elements-the-server-drew.md`,
-`adr/2026-10-02-an-element-asks-with-nominis-get-and-post.md` and
-`adr/2026-10-02-nomini-is-handed-each-answer-whole-and-drawable.md`.
+`adr/2026-11-27-an-element-asks-with-nagis-get-and-post.md` and
+`adr/2026-11-27-what-an-answer-cannot-draw-is-a-toast.md`.
 
 A space's archive moves whatever its size. The export writes it to a file under
 `archives/` beside the database and sends it from there; the page marks the
@@ -293,7 +296,7 @@ one transaction. Searching, filtering, sorting and
 paging a list are actions as well, whose answers replace the page's URL so it still
 carries that state for its GET to draw. See
 `adr/2026-10-01-pages-answer-get-and-every-change-is-an-action.md` and
-`adr/2026-10-01-lists-are-read-in-place-and-the-url-follows.md`.
+`adr/2026-11-27-lists-are-read-in-place-and-the-url-follows.md`.
 
 ## Running it
 

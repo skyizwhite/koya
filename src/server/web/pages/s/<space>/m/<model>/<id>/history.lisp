@@ -14,7 +14,7 @@
   (:import-from #:koya-server/domain/revision
                 #:revision-id #:revision-event #:revision-data #:revision-by
                 #:revision-created-at #:changed-keys)
-  (:import-from #:koya-server/web/lib/http #:path-param #:param #:set-response-status)
+  (:import-from #:koya-server/web/lib/http #:path-param #:param #:set-response-status #:replace-url)
   (:import-from #:koya-server/domain/errors #:not-found)
   (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-server/web/lib/assets #:asset-url)
@@ -23,7 +23,7 @@
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:history-url #:editor-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url #:~confirm-dialog)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~confirm-dialog)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:koya-server/usecases/schema #:resolve-model)
@@ -190,10 +190,10 @@
           (t
            (let* ((published-only (equal (param params "view") "published"))
                   (page (min (page-number params) (page-count space (content-id content) published-only))))
-             (hsx (<> (~revisions :space space :model model :content content
-                                  :published-only published-only :page page)
-                      (~replace-url :url (history-url space (model-name model) (content-id content)
-                                                      :published-only published-only :page page)))))))))
+             (replace-url (history-url space (model-name model) (content-id content)
+                                       :published-only published-only :page page))
+             (hsx (~revisions :space space :model model :content content
+                              :published-only published-only :page page)))))))
 
 (defaction clear-history-action :post (params)
   (let* ((space (param params "space"))
@@ -202,8 +202,8 @@
     (cond ((null content) (action-refusal "Content not found." 404))
           (t
            (clear-history space model (content-id content))
+           (replace-url (history-url space (model-name model) (content-id content)))
            (hsx (<> (~revisions :space space :model model :content content :published-only nil :page 1)
-                    (~replace-url :url (history-url space (model-name model) (content-id content)))
                     (~toast :message "History cleared.")))))))
 
 (defun @get (params)
