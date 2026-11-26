@@ -425,7 +425,11 @@
   });
 
   const unsavedEdits = new Map();
-  const anyUnsaved = () => [...unsavedEdits.values()].some((unsaved) => unsaved());
+  const forgetGone = () => unsavedEdits.forEach((_, editor) => editor.isConnected || unsavedEdits.delete(editor));
+  const anyUnsaved = () => {
+    forgetGone();
+    return [...unsavedEdits.values()].some((unsaved) => unsaved());
+  };
 
   window.addEventListener("beforeunload", (event) => {
     if (!leaving && anyUnsaved()) event.preventDefault();
@@ -444,8 +448,8 @@
     const snapshot = () => new URLSearchParams(new FormData(form)).toString();
     const drawn = snapshot();
     let current = drawn;
-    unsavedEdits.forEach((_, editor) => editor.isConnected || unsavedEdits.delete(editor));
-    unsavedEdits.set(el, () => el.isConnected && (unsaved || current !== drawn));
+    forgetGone();
+    unsavedEdits.set(el, () => unsaved || current !== drawn);
     return {
       current: drawn,
       unfolded: false,
