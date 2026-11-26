@@ -84,7 +84,7 @@
   (migrate))
 
 (deftest migrations
-  (ok (= (current-version) 18))
+  (ok (= (current-version) 19))
   (ok (null (migrate)) "second run applies nothing")
   (ok (fetch-one "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contents'")))
 
@@ -95,7 +95,7 @@
         "legacy" "about" "object"
         "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"previewUrl\":\"javascript:alert(1)\",\"publicUrl\":\"https://x/about\"}"
         0)
-  (ok (equal (migrate) '(10 11 12 13 14 15 16 17 18)))
+  (ok (equal (migrate) '(10 11 12 13 14 15 16 17 18 19)))
   (let ((definition (col (fetch-one "SELECT definition FROM models WHERE space = 'legacy'") "definition")))
     (ng (search "previewUrl" definition))
     (ok (search "https://x/about" definition) "a web address is kept"))
@@ -106,7 +106,7 @@
   (create-space "legacy")
   (exec "UPDATE spaces SET webhooks = ? WHERE name = 'legacy'"
         "[{\"label\":\"bare\",\"url\":\"example.com/hook\"},{\"label\":\"site\",\"url\":\"https://x/hook\"},{\"label\":\"ftp\",\"url\":\"ftp://x/hook\"}]")
-  (ok (equal (migrate) '(11 12 13 14 15 16 17 18)))
+  (ok (equal (migrate) '(11 12 13 14 15 16 17 18 19)))
   (ok (equal (mapcar (lambda (hook) (getf hook :label)) (space-webhooks "legacy")) '("site"))
       "the space still reads, with the one hook that can be sent")
   (migrated-fully))
@@ -118,11 +118,29 @@
         "older" "post" "list" "{\"name\":\"post\",\"kind\":\"list\",\"fields\":[{\"name\":\"title\",\"type\":\"text\"}]}" 0)
   (exec "INSERT INTO models (space, name, kind, definition, position) VALUES (?, ?, ?, ?, ?)"
         "older" "about" "object" "{\"name\":\"about\",\"kind\":\"object\",\"fields\":[],\"publicUrl\":\"https://x/about\"}" 1)
-  (ok (equal (migrate) '(18)))
+  (ok (equal (migrate) '(18 19)))
   (ok (every #'model-history-p (schema-models (load-schema "older")))
       "every model there was keeps the history it was keeping")
   (ok (string= (model-public-url (schema-model (load-schema "older") "about")) "https://x/about")
       "and the rest of its definition is left as it was")
+  (migrated-fully))
+
+(deftest a-space-keeps-its-newest-20-webhook-calls-from-before
+  (migrated-to 18)
+  (create-space "chatty")
+  (create-space "quiet")
+  (flet ((call (space n)
+           (exec "INSERT INTO webhook_deliveries (id, space, url, event, ok, created_at) VALUES (?, ?, '', 'publish', 1, '')"
+                 (format nil "~a-~3,'0d" space n) space)))
+    (dotimes (n 200) (call "chatty" n))
+    (dotimes (n 3) (call "quiet" n)))
+  (ok (equal (migrate) '(19)))
+  (flet ((ids (space)
+           (mapcar (lambda (row) (col row "id"))
+                   (fetch "SELECT id FROM webhook_deliveries WHERE space = ? ORDER BY id" space))))
+    (ok (equal (ids "chatty") (loop :for n :from 180 :below 200 :collect (format nil "chatty-~3,'0d" n)))
+        "a space with more keeps only its newest 20")
+    (ok (= (length (ids "quiet")) 3) "and one with fewer keeps them all"))
   (migrated-fully))
 
 (deftest schema-snapshot-matches-the-migrations
@@ -392,7 +410,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('kept', 'publish', '{\"title\":\"Old\",\"gone\":{\"a\":1}}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(12 13 14 15 16 17 18)))
+  (ok (equal (migrate) '(12 13 14 15 16 17 18 19)))
   (let ((content (stored-content "leftover" "kept")))
     (ng (nth-value 1 (access (content-published content) :gone)))
     (ng (nth-value 1 (access (content-draft content) :gone)))
@@ -465,7 +483,7 @@
     (row "live" "published" "{\"body\":\"<p>live</p>\"}" nil)
     (row "both" "published+draft" "{\"body\":\"<p>old</p>\"}" "{\"body\":\"<p>new</p>\"}")
     (row "bare" "draft" nil "{\"n\":1}"))
-  (ok (equal (migrate) '(14 15 16 17 18)))
+  (ok (equal (migrate) '(14 15 16 17 18 19)))
   (ok (texts-fit-p "older") "every content gets the text of its data")
   (ok (string= (col (fetch-one "SELECT draft_text FROM contents WHERE id = 'drafted'") "draft_text")
                "{\"body\":\"new & bold\"}"))
@@ -535,7 +553,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (content_id, event, data, created_at)
          VALUES ('about', 'publish', '{\"title\":\"One\"}', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(13 14 15 16 17 18)))
+  (ok (equal (migrate) '(13 14 15 16 17 18 19)))
   (testing "what was stored moves into its space, history and all"
     (ok (string= (access (content-published (stored-content "one" "about")) :title) "One"))
     (ok (equal (mapcar #'revision-event (list-revisions "one" "about")) '("publish"))))
@@ -753,7 +771,7 @@
     (row "second" "page" nil "{\"slug\":\"same\"}")
     (row "only" "page" "{\"slug\":\"only\"}" nil)
     (row "pair" "twin" "{\"a\":\"x\",\"b\":\"y\"}" nil))
-  (ok (equal (migrate) '(16 17 18)))
+  (ok (equal (migrate) '(16 17 18 19)))
   (testing "the schema loses what a slug no longer takes, and is read"
     (dolist (row (fetch "SELECT definition FROM models WHERE space = 'older'"))
       (ng (search "\"from\"" (col row "definition")))
@@ -804,7 +822,7 @@
                  '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')")
   (exec "INSERT INTO content_revisions (space, content_id, event, data, written_by, created_at)
          VALUES ('older', 'nulled', 'draft', '{\"title\":null,\"rows\":[{\"fieldId\":\"h\",\"text\":null}]}', '', '2026-01-01T00:00:00.000Z')")
-  (ok (equal (migrate) '(17 18)))
+  (ok (equal (migrate) '(17 18 19)))
   (let ((content (stored-content "older" "nulled")))
     (ok (string= (content-status content) "published+draft") "the content is as it was")
     (ok (equal (content-published content) '(:title "Live")) "less the nulls of its published data")

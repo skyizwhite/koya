@@ -17,7 +17,7 @@
 
 (defgeneric record-delivery (space &key label url model event content-id ok status response error duration-ms))
 
-(defgeneric list-deliveries (space &key label model limit offset))
+(defgeneric list-deliveries (space &key label model limit))
 
 (defgeneric count-deliveries (space &key label model))
 

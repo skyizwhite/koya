@@ -230,7 +230,12 @@
     (17
      drop-stored-nulls)
     (18
-     "UPDATE models SET definition = json_set(definition, '$.history', json('true'))")))
+     "UPDATE models SET definition = json_set(definition, '$.history', json('true'))")
+    (19
+     "DELETE FROM webhook_deliveries
+       WHERE id IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY space ORDER BY id DESC) AS n
+                                      FROM webhook_deliveries)
+                     WHERE n > 20)")))
 
 (defun drop-slug-options ()
   (dolist (row (fetch "SELECT space, name, definition FROM models"))

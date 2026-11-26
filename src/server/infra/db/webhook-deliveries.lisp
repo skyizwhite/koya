@@ -54,10 +54,10 @@
                 (unless (blank-p label) (sql "label = ?" label))
                 (unless (blank-p model) (sql "model = ?" model)))))
 
-(defmethod list-deliveries (space &key label model (limit 50) (offset 0))
+(defmethod list-deliveries (space &key label model (limit 50))
   (mapcar #'row->delivery
-          (fetch (fragment "SELECT * FROM webhook_deliveries WHERE ~a ORDER BY id DESC LIMIT ~a OFFSET ~a"
-                           (deliveries-where space label model) (bound limit) (bound offset)))))
+          (fetch (fragment "SELECT * FROM webhook_deliveries WHERE ~a ORDER BY id DESC LIMIT ~a"
+                           (deliveries-where space label model) (bound limit)))))
 
 (defmethod count-deliveries (space &key label model)
   (fetch-value (fragment "SELECT COUNT(*) FROM webhook_deliveries WHERE ~a" (deliveries-where space label model))))
