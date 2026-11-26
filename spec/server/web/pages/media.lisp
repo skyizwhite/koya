@@ -30,7 +30,7 @@
     (multiple-value-bind (status body) (request :get "/s/website/media")
       (ok (= status 200))
       (ok (search "No media yet" body))
-      (ok (search (bound "n-on-change" (upload-picked (upload-media :space "website" :q "" :page 1))) body)
+      (ok (search (format nil "n-scope=\"\" ~a" (bound "n-on-change" (upload-picked (upload-media :space "website" :q "" :page 1)))) body)
           "a file goes as it is chosen"))
     (testing "upload from the library page"
       (multiple-value-bind (status body)
@@ -94,7 +94,7 @@
         (ok (not (search "<html" body)) "a fragment, not a page")
         (ok (search "n-on-click=\"pick(this)\" " body) "a card hands its file over")
         (ok (search (searching (media-picker-search :space "website")) body) "the box searches as the typing stops")
-        (ok (search (bound "n-on-change" (upload-picked (media-picker-upload :space "website"))) body)))
+        (ok (search (format nil "n-scope=\"\" ~a" (bound "n-on-change" (upload-picked (media-picker-upload :space "website")))) body)))
       (multiple-value-bind (status body) (call-action :get (media-picker-search :space "website" :q "zzz-nothing"))
         (ok (= status 200))
         (ok (search "<div id=\"media-picker-grid\"" body) "a search answers the grid")

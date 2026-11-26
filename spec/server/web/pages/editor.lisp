@@ -506,7 +506,7 @@
       (multiple-value-bind (status body headers) (edit path :form '(("action" . "delete")))
         (ok (= status 409))
         (ng (search "id=\"editor\"" body) "the editor stays as it is")
-        (ok (null (moved-to headers)) "and on this content, not the list")
+        (ok (null (or (moved-to headers) (replaced-url headers))) "and on this content, not the list")
         (ok (search "referenced by 1 other content" body) "the toast says why")
         (ok (stored-content "website" target) "it is still there")))))
 
