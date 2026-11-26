@@ -20,7 +20,7 @@
        (link :rel "icon" :type "image/svg+xml" :href (asset-url "icon.svg"))
        (link :rel "stylesheet" :href (asset-url "style/quill.snow.css"))
        (link :rel "stylesheet" :href (asset-url "style/dist.css"))
-       (script :src (asset-url "js/nomini.js") :defer t)
+       (script :src (asset-url "js/nagi.js") :defer t)
        (script :src (asset-url "js/quill.min.js") :defer t)
        (script :src (asset-url "js/qrcode.min.js") :defer t)
        (script :src (asset-url "js/koya.js") :defer t))

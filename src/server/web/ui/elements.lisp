@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/ui/elements
   (:use #:cl #:hsx)
   (:import-from #:koya-server/web/ui/icon #:~icon)
-  (:import-from #:koya-server/web/lib/binds #:on-follow)
+  (:import-from #:koya-server/web/lib/binds #:js-string #:follow)
   (:import-from #:koya-server/web/lib/urls #:editor-url)
   (:import-from #:koya-core/schema #:model-name)
   (:export #:~errors
@@ -9,6 +9,7 @@
            #:~empty-state
            #:~status-badge
            #:~pager
+           #:~search-form
            #:~confirm-dialog
            #:~go-to
            #:~replace-url))
@@ -48,7 +49,7 @@
 
 (defcomp ~pager (&key page pages href browse)
   (flet ((link (n)
-           (hsx (a :href (funcall href n) :nm-bind (on-follow (funcall browse n)) :class "btn"
+           (hsx (a :href (funcall href n) :n-on-click (follow (funcall browse n)) :class "btn"
                    (if (< n page)
                        (hsx (<> (~icon :name :prev) "Previous"))
                        (hsx (<> "Next" (~icon :name :next))))))))
@@ -58,6 +59,16 @@
                   (when (> page 1) (link (1- page)))
                   (span :class "text-muted" (format nil "Page ~a of ~a" page pages))
                   (when (< page pages) (link (1+ page))))))))))
+
+(defcomp ~search-form (&key url changes-only children rest)
+  (let ((url (js-string url)))
+    (hsx
+     (form (append rest
+                   (list :n-scope "koya.search()"
+                         :n-on-submit.prevent (format nil "_ask(~a, this, true)" url)
+                         :n-on-input.debounce300 (and (not changes-only) (format nil "_ask(~a, this)" url))
+                         :n-on-change (format nil "_ask(~a, this)" url)))
+       children))))
 
 (defcomp ~confirm-dialog (&key id title message children)
   (hsx
@@ -73,10 +84,10 @@
 
 (defcomp ~go-to (&key url on-purpose)
   (hsx (div :id "location" :hidden t :data-go url
-            :nm-bind (if on-purpose
-                         "{ oninit: () => koya.go(this.dataset.go) }"
-                         "{ oninit: () => window.location.assign(this.dataset.go) }"))))
+            :n-on-init (if on-purpose
+                           "koya.go(this.dataset.go)"
+                           "window.location.assign(this.dataset.go)"))))
 
 (defcomp ~replace-url (&key url)
   (hsx (div :id "location" :hidden t :data-replace url
-            :nm-bind "{ oninit: () => history.replaceState(history.state, '', this.dataset.replace) }")))
+            :n-on-init "history.replaceState(history.state, '', this.dataset.replace)")))

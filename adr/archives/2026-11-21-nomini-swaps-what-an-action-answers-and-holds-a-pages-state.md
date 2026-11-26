@@ -1,5 +1,7 @@
 # Nomini swaps what an action answers and holds a page's state
 
+Superseded by adr/2026-11-27-nagi-replaces-nomini.md
+
 *2026-11-21*
 
 ## Context

@@ -47,14 +47,14 @@
   (let ((many (field-many-p field)))
     (hsx
      (div :class "space-y-2"
-          :nm-data (format nil "...koya.references(this, ~a, ~:[false~;true~])" (js-string (field-option field :model)) many)
+          :n-scope (format nil "koya.references(this, ~a, ~:[false~;true~])" (js-string (field-option field :model)) many)
        (ul :id name :class "space-y-2 empty:hidden" :data-reference-list t
-           :nm-bind (and many "{ oninit: () => koya.sortable(this) }")
+           :n-on-init (and many "koya.sortable(this)")
          (loop :for reference :in references :collect
            (hsx (~reference-card :name name :many many
                                  :id (getf reference :id) :label (getf reference :label)
                                  :status (getf reference :status) :href (getf reference :href)))))
-       (button :type "button" :class "btn" :nm-bind "{ onclick: () => _choose() }"
+       (button :type "button" :class "btn" :n-on-click "_choose()"
          (~icon :name :plus) (if many "Add" "Select"))))))
 
 (defcomp ~media-control (&key name value media)
@@ -65,20 +65,20 @@
                      (t "No image"))))
     (hsx
      (div :class "flex items-start gap-4"
-          :nm-data (format nil "...koya.mediaField(~a)"
+          :n-scope (format nil "koya.mediaField(~a)"
                            (to-json (jobject "id" (or value "") "url" url "alt" alt "name" label)))
-       (input :type "hidden" :id name :name name :value (or value "") :nm-ref "input"
-              :nm-bind "{ value: () => _id }")
+       (input :type "hidden" :id name :name name :value (or value "") :n-ref "input"
+              :n-bind-value "_id")
        (img :src url :alt alt
             :class (clsx "h-24 w-24 rounded-md border border-line bg-panel object-contain" (unless media "hidden"))
-            :nm-bind "{ src: () => _url, alt: () => _alt, 'class.hidden': () => !_url }")
+            :n-bind-src "_url" :n-bind-alt "_alt" :n-bind-class.hidden "!_url")
        (div :class "space-y-2 text-sm"
-         (div :class "text-muted" :nm-bind "{ textContent: () => _name }" label)
+         (div :class "text-muted" :n-bind-textcontent "_name" label)
          (div :class "flex gap-2"
-           (button :type "button" :class "btn" :nm-bind "{ onclick: () => _choose() }"
+           (button :type "button" :class "btn" :n-on-click "_choose()"
              (~icon :name :media) "Select")
            (button :type "button" :class "btn" :hidden (blank-p value)
-                   :nm-bind "{ onclick: () => _clear(), hidden: () => !_id }"
+                   :n-on-click "_clear()" :n-bind-hidden "!_id"
              (~icon :name :close) "Clear")))))))
 
 (defcomp ~media-entry (&key name id media)
@@ -101,12 +101,12 @@
 
 (defcomp ~media-list-control (&key name entries)
   (hsx
-   (div :class "space-y-2" :nm-data "...koya.mediaList(this)"
+   (div :class "space-y-2" :n-scope "koya.mediaList(this)"
      (ul :id name :class "flex flex-wrap gap-3 empty:hidden" :data-media-list t :data-sort-axis "x"
-         :nm-bind "{ oninit: () => koya.sortable(this) }"
+         :n-on-init "koya.sortable(this)"
        (loop :for (id . media) :in entries :collect (hsx (~media-entry :name name :id id :media media))))
      (template (~media-entry :name name))
-     (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add() }"
+     (button :type "button" :class "btn" :n-on-click "_add()"
        (~icon :name :media) "Add"))))
 
 (defcomp ~field-error (&key field parent error)
@@ -117,7 +117,7 @@
          (required (field-required-p field))
          (on (or required present)))
     (hsx
-     (div :class "space-y-1.5" :nm-data (format nil "...koya.customField(~:[false~;true~])" on)
+     (div :class "space-y-1.5" :n-scope (format nil "koya.customField(~:[false~;true~])" on)
        (div :class "flex items-center justify-between gap-3"
          (div :id (format nil "~a-label" name) :class "label"
            (field-name field)
@@ -128,26 +128,26 @@
                     (field-option field :help)))))
          (unless required
            (hsx (button :type "button" :class "btn" :hidden (not on)
-                        :nm-bind "{ hidden: () => !_on, onclick: () => _remove() }"
+                        :n-bind-hidden "!_on" :n-on-click "_remove()"
                   (~icon :name :close) (format nil "Remove ~a" (field-name field))))))
-       (input :type "hidden" :name name :value "on" :disabled (not on) :nm-ref "marker"
-              :nm-bind "{ disabled: () => !_on }")
+       (input :type "hidden" :name name :value "on" :disabled (not on) :n-ref "marker"
+              :n-bind-disabled "!_on")
        (unless required
          (hsx (div :class "rounded-md border border-dashed border-line p-4" :hidden on
-                   :nm-bind "{ hidden: () => _on }"
-                (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add() }"
+                   :n-bind-hidden "_on"
+                (button :type "button" :class "btn" :n-on-click "_add()"
                   (~icon :name :plus) (format nil "Add ~a" (field-name field))))))
        (fieldset :id name :aria-labelledby (format nil "~a-label" name)
                  :class "space-y-4 rounded-md border border-line p-4"
                  :hidden (not on) :disabled (not on)
-                 :nm-bind "{ hidden: () => !_on, disabled: () => !_on }"
+                 :n-bind-hidden "!_on" :n-bind-disabled "!_on"
          children)
        (~field-error :field field :error error)))))
 
 (defcomp ~repeater-input (&key field add-url error children)
   (let ((name (field-param-name field)))
     (hsx
-     (div :class "space-y-1.5" :nm-data (format nil "...koya.repeater(~a)" (js-string add-url))
+     (div :class "space-y-1.5" :n-scope (format nil "koya.repeater(~a)" (js-string add-url))
        (div :id (format nil "~a-label" name) :class "label"
          (field-name field)
          (span :class "ml-2 text-xs font-normal text-muted" "repeater")
@@ -157,13 +157,13 @@
                   (field-option field :help)))))
        (div :class "space-y-3 rounded-md border border-line p-4"
          (div :id (format nil "~a-rows" name) :class "space-y-3 empty:hidden" :role "list" :aria-labelledby (format nil "~a-label" name)
-              :nm-bind "{ oninit: () => koya.sortable(this) }"
+              :n-on-init "koya.sortable(this)"
            children)
          (div :class "flex items-center gap-2"
-           (select :aria-label (format nil "Custom field of a new ~a row" (field-name field)) :nm-ref "kind" :class "w-auto"
+           (select :aria-label (format nil "Custom field of a new ~a row" (field-name field)) :n-ref "kind" :class "w-auto"
              (loop :for kind :in (field-row-kinds field) :collect
                (hsx (option :value (custom-field-name kind) (custom-field-name kind)))))
-           (button :type "button" :class "btn" :nm-bind "{ onclick: () => _add($refs.kind) }"
+           (button :type "button" :class "btn" :n-on-click "_add($refs.kind)"
              (~icon :name :plus) "Add row")))
        (~field-error :field field :error error)))))
 
@@ -190,7 +190,7 @@
            (div :class "richtext"
              (input :type "hidden" :id id :name name :value string)
              (div :class "quill-editor" :data-quill-for id
-                  :nm-bind "{ oninit: () => koya.quill(this) }"))))
+                  :n-on-init "koya.quill(this)"))))
          (:number
           (hsx (input :type "number" :id id :name name :value string :step "any" :class "input")))
          (:boolean

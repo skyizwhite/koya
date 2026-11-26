@@ -3,7 +3,7 @@
   (:import-from #:koya-core/data #:blank-p)
   (:import-from #:quri #:make-uri #:render-uri)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:on-submit #:on-follow #:on-search #:on-pick)
+  (:import-from #:koya-server/web/lib/binds #:submit #:follow #:upload-picked)
   (:import-from #:koya-server/usecases/spaces #:find-space)
   (:import-from #:koya-server/domain/media
                 #:media-id #:media-filename #:media-size #:media-alt #:media-created-at)
@@ -19,7 +19,7 @@
   (:import-from #:koya-server/web/lib/urls #:space-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url #:~referrers)
+  (:import-from #:koya-server/web/ui/elements #:~empty-state #:~pager #:~replace-url #:~referrers #:~search-form)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:koya-server/web/ui/media/grid #:~thumb #:dimensions #:human-size #:~upload-limit)
@@ -50,16 +50,16 @@
     (hsx
      (li :class "relative"
        (input :type "checkbox" :name "id" :value id :form +bulk-form+ :data-bulk-item t
-              :nm-bind "{ checked: () => _picked(this.value), onchange: () => _pick(this.value, this.checked) }"
+              :n-bind-checked "_picked(this.value)" :n-on-change "_pick(this.value, this.checked)"
               :class "absolute left-1 top-1 z-10 h-4 w-4 cursor-pointer"
               :aria-label (format nil "Select ~a" (media-filename media)))
        (button :type "button" :class "block w-full cursor-zoom-in"
-               :nm-bind (on-follow (preview-media :space space :id id :q (or search "") :page page))
+               :n-on-click (follow (preview-media :space space :id id :q (or search "") :page page))
                :title (media-filename media)
                :aria-label (format nil "Preview ~a" (media-filename media))
          (~thumb :media media))
        (form :class "absolute right-1 top-1"
-             :nm-bind (on-submit (delete-media-action :space space :q (or search "") :page page)
+             :n-on-submit.prevent (submit (delete-media-action :space space :q (or search "") :page page)
                                  :confirm (delete-confirmation media references))
          (input :type "hidden" :name "id" :value id)
          (button :type "submit" :class "btn btn-danger btn-icon"
@@ -76,8 +76,8 @@
          (references (media-reference-counts space (mapcar #'media-id items)))
          (q (or search "")))
     (hsx
-     (div :id "library" :nm-data "...koya.bulk(this)"
-       (form :nm-bind (on-pick (upload-media :space space :q q :page page))
+     (div :id "library" :n-scope "koya.bulk(this)"
+       (form :n-on-change (upload-picked (upload-media :space space :q q :page page))
              :class "mb-8 flex flex-wrap items-center gap-3 rounded-md border border-dashed border-line p-3 text-sm"
          (label :class "btn" (~icon :name :upload) "Upload"
            (input :type "file" :name "file" :accept "image/png,image/jpeg,image/gif,image/webp"
@@ -91,14 +91,14 @@
               (div :class "mb-4 flex flex-wrap items-center gap-3"
                 (label :class "flex items-center gap-2 text-sm text-muted"
                   (input :type "checkbox" :form +bulk-form+
-                         :nm-bind "{ checked: () => _all(), indeterminate: () => _partly(), onchange: () => _pickAll(this.checked) }")
+                         :n-bind-checked "_all()" :n-bind-indeterminate "_partly()" :n-on-change "_pickAll(this.checked)")
                   "Select all on this page")
                 (form :id +bulk-form+
-                      :nm-bind (on-submit (delete-selected-media :space space :q q :page page)
+                      :n-on-submit.prevent (submit (delete-selected-media :space space :q q :page page)
                                           :data "{ id: _chosen }"
                                           :confirm "Delete the selected files? This cannot be undone.")
-                  (div :hidden t :nm-bind "{ hidden: () => !_count() }" :class "flex flex-wrap items-center gap-2 text-sm"
-                    (span :class "mr-1 text-muted" :nm-bind "{ textContent: () => `${_count()} selected` }" "0 selected")
+                  (div :hidden t :n-bind-hidden "!_count()" :class "flex flex-wrap items-center gap-2 text-sm"
+                    (span :class "mr-1 text-muted" :n-bind-textcontent "`${_count()} selected`" "0 selected")
                     (button :type "submit" :class "btn btn-danger" (~icon :name :delete) "Delete"))))
               (ul :class "grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6"
                 (loop :for media :in items :collect
@@ -116,8 +116,8 @@
   (hsx
    (div :class "mb-6 flex flex-wrap items-center justify-between gap-4"
      (h1 :class "text-2xl font-bold" "Media" (~media-count :space space :search search))
-     (form :method "get" :action (media-page-url space) :class "flex gap-2"
-           :nm-data "...koya.search()" :nm-bind (on-search (browse-media :space space))
+     (~search-form :method "get" :action (media-page-url space) :class "flex gap-2"
+           :url (browse-media :space space)
        (input :type "search" :name "q" :value (or search "") :placeholder "Search file names"
               :aria-label "Search" :class "input")))))
 
@@ -129,7 +129,7 @@
         (count (length references)))
     (hsx
      (dialog :id "media-preview" :closedby "any"
-             :nm-bind (and media "{ oninit: () => this.showModal() }")
+             :n-on-init (and media "this.showModal()")
              :class "koya-dialog koya-dialog-wide max-w-3xl"
        (when media
          (hsx
@@ -141,7 +141,7 @@
                   (format nil "~a · ~a · ~a" (dimensions media) (human-size (media-size media))
                           (short-time (media-created-at media)))))
               (div :class "flex shrink-0 items-center gap-2"
-                (form :nm-bind (on-submit (delete-media-action :space space :q (or search "") :page page)
+                (form :n-on-submit.prevent (submit (delete-media-action :space space :q (or search "") :page page)
                                           :confirm (delete-confirmation media count))
                   (input :type "hidden" :name "id" :value (media-id media))
                   (button :type "submit" :class "btn btn-danger btn-icon" :aria-label "Delete"
@@ -152,7 +152,7 @@
             (div :class "flex max-h-[65vh] items-center justify-center bg-fg/5 p-4"
               (img :src (media-url media :absolute nil) :alt (media-alt media)
                    :class "max-h-[60vh] max-w-full object-contain"))
-            (form :nm-bind (on-submit (save-alt :space space :id (media-id media)))
+            (form :n-on-submit.prevent (submit (save-alt :space space :id (media-id media)))
                   :class "flex items-center gap-2 border-t border-line px-4 py-3"
               (input :type "text" :name "alt" :value (media-alt media) :placeholder "alt text"
                      :class "input" :aria-label "alt text")

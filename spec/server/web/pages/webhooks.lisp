@@ -1,9 +1,8 @@
 (defpackage #:koya-spec/server/web/pages/webhooks
   (:use #:cl #:rove)
   (:import-from #:koya-spec/server/schema #:with-schema)
-  (:import-from #:koya-server/web/lib/binds #:on-search)
   (:import-from #:koya-spec/server/web/pages/support
-                #:replaced-url #:bound #:blog-model #:request #:call-action #:setup-pages #:log-in)
+                #:replaced-url #:searching #:blog-model #:request #:call-action #:setup-pages #:log-in)
   (:import-from #:koya-server/web/pages/s/<space>/webhooks #:browse-deliveries)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/webhooks #:record-delivery)
@@ -135,7 +134,7 @@
                                :ok t :status 200 :response "" :error "" :duration-ms 1))
   (testing "the selects call the action as they are picked"
     (let ((body (nth-value 1 (request :get "/s/website/webhooks"))))
-      (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (on-search (browse-deliveries :space "website") :typing nil)))
+      (ok (search (searching (browse-deliveries :space "website") :changes-only t)
                   body)
           "either select, as its change bubbles")
       (ng (search ">Filter<" body) "so there is no button to press")))

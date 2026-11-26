@@ -15,7 +15,7 @@
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:on-submit #:on-click)
+  (:import-from #:koya-server/web/lib/binds #:submit #:post)
   (:export #:@get
            #:save-timezone-action #:begin-two-factor-action #:cancel-two-factor-action
            #:enable-two-factor-action #:disable-two-factor-action #:end-other-sessions-action))
@@ -38,19 +38,19 @@
 
 (defcomp ~disable-form (&key error)
   (hsx (form :id "two-factor-disable" :class "space-y-3"
-             :nm-bind (on-submit (disable-two-factor-action))
+             :n-on-submit.prevent (submit (disable-two-factor-action))
          (~card-error :message error)
          (~code-input :label "Enter a current code to turn it off")
          (button :type "submit" :class "btn btn-danger" (~icon :name :close) "Disable two-factor login"))))
 
 (defcomp ~enable-form (&key error)
   (hsx (form :id "two-factor-enable" :class "space-y-3"
-             :nm-bind (on-submit (enable-two-factor-action))
+             :n-on-submit.prevent (submit (enable-two-factor-action))
          (~card-error :message error)
          (~code-input :label "Code shown by the app")
          (div :class "flex gap-2"
            (button :type "submit" :class "btn btn-primary" (~icon :name :check) "Enable two-factor login")
-           (button :type "button" :class "btn" :nm-bind (on-click (cancel-two-factor-action))
+           (button :type "button" :class "btn" :n-on-click (post (cancel-two-factor-action))
              (~icon :name :close) "Cancel")))))
 
 (defcomp ~two-factor (&key pending)
@@ -69,7 +69,7 @@
                (p :class "mb-4 text-sm" "Scan the QR code with your authenticator app, or enter the secret by hand, then type the code it shows to finish.")
                (div :class "mb-4 flex flex-wrap items-start gap-6"
                  (div :class "rounded-md border border-line bg-white p-2" :data-qr (otpauth-uri pending)
-                      :nm-bind "{ oninit: () => koya.qr(this) }")
+                      :n-on-init "koya.qr(this)")
                  (dl :class "space-y-2 text-sm"
                    (dt :class "text-muted" "Secret")
                    (dd (code :class "select-all break-all" pending))
@@ -79,7 +79,7 @@
        (t
         (hsx (<>
                (p :class "mb-4 text-sm" (span :class "badge bg-line text-muted" "Disabled"))
-               (form :nm-bind (on-submit (begin-two-factor-action))
+               (form :n-on-submit.prevent (submit (begin-two-factor-action))
                  (button :type "submit" :class "btn btn-primary" (~icon :name :shield) "Set up two-factor login")))))))))
 
 (defcomp ~time-zone ()
@@ -91,7 +91,7 @@
        "Stored values and the delivery API stay UTC.")
      (~card-error :id "time-zone-error")
      (form :class "flex flex-wrap items-end gap-3"
-           :nm-bind (on-submit (save-timezone-action))
+           :n-on-submit.prevent (submit (save-timezone-action))
        (div
          (label :for "timezone" :class "label" "IANA name")
          (input :type "text" :id "timezone" :name "timezone" :list "timezones" :required t :autocomplete "off"
@@ -108,7 +108,7 @@
      (p :class "mb-4 text-sm text-muted"
        "End every session but this one, such as a browser you are no longer at. "
        "Turning two-factor login on or off does the same, and a new owner secret ends them all.")
-     (form :nm-bind (on-submit (end-other-sessions-action))
+     (form :n-on-submit.prevent (submit (end-other-sessions-action))
        (button :type "submit" :class "btn btn-danger" (~icon :name :logout) "Log out other sessions")))))
 
 (defcomp ~settings-page (&key pending)

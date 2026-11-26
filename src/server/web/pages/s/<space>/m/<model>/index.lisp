@@ -15,11 +15,11 @@
   (:import-from #:koya-server/web/lib/urls #:content-url #:model-url #:webhook-log-url)
   (:import-from #:koya-server/web/lib/document #:set-title)
   (:import-from #:koya-server/web/ui/layout #:~layout #:~missing)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager #:~confirm-dialog #:~replace-url)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~pager #:~confirm-dialog #:~replace-url #:~search-form)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-server/web/ui/toast #:~toast #:action-refusal)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:on-search #:on-follow #:on-click)
+  (:import-from #:koya-server/web/lib/binds #:follow #:post)
   (:import-from #:koya-server/usecases/listing
                 #:parse-sort #:content-page #:page-media #:count-contents #:find-object-content)
   (:import-from #:koya-server/usecases/held #:held-names #:held-entry)
@@ -121,15 +121,15 @@
    (span :id "filters-clear" :class "inline-flex min-h-[2.125rem] items-center"
      (when (filtered-p state)
        (hsx (a :href (list-url space model state :search-text nil :status nil :page 1)
-               :nm-bind (on-follow (browse-url space model state :search-text "" :status "" :page 1 :clear t))
+               :n-on-click (follow (browse-url space model state :search-text "" :status "" :page 1 :clear t))
                :class "btn"
               "Clear"))))))
 
 (defcomp ~filters (&key space model state)
   (let ((status (getf state :status)))
     (hsx
-     (form :id "filters" :method "get" :action (model-url space model)
-           :nm-data "...koya.search()" :nm-bind (on-search (browse-contents :space space :model model))
+     (~search-form :id "filters" :method "get" :action (model-url space model)
+           :url (browse-contents :space space :model model)
            :class "mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-line bg-panel px-4 py-3"
        (~sort-input :sort-key (getf state :sort-key))
        (input :type "search" :name "q" :value (or (getf state :search-text) "") :placeholder "Search text and ids"
@@ -155,7 +155,7 @@
      (th :class "py-2 pr-4 font-medium"
          :aria-sort (case direction (:asc "ascending") (:desc "descending"))
        (a :href (list-url space model state :sort-key next :page 1)
-          :nm-bind (on-follow (browse-url space model state :sort-key next :page 1))
+          :n-on-click (follow (browse-url space model state :sort-key next :page 1))
           :class (clsx "flex items-center gap-1 hover:text-fg" (column-width field))
          (if direction
              (hsx (span :class "shrink-0 text-accent" (~icon :name (if (eq direction :asc) :up :down))))
@@ -175,12 +175,12 @@
                               label))
                         (~confirm-dialog :id dialog :title title :message message
                           (button :type "button" :class class :commandfor dialog :command "close"
-                                  :nm-bind (on-click (url op) :data "{ id: _chosen }")
+                                  :n-on-click (post (url op) :data "{ id: _chosen }")
                             (~icon :name icon) label)))))))
     (hsx
-     (div :hidden t :nm-bind "{ hidden: () => !_count() }"
+     (div :hidden t :n-bind-hidden "!_count()"
           :class "sticky bottom-4 z-20 mt-3 flex flex-col gap-2 rounded-md border border-line bg-panel px-4 py-2 text-sm shadow-lg sm:flex-row sm:items-center sm:gap-4"
-       (span :class "text-muted" :nm-bind "{ textContent: () => `${_count()} selected` }" "0 selected")
+       (span :class "text-muted" :n-bind-textcontent "`${_count()} selected`" "0 selected")
        (div :class "flex flex-1 items-center justify-between gap-2"
          (div :class "flex items-center gap-2"
            (action "publish" "btn" :publish "Publish" "Publish contents"
@@ -226,13 +226,13 @@
            (hsx (~empty-state (cond ((not (blank-p search-text)) "Nothing matches this search.")
                                     ((not (blank-p status)) "No contents with this status.")
                                     (t "No contents yet."))))
-           (hsx (form :nm-data "...koya.bulk(this)"
+           (hsx (form :n-scope "koya.bulk(this)"
                   (div :class "overflow-x-auto rounded-md border border-line bg-panel"
                     (table :class "w-full text-sm"
                       (thead (tr :class "border-b border-line text-left text-muted"
                                (th :class "py-2 pl-4 pr-2"
                                  (input :type "checkbox"
-                                        :nm-bind "{ checked: () => _all(), indeterminate: () => _partly(), onchange: () => _pickAll(this.checked) }"
+                                        :n-bind-checked "_all()" :n-bind-indeterminate "_partly()" :n-on-change "_pickAll(this.checked)"
                                         :aria-label "Select every content on this page"))
                                (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
                                (loop :for field :in fields :collect
@@ -243,7 +243,7 @@
                           (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
                                  (td :class "relative z-10 py-2 pl-4 pr-2"
                                    (input :type "checkbox" :name "id" :value (content-id content) :data-bulk-item t
-                                          :nm-bind "{ checked: () => _picked(this.value), onchange: () => _pick(this.value, this.checked) }"
+                                          :n-bind-checked "_picked(this.value)" :n-on-change "_pick(this.value, this.checked)"
                                           :aria-label (format nil "Select ~a" (content-label content model))))
                                  (td :class "py-2 pr-4 whitespace-nowrap"
                                    (~status-badge :status (content-status content)))

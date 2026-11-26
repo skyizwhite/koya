@@ -3,7 +3,7 @@
 
   const fetchWhole = window.fetch;
   window.fetch = async (input, init) => {
-    if (!init?.headers?.["nm-request"]) return fetchWhole(input, init);
+    if (!init?.headers?.["n-request"]) return fetchWhole(input, init);
     let ok = false;
     let html = "";
     try {
@@ -91,7 +91,7 @@
       document.getElementById("toast")?.replaceWith(limit.content.cloneNode(true));
       return;
     }
-    const answer = await fetchWhole(url, { method: "POST", body: new FormData(input.form), headers: { "nm-request": "true" } })
+    const answer = await fetchWhole(url, { method: "POST", body: new FormData(input.form), headers: { "n-request": "true" } })
       .then((response) => response.text())
       .catch(() => "");
     const drawn = dataUrl(answer);
@@ -522,7 +522,7 @@
       const response = await fetchWhole(url, {
         method: "POST",
         body,
-        headers: { "Content-Type": "application/octet-stream", "nm-request": "true" },
+        headers: { "Content-Type": "application/octet-stream", "n-request": "true" },
       });
       const text = await response.text();
       if (!response.ok) throw Object.assign(new Error(textOf(text)), { answer: text });

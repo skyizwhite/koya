@@ -1,6 +1,6 @@
 (defpackage #:koya-spec/server/web/pages/settings
   (:use #:cl #:rove)
-  (:import-from #:koya-server/web/lib/binds #:on-click #:on-submit)
+  (:import-from #:koya-server/web/lib/binds #:post #:submit)
   (:import-from #:koya-spec/server/web/pages/support
                 #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:call-action #:setup-pages #:log-in)
@@ -155,8 +155,8 @@
         (ok (= status 200))
         (ok (search "id=\"two-factor\"" body))
         (ok (search "data-qr=\"otpauth://" body))
-        (ok (search "nm-bind=\"{ oninit: () => koya.qr(this) }\"" body) "drawn as it comes in")
-        (ok (search (format nil "<button type=\"button\" class=\"btn\" ~a" (bound (on-click (cancel-two-factor-action)))) body)
+        (ok (search "n-on-init=\"koya.qr(this)\"" body) "drawn as it comes in")
+        (ok (search (format nil "<button type=\"button\" class=\"btn\" ~a" (bound "n-on-click" (post (cancel-two-factor-action)))) body)
             "cancelling sends no form, so it needs no code")
         (multiple-value-bind (match groups) (scan-to-strings "secret=([A-Z2-7]+)&amp;" body)
           (ok match)
@@ -209,7 +209,7 @@
   (let ((other (another-session)))
     (let ((body (nth-value 1 (request :get "/settings"))))
       (ok (search "Log out other sessions" body))
-      (ok (search (bound (on-submit (end-other-sessions-action))) body)))
+      (ok (search (bound "n-on-submit.prevent" (submit (end-other-sessions-action))) body)))
     (multiple-value-bind (status body) (call-action :post (end-other-sessions-action))
       (ok (= status 200))
       (ok (search "Every other session has ended." body)))

@@ -1,7 +1,7 @@
 (defpackage #:koya-server/web/ui/content/reference-picker
   (:use #:cl #:hsx)
   (:import-from #:ningle-actions #:defaction)
-  (:import-from #:koya-server/web/lib/binds #:on-search #:on-reveal)
+  (:import-from #:koya-server/web/lib/binds #:ask)
   (:import-from #:koya-server/web/lib/http #:param #:set-response-status)
   (:import-from #:koya-server/web/lib/paging #:page-number)
   (:import-from #:koya-server/web/lib/urls #:editor-url)
@@ -9,7 +9,7 @@
   (:import-from #:koya-server/usecases/schema #:find-model)
   (:import-from #:koya-server/usecases/listing #:content-page)
   (:import-from #:koya-server/domain/content #:content-id #:content-label #:content-status)
-  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state)
+  (:import-from #:koya-server/web/ui/elements #:~status-badge #:~empty-state #:~search-form)
   (:import-from #:koya-server/web/ui/content/field-input #:~reference-card)
   (:import-from #:koya-server/web/ui/picker #:~picker-dialog)
   (:export #:reference-picker
@@ -37,7 +37,7 @@
        (button :type "button"
                :class "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm ring-accent hover:bg-accent/5 disabled:opacity-50"
                :data-pick-id id
-               :nm-bind "{ onclick: () => _pick(this), 'class.ring-2': () => _has(this.dataset.pickId), disabled: () => _taken(this.dataset.pickId), ariaPressed: () => _many ? String(_has(this.dataset.pickId)) : null }"
+               :n-on-click "_pick(this)" :n-bind-class.ring-2 "_has(this.dataset.pickId)" :n-bind-disabled "_taken(this.dataset.pickId)" :n-bind-ariapressed "_many ? String(_has(this.dataset.pickId)) : null"
          (span :class "min-w-0 flex-1 truncate" label)
          (~status-badge :status (content-status content)))
        (template
@@ -49,7 +49,7 @@
    (<> (loop :for content :in items :collect
          (hsx (~pick-item :space space :model model :content content :many many)))
        (when more
-         (hsx (li :id more :class "py-2 text-center text-xs text-muted" :nm-bind (on-reveal more)
+         (hsx (li :id more :class "py-2 text-center text-xs text-muted" :n-on-init "koya.reveal(e)" :n-on-revealed (ask more)
                 "Loading…"))))))
 
 (defcomp ~pick-list (&key space model many search)
@@ -65,8 +65,8 @@
   (let ((model-name (model-name model)))
     (hsx
      (div :id "reference-picker-body" :class "space-y-4"
-       (form :nm-data "...koya.search()" :class "flex gap-2"
-             :nm-bind (on-search (reference-picker-search :space space :model model-name :many (if many "true" "false")))
+       (~search-form :class "flex gap-2"
+             :url (reference-picker-search :space space :model model-name :many (if many "true" "false"))
          (input :type "search" :name "q" :value (or search "") :placeholder (format nil "Search ~a" model-name)
                 :class "input" :aria-label "Search"))
        (~pick-list :space space :model model :many many :search search)))))
@@ -103,7 +103,7 @@
           (multiple-value-bind (items more) (picker-items space model many (param params "q") (page-number params))
             (let ((asked (reference-picker-more :space space :model (param params "model") :many many
                                                 :q (or (param params "q") "") :page (page-number params))))
-              (hsx (<> (ul :id asked :nm-swap "before"
+              (hsx (<> (ul :id asked :n-swap "before"
                          (~pick-items :space space :model model :items items :many (many-p params) :more more))
                        (li :id asked :hidden t))))))
         (unknown))))

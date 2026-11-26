@@ -3,9 +3,8 @@
   (:import-from #:hsx #:hsx #:render-to-string)
   (:import-from #:koya-server/web/ui/icon #:~icon)
   (:import-from #:koya-spec/server/stored #:stored-content)
-  (:import-from #:koya-server/web/lib/binds #:on-search)
   (:import-from #:koya-spec/server/web/pages/support
-                #:replaced-url #:bound #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
+                #:replaced-url #:searching #:post-login #:edit #:moved-to #:*secret* #:*cookie* #:blog-model #:request
                 #:location #:setup-pages #:log-in #:asked-first)
   (:import-from #:koya-server/infra/db/connection #:disconnect-db #:exec)
   (:import-from #:koya-server/usecases/ports/contents
@@ -49,7 +48,7 @@
       (ok (= status 200))
       (ok (search "Page 2 of 2" body))
       (ok (search "Page filler 000" body))
-      (ok (search "<a href=\"/s/website/m/blog\" nm-bind=\"{ onclick: (e) => koya.follow(e) &amp;&amp; $get(" body)
+      (ok (search "<a href=\"/s/website/m/blog\" n-on-click=\"koya.follow(e) &amp;&amp; $get(" body)
           "and back, to the list's own URL: page 1 is not a query"))
     (multiple-value-bind (status body) (request :get "/s/website/m/blog" :query "q=filler&status=draft&sort=title")
       (ok (= status 200))
@@ -354,13 +353,13 @@
         (testing "the list offers a box per row and one for the page"
           (multiple-value-bind (status body) (request :get "/s/website/m/blog")
             (ok (= status 200))
-            (ok (search "<form nm-data=\"...koya.bulk(this)\">" body) "the selection is the form's")
-            (ok (search "nm-bind=\"{ checked: () => _all(), indeterminate: () => _partly(), onchange: () => _pickAll(this.checked) }\"" body)
+            (ok (search "<form n-scope=\"koya.bulk(this)\">" body) "the selection is the form's")
+            (ok (search "n-bind-checked=\"_all()\" n-bind-indeterminate=\"_partly()\" n-on-change=\"_pickAll(this.checked)\"" body)
                 "a box for the page")
-            (ok (search (format nil "name=\"id\" value=\"~a\" data-bulk-item nm-bind=\"{ checked: () => _picked(this.value), onchange: () => _pick(this.value, this.checked) }\"" one) body)
+            (ok (search (format nil "name=\"id\" value=\"~a\" data-bulk-item n-bind-checked=\"_picked(this.value)\" n-on-change=\"_pick(this.value, this.checked)\"" one) body)
                 "each row carries its id")
-            (ok (search "hidden nm-bind=\"{ hidden: () => !_count() }\"" body) "the bar waits for a selection")
-            (ok (< (search "</table>" body) (search "nm-bind=\"{ hidden: () => !_count() }\"" body))
+            (ok (search "hidden n-bind-hidden=\"!_count()\"" body) "the bar waits for a selection")
+            (ok (< (search "</table>" body) (search "n-bind-hidden=\"!_count()\"" body))
                 "below the table, so showing it moves no row")
             (ok (search "sticky bottom-" body) "and kept in reach while the table runs past the screen")
             (dolist (op '("publish" "unpublish" "delete"))
@@ -447,7 +446,7 @@
     (testing "the page's controls call the action"
       (let ((body (nth-value 1 (request :get "/s/website/m/blog"))))
         (ok (search "id=\"filters\"" body))
-        (ok (search (format nil "nm-data=\"...koya.search()\" ~a" (bound (on-search (browse-contents :space "website" :model "blog"))))
+        (ok (search (searching (browse-contents :space "website" :model "blog"))
                     body)
             "the search goes as the typing stops, and the status as it is picked")
         (ng (search ">Filter<" body) "so there is no button to press")

@@ -223,7 +223,7 @@ SBCL with package-inferred systems — a file under `src/core/`, `src/sdk/` or
 | Middlewares | lack-mw: Lack's own, and the guards combined with `mw-every` / `mw-except` |
 | Router | ningle + ningle-fbr |
 | Templates | hsx; ningle-actions for everything done on a page |
-| Browser | Nomini (requests, swaps and a page's state), `koya.js` (what a page holds) |
+| Browser | Nagi (requests, swaps and a page's state), `koya.js` (what a page holds) |
 | DB | cl-dbi + dbd-sqlite3 |
 | JSON | jzon, with kebab/camel conversion and Lisp data conversion in `core/case` |
 | Data | access, for reading and changing plists, vectors and structs |
@@ -257,7 +257,7 @@ that it answers 413 in plain text itself.
 A page route answers GET and draws a page; everything done on it is an action
 (`defaction`), defined beside the page that calls it, or with the `ui/`
 component that cannot work without it (the media picker, Log out). The actions middleware lets
-through requests from the admin UI only (`nm-request`, which Nomini sends), from the
+through requests from the admin UI only (`n-request`, which Nagi sends), from the
 owner's session and this origin, and answers a request that has lost its session with
 a toast linking to the login page in a new tab, so the page and what was typed in it
 stay. An action answers each part of the page it changed, under that part's id,
@@ -272,13 +272,14 @@ needs no session: the login page and its action. `/assets/` and
 `/media/` are served outside the session and the guards, so the login page is
 drawn with the assets and no file fetched reads the session.
 
-In the browser, an element asks for an action with Nomini's `$get` or `$post` in its
-`nm-bind`, written by `web/lib/binds`, and Nomini swaps each element of the answer in
-where the element of its id is. `koya.js` wraps `window.fetch` so that Nomini reads each
-answer whole and draws a refused one as any other. A list is sent comma-separated. A
-part of a page that holds state in the browser is a Nomini scope made by a factory in
-`assets/js/koya.js` (`nm-data="...koya.bulk(this)"`). See
-`adr/2026-11-21-nomini-swaps-what-an-action-answers-and-holds-a-pages-state.md`,
+In the browser, an element asks for an action with Nagi's `$get` or `$post` in one of
+its `n-on-*` attributes, written by `web/lib/binds`, and Nagi swaps each element of the
+answer in where the element of its id is. `koya.js` wraps `window.fetch` so that Nagi
+draws a refused answer as any other. A list is sent with its name once for each value,
+and the actions read a value joined with commas as a list too. A part of a page that
+holds state in the browser is a Nagi scope made by a factory in `assets/js/koya.js`
+(`n-scope="koya.bulk(this)"`), and its elements bind with `n-bind-*` and `n-on-*`. See
+`adr/2026-11-27-nagi-replaces-nomini.md`,
 `adr/2026-11-21-a-scope-adds-elements-the-server-drew.md`,
 `adr/2026-10-02-an-element-asks-with-nominis-get-and-post.md` and
 `adr/2026-10-02-nomini-is-handed-each-answer-whole-and-drawable.md`.
