@@ -347,9 +347,9 @@ content cannot be restored at all: its history went with it.
 
 ## The webhook delivery log
 
-The delivery log is the last 200 calls the space's webhooks made, newest first;
-**View log →** on the space page opens it. A row names the webhook and the
-model, and carries the outcome as a badge:
+The delivery log is the last 20 calls the space's webhooks made, newest first,
+on one page; **View log →** on the space page opens it. A row names the webhook
+and the model, and carries the outcome as a badge:
 
 | Badge | Meaning |
 |---|---|
@@ -370,7 +370,7 @@ The same views are reached by link: a webhook row on the space page opens that
 webhook's calls, and **Webhooks** on a model's page opens the calls a change to
 that model set off. **Clear**, beside the selects, drops both.
 
-Nothing here is retried, and nothing is kept beyond the newest 200 calls of a
+Nothing here is retried, and nothing is kept beyond the newest 20 calls of a
 space: this is a log to glance at after a publish, not an audit trail.
 
 ## Schema deploys

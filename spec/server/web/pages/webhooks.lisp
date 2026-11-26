@@ -141,7 +141,7 @@
       (ng (search ">Filter<" body) "so there is no button to press")))
   (testing "a filter draws #deliveries and the count, and puts itself in the URL"
     (multiple-value-bind (status body)
-        (call-action :get (browse-deliveries :space "website" :label "" :model "about" :page 1))
+        (call-action :get (browse-deliveries :space "website" :label "" :model "about"))
       (ok (= status 200))
       (ok (search "id=\"deliveries\"" body))
       (ok (search "1 call matches." body) "the count, out of band")
@@ -150,7 +150,7 @@
       (ng (search "id=\"filters\"" body) "the selects stay as they are")
       (ok (string= (replaced-url body) "/s/website/webhooks?model=about"))))
   (testing "nothing filtered takes the Clear button away"
-    (let ((body (nth-value 1 (call-action :get (browse-deliveries :space "website" :label "" :model "" :page 1)))))
+    (let ((body (nth-value 1 (call-action :get (browse-deliveries :space "website" :label "" :model "")))))
       (ok (search "id=\"filters-clear\"" body))
       (ng (search ">Clear<" body))))
   (testing "clearing puts the selects back"
@@ -161,6 +161,25 @@
       (ok (search "3 calls." body))
       (ok (string= (replaced-url body) "/s/website/webhooks"))))
   (ok (= 404 (call-action :get (browse-deliveries :space "nope")))))
+
+(deftest every-call-kept-is-on-one-page
+  (exec "DELETE FROM webhook_deliveries")
+  (dotimes (i 25)
+    (declare (ignorable i))
+    (record-delivery "website" :label "revalidate" :url "https://site.test/api/revalidate"
+                               :model "blog" :event "publish" :content-id "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+                               :ok t :status 200 :response "" :error "" :duration-ms 1))
+  (multiple-value-bind (status body) (request :get "/s/website/webhooks")
+    (ok (= status 200))
+    (ok (= 20 (length (cl-ppcre:all-matches-as-strings "<details" body))) "the 20 calls kept, all of them")
+    (ok (search "20 calls. The newest 20 of the space are kept." body))
+    (ng (search "Page 1 of" body) "with no pager")
+    (ng (search "Next" body)))
+  (multiple-value-bind (status body) (call-action :get (browse-deliveries :space "website" :label "" :model "blog"))
+    (ok (= status 200))
+    (ok (= 20 (length (cl-ppcre:all-matches-as-strings "<details" body))) "a filter draws them all as well")
+    (ok (string= (replaced-url body) "/s/website/webhooks?model=blog") "and puts no page in the URL"))
+  (exec "DELETE FROM webhook_deliveries"))
 
 (deftest a-delivery-links-to-where-its-content-is-edited
   (exec "DELETE FROM webhook_deliveries")

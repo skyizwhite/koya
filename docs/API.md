@@ -394,7 +394,7 @@ export async function POST(req: Request) {
 
 Delivery is fire-and-forget: koya does not retry, and follows no redirect; a
 3xx is logged with its `Location`. What each call answered — its status and
-body, or the error when it never arrived — is kept for the space's newest 200
+body, or the error when it never arrived — is kept for the space's newest 20
 deliveries and shown in the admin UI; the body only from a public address (see
 [SCHEMA.md](SCHEMA.md#webhook)). See
 [ADMIN-UI.md](ADMIN-UI.md#the-webhook-delivery-log).
