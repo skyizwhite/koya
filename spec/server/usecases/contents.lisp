@@ -356,6 +356,11 @@
         (ok (null *read-eval-probe*) "and never evaluated"))
       (ok (signals (list-contents "website" "blog" model (q "filters" "title[weird]1")) 'query-error))
       (ok (signals (list-contents "website" "blog" model (q "orders" "nope")) 'query-error))
+      (ok (signals (list-contents "website" "blog" model (q "orders" "body")) 'query-error)
+          "a field whose order means nothing is no order")
+      (ok (signals (list-contents "website" "blog" model (q "orders" "-tags")) 'query-error) "either way round")
+      (ok (signals (list-contents "website" "blog" model (q "orders" "title,body")) 'query-error)
+          "nor beside one that sorts")
       (ok (signals (q "limit" "abc") 'query-error)))))
 
 (deftest listing-without-a-limit

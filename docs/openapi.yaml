@@ -1027,6 +1027,8 @@ components:
         e.g. `-publishedAt,title`. Default: newest published first. `id`
         orders by the ids' text, not by when the contents were made;
         `createdAt` by its value, which creating the content may have given.
+        Only `text`, `slug`, `number`, `boolean`, `date` and `datetime` fields
+        and the system fields sort; any other field is `bad_query`.
     filters:
       name: filters
       in: query
@@ -1096,7 +1098,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }
     BadQuery:
-      description: "`bad_query`: a malformed `filters`, an unknown field in `filters`/`orders`/`include`, an unknown operator, an operator or an order a custom field, a field inside one or a repeater does not take, a value that is not a number for a `number` field or not `true`/`false` for a `boolean` one, an `include` path with a segment that is not a reference (or, on the way to one, a custom field or a repeater), or a bad integer"
+      description: "`bad_query`: a malformed `filters`, an unknown field in `filters`/`orders`/`include`, an unknown operator, an operator or an order a custom field, a field inside one or a repeater does not take, an order on a field that does not sort, a value that is not a number for a `number` field or not `true`/`false` for a `boolean` one, an `include` path with a segment that is not a reference (or, on the way to one, a custom field or a repeater), or a bad integer"
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ApiError" }

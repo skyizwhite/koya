@@ -2,13 +2,12 @@
   (:use #:cl)
   (:import-from #:koya-core/data #:blank-p)
   (:import-from #:koya-core/schema
-                #:model-name #:model-fields #:model-field #:field-type
-                #:+system-fields+ #:field-many-p #:field-value)
+                #:model-name #:model-fields #:field-type #:field-many-p #:field-value)
   (:import-from #:koya-server/usecases/ports/contents
                 #:list-contents #:count-contents #:find-object-content)
   (:import-from #:koya-server/domain/content #:content-data #:held-ids)
   (:import-from #:koya-server/usecases/ports/media #:find-media-by-ids)
-  (:import-from #:koya-server/domain/query #:make-query)
+  (:import-from #:koya-server/domain/query #:make-query #:sortable-p)
   (:export #:parse-sort
            #:content-page
            #:page-media
@@ -16,13 +15,6 @@
            #:count-contents
            #:find-object-content))
 (in-package #:koya-server/usecases/listing)
-
-(defun sortable-p (model name)
-  (and (not (blank-p name))
-       (let ((field (model-field model name)))
-         (if field
-             (not (member (field-type field) '(:custom :repeater)))
-             (member name +system-fields+ :test #'string=)))))
 
 (defun parse-sort (raw model)
   (let* ((desc (and (not (blank-p raw)) (char= (char raw 0) #\-)))

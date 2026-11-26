@@ -164,7 +164,8 @@ is no button.
   draft, when there is one.
 - The status filter offers the three badges: `draft`, `published` and
   `published+draft`.
-- Every header that sorts carries a faint ↕; a custom field's or a repeater's does not sort. Clicking one sorts by it (↑),
+- The header of a `text`, `slug`, `number`, `boolean`, `date` or `datetime`
+  field sorts and carries a faint ↕; any other field's does not. Clicking one sorts by it (↑),
   clicking it again turns it around (↓), and a third click goes back to the
   default order, newest created first. The system fields (created, updated,
   published, revised, id) can be sorted by as well.

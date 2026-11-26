@@ -23,6 +23,7 @@
                "koya-spec/server/domain/references"
                "koya-spec/server/domain/content"
                "koya-spec/server/domain/id"
+               "koya-spec/server/domain/query"
                "koya-spec/server/usecases/settings"
                "koya-spec/server/usecases/auth"
                "koya-spec/server/infra/db"
