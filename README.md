@@ -70,7 +70,7 @@ KOYA_MANAGEMENT_KEY=koya_mgmt_…
 ### 3. Define your models
 
 ```sh
-npm install github:skyizwhite/koya-ts-sdk#v0.7.0
+npm install github:skyizwhite/koya-ts-sdk#v0.8.0
 ```
 
 ```ts
