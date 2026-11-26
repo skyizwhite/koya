@@ -336,7 +336,7 @@ are the same.
 |---|---|
 | `:limit` | default 10, values above 100 are clamped to 100 |
 | `:offset` | default 0 |
-| `:orders` | comma-separated field names, `-` for descending; default newest published first |
+| `:orders` | comma-separated field names, `-` for descending; default newest published first. Only `text`, `slug`, `number`, `boolean`, `date` and `datetime` fields and the system fields sort |
 | `:fields` | fields to keep in each content; the system fields are always kept |
 | `:filters` | see below |
 | `:q` | search the text fields, as the delivery API's `q` |

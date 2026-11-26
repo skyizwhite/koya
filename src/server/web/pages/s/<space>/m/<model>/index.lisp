@@ -27,6 +27,7 @@
   (:import-from #:koya-server/web/lib/value-text #:value-text)
   (:import-from #:koya-server/web/lib/presenters #:media-url)
   (:import-from #:koya-server/domain/media #:media-alt)
+  (:import-from #:koya-server/domain/query #:sortable-field-p)
   (:import-from #:koya-server/usecases/schema #:find-model)
   (:import-from #:koya-server/usecases/webhooks #:space-webhooks)
   (:import-from #:koya-server/web/ui/content/editor #:show-editor)
@@ -148,7 +149,7 @@
                  (:asc (format nil "-~a" name))
                  (:desc nil)
                  (t name))))
-    (if (member (field-type field) '(:custom :repeater))
+    (if (not (sortable-field-p field))
         (hsx (th :class "py-2 pr-4 font-medium" (span :class (clsx "block truncate" (column-width field)) name)))
     (hsx
      (th :class "py-2 pr-4 font-medium"

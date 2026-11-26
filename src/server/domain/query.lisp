@@ -1,7 +1,7 @@
 (defpackage #:koya-server/domain/query
   (:use #:cl)
   (:import-from #:koya-core/schema
-                #:+system-fields+ #:model-fields #:field-name #:field-type #:field-fields)
+                #:+system-fields+ #:model-fields #:model-field #:field-name #:field-type #:field-fields)
   (:import-from #:koya-server/domain/errors
                 #:invalid-input)
   (:import-from #:cl-ppcre
@@ -13,6 +13,8 @@
            #:query-limit #:query-offset #:query-orders #:query-filters #:query-fields #:query-include
            #:query-search
            #:search-filters
+           #:sortable-field-p
+           #:sortable-p
            #:+system-fields+))
 (in-package #:koya-server/domain/query)
 
@@ -53,6 +55,17 @@
 
 (defun parse-include (string)
   (mapcar (lambda (path) (remove "" (split "\\." path) :test #'string=)) (split-csv string)))
+
+(defparameter +sortable-types+ '(:text :slug :number :boolean :date :datetime))
+
+(defun sortable-field-p (field)
+  (and (member (field-type field) +sortable-types+) t))
+
+(defun sortable-p (model name)
+  (let ((field (and name (model-field model name))))
+    (if field
+        (sortable-field-p field)
+        (and (member name +system-fields+ :test #'equal) t))))
 
 (defun parse-orders (string)
   (mapcar (lambda (item)

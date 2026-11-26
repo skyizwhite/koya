@@ -4,7 +4,7 @@
                 #:model-field #:field-type #:field-many-p #:field-name #:field-fields
                 #:field-row-kinds #:custom-field-fields #:custom-field-name)
   (:import-from #:koya-server/domain/query
-                #:bad-query)
+                #:bad-query #:sortable-field-p)
   (:import-from #:koya-server/domain/number
                 #:parse-decimal)
   (:import-from #:koya-server/infra/db/sql
@@ -152,11 +152,17 @@
   (separated " AND " (list (and filters (groups-sql filters model column text-column))
                            (and and (groups-sql and model column text-column)))))
 
+(defun order-expr (name model column)
+  (let ((field (model-field model name)))
+    (when (and field (not (sortable-field-p field)))
+      (bad-query "~a is a ~(~a~) field, which does not sort" name (field-type field)))
+    (field-expr name model column)))
+
 (defun build-order-by (orders model column)
   (if (null orders)
       (sql "published_at DESC, created_at DESC, rowid DESC")
       (fragment "~a, rowid DESC"
                 (separated ", " (mapcar (lambda (order)
                                           (fragment (if (eq (cdr order) :desc) "~a DESC" "~a ASC")
-                                                    (field-expr (car order) model column)))
+                                                    (order-expr (car order) model column)))
                                         orders)))))
