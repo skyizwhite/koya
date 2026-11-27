@@ -284,7 +284,7 @@ of a page that holds state in the browser is a Nagi scope made by a factory in
 `n-bind-*` and `n-on-*`. See
 `adr/2026-11-27-nagi-is-taken-as-it-is-released.md`,
 `adr/2026-11-27-a-part-of-a-page-that-holds-state-is-a-scope.md`,
-`adr/2026-11-27-what-the-server-writes-for-a-scope-is-a-data-attribute.md`,
+`adr/2026-11-27-the-page-itself-is-no-scope.md`,
 `adr/2026-11-27-binds-writes-what-a-handler-runs.md`,
 `adr/2026-11-21-a-scope-adds-elements-the-server-drew.md`,
 `adr/2026-11-27-an-element-asks-with-get-and-post-written-on-it.md` and

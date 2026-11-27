@@ -33,4 +33,5 @@ taken as it is released, and is not changed here.
 - What Nagi does not do is done in `assets/js/koya.js`, or asked of Nagi in a
   release of its own.
 - The ADRs written for Nomini that no later one replaces hold for Nagi, `nm-*`
-  read as `n-*`.
+  read as `n-*`, `nomini.js` as `nagi.js`, and an `nm-bind` as the `n-bind-*` and
+  `n-on-*` it held.

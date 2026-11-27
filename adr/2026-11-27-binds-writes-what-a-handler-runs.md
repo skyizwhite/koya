@@ -10,9 +10,9 @@ the same way everywhere.
 
 ## Decision
 
-`web/lib/binds` writes what a handler runs (`submit`, `post`, `follow`, `ask`,
-`upload-picked`), and the markup names the event it runs on. A search form,
-which asks on three events, is `~search-form`.
+`web/lib/binds` writes what a handler runs (`submit`, `post`, `follow`, `ask`),
+and the markup names the event it runs on. A search form, which asks on three
+events, is `~search-form`.
 
 ## Consequences
 
