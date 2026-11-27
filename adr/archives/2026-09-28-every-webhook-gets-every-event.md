@@ -13,7 +13,7 @@ say so, and the list is one more thing to read in the schema.
 ## Decision
 
 - There is nothing to subscribe to. Every webhook is sent every event; which
-  events there are is `adr/archives/2026-09-28-a-webhook-is-sent-for-every-history-entry.md`.
+  events there are is `adr/2026-09-28-a-webhook-is-sent-for-every-history-entry.md`.
 - The payload's `event` says which, and the receiver decides what to act on.
 
 ## Consequences

@@ -37,4 +37,4 @@ and change (`nm-bind`), bound again whenever something is swapped in.
 - A scope does not see the one around it; scopes that work together hold each
   other, as a field and the picker it opens do.
 - An element asks the server with Nomini's own `$get` and `$post`
-  (`adr/archives/2026-10-02-an-element-asks-with-nominis-get-and-post.md`).
+  (`adr/2026-10-02-an-element-asks-with-nominis-get-and-post.md`).

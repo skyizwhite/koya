@@ -14,7 +14,7 @@ Sending each affected content as an event it already knows was weighed:
 `delete` for a removed model's contents works, but a field taken out of a
 published content is no publish, and the history keeps no entry for it, while
 every event so far is an entry of the history
-(`adr/archives/2026-09-28-each-history-entry-is-sent-as-its-kind.md`).
+(`adr/2026-09-28-each-history-entry-is-sent-as-its-kind.md`).
 
 ## Decision
 

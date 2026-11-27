@@ -18,7 +18,7 @@ and leaves the values, or as a change of type, which takes them.
 Changing the model a reference field points at is a change of the field's type:
 it is destructive, and a forced deploy takes the field's values out of every
 published object, draft and revision, as
-`adr/archives/2026-09-30-a-forced-field-change-takes-its-values-with-it.md` has it for a
+`adr/2026-09-30-a-forced-field-change-takes-its-values-with-it.md` has it for a
 type.
 
 ## Consequences

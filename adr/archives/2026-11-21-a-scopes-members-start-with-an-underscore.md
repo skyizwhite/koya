@@ -8,7 +8,7 @@ Superseded by adr/archives/2026-11-27-nagi-replaces-nomini.md
 
 A part of a page that holds state is a Nomini scope made by a factory in
 `assets/js/koya.js`
-(`adr/archives/2026-11-21-nomini-swaps-what-an-action-answers-and-holds-a-pages-state.md`).
+(`adr/2026-11-21-nomini-swaps-what-an-action-answers-and-holds-a-pages-state.md`).
 When an element of a scope asks the server with `$get` or `$post`, Nomini sends
 the members of the scope whose names are letters only along with the request,
 and calls each function among them to get its value.
