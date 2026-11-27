@@ -282,7 +282,7 @@ once for each value; the actions read a value joined with commas as a list too. 
 of a page that holds state in the browser is a Nagi scope made by a factory in
 `assets/js/koya.js` (`n-scope="koya.bulk($el)"`), and its elements bind with
 `n-bind-*` and `n-on-*`. See
-`adr/2026-11-27-nagi-replaces-nomini.md`,
+`adr/2026-11-27-nagi-swaps-answers-and-holds-a-pages-state.md`,
 `adr/2026-11-21-a-scope-adds-elements-the-server-drew.md`,
 `adr/2026-11-27-an-element-asks-with-get-and-post-written-on-it.md` and
 `adr/2026-11-27-what-an-answer-cannot-draw-is-a-toast.md`.

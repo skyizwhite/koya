@@ -1,5 +1,7 @@
 # Nagi replaces Nomini
 
+Superseded by adr/2026-11-27-nagi-swaps-answers-and-holds-a-pages-state.md
+
 *2026-11-27*
 
 ## Context
