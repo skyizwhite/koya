@@ -1,6 +1,11 @@
 # Nagi replaces Nomini
 
-Superseded by adr/2026-11-27-nagi-swaps-answers-and-holds-a-pages-state.md
+Superseded by adr/2026-11-27-nagi-is-taken-as-it-is-released.md
+Superseded by adr/2026-11-27-a-part-of-a-page-that-holds-state-is-a-scope.md
+Superseded by adr/2026-11-27-a-scopes-members-carry-no-mark.md
+Superseded by adr/2026-11-27-the-page-itself-is-no-scope.md
+Superseded by adr/2026-11-27-what-the-server-writes-for-a-scope-is-a-data-attribute.md
+Superseded by adr/2026-11-27-binds-writes-what-a-handler-runs.md
 
 *2026-11-27*
 
