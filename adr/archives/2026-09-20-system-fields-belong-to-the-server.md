@@ -1,7 +1,7 @@
 # The system fields are the server's, except when importing
 
 Superseded by adr/2026-09-27-the-system-fields-are-the-servers.md
-Superseded by adr/2026-09-27-a-new-content-may-bring-its-id-and-dates.md
+Superseded by adr/archives/2026-09-27-a-new-content-may-bring-its-id-and-dates.md
 
 *2026-09-20*
 

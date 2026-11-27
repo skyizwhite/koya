@@ -1,7 +1,7 @@
 # An id koya makes is a ULID
 
-Superseded by adr/2026-10-10-a-content-id-koya-makes-is-twelve-letters-and-digits.md
-Superseded by adr/2026-10-10-an-id-koya-makes-for-anything-but-a-content-is-a-ulid.md
+Superseded by adr/archives/2026-10-10-a-content-id-koya-makes-is-twelve-letters-and-digits.md
+Superseded by adr/archives/2026-10-10-an-id-koya-makes-for-anything-but-a-content-is-a-ulid.md
 
 *2026-09-27, restating a decision of 2026-09-20*
 

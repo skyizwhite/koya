@@ -1,9 +1,9 @@
 # Two REST APIs, JSON only
 
-Superseded by adr/2026-09-27-delivery-and-admin-are-two-apis.md
+Superseded by adr/archives/2026-09-27-delivery-and-admin-are-two-apis.md
 Superseded by adr/2026-09-27-the-apis-are-rest-and-json-only.md
 Superseded by adr/2026-09-27-json-keys-are-camelcase.md
-Superseded by adr/2026-09-27-admin-routes-name-the-resource-before-the-space.md
+Superseded by adr/archives/2026-09-27-admin-routes-name-the-resource-before-the-space.md
 Superseded by adr/2026-09-27-a-reference-is-embedded-only-when-include-names-it.md
 
 *2026-09-20*

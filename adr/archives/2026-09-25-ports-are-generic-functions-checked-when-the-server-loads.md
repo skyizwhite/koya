@@ -1,6 +1,6 @@
 # Ports are generic functions, and the server checks they are all implemented when it loads
 
-Superseded by adr/2026-09-25-use-cases-hand-over-data-and-the-web-makes-json.md (who implements a port)
+Superseded by adr/archives/2026-09-25-use-cases-hand-over-data-and-the-web-makes-json.md (who implements a port)
 
 Superseded by adr/archives/2026-09-27-the-spec-comes-first-and-src-has-no-comments.md (a port's documentation as its contract)
 Superseded by adr/2026-09-27-a-port-is-a-generic-function-with-one-method.md

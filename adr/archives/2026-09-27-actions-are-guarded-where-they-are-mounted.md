@@ -1,6 +1,6 @@
 # Actions are guarded where they are mounted
 
-Superseded by adr/2026-10-01-actions-are-guarded-where-they-are-mounted.md
+Superseded by adr/archives/2026-10-01-actions-are-guarded-where-they-are-mounted.md
 
 *2026-09-27, restating a decision of 2026-09-25*
 

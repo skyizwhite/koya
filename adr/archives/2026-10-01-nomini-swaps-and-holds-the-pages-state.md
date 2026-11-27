@@ -1,7 +1,7 @@
 # Nomini swaps what an action answers and holds a page's state
 
-Superseded by adr/2026-11-21-nomini-swaps-what-an-action-answers-and-holds-a-pages-state.md
-Superseded by adr/2026-11-21-a-scopes-members-start-with-an-underscore.md
+Superseded by adr/archives/2026-11-21-nomini-swaps-what-an-action-answers-and-holds-a-pages-state.md
+Superseded by adr/archives/2026-11-21-a-scopes-members-start-with-an-underscore.md
 Superseded by adr/2026-11-21-a-scope-adds-elements-the-server-drew.md
 
 *2026-10-01*

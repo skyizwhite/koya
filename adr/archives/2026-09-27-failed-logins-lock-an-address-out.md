@@ -1,6 +1,6 @@
 # Failed logins lock an address out for a while
 
-Superseded by adr/2026-09-28-the-owner-secret-is-too-long-to-guess.md
+Superseded by adr/archives/2026-09-28-the-owner-secret-is-too-long-to-guess.md
 
 *2026-09-27, restating a decision of 2026-09-20*
 

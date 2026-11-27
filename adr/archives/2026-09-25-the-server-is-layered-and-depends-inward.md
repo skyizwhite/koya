@@ -1,8 +1,8 @@
 # The server is layered, and each layer depends only on the ones inside it
 
-Superseded by adr/2026-09-25-what-refers-to-what-is-decided-in-the-domain.md (where references are counted)
+Superseded by adr/archives/2026-09-25-what-refers-to-what-is-decided-in-the-domain.md (where references are counted)
 Superseded by adr/archives/2026-09-25-ports-are-generic-functions-checked-when-the-server-loads.md (what a port is, and when the web app is built)
-Superseded by adr/2026-09-25-use-cases-hand-over-data-and-the-web-makes-json.md (where the delivery shape is made)
+Superseded by adr/archives/2026-09-25-use-cases-hand-over-data-and-the-web-makes-json.md (where the delivery shape is made)
 Superseded by adr/2026-09-27-the-server-is-layered-and-depends-inward.md
 Superseded by adr/2026-09-27-domain-errors-carry-no-http-status.md
 Superseded by adr/2026-09-27-main-is-the-composition-root.md

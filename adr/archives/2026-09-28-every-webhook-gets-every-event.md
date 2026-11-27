@@ -1,6 +1,6 @@
 # Every webhook is sent every event
 
-Superseded by adr/2026-09-28-a-webhook-subscribes-to-nothing.md
+Superseded by adr/archives/2026-09-28-a-webhook-subscribes-to-nothing.md
 Superseded by adr/2026-09-28-the-receiver-decides-what-to-act-on.md
 
 *2026-09-28, restating a decision of 2026-09-22*

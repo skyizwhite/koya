@@ -4,7 +4,7 @@ Superseded by adr/2026-09-25-woo-holds-a-body-to-the-body-limit.md (Woo's own li
 Superseded by adr/2026-09-27-a-space-has-no-size-limit.md
 Superseded by adr/2026-09-27-archives-are-streamed-by-infra.md
 Superseded by adr/2026-09-27-an-export-is-sent-from-a-file-and-deleted.md
-Superseded by adr/2026-09-27-an-import-is-uploaded-in-pieces.md
+Superseded by adr/archives/2026-09-27-an-import-is-uploaded-in-pieces.md
 Superseded by adr/2026-09-27-archives-are-kept-beside-the-database.md
 
 *2026-09-25*

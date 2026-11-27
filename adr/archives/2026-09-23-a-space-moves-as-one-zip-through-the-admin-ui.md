@@ -1,7 +1,7 @@
 # A space moves as one zip, through the admin UI
 
 Superseded by adr/archives/2026-09-25-a-space-has-no-size-limit-and-moves-in-pieces.md (how the archive is built and sent, and its size)
-Superseded by adr/2026-09-27-a-space-moves-as-a-zip-through-the-admin-ui-only.md
+Superseded by adr/archives/2026-09-27-a-space-moves-as-a-zip-through-the-admin-ui-only.md
 Superseded by adr/2026-09-27-an-import-goes-only-into-an-empty-space.md
 Superseded by adr/2026-09-27-keys-and-the-webhook-secret-move-with-a-space.md
 Superseded by adr/2026-09-27-an-import-sends-no-webhooks.md

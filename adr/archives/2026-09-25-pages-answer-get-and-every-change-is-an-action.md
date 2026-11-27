@@ -1,12 +1,12 @@
 # Pages answer GET, and every change is an action
 
-Superseded by adr/2026-09-25-lists-are-read-in-place-and-the-url-follows.md (what lives in the query string)
+Superseded by adr/archives/2026-09-25-lists-are-read-in-place-and-the-url-follows.md (what lives in the query string)
 Superseded by adr/archives/2026-09-25-shared-components-live-in-ui.md (where the media picker and the space import live)
 Superseded by adr/archives/2026-09-25-a-space-has-no-size-limit-and-moves-in-pieces.md (how the import action takes its body)
-Superseded by adr/2026-09-27-pages-answer-get-and-every-change-is-an-action.md
-Superseded by adr/2026-09-27-actions-are-guarded-where-they-are-mounted.md
-Superseded by adr/2026-09-27-what-is-open-is-declared-with-public-path.md
-Superseded by adr/2026-09-27-an-action-answers-the-part-it-changed.md
+Superseded by adr/archives/2026-09-27-pages-answer-get-and-every-change-is-an-action.md
+Superseded by adr/archives/2026-09-27-actions-are-guarded-where-they-are-mounted.md
+Superseded by adr/archives/2026-09-27-what-is-open-is-declared-with-public-path.md
+Superseded by adr/archives/2026-09-27-an-action-answers-the-part-it-changed.md
 
 *2026-09-25*
 
