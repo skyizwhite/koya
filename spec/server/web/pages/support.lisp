@@ -123,9 +123,9 @@
 (defun searching (url &key changes-only)
   (let ((url (koya-server/web/lib/binds:js-string url)))
     (format nil "n-scope=\"koya.search()\" ~a~@[ ~a~] ~a"
-            (bound "n-on-submit.prevent" (format nil "ask(~a, this, true)" url))
-            (and (not changes-only) (bound "n-on-input.debounce300" (format nil "ask(~a, this)" url)))
-            (bound "n-on-change" (format nil "ask(~a, this)" url)))))
+            (bound "n-on-submit.prevent" (format nil "ask(~a, $el, true)" url))
+            (and (not changes-only) (bound "n-on-input.debounce300" (format nil "ask(~a, $el)" url)))
+            (bound "n-on-change" (format nil "ask(~a, $el)" url)))))
 
 (defun revealing (url)
   (format nil "n-on-init=\"koya.reveal(e)\" ~a" (bound "n-on-revealed" (koya-server/web/lib/binds:ask url))))

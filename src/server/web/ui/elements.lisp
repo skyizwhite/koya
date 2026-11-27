@@ -63,9 +63,9 @@
     (hsx
      (form (append rest
                    (list :n-scope "koya.search()"
-                         :n-on-submit.prevent (format nil "ask(~a, this, true)" url)
-                         :n-on-input.debounce300 (and (not changes-only) (format nil "ask(~a, this)" url))
-                         :n-on-change (format nil "ask(~a, this)" url)))
+                         :n-on-submit.prevent (format nil "ask(~a, $el, true)" url)
+                         :n-on-input.debounce300 (and (not changes-only) (format nil "ask(~a, $el)" url))
+                         :n-on-change (format nil "ask(~a, $el)" url)))
        children))))
 
 (defcomp ~confirm-dialog (&key id title message children)

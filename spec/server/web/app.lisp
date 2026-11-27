@@ -39,7 +39,7 @@
     (ok (search "name=\"f-body\"" body))
     (ok (search "type=\"checkbox\"" body))
     (ok (search "datetime-local" body))
-    (ok (search "data-quill-for=\"f-body\" n-on-init=\"koya.quill(this)\"" body)
+    (ok (search "data-quill-for=\"f-body\" n-on-init=\"koya.quill($el)\"" body)
         "rich text gets a Quill holder")
     (ok (search "<div class=\"richtext\"><input type=\"hidden\" id=\"f-body\"" body)
         "in a box that marks the editor and its toolbar while either has the focus, as an input is marked")

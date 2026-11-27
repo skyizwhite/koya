@@ -91,18 +91,18 @@
         (name (field-param-name field)))
     (hsx
      (div :class "rounded-md border border-line bg-panel" :data-row key
-          :n-on-init (and fresh "koya.rowAdded(this)")
+          :n-on-init (and fresh "koya.rowAdded($el)")
        (div :class "flex items-center justify-between gap-2 border-b border-line px-3 py-1"
          (div :class "flex items-center gap-2 text-sm"
            (span :class "cursor-move select-none text-muted" :aria-hidden "true" :data-drag-handle t "⠿")
            (span :class "font-medium" (custom-field-name kind)))
          (div :class "flex items-center gap-1"
            (button :type "button" :class "btn btn-icon py-1" :aria-label "Move row up"
-                   :n-on-click "koya.moveRow(this, -1)" (~icon :name :up))
+                   :n-on-click "koya.moveRow($el, -1)" (~icon :name :up))
            (button :type "button" :class "btn btn-icon py-1" :aria-label "Move row down"
-                   :n-on-click "koya.moveRow(this, 1)" (~icon :name :down))
+                   :n-on-click "koya.moveRow($el, 1)" (~icon :name :down))
            (button :type "button" :class "btn btn-icon py-1" :aria-label "Remove row"
-                   :n-on-click "koya.removeRow(this)" (~icon :name :close))))
+                   :n-on-click "koya.removeRow($el)" (~icon :name :close))))
        (input :type "hidden" :name name :value key)
        (input :type "hidden" :name (format nil "~a.~a.fieldId" name key) :value (custom-field-name kind))
        (div :class "space-y-4 p-4"
@@ -238,7 +238,7 @@
          (public-url (and published (expand-url-template (model-public-url model)
                                                          :id id :slug (slug-value model (content-published content))))))
     (hsx
-     (div :id "editor" :n-scope (format nil "koya.editor(this, ~:[false~;true~])" (or restoring original))
+     (div :id "editor" :n-scope (format nil "koya.editor($el, ~:[false~;true~])" (or restoring original))
           :n-on-fetchredirect.window "koya.leave()"
        (div :class "sticky top-0 z-10 -mx-4 -mt-3 mb-8 border-b border-line bg-base/95 px-4 py-3 backdrop-blur"
          (div :class "flex items-center justify-between gap-3"

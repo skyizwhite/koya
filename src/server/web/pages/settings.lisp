@@ -69,7 +69,7 @@
                (p :class "mb-4 text-sm" "Scan the QR code with your authenticator app, or enter the secret by hand, then type the code it shows to finish.")
                (div :class "mb-4 flex flex-wrap items-start gap-6"
                  (div :class "rounded-md border border-line bg-white p-2" :data-qr (otpauth-uri pending)
-                      :n-on-init "koya.qr(this)")
+                      :n-on-init "koya.qr($el)")
                  (dl :class "space-y-2 text-sm"
                    (dt :class "text-muted" "Secret")
                    (dd (code :class "select-all break-all" pending))

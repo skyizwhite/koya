@@ -354,10 +354,10 @@
         (testing "the list offers a box per row and one for the page"
           (multiple-value-bind (status body) (request :get "/s/website/m/blog")
             (ok (= status 200))
-            (ok (search "<form n-scope=\"koya.bulk(this)\">" body) "the selection is the form's")
-            (ok (search "n-bind-checked=\"all()\" n-bind-indeterminate=\"partly()\" n-on-change=\"pickAll(this.checked)\"" body)
+            (ok (search "<form n-scope=\"koya.bulk($el)\">" body) "the selection is the form's")
+            (ok (search "n-bind-checked=\"all()\" n-bind-indeterminate=\"partly()\" n-on-change=\"pickAll($el.checked)\"" body)
                 "a box for the page")
-            (ok (search (format nil "name=\"id\" value=\"~a\" data-bulk-item n-bind-checked=\"picked(this.value)\" n-on-change=\"pick(this.value, this.checked)\"" one) body)
+            (ok (search (format nil "name=\"id\" value=\"~a\" data-bulk-item n-bind-checked=\"picked($el.value)\" n-on-change=\"pick($el.value, $el.checked)\"" one) body)
                 "each row carries its id")
             (ok (search "hidden n-bind-hidden=\"!count()\"" body) "the bar waits for a selection")
             (ok (< (search "</table>" body) (search "n-bind-hidden=\"!count()\"" body))

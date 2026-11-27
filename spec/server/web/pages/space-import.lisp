@@ -316,7 +316,7 @@
       (ng (find-space "archive")))
     (testing "the import dialog is on the spaces page"
       (let ((page (nth-value 1 (request :get "/"))))
-        (ok (search "n-scope=\"koya.importer(this)\"" page) "the form holds how far the import is")
+        (ok (search "n-scope=\"koya.importer($el)\"" page) "the form holds how far the import is")
         (ok (search (format nil "data-import-begin=\"~a\"" (begin-import-action)) page))
         (ok (search "data-import-piece-bytes=" page))
         (ok (search "n-bind-href=\"login\"" page)

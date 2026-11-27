@@ -156,7 +156,7 @@
         (ok (= status 200))
         (ok (search "id=\"two-factor\"" body))
         (ok (search "data-qr=\"otpauth://" body))
-        (ok (search "n-on-init=\"koya.qr(this)\"" body) "drawn as it comes in")
+        (ok (search "n-on-init=\"koya.qr($el)\"" body) "drawn as it comes in")
         (ok (search (format nil "<button type=\"button\" class=\"btn\" ~a" (bound "n-on-click" (post (cancel-two-factor-action)))) body)
             "cancelling sends no form, so it needs no code")
         (multiple-value-bind (match groups) (scan-to-strings "secret=([A-Z2-7]+)&amp;" body)

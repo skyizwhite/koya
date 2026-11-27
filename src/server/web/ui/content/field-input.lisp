@@ -47,9 +47,9 @@
   (let ((many (field-many-p field)))
     (hsx
      (div :class "space-y-2"
-          :n-scope (format nil "koya.references(this, ~a, ~:[false~;true~])" (js-string (field-option field :model)) many)
+          :n-scope (format nil "koya.references($el, ~a, ~:[false~;true~])" (js-string (field-option field :model)) many)
        (ul :id name :class "space-y-2 empty:hidden" :data-reference-list t
-           :n-on-init (and many "koya.sortable(this)")
+           :n-on-init (and many "koya.sortable($el)")
          (loop :for reference :in references :collect
            (hsx (~reference-card :name name :many many
                                  :id (getf reference :id) :label (getf reference :label)
@@ -101,9 +101,9 @@
 
 (defcomp ~media-list-control (&key name entries)
   (hsx
-   (div :class "space-y-2" :n-scope "koya.mediaList(this)"
+   (div :class "space-y-2" :n-scope "koya.mediaList($el)"
      (ul :id name :class "flex flex-wrap gap-3 empty:hidden" :data-media-list t :data-sort-axis "x"
-         :n-on-init "koya.sortable(this)"
+         :n-on-init "koya.sortable($el)"
        (loop :for (id . media) :in entries :collect (hsx (~media-entry :name name :id id :media media))))
      (template (~media-entry :name name))
      (button :type "button" :class "btn" :n-on-click "add()"
@@ -157,7 +157,7 @@
                   (field-option field :help)))))
        (div :class "space-y-3 rounded-md border border-line p-4"
          (div :id (format nil "~a-rows" name) :class "space-y-3 empty:hidden" :role "list" :aria-labelledby (format nil "~a-label" name)
-              :n-on-init "koya.sortable(this)"
+              :n-on-init "koya.sortable($el)"
            children)
          (div :class "flex items-center gap-2"
            (select :aria-label (format nil "Custom field of a new ~a row" (field-name field)) :n-ref "kind" :class "w-auto"
@@ -190,7 +190,7 @@
            (div :class "richtext"
              (input :type "hidden" :id id :name name :value string)
              (div :class "quill-editor" :data-quill-for id
-                  :n-on-init "koya.quill(this)"))))
+                  :n-on-init "koya.quill($el)"))))
          (:number
           (hsx (input :type "number" :id id :name name :value string :step "any" :class "input")))
          (:boolean

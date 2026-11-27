@@ -8,8 +8,8 @@
 (defcomp ~picker-dialog (&key id class title factory url add-label)
   (hsx
    (dialog :id id :class (clsx "koya-dialog koya-dialog-wide" class)
-           :n-scope (format nil "koya.~a(this, ~a)" factory (js-string url))
-           :n-on-click "e.target === this && close()" :n-on-openpicker "open(e.detail)"
+           :n-scope (format nil "koya.~a($el, ~a)" factory (js-string url))
+           :n-on-click "e.target === $el && close()" :n-on-openpicker "open(e.detail)"
      (div :class "flex items-center justify-between border-b border-line px-4 py-3"
        (h2 :class "font-semibold" title)
        (button :type "button" :class "btn btn-icon" :n-on-click "close()" :aria-label "Close"

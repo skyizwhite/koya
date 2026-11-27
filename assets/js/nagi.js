@@ -1,4 +1,4 @@
-// Nagi v0.1.0
+// Nagi v0.4.0
 // Forked from Nomini (https://github.com/nonnorm/nomini)
 // Inspired by aidenybai/dababy
 // Copyright (c) 2025 nonnorm
@@ -6,25 +6,29 @@
 // Licensed under the MIT License.
 
 (() => {
+    // Important reactivity stuff
+    let currentBind = null;
+    let currentEl = null;
+    let currentHandler = null;
+
     // Utility functions
-    const dispatch = (el, name, opts) => {
-        opts = { bubbles: true, detail: {}, ...opts };
-        return el.dispatchEvent(new CustomEvent(name, opts));
-    };
+    const dispatch = (el, name, opts) => el.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: {}, ...opts }));
 
     const failed = Symbol();
 
-    const isData = (obj, prop) => {
+    const descriptorOf = (obj, prop) => {
         for (let o = obj; o; o = Object.getPrototypeOf(o)) {
             const found = Object.getOwnPropertyDescriptor(o, prop);
-            if (found) return "value" in found;
+            if (found) return found;
         }
-        return true;
     };
 
-    const evaluate = (expression, data, thisArg) => {
+    const define = (obj, key, value) =>
+        Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
+
+    const evaluate = (expression, data, thisArg, el) => {
         try {
-            return new Function("__data", `with(__data) {return (${expression}\n)}`).call(thisArg, data);
+            return new Function("__data", "$el", `with(__data) {return (${expression}\n)}`).call(thisArg, data, el);
         } catch (err) {
             console.error("[Nagi] failed to evaluate:", expression, "\n", err);
             return failed;
@@ -33,22 +37,26 @@
 
     const queryAttr = (el, selector) => {
         const elMatch = el.matches(selector) ? [el] : [];
-        return [...elMatch, ...el.querySelectorAll(selector)].filter(
-            (val) => !val.closest("[n-ignore]"),
-        );
+        return [...elMatch, ...el.querySelectorAll(selector)].filter((val) => !val.closest("[n-ignore]"));
     };
 
-    const pageWriting = new Set();
-    const getClosestProxy = (el) => {
-        for (; el; el = el.parentElement) if (el.nagiProxy) return el.nagiProxy;
-        return helpers(0, pageWriting);
+    const closestScope = (el) => {
+        for (; el; el = el.parentElement) if (el.nagiProxy) return el;
     };
+
+    const ownScopes = new WeakMap();
+    const getClosestProxy = (el) => {
+        const scope = closestScope(el)?.nagiProxy;
+        if (scope) return scope;
+        if (!ownScopes.has(el)) ownScopes.set(el, reactive({ ...helpers(), _nagiEl: el }));
+        return ownScopes.get(el);
+    };
+
+    const hostOf = (scope) => currentEl ?? scope._nagiEl;
 
     const runWithEl = (el, fn, bind = null, handler = null) => {
         const prev = [currentEl, currentBind, currentHandler];
-        currentEl = el;
-        currentBind = bind;
-        currentHandler = handler;
+        [currentEl, currentBind, currentHandler] = [el, bind, handler];
         try {
             return fn();
         } finally {
@@ -92,9 +100,7 @@
                 run.active = false;
             }
         };
-        run.owner = owner;
-        run.deps = new Set();
-        run.children = [];
+        Object.assign(run, { owner, deps: new Set(), children: [] });
         owner && (owner.nagiRuns ||= new Set()).add(run);
         run.key = currentBind ? `${currentBind.key}.${currentBind.children.length}` : `run${++runCount}`;
         currentBind?.children.push(run);
@@ -102,114 +108,77 @@
         return run;
     };
 
-    // Important reactivity stuff
-    let currentBind = null;
-    let currentEl = null;
-    let currentHandler = null;
-
     // Helpers that are included with every data object
-    const helpers = (pending = 0, writing = new Set(), controllers = new Set()) => ({
-        // --- BEGIN ref
+    const helpers = (pending = 0, writing = new Set(), controllers = new Set(), read = null) => ({
         $refs: {},
-        // --- END ref
-        // --- BEGIN fetch
         $fetching: false,
         _nagiAbort: new AbortController(),
-        $get(url, data, options) {
-            this.$fetch(url, "GET", data, options);
-        },
-        $post(url, data, options) {
-            this.$fetch(url, "POST", data, options);
-        },
+        ...Object.fromEntries(
+            ["GET", "POST", "PUT", "PATCH", "DELETE"].map((method) => [
+                `$${method.toLowerCase()}`,
+                function (url, data, options) {
+                    this.$fetch(url, method, data, options);
+                },
+            ]),
+        ),
         $abort() {
             controllers.forEach((controller) => controller.abort());
+            this._nagiStop();
+        },
+        _nagiStop() {
+            read?.abort();
             this._nagiAbort.abort();
             this._nagiAbort = new AbortController();
         },
         $fetch(url, method, data, options) {
             options ??= {};
-            const el = currentEl ?? this._nagiEl;
+            const el = hostOf(this);
             const controller = new AbortController();
             const { signal } = controller;
             method = (method || "GET").toUpperCase();
             url = String(url);
             const reading = /^(GET|HEAD|OPTIONS)$/.test(method);
+            const inQuery = /^(GET|HEAD|DELETE)$/.test(method);
+            const dedupe = options.dedupe !== false;
             const report = (name, detail, cancelable = false) =>
                 dispatch(el?.isConnected ? el : document, name, { detail, cancelable });
             let write;
 
             const opts = runWithEl(el, () => {
-                let body;
-                const isEvent = typeof data?.preventDefault === "function";
-                const isBlob = (value) => typeof value?.arrayBuffer === "function";
-                if (typeof data === "string") body = new URLSearchParams(data);
-                else if (isEvent || data?.nodeType === 1) {
-                    const node = isEvent ? data.target : data;
-                    const button = node?.closest?.("button, input[type=submit], input[type=image]");
-                    const form = node?.tagName === "FORM" ? node : (button ?? node)?.form ?? node?.closest?.("form");
-                    const submitter = isEvent && data.submitter;
-                    if (form) {
-                        body = new FormData(form, submitter || undefined);
-                        if (button?.name && button !== submitter && button.form === form) body.append(button.name, button.value);
-                    } else {
-                        console.warn("[Nagi] no form to send for:", data);
-                        body = new URLSearchParams();
-                    }
-                } else if (typeof data?.append === "function" && typeof data[Symbol.iterator] === "function") body = data;
-                else {
-                    const pairs = Object.entries(data ?? {}).flatMap(([key, value]) =>
-                        [value]
-                            .flat()
-                            .flatMap((item) => (typeof item?.item === "function" && typeof item[Symbol.iterator] === "function" ? [...item] : [item]))
-                            .filter((item) => item != null)
-                            .filter((item) => {
-                                if (item !== Object(item) || isBlob(item) || !String(item).startsWith("[object ")) return true;
-                                console.warn("[Nagi] cannot send:", key, item);
-                            })
-                            .map((item) => [key, isBlob(item) ? item : String(item)]),
-                    );
-                    body = pairs.some(([, value]) => isBlob(value)) ? new FormData() : new URLSearchParams();
-                    pairs.forEach(([key, value]) => body.append(key, value));
-                }
-
+                const body = bodyOf(data);
                 const entries = [...body];
                 const opts = { headers: { "n-request": true }, method, signal };
-                const reads = /^(GET|HEAD|DELETE)$/.test(method);
-                if (reads && entries.some(([, value]) => typeof value !== "string"))
-                    console.warn("[Nagi] files are not sent with", method, url);
-                const query = String(new URLSearchParams(entries.filter(([, value]) => typeof value === "string")));
+                if (inQuery) {
+                    if (entries.some(([, value]) => typeof value !== "string"))
+                        console.warn("[Nagi] files are not sent with", method, url);
+                    url = withQuery(url, String(new URLSearchParams(entries.filter(([, value]) => typeof value === "string"))));
+                } else opts.body = body;
 
-                if (!/^(GET|HEAD|DELETE)$/.test(method)) opts.body = body;
-                else if (query) {
-                    const hashAt = url.includes("#") ? url.indexOf("#") : url.length;
-                    const path = url.slice(0, hashAt);
-                    const joiner = !path.includes("?") ? "?" : /[?&]$/.test(path) ? "" : "&";
-                    url = path + joiner + query + url.slice(hashAt);
-                }
+                write = !reading && `${method} ${url} ${opts.body ? new URLSearchParams(sentOf(entries)) : ""}`;
+                if (dedupe && writing.has(write)) return;
 
-                const sent = entries.map(([key, value]) => [
-                    key,
-                    typeof value === "string" ? value : value.size || value.name ? `\0file${idOf(value)}` : "\0empty",
-                ]);
-                write = !reading && `${method} ${url} ${opts.body ? new URLSearchParams(sent) : ""}`;
-                if (options.dedupe !== false && writing.has(write)) return;
-
+                read?.abort();
                 this._nagiAbort.abort();
                 return opts;
             });
 
-            if (!opts) return report("fetchskip", { method, url });
+            if (!opts) {
+                report("fetchskip", { method, url });
+                return;
+            }
 
-            this._nagiAbort = reading ? controller : new AbortController();
-            const deduped = write && options.dedupe !== false;
+            this._nagiAbort = new AbortController();
+            if (reading) read = controller;
+            if (reading && el) el.nagiRead = controller;
+            const deduped = write && dedupe;
             if (deduped) writing.add(write);
             controllers.add(controller);
             let timedOut = false;
+            let received = false;
             const { timeout } = options;
             const timer = Number.isFinite(timeout) && timeout > 0 && setTimeout(() => {
                 timedOut = true;
                 controller.abort();
-                if (this._nagiAbort === controller) this._nagiAbort = new AbortController();
             }, Math.min(timeout, 2147483647));
             pending++;
             this.$fetching = true;
@@ -223,23 +192,11 @@
                         return;
                     }
 
-                    let buf = "";
-                    if (res.body) {
-                        const stream = res.body.pipeThrough(new TextDecoderStream()).getReader();
-                        while (true) {
-                            const { done, value } = await stream.read();
-                            if (done) break;
-                            buf += value;
-                        }
-                    }
+                    const text = await readText(res.body);
                     if (signal.aborted) return;
+                    received = true;
 
-                    let swapped = res.ok;
-                    if (!res.ok) {
-                        const template = document.createElement("template");
-                        template.innerHTML = buf;
-                        swapped = [...template.content.children].some((child) => child.id && document.getElementById(child.id));
-                    }
+                    const swapped = res.ok || fragmentsOf(text).some((child) => child.id && document.getElementById(child.id));
 
                     const replace = res.headers.get("n-replace-url");
                     if (replace) {
@@ -249,43 +206,35 @@
                             console.warn("[Nagi] cannot replace the URL with", replace, err);
                         }
                     }
-                    if (swapped) swap(buf);
+                    if (swapped) swap(text);
                     if (!res.ok)
-                        throw Object.assign(new Error(`${res.status} ${res.statusText}`), { status: res.status, text: buf, swapped });
+                        throw Object.assign(new Error(`${res.status} ${res.statusText}`), { status: res.status, text, swapped });
                 })
                 .catch((err) => {
                     if (timedOut) err = new DOMException("The request timed out.", "TimeoutError");
-                    else if (signal.aborted) return;
+                    else if (signal.aborted && !received) return;
                     report("fetcherr", { err, url, status: err?.status, text: err?.text, swapped: !!err?.swapped });
                 })
                 .finally(() => {
                     clearTimeout(timer);
                     controllers.delete(controller);
+                    if (read === controller) read = null;
+                    if (el?.nagiRead === controller) el.nagiRead = null;
                     if (deduped) writing.delete(write);
                     if (!--pending) this.$fetching = false;
                 });
         },
-        // --- END fetch
         $dataset() {
             let datasets = {};
-            let el = currentEl ?? this._nagiEl;
-
-            while (el?.nodeType === 1) {
-                datasets = { ...el.dataset, ...datasets };
-                if (el.nagiProxy) break;
-                el = el.parentElement;
-            }
-
+            for (let el = hostOf(this); el?.nodeType === 1; el = el.parentElement) datasets = { ...el.dataset, ...datasets };
             return datasets;
         },
-        $watch: (fn) => {
-            watch(fn);
-        },
+        $watch: (fn) => void watch(fn),
         $dispatch(evt, detail, opts) {
-            dispatch(currentEl ?? this._nagiEl ?? document, evt, { detail, ...opts });
+            dispatch(hostOf(this) ?? document, evt, { detail, ...opts });
         },
         $debounce(fn, ms, abortable = false) {
-            const el = currentEl ?? this._nagiEl;
+            const el = hostOf(this);
             const signal = abortable && runWithEl(el, () => this._nagiAbort?.signal);
             const timers = ((el ?? document).nagiTimers ||= new Map());
             const key = currentHandler ?? currentBind?.key ?? fn.nagiSource ?? String(fn);
@@ -295,7 +244,6 @@
                 if (!signal?.aborted) runWithEl(el, fn);
             }, ms));
         },
-        // --- BEGIN helpers
         $persist(prop, key) {
             key = key || `_nagiProp-${prop}`;
 
@@ -306,10 +254,8 @@
                 localStorage[key] = JSON.stringify(this[prop]);
             });
         },
-        // --- END helpers
     });
 
-    // --- BEGIN fetch
     const fileIds = new WeakMap();
     let fileCount = 0;
     const idOf = (file) => {
@@ -317,17 +263,87 @@
         return fileIds.get(file);
     };
 
+    const isBlob = (value) => typeof value?.arrayBuffer === "function";
+    const isListOf = (value, method) => typeof value?.[method] === "function" && typeof value[Symbol.iterator] === "function";
+
+    const formBody = (data) => {
+        const isEvent = typeof data.preventDefault === "function";
+        const node = isEvent ? data.target : data;
+        const button = node?.closest?.("button, input[type=submit], input[type=image]");
+        const form = node?.tagName === "FORM" ? node : (button ?? node)?.form ?? node?.closest?.("form");
+        if (!form) {
+            console.warn("[Nagi] no form to send for:", data);
+            return new URLSearchParams();
+        }
+        const submitter = isEvent && data.submitter;
+        const body = new FormData(form, submitter || undefined);
+        if (button?.name && button !== submitter && button.form === form) body.append(button.name, button.value);
+        return body;
+    };
+
+    const sendable = (key, item) => {
+        if (item !== Object(item) || isBlob(item) || !String(item).startsWith("[object ")) return true;
+        console.warn("[Nagi] cannot send:", key, item);
+    };
+
+    const objectBody = (data) => {
+        const pairs = Object.entries(data ?? {}).flatMap(([key, value]) =>
+            [value]
+                .flat()
+                .flatMap((item) => (isListOf(item, "item") ? [...item] : [item]))
+                .filter((item) => item != null && sendable(key, item))
+                .map((item) => [key, isBlob(item) ? item : String(item)]),
+        );
+        const body = pairs.some(([, value]) => isBlob(value)) ? new FormData() : new URLSearchParams();
+        pairs.forEach(([key, value]) => body.append(key, value));
+        return body;
+    };
+
+    const bodyOf = (data) => {
+        if (typeof data === "string") return new URLSearchParams(data);
+        if (typeof data?.preventDefault === "function" || data?.nodeType === 1) return formBody(data);
+        if (isListOf(data, "append")) return data;
+        return objectBody(data);
+    };
+
+    const withQuery = (url, query) => {
+        if (!query) return url;
+        const hashAt = url.includes("#") ? url.indexOf("#") : url.length;
+        const path = url.slice(0, hashAt);
+        const joiner = !path.includes("?") ? "?" : /[?&]$/.test(path) ? "" : "&";
+        return path + joiner + query + url.slice(hashAt);
+    };
+
+    const sentOf = (entries) =>
+        entries.map(([key, value]) => [
+            key,
+            typeof value === "string" ? value : value.size || value.name ? `\0file${idOf(value)}` : "\0empty",
+        ]);
+
+    const readText = async (body) => {
+        let text = "";
+        if (!body) return text;
+        const stream = body.pipeThrough(new TextDecoderStream()).getReader();
+        for (let chunk; !(chunk = await stream.read()).done; ) text += chunk.value;
+        return text;
+    };
+
+    const fragmentsOf = (text) => {
+        const template = document.createElement("template");
+        template.innerHTML = text;
+        return [...template.content.children];
+    };
+
     const drop = (el) => {
         queryAttr(el, "*").forEach((node) => node.nagiBound && dispatch(node, "destroy", { bubbles: false }));
-        // --- BEGIN ref
         queryAttr(el, "[n-ref]").forEach((node) => {
-            const refs = getClosestProxy(node).$refs;
+            const refs = closestScope(node)?.nagiProxy.$refs;
             const name = node.getAttribute("n-ref");
-            if (refs[name] === node) delete refs[name];
+            if (refs?.[name] === node) delete refs[name];
         });
-        // --- END ref
         [el, ...el.querySelectorAll("*")].forEach((node) => {
-            node.nagiProxy?._nagiAbort.abort();
+            (node.nagiProxy ?? ownScopes.get(node))?._nagiStop();
+            node.nagiRead?.abort();
             node.nagiRuns?.forEach(kill);
             node.nagiCleanup?.forEach((clean) => clean());
             node.nagiTimers?.forEach(clearTimeout);
@@ -338,40 +354,20 @@
     const initAll = (nodes) => nodes.forEach((node) => node.nodeType === 1 && init(node));
 
     const swap = (text) => {
-        const template = document.createElement("template");
-        template.innerHTML = text;
-
-        for (const fragment of [...template.content.children]) {
-            if (!fragment.id) {
-                console.warn("[Nagi] Fragment is missing an id: ", fragment);
-                continue;
-            }
-
+        for (const fragment of fragmentsOf(text)) {
             const strategy = fragment.getAttribute("n-swap") || "outer";
-            const target = document.getElementById(fragment.id);
-
-            if (!target) {
-                console.warn("[Nagi] Swap target not found: #", fragment.id);
-                continue;
-            }
-
-            if (!/^(inner|outer|before|after|prepend|append)$/.test(strategy)) {
-                console.error("[Nagi] Invalid swap strategy: ", strategy);
-                continue;
-            }
+            const target = fragment.id && document.getElementById(fragment.id);
+            if (!fragment.id) { console.warn("[Nagi] Fragment is missing an id: ", fragment); continue; }
+            if (!target) { console.warn("[Nagi] Swap target not found: #", fragment.id); continue; }
+            if (!/^(inner|outer|before|after|prepend|append)$/.test(strategy)) { console.error("[Nagi] Invalid swap strategy: ", strategy); continue; }
 
             const kids = [...fragment.childNodes];
 
-            // --- BEGIN morph
             const settles = (strategy === "outer" ? [fragment] : kids.filter((kid) => kid.nodeType === 1)).map(cssMorph);
-            // --- END morph
 
             if (strategy === "inner") {
                 [...target.children].forEach(drop);
                 target.replaceChildren(...kids);
-                // --- BEGIN template
-                if (target.hasAttribute("n-use")) use(target);
-                // --- END template
                 initAll([...target.childNodes]);
             } else if (strategy === "outer") {
                 drop(target);
@@ -382,21 +378,17 @@
                 initAll(kids);
             }
 
-            // --- BEGIN morph
             settles.forEach((settle) => settle());
-            // --- END morph
         }
     };
-    // --- END fetch
 
-    // --- BEGIN morph
+    const attributesToSettle = ["style", "class", "height", "width"];
+    const readSettled = (el) => attributesToSettle.map((attr) => [attr, el.getAttribute(attr)]);
+
     const cssMorph = (fragment) => {
-        const attributesToSettle = ["style", "class", "height", "width"];
-        const read = (el) => attributesToSettle.map((attr) => [attr, el.getAttribute(attr)]);
-
         const pairs = queryAttr(fragment, "[id]").flatMap((newEl) => {
             const oldEl = document.getElementById(newEl.id);
-            return oldEl && oldEl.tagName === newEl.tagName ? [[newEl, read(oldEl)]] : [];
+            return oldEl && oldEl.tagName === newEl.tagName ? [[newEl, readSettled(oldEl)]] : [];
         });
 
         return () =>
@@ -405,7 +397,7 @@
                     values.forEach(([attr, value]) =>
                         value != null ? newEl.setAttribute(attr, value) : newEl.removeAttribute(attr),
                     );
-                const settled = read(newEl);
+                const settled = readSettled(newEl);
                 apply(oldValues);
                 requestAnimationFrame(() => {
                     apply(settled);
@@ -413,127 +405,271 @@
                 });
             });
     };
-    // --- END morph
 
-    // --- BEGIN template
-    const use = (useEl) => {
-        const id = useEl.getAttribute("n-use");
-        const template = document.getElementById(id);
-        if (template) {
-            const templateFrag = template.content.cloneNode(true);
-            const slot = templateFrag.querySelector("slot:not([name])");
-            if (slot) slot.replaceWith(...useEl.childNodes);
-            useEl.replaceChildren(templateFrag);
-        } else console.error("[Nagi] No template with id: #", id);
+    const reserved = (key, el) => {
+        if (!/^(\$|_nagi|__proto__$)/i.test(key)) return false;
+        console.error("[Nagi] this name is Nagi's own:", key, el);
+        return true;
     };
-    // --- END template
 
-    const init = (baseEl) => {
-        // --- BEGIN template
-        queryAttr(baseEl, "[n-use]").forEach(use);
-        // --- END template
+    const builtIn = (obj) => {
+        for (let p = Object.getPrototypeOf(obj); p && Object.getPrototypeOf(p); p = Object.getPrototypeOf(p))
+            if (Object.hasOwn(p, "constructor") && /\[native code\]/.test(Function.prototype.toString.call(p.constructor)))
+                return true;
+    };
 
+    const baseOf = (dataEl) => {
+        const base = dataEl.getAttribute("n-scope")?.trim();
+        const made = base ? evaluate(base, {}, Object.freeze({}), dataEl) : {};
+        try {
+            if (made !== null && typeof made === "object" && typeof made.then !== "function" && !builtIn(made)) {
+                const descriptors = Object.getOwnPropertyDescriptors(made);
+                Object.keys(descriptors).forEach((key) => reserved(key, dataEl) && delete descriptors[key]);
+                Object.values(descriptors).forEach((d) => {
+                    d.configurable = true;
+                    if ("value" in d) d.writable = true;
+                });
+                return Object.create(Object.getPrototypeOf(made), descriptors);
+            }
+            if (made !== failed) console.error("[Nagi] n-scope must give an object:", base, dataEl);
+        } catch (err) {
+            console.error("[Nagi] failed to read the object of n-scope:", base, dataEl, "\n", err);
+        }
+        return {};
+    };
 
-        // --- BEGIN data
-        const reserved = (key, el) => {
-            if (!/^(\$|_nagi|__proto__$)/i.test(key)) return false;
-            console.error("[Nagi] this name is Nagi's own:", key, el);
-            return true;
+    const reactive = (rawData, outer) => {
+        const trackedDeps = new Map();
+        const fromOuter = (obj, prop) => !(prop in obj) && !!outer && prop in outer;
+        const bound = new WeakMap();
+        const bindToOuter = (fn) => {
+            if (!bound.has(fn)) bound.set(fn, Object.assign(fn.bind(outer), { nagiSource: fn.nagiSource ?? String(fn) }));
+            return bound.get(fn);
         };
 
+        return new Proxy(rawData, {
+            has(obj, prop) {
+                return prop !== "$el" && (prop in obj || (!!outer && prop in outer));
+            },
+            get(obj, prop, receiver) {
+                if (fromOuter(obj, prop)) {
+                    const value = outer[prop];
+                    return typeof value === "function" ? bindToOuter(value) : value;
+                }
+                if (currentBind) {
+                    if (outer && !(prop in obj)) outer[prop];
+                    const deps = trackedDeps.get(prop) ?? trackedDeps.set(prop, new Set()).get(prop);
+                    deps.add(currentBind);
+                    currentBind.deps.add(deps);
+                }
+                return Reflect.get(obj, prop, receiver);
+            },
+            set(obj, prop, val, receiver) {
+                if (fromOuter(obj, prop)) return Reflect.set(outer, prop, val);
+                const found = descriptorOf(obj, prop);
+                if (found && "value" in found && val !== Object(val) && Object.is(obj[prop], val)) return true;
+                if (!Reflect.set(obj, prop, val, receiver)) return false;
+                const deps = trackedDeps.get(prop);
+                deps && [...deps].forEach((run) => run());
+                return true;
+            },
+        });
+    };
+
+    const makeScope = (dataEl) => {
+        if (dataEl.nagiProxy) return;
+        const attrs = [...dataEl.attributes];
+        if (!attrs.some(({ name }) => /^n-(scope$|let-)/.test(name))) return;
+
+        const rawData = baseOf(dataEl);
+        Object.entries({ ...helpers(), _nagiEl: dataEl }).forEach(([key, value]) => define(rawData, key, value));
+
+        const outer = closestScope(dataEl.parentElement)?.nagiProxy;
+        const proxyData = reactive(rawData, outer);
+
+        dataEl.nagiProxy = proxyData;
+        dataEl.nagiRaw = rawData;
+
+        attrs.forEach(({ name, value }) => {
+            const key = name.match(/^n-let-(.+)$/)?.[1];
+            if (!key || reserved(key, dataEl)) return;
+            const result = value.trim() ? runWithEl(dataEl, () => evaluate(value, proxyData, proxyData, dataEl)) : undefined;
+            if (result === failed) return;
+            if (!(key in rawData) || !Reflect.set(proxyData, key, result)) define(rawData, key, result);
+        });
+    };
+
+    const formScope = (el) => closestScope(el.closest("[n-form]"));
+
+    const isField = (el) => /^(SELECT|TEXTAREA)$/.test(el.tagName) || (el.tagName === "INPUT" && !/^(submit|image|button|reset)$/.test(el.type));
+
+    const formFields = new Set();
+    document.addEventListener("reset", (e) =>
+        setTimeout(() =>
+            formFields.forEach((field) => {
+                if (!field.inputEl.isConnected) formFields.delete(field);
+                else if (field.inputEl.form === e.target) field.setVal();
+            }),
+        ), true);
+
+    const hasName = (raw, name) => {
+        for (let o = raw; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) if (Object.hasOwn(o, name)) return true;
+        return false;
+    };
+
+    const fieldOf = (inputEl, scopeEl) => {
+        const { nagiProxy: proxyData, nagiRaw: rawData } = scopeEl;
+        const { name, type, form } = inputEl;
+        const radio = type === "radio";
+        const owned = (scopeEl.nagiFields ||= new Map());
+        let group = owned.get(name);
+        group?.members.forEach((el) => el.isConnected || group.members.delete(el));
+        if (group?.members.size && !(radio && group.radio && group.form === form))
+            return console.error("[Nagi] another field of the form has this name:", name, inputEl);
+        if (!group) {
+            if (hasName(rawData, name)) return console.error("[Nagi] this field's name is already a name of the scope:", name, inputEl);
+            define(rawData, name, undefined);
+            owned.set(name, (group = { members: new Set() }));
+        }
+        Object.assign(group, { radio, form });
+        group.members.add(inputEl);
+
+        const read = {
+            radio: () => [...group.members].find((el) => el.isConnected && el.form === inputEl.form && el.checked)?.value,
+            checkbox: () => inputEl.checked,
+            file: () => inputEl.files,
+            number: () => (inputEl.value === "" ? undefined : +inputEl.value),
+            range: () => +inputEl.value,
+            "select-multiple": () => [...inputEl.selectedOptions].map((option) => option.value),
+        }[type] ?? (() => inputEl.value);
+        const setVal = () => {
+            if (group.members.has(inputEl)) proxyData[name] = read();
+        };
+        const field = { inputEl, setVal };
+
+        setVal();
+        inputEl.addEventListener("input", setVal);
+        inputEl.addEventListener("change", setVal);
+        formFields.add(field);
+        (inputEl.nagiCleanup ||= []).push(() => {
+            group.members.delete(inputEl);
+            formFields.delete(field);
+        });
+    };
+
+    const propOf = (obj, name) => {
+        for (let o = obj; o; o = Object.getPrototypeOf(o))
+            for (const key of Object.getOwnPropertyNames(o)) if (key.toLowerCase() === name) return key;
+    };
+
+    const writable = (obj, key) => {
+        const found = descriptorOf(obj, key);
+        return !found || !!(found.set || found.writable);
+    };
+
+    const unset = (value) => value == null || value === false;
+
+    const keyedWriters = {
+        __proto__: null,
+        class: (el, sub, value) => el.classList.toggle(sub, !!value),
+        style: (el, sub, value) => (unset(value) ? el.style.removeProperty(sub) : el.style.setProperty(sub, value)),
+        dataset: (el, sub, value) =>
+            unset(value) ? el.removeAttribute("data-" + sub) : el.setAttribute("data-" + sub, value),
+    };
+
+    const sourceOf = (bindEl, name, value) => {
+        const [, kind, rest] = name.match(/^n-(bind|on)-(.+)$/) || [];
+        if (kind === "on") {
+            if (/^\s*(async\s+)?(\([^)]*\)|[\w$]+)\s*=>/.test(value))
+                console.warn("[Nagi] n-on-* runs statements, and this only makes a function:", name, bindEl);
+            return `${JSON.stringify("@" + rest)}: async (e) => {${value}\n}`;
+        }
+        if (!kind) return;
+
+        const [first, ...subs] = rest.split(".");
+        const sub = subs.join(".");
+        const main = first === "class" ? first : propOf(bindEl, first);
+        const keyed = !!main && main in keyedWriters;
+        const inner = !sub || keyed ? sub : propOf(bindEl[main], sub);
+        if (!main || inner === undefined) return console.error("[Nagi] no such property:", name, bindEl);
+
+        const camelSub = sub.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+        if (main === "style" && sub && !sub.startsWith("--") && !(sub in bindEl.style) && !(camelSub in bindEl.style))
+            console.warn("[Nagi] the style has no such property:", name, bindEl);
+        if (!(sub && keyed) && !(sub ? writable(bindEl[main], inner) : writable(bindEl, main)))
+            return console.error("[Nagi] cannot write:", name, bindEl);
+
+        const key = main + (sub ? "." + inner : "");
+        const body = value.replace(/[\s;]+$/, "");
+        const empty = !body.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "").trim();
+        return `${JSON.stringify(key)}: () => (${empty ? "undefined" : body}\n)`;
+    };
+
+    const classesOf = (v) =>
+        typeof v === "string" ? v.split(/\s+/)
+            : Array.isArray(v) ? v.filter(Boolean).flatMap((item) => String(item).split(/\s+/))
+            : Object.keys(v ?? {}).filter((name) => v[name]).flatMap((name) => name.split(/\s+/));
+
+    const writerOf = (bindEl, main, sub) => {
+        if (sub && main in keyedWriters) return (value) => keyedWriters[main](bindEl, sub, value);
+        if (sub) return (value) => (bindEl[main][sub] = value);
+        if (main === "disabled") return (value) => bindEl.nagiHeld || (bindEl.disabled = value);
+        if (main !== "class") return (value) => (bindEl[main] = value);
+
+        let added = new Set();
+        return (value) => {
+            const next = new Set(classesOf(value).filter(Boolean));
+            const mine = new Set();
+            added.forEach((name) => next.has(name) || bindEl.classList.remove(name));
+            next.forEach((name) => {
+                if (added.has(name) || !bindEl.classList.contains(name)) mine.add(name);
+                bindEl.classList.add(name);
+            });
+            added = mine;
+        };
+    };
+
+    const handle = (val, e) => val(e)?.catch?.((err) => console.error("[Nagi] failed to run:", val, "\n", err));
+
+    const listen = (bindEl, key, val, proxyData) => {
+        const [eventName, ...mods] = key.split(".");
+        const unknown = mods.filter((mod) => !/^(prevent|stop|once|window|debounce\d+)$/.test(mod));
+        if (unknown.length) console.warn("[Nagi] unknown modifiers:", unknown, bindEl);
+
+        const delay = +mods.find((mod) => mod.startsWith("debounce"))?.slice(8);
+
+        const listener = (e) => runWithEl(bindEl, () => {
+            if (mods.includes("prevent")) e.preventDefault();
+            if (mods.includes("stop")) e.stopPropagation();
+
+            if (delay) proxyData.$debounce(() => handle(val, e), delay);
+            else handle(val, e);
+        }, null, val);
+
+        const listenOn = mods.includes("window") ? window : bindEl;
+        listenOn.addEventListener(eventName, listener, { once: mods.includes("once") });
+        if (listenOn === window) (bindEl.nagiCleanup ||= []).push(() => window.removeEventListener(eventName, listener));
+    };
+
+    const bindProp = (bindEl, key, val) => {
+        const [main, ...rest] = key.split(".");
+        const write = writerOf(bindEl, main, rest.join("."));
+        let latest = 0;
+        const run = watch(() => {
+            const value = val();
+            const mine = ++latest;
+            if (typeof value?.then !== "function") return write(value);
+            value
+                .then((resolved) => mine === latest && !run?.gone && write(resolved))
+                .catch((err) => console.error("[Nagi] failed to run:", val, "\n", err));
+        }, bindEl);
+        run.attr = /^class(name|list)$/i.test(main) ? "class" : main;
+    };
+
+    const init = (baseEl) => {
         const walker = document.createTreeWalker(baseEl, NodeFilter.SHOW_ELEMENT, {
             acceptNode: (node) => (node.hasAttribute("n-ignore") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
         });
-        const define = (obj, key, value) =>
-            Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
-
-        const baseOf = (dataEl) => {
-            const base = dataEl.getAttribute("n-scope")?.trim();
-            const made = base ? evaluate(base, {}, dataEl) : {};
-            try {
-                const builtIn = (obj) => {
-                    for (let p = Object.getPrototypeOf(obj); p && Object.getPrototypeOf(p); p = Object.getPrototypeOf(p))
-                        if (Object.hasOwn(p, "constructor") && /\[native code\]/.test(Function.prototype.toString.call(p.constructor)))
-                            return true;
-                };
-                if (made !== null && typeof made === "object" && typeof made.then !== "function" && !builtIn(made)) {
-                    const descriptors = Object.getOwnPropertyDescriptors(made);
-                    Object.values(descriptors).forEach((d) => {
-                        d.configurable = true;
-                        if ("value" in d) d.writable = true;
-                    });
-                    return Object.create(Object.getPrototypeOf(made), descriptors);
-                }
-                if (made !== failed) console.error("[Nagi] n-scope must give an object:", base, dataEl);
-            } catch (err) {
-                console.error("[Nagi] failed to read the object of n-scope:", base, dataEl, "\n", err);
-            }
-            return {};
-        };
-
-        const makeScope = (dataEl) => {
-            if (dataEl.nagiProxy) return;
-            const attrs = [...dataEl.attributes];
-            if (!attrs.some(({ name }) => /^n-(scope$|let-)/.test(name))) return;
-
-            const rawData = baseOf(dataEl);
-            Object.entries({ ...helpers(), _nagiEl: dataEl }).forEach(([key, value]) => define(rawData, key, value));
-            Object.entries(dataEl.dataset).forEach(([key, value]) => reserved(key, dataEl) || define(rawData, key, value));
-
-            const trackedDeps = new Map();
-
-            let outer = null;
-            for (let node = dataEl.parentElement; node && !outer; node = node.parentElement) outer = node.nagiProxy ?? null;
-            const fromOuter = (obj, prop) => !(prop in obj) && !!outer && prop in outer;
-            const bound = new WeakMap();
-            const bindToOuter = (fn) => {
-                if (!bound.has(fn)) bound.set(fn, Object.assign(fn.bind(outer), { nagiSource: fn.nagiSource ?? String(fn) }));
-                return bound.get(fn);
-            };
-
-            const proxyData = new Proxy(rawData, {
-                has(obj, prop) {
-                    return prop in obj || (!!outer && prop in outer);
-                },
-                get(obj, prop, receiver) {
-                    if (fromOuter(obj, prop)) {
-                        const value = outer[prop];
-                        return typeof value === "function" ? bindToOuter(value) : value;
-                    }
-                    if (currentBind) {
-                        let deps = trackedDeps.get(prop);
-                        if (!deps) trackedDeps.set(prop, (deps = new Set()));
-                        deps.add(currentBind);
-                        currentBind.deps.add(deps);
-                    }
-
-                    return Reflect.get(obj, prop, receiver);
-                },
-                set(obj, prop, val, receiver) {
-                    if (fromOuter(obj, prop)) return Reflect.set(outer, prop, val);
-                    if (prop in obj && val !== Object(val) && isData(obj, prop) && Object.is(obj[prop], val)) return true;
-                    if (!Reflect.set(obj, prop, val, receiver)) return false;
-
-                    const deps = trackedDeps.get(prop);
-
-                    deps && [...deps].forEach((run) => run());
-
-                    return true;
-                },
-            });
-
-            dataEl.nagiProxy = proxyData;
-            dataEl.nagiRaw = rawData;
-
-            attrs.forEach(({ name, value }) => {
-                const key = name.match(/^n-let-(.+)$/)?.[1];
-                if (!key || reserved(key, dataEl)) return;
-                const result = value.trim() ? runWithEl(dataEl, () => evaluate(value, proxyData, dataEl)) : undefined;
-                if (result === failed) return;
-                if (!(key in rawData) || !Reflect.set(proxyData, key, result)) define(rawData, key, result);
-            });
-        };
-
         const seen = new Set();
         let dataEl = baseEl.closest("[n-ignore]") ? null : baseEl;
         while (dataEl) {
@@ -546,198 +682,52 @@
             do dataEl = walker.nextNode();
             while (dataEl && seen.has(dataEl));
         }
-        // --- END data
 
-        // --- BEGIN ref
         queryAttr(baseEl, "[n-ref]").forEach((el) => {
-            const proxyData = getClosestProxy(el);
-            const refName = el.getAttribute("n-ref");
-
-            proxyData.$refs[refName] = el;
+            const scope = closestScope(el)?.nagiProxy;
+            if (!scope) return console.error("[Nagi] n-ref needs a scope:", el);
+            scope.$refs[el.getAttribute("n-ref")] = el;
         });
-        // --- END ref
 
-        // --- BEGIN form
-        const formProxy = (el) => {
-            const form = el.closest("[n-form]");
-            return form && getClosestProxy(form);
-        };
+        queryAttr(baseEl, "[n-form]").forEach((form) => closestScope(form) || console.error("[Nagi] n-form needs a scope:", form));
 
-        queryAttr(baseEl, "[name]").forEach((inputEl) => {
-            const proxyData = formProxy(inputEl);
-            if (!proxyData) return;
+        queryAttr(baseEl, "[name]").filter(isField).forEach((inputEl) => {
+            const scopeEl = formScope(inputEl);
+            if (scopeEl && !reserved(inputEl.name, inputEl)) fieldOf(inputEl, scopeEl);
+        });
 
-            let scopeEl = inputEl.closest("[n-form]");
-            while (scopeEl && !scopeEl.nagiRaw) scopeEl = scopeEl.parentElement;
-            if (scopeEl && !(inputEl.name in scopeEl.nagiRaw))
-                Object.defineProperty(scopeEl.nagiRaw, inputEl.name, { writable: true, enumerable: true, configurable: true });
-
-            const inputType = inputEl.type;
-
-            const setVal = () => {
-                let res;
-
-                if (inputType === "checkbox")
-                    res = inputEl.checked;
-                else if (inputType === "radio") {
-                    if (!inputEl.checked) {
-                        if (!(inputEl.name in proxyData)) proxyData[inputEl.name] = undefined;
-                        return;
-                    }
-                    res = inputEl.value;
+        queryAttr(baseEl, "button, input[type=submit], input[type=image]").forEach((submitEl) => {
+            const proxyData = formScope(submitEl)?.nagiProxy;
+            if (!proxyData || !submitEl.form) return;
+            let wasDisabled = false;
+            watch(() => {
+                const fetching = proxyData.$fetching;
+                if (fetching && !submitEl.nagiHeld && /^(submit|image)$/.test(submitEl.type)) {
+                    wasDisabled = submitEl.disabled;
+                    submitEl.disabled = submitEl.nagiHeld = true;
+                } else if (!fetching && submitEl.nagiHeld) {
+                    submitEl.nagiHeld = false;
+                    if (!wasDisabled) submitEl.disabled = false;
+                    submitEl.nagiRuns?.forEach((run) => run.attr === "disabled" && run());
                 }
-                else if (inputType === "file")
-                    res = inputEl.files;
-                else if (/number|range/.test(inputType))
-                    res = +inputEl.value;
-                else res = inputEl.value;
-
-                proxyData[inputEl.name] = res;
-            };
-
-            setVal();
-
-            inputEl.addEventListener("input", setVal);
-            inputEl.addEventListener("change", setVal);
+            }, submitEl);
         });
-
-        queryAttr(baseEl, "button, input[type='submit']").forEach((submitEl) => {
-            const proxyData = formProxy(submitEl);
-            if (proxyData) watch(() => submitEl.disabled = proxyData.$fetching, submitEl);
-        });
-        // --- END form
-
-        // --- BEGIN bind
-        const propOf = (obj, name) => {
-            for (let o = obj; o; o = Object.getPrototypeOf(o))
-                for (const key of Object.getOwnPropertyNames(o))
-                    if (key.toLowerCase() === name) return key;
-        };
-
-        const writable = (obj, key) => {
-            for (let o = obj; o; o = Object.getPrototypeOf(o)) {
-                const found = Object.getOwnPropertyDescriptor(o, key);
-                if (found) return !!(found.set || found.writable);
-            }
-            return true;
-        };
 
         queryAttr(baseEl, "*").forEach((bindEl) => {
             if (bindEl.nagiBound) return;
-            const entries = [...bindEl.attributes].flatMap(({ name, value }) => {
-                const [, kind, rest] = name.match(/^n-(bind|on)-(.+)$/) || [];
-                if (kind === "on") {
-                    if (/^\s*(async\s+)?(\([^)]*\)|[\w$]+)\s*=>/.test(value))
-                        console.warn("[Nagi] n-on-* runs statements, and this only makes a function:", name, bindEl);
-                    return `${JSON.stringify("@" + rest)}: async (e) => {${value}\n}`;
-                }
-                if (!kind) return [];
-                const [first, ...subs] = rest.split(".");
-                const sub = subs.join(".");
-                const main = first === "class" ? first : propOf(bindEl, first);
-                const inner = !sub || /^(class|style|dataset)$/.test(main) ? sub : propOf(bindEl[main], sub);
-                if (!main || inner === undefined) {
-                    console.error("[Nagi] no such property:", name, bindEl);
-                    return [];
-                }
-                const keyed = sub && /^(class|style|dataset)$/.test(main);
-                const camelSub = sub.replace(/-(\w)/g, (_, c) => c.toUpperCase());
-                if (main === "style" && sub && !sub.startsWith("--") && !(sub in bindEl.style) && !(camelSub in bindEl.style))
-                    console.warn("[Nagi] the style has no such property:", name, bindEl);
-                if (!keyed && !(sub ? writable(bindEl[main], inner) : writable(bindEl, main))) {
-                    console.error("[Nagi] cannot write:", name, bindEl);
-                    return [];
-                }
-                const key = main + (sub ? "." + inner : "");
-                const body = value.replace(/[\s;]+$/, "");
-                const empty = !body.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "").trim();
-                return `${JSON.stringify(key)}: () => (${empty ? "undefined" : body}\n)`;
-            });
-
+            const entries = [...bindEl.attributes].map(({ name, value }) => sourceOf(bindEl, name, value)).filter(Boolean);
             if (!entries.length) return;
             bindEl.nagiBound = true;
 
             const proxyData = getClosestProxy(bindEl);
-            const props = Object.assign({}, ...entries.map((entry) => evaluate(`{${entry}}`, proxyData, bindEl)));
-            const handle = (val, e) => val(e)?.catch?.((err) => console.error("[Nagi] failed to run:", val, "\n", err));
+            const props = Object.assign({}, ...entries.map((entry) => evaluate(`{${entry}}`, proxyData, proxyData, bindEl)));
 
-            Object.entries(props).forEach(([key, val]) => {
-                if (key.startsWith("@")) {
-                    // --- BEGIN events
-                    const [eventName, ...mods] = key.slice(1).split(".");
-                    const unknown = mods.filter((mod) => !/^(prevent|stop|once|window|debounce\d+)$/.test(mod));
-                    if (unknown.length) console.warn("[Nagi] unknown modifiers:", unknown, bindEl);
-
-                    const debounceMod = mods.find((val) => val.startsWith("debounce"));
-                    const delay = +debounceMod?.slice(8);
-
-                    const listener = (e) => runWithEl(bindEl, () => {
-
-                        if (mods.includes("prevent")) e.preventDefault();
-                        if (mods.includes("stop")) e.stopPropagation();
-
-                        if (delay) proxyData.$debounce(() => handle(val, e), delay);
-                        else handle(val, e);
-                    }, null, val);
-
-                    const listenOn = mods.includes("window") ? window : bindEl;
-                    listenOn.addEventListener(eventName, listener, { once: mods.includes("once") });
-                    if (listenOn === window)
-                        (bindEl.nagiCleanup ||= []).push(() => window.removeEventListener(eventName, listener));
-
-                    return;
-                    // --- END events
-
-                    // If special event handling isn't enabled just do a normal event listener
-                    if (key.includes(".")) console.warn("[Nagi] this build does not handle modifiers:", key.slice(1), bindEl);
-                    bindEl.addEventListener(key.slice(1).split(".")[0], (e) => runWithEl(bindEl, () => handle(val, e), null, val));
-                } else {
-                    const [main, ...rest] = key.split(".");
-                    const sub = rest.join(".");
-                    let added = new Set();
-                    const write = (resolvedVal) => {
-                        if (main === "class" && !sub) {
-                            const v = resolvedVal;
-                            const next = new Set(
-                                typeof v === "string" ? v.split(/\s+/).filter(Boolean)
-                                    : Array.isArray(v) ? v.filter(Boolean).flatMap((item) => String(item).split(/\s+/)).filter(Boolean)
-                                    : Object.keys(v ?? {}).filter((name) => v[name]).flatMap((name) => name.split(/\s+/)).filter(Boolean),
-                            );
-                            const mine = new Set();
-                            added.forEach((name) => next.has(name) || bindEl.classList.remove(name));
-                            next.forEach((name) => {
-                                if (added.has(name) || !bindEl.classList.contains(name)) mine.add(name);
-                                bindEl.classList.add(name);
-                            });
-                            added = mine;
-                        } else if (sub) {
-                            const unset = resolvedVal == null || resolvedVal === false;
-                            if (main === "class") bindEl.classList.toggle(sub, !!resolvedVal);
-                            else if (main === "style")
-                                unset ? bindEl.style.removeProperty(sub) : bindEl.style.setProperty(sub, resolvedVal);
-                            else if (main === "dataset")
-                                unset ? bindEl.removeAttribute("data-" + sub) : bindEl.setAttribute("data-" + sub, resolvedVal);
-                            else bindEl[main][sub] = resolvedVal;
-                        } else bindEl[main] = resolvedVal;
-                    };
-
-                    let latest = 0;
-                    const run = watch(() => {
-                        const value = val();
-                        const mine = ++latest;
-                        if (typeof value?.then === "function")
-                            value
-                                .then((resolved) => mine === latest && !run?.gone && write(resolved))
-                                .catch((err) => console.error("[Nagi] failed to run:", val, "\n", err));
-                        else write(value);
-                    }, bindEl);
-                    run.attr = /^class(name|list)$/i.test(main) ? "class" : main;
-                }
-            });
+            Object.entries(props).forEach(([key, val]) =>
+                key.startsWith("@") ? listen(bindEl, key.slice(1), val, proxyData) : bindProp(bindEl, key, val),
+            );
 
             dispatch(bindEl, "init", { bubbles: false });
         });
-        // --- END bind
     };
 
     document.addEventListener("DOMContentLoaded", () => init(document.body));

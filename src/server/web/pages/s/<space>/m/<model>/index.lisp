@@ -226,13 +226,13 @@
            (hsx (~empty-state (cond ((not (blank-p search-text)) "Nothing matches this search.")
                                     ((not (blank-p status)) "No contents with this status.")
                                     (t "No contents yet."))))
-           (hsx (form :n-scope "koya.bulk(this)"
+           (hsx (form :n-scope "koya.bulk($el)"
                   (div :class "overflow-x-auto rounded-md border border-line bg-panel"
                     (table :class "w-full text-sm"
                       (thead (tr :class "border-b border-line text-left text-muted"
                                (th :class "py-2 pl-4 pr-2"
                                  (input :type "checkbox"
-                                        :n-bind-checked "all()" :n-bind-indeterminate "partly()" :n-on-change "pickAll(this.checked)"
+                                        :n-bind-checked "all()" :n-bind-indeterminate "partly()" :n-on-change "pickAll($el.checked)"
                                         :aria-label "Select every content on this page"))
                                (th :class "py-2 pr-4 font-medium whitespace-nowrap" "status")
                                (loop :for field :in fields :collect
@@ -243,7 +243,7 @@
                           (hsx (tr :class (clsx "group relative transition hover:bg-base" +row-height+)
                                  (td :class "relative z-10 py-2 pl-4 pr-2"
                                    (input :type "checkbox" :name "id" :value (content-id content) :data-bulk-item t
-                                          :n-bind-checked "picked(this.value)" :n-on-change "pick(this.value, this.checked)"
+                                          :n-bind-checked "picked($el.value)" :n-on-change "pick($el.value, $el.checked)"
                                           :aria-label (format nil "Select ~a" (content-label content model))))
                                  (td :class "py-2 pr-4 whitespace-nowrap"
                                    (~status-badge :status (content-status content)))

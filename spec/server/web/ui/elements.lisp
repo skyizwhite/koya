@@ -18,9 +18,9 @@
   (let ((form (render-to-string (hsx (~search-form :url "/list" :id "filters" :class "flex" (input :name "q"))))))
     (ok (search (concatenate 'string
                              "<form id=\"filters\" class=\"flex\" n-scope=\"koya.search()\""
-                             " n-on-submit.prevent=\"ask(&quot;/list&quot;, this, true)\""
-                             " n-on-input.debounce300=\"ask(&quot;/list&quot;, this)\""
-                             " n-on-change=\"ask(&quot;/list&quot;, this)\""
+                             " n-on-submit.prevent=\"ask(&quot;/list&quot;, $el, true)\""
+                             " n-on-input.debounce300=\"ask(&quot;/list&quot;, $el)\""
+                             " n-on-change=\"ask(&quot;/list&quot;, $el)\""
                              "><input name=\"q\"></form>")
                 form)
         "asks as it is submitted, as the typing stops and as a choice changes, and keeps what else it is given"))

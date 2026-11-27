@@ -51,7 +51,7 @@
     (hsx
      (li :class "relative"
        (input :type "checkbox" :name "id" :value id :form +bulk-form+ :data-bulk-item t
-              :n-bind-checked "picked(this.value)" :n-on-change "pick(this.value, this.checked)"
+              :n-bind-checked "picked($el.value)" :n-on-change "pick($el.value, $el.checked)"
               :class "absolute left-1 top-1 z-10 h-4 w-4 cursor-pointer"
               :aria-label (format nil "Select ~a" (media-filename media)))
        (button :type "button" :class "block w-full cursor-zoom-in"
@@ -77,7 +77,7 @@
          (references (media-reference-counts space (mapcar #'media-id items)))
          (q (or search "")))
     (hsx
-     (div :id "library" :n-scope "koya.bulk(this)"
+     (div :id "library" :n-scope "koya.bulk($el)"
        (if (null items)
            (hsx (~empty-state (if (blank-p q) "No media yet. Upload an image above." "No file matches.")))
            (hsx
@@ -85,7 +85,7 @@
               (div :class "mb-4 flex flex-wrap items-center gap-3"
                 (label :class "flex items-center gap-2 text-sm text-muted"
                   (input :type "checkbox" :form +bulk-form+
-                         :n-bind-checked "all()" :n-bind-indeterminate "partly()" :n-on-change "pickAll(this.checked)")
+                         :n-bind-checked "all()" :n-bind-indeterminate "partly()" :n-on-change "pickAll($el.checked)")
                   "Select all on this page")
                 (form :id +bulk-form+
                       :n-on-submit.prevent (submit (delete-selected-media :space space :q q :page page)
@@ -123,7 +123,7 @@
         (count (length references)))
     (hsx
      (dialog :id "media-preview" :closedby "any"
-             :n-on-init (and media "this.showModal()")
+             :n-on-init (and media "$el.showModal()")
              :class "koya-dialog koya-dialog-wide max-w-3xl"
        (when media
          (hsx
