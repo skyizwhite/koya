@@ -4,7 +4,7 @@
 
 ## Context
 
-`adr/2026-09-25-pages-are-guarded-where-they-are-mounted.md` brought the pages
+`adr/archives/2026-09-25-pages-are-guarded-where-they-are-mounted.md` brought the pages
 in line with the admin API and the actions: each is guarded by a middleware
 where it is mounted, and a route added later is covered without doing anything.
 

@@ -1,6 +1,6 @@
 # Nomini swaps what an action answers and holds a page's state
 
-Superseded by adr/2026-11-27-nagi-replaces-nomini.md
+Superseded by adr/archives/2026-11-27-nagi-replaces-nomini.md
 
 *2026-11-21*
 
@@ -37,4 +37,4 @@ and change (`nm-bind`), bound again whenever something is swapped in.
 - A scope does not see the one around it; scopes that work together hold each
   other, as a field and the picker it opens do.
 - An element asks the server with Nomini's own `$get` and `$post`
-  (`adr/2026-10-02-an-element-asks-with-nominis-get-and-post.md`).
+  (`adr/archives/2026-10-02-an-element-asks-with-nominis-get-and-post.md`).

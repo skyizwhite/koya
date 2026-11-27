@@ -1,7 +1,7 @@
 # An object model refuses a second content
 
-Superseded by adr/2026-10-04-an-object-content-is-reached-through-its-model.md
-Superseded by adr/2026-10-04-an-object-model-refuses-a-second-content.md
+Superseded by adr/archives/2026-10-04-an-object-content-is-reached-through-its-model.md
+Superseded by adr/archives/2026-10-04-an-object-model-refuses-a-second-content.md
 
 *2026-09-28*
 

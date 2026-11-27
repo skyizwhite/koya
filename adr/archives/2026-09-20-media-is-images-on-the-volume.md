@@ -1,6 +1,6 @@
 # Media is images, on the volume, unaltered
 
-Superseded by adr/2026-09-27-media-is-kept-on-the-volume-as-uploaded.md
+Superseded by adr/archives/2026-09-27-media-is-kept-on-the-volume-as-uploaded.md
 Superseded by adr/2026-09-27-media-is-png-jpeg-gif-or-webp-by-its-bytes.md
 Superseded by adr/2026-09-27-a-media-field-refers-to-the-spaces-library.md
 Superseded by adr/2026-09-27-the-delivery-api-expands-a-media-field.md

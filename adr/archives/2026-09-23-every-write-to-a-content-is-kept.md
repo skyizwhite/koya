@@ -1,6 +1,6 @@
 # Every write to a content is kept, and a restore goes through the editor
 
-Superseded by adr/2026-09-27-every-write-to-a-content-is-kept.md
+Superseded by adr/archives/2026-09-27-every-write-to-a-content-is-kept.md
 Superseded by adr/2026-09-27-the-history-is-read-in-the-admin-ui-only.md
 Superseded by adr/2026-09-27-a-restore-goes-through-the-editor.md
 

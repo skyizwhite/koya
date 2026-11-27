@@ -2,7 +2,7 @@
 
 Superseded by adr/2026-09-27-koya-stores-its-data-in-sqlite.md
 Superseded by adr/2026-09-27-contents-are-json-in-one-table.md
-Superseded by adr/2026-09-27-an-id-koya-makes-is-a-ulid.md
+Superseded by adr/archives/2026-09-27-an-id-koya-makes-is-a-ulid.md
 
 *2026-09-20*
 

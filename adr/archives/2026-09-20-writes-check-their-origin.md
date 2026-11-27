@@ -1,9 +1,9 @@
 # Writes check their origin, and the front door is bolted
 
-Superseded by adr/2026-09-27-a-write-must-come-from-this-origin.md
+Superseded by adr/archives/2026-09-27-a-write-must-come-from-this-origin.md
 Superseded by adr/2026-09-27-the-session-cookie-is-httponly-and-samesite-lax.md
 Superseded by adr/2026-09-27-a-request-body-is-limited-to-an-upload.md
-Superseded by adr/2026-09-27-failed-logins-lock-an-address-out.md
+Superseded by adr/archives/2026-09-27-failed-logins-lock-an-address-out.md
 
 *2026-09-20*
 

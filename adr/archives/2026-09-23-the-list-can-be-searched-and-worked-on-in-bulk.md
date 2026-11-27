@@ -1,8 +1,8 @@
 # The content list can be searched, filtered, sorted, and acted on in bulk
 
 Superseded by adr/2026-09-27-the-content-list-is-searched-through-the-delivery-query.md
-Superseded by adr/2026-09-27-bulk-actions-go-one-item-at-a-time.md
-Superseded by adr/2026-09-27-an-action-with-nothing-to-do-leaves-a-content-alone.md
+Superseded by adr/archives/2026-09-27-bulk-actions-go-one-item-at-a-time.md
+Superseded by adr/archives/2026-09-27-an-action-with-nothing-to-do-leaves-a-content-alone.md
 
 *2026-09-23*
 

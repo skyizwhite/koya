@@ -1,7 +1,7 @@
 # An id koya makes is a ULID
 
-Superseded by adr/2026-10-10-a-content-id-koya-makes-is-twelve-letters-and-digits.md
-Superseded by adr/2026-10-10-an-id-koya-makes-for-anything-but-a-content-is-a-ulid.md
+Superseded by adr/archives/2026-10-10-a-content-id-koya-makes-is-twelve-letters-and-digits.md
+Superseded by adr/archives/2026-10-10-an-id-koya-makes-for-anything-but-a-content-is-a-ulid.md
 
 *2026-09-27, restating a decision of 2026-09-20*
 
@@ -18,5 +18,5 @@ Every id koya makes is a ULID, from `koya-core/ulid`.
 - An id is made without asking the database, and ids sort in the order they
   were made.
 - A content may still be given its own id by whoever creates it, as
-  `adr/2026-09-27-a-new-content-may-bring-its-id-and-dates.md` allows. Only the ids
+  `adr/archives/2026-09-27-a-new-content-may-bring-its-id-and-dates.md` allows. Only the ids
   koya makes are ULIDs.

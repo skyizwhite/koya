@@ -8,7 +8,7 @@ Superseded by adr/2026-10-12-the-webhook-body-is-made-through-a-port-the-web-imp
 
 A webhook carries a content in the delivery API's shape, and that shape is made
 in `web/presenters`
-([adr/2026-09-27-use-cases-return-data-and-web-presenters-make-json.md](2026-09-27-use-cases-return-data-and-web-presenters-make-json.md)).
+([adr/archives/2026-09-27-use-cases-return-data-and-web-presenters-make-json.md](2026-09-27-use-cases-return-data-and-web-presenters-make-json.md)).
 The use case that sends webhooks cannot depend on the web.
 
 ## Decision

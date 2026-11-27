@@ -1,6 +1,6 @@
 # An element asks with Nomini's own $get and $post
 
-Superseded by adr/2026-11-27-an-element-asks-with-nagis-get-and-post.md
+Superseded by adr/archives/2026-11-27-an-element-asks-with-nagis-get-and-post.md
 
 *2026-10-02, restating a decision of 2026-10-02*
 

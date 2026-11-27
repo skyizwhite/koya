@@ -1,6 +1,6 @@
 # The admin UI is Lisp, server-rendered
 
-Superseded by adr/2026-09-27-the-admin-ui-is-lisp-rendered-on-the-server.md
+Superseded by adr/archives/2026-09-27-the-admin-ui-is-lisp-rendered-on-the-server.md
 Superseded by adr/2026-09-27-systems-are-package-inferred.md
 
 *2026-09-20*

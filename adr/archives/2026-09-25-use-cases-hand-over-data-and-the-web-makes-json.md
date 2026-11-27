@@ -1,8 +1,8 @@
 # Use cases hand over data, and the web makes the JSON
 
-Superseded by adr/2026-09-27-use-cases-return-data-and-web-presenters-make-json.md
-Superseded by adr/2026-09-27-the-webhook-body-is-made-through-a-port-the-web-implements.md
-Superseded by adr/2026-09-27-space-json-is-made-by-the-archive-use-case.md
+Superseded by adr/archives/2026-09-27-use-cases-return-data-and-web-presenters-make-json.md
+Superseded by adr/archives/2026-09-27-the-webhook-body-is-made-through-a-port-the-web-implements.md
+Superseded by adr/archives/2026-09-27-space-json-is-made-by-the-archive-use-case.md
 
 *2026-09-25*
 

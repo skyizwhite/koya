@@ -1,7 +1,7 @@
 # Webhooks belong to the space and get every event
 
 Superseded by adr/2026-09-27-webhooks-are-declared-on-the-space.md
-Superseded by adr/2026-09-27-every-webhook-gets-every-event.md
+Superseded by adr/archives/2026-09-27-every-webhook-gets-every-event.md
 Superseded by adr/2026-09-27-a-space-has-one-webhook-secret.md
 
 *2026-09-22*

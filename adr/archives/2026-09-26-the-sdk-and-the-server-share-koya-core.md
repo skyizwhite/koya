@@ -43,6 +43,6 @@ A site writes `koya-sdk` in its `:depends-on` and `koya-sdk:` before the SDK's
 symbols. The repository is still `koya`, so the qlot line is unchanged.
 
 The MIT part is `koya-core.asd`, `koya-sdk.asd`, `LICENSE-MIT`, `src/core/` and
-`src/sdk/`; the list in `adr/2026-09-23-the-server-is-agpl-the-library-is-mit.md`
+`src/sdk/`; the list in `adr/archives/2026-09-23-the-server-is-agpl-the-library-is-mit.md`
 reads as those. A file moved into `src/server/` from either is the licensing
 change that ADR describes.
