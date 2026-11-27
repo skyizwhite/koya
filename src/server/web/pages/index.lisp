@@ -36,7 +36,7 @@
         (phrase (delete-phrase name))
         (input (delete-phrase-id name)))
     (hsx
-     (dialog :id id :closedby "any" :class "koya-dialog max-w-sm" :n-scope "koya.phrase(this)"
+     (dialog :id id :closedby "any" :class "koya-dialog max-w-sm" :n-scope "koya.phrase($el)"
              :n-on-close "reset()"
        (form :n-on-submit.prevent (submit (delete-space-action))
          (input :type "hidden" :name "name" :value name)
@@ -51,7 +51,7 @@
            (label :for input :class "label mt-4" "Type " (code (format nil "\"~a\"" phrase)) " to confirm")
            (input :type "text" :id input :name "confirm" :required t :autocomplete "off"
                   :spellcheck "false" :data-confirm-phrase phrase :class "input mt-1.5"
-                  :n-bind-value "typed" :n-on-input "typed = this.value")
+                  :n-bind-value "typed" :n-on-input "typed = $el.value")
            (~delete-error :name name))
          (div :class "flex justify-end gap-2 border-t border-line px-4 py-3"
            (~dialog-close :dialog id "Cancel")
@@ -111,7 +111,7 @@
 (defcomp ~import-space-dialog ()
   (hsx
    (dialog :id "import-space" :closedby "any" :class "koya-dialog max-w-sm"
-     (form :n-scope "koya.importer(this)" :n-on-submit.prevent "start()"
+     (form :n-scope "koya.importer($el)" :n-on-submit.prevent "start()"
            :data-import-begin (begin-import-action)
            :data-import-continue (continue-import-action)
            :data-import-finish (finish-import-action)

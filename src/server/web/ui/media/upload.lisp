@@ -17,7 +17,7 @@
 
 (defcomp ~upload-form (&key space redraw search hint class)
   (hsx
-   (form :n-scope "koya.uploader(this)" :n-on-change "upload(e.target)"
+   (form :n-scope "koya.uploader($el)" :n-on-change "upload(e.target)"
          :data-upload-url (upload-media :space space)
          :data-upload-limit (princ-to-string +max-upload-bytes+)
          :data-upload-limit-message (limit-message)

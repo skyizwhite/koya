@@ -59,7 +59,7 @@
 
 (defcomp ~richtext (&key html)
   (hsx (iframe :sandbox "allow-same-origin" :srcdoc (richtext-document html) :title "rich text"
-               :n-on-init "koya.fitContent(this)" :class "block h-16 w-full")))
+               :n-on-init "koya.fitContent($el)" :class "block h-16 w-full")))
 
 (defcomp ~value (&key label field value found class)
   (let* ((richtext (and (eq (field-type field) :richtext) (stringp value)))

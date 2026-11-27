@@ -30,7 +30,7 @@
     (multiple-value-bind (status body) (request :get "/s/website/media")
       (ok (= status 200))
       (ok (search "No media yet" body))
-      (ok (search (format nil "n-scope=\"koya.uploader(this)\" n-on-change=\"upload(e.target)\" data-upload-url=\"~a\""
+      (ok (search (format nil "n-scope=\"koya.uploader($el)\" n-on-change=\"upload(e.target)\" data-upload-url=\"~a\""
                           (escaped (upload-media :space "website")))
                   body)
           "the files chosen go one to a request as they are chosen")
@@ -41,7 +41,7 @@
                   body)
           "and the library is drawn again, for what the search box says, once they are sent")
       (ok (search "<form id=\"media-search-form\"" body))
-      (ok (< (search "koya.uploader(this)" body) (search "id=\"library\"" body))
+      (ok (< (search "koya.uploader($el)" body) (search "id=\"library\"" body))
           "the form is outside the library, so drawing the library again leaves how the sending went")
       (ok (search "<input type=\"file\" name=\"file\" accept=\"image/png,image/jpeg,image/gif,image/webp\" multiple class=\"hidden\" n-bind-disabled=\"busy\">" body)
           "several are chosen at once, and none while some are being sent")
@@ -54,7 +54,7 @@
           "and the files that were not added, and why")
       (ok (search "<template id=\"toast-done\"><div role=\"status\"" body)
           "the page has a toast to say they all were")
-      (ng (search "koya.uploader(this)" (nth-value 1 (call-action :get (browse-media :space "website" :q "" :page 1))))
+      (ng (search "koya.uploader($el)" (nth-value 1 (call-action :get (browse-media :space "website" :q "" :page 1))))
           "and the library drawn again has no form of its own"))
     (testing "upload from the library page"
       (multiple-value-bind (status body)
@@ -120,9 +120,9 @@
         (ok (search "</svg>Select</button>" body) "its button says what it does, with no ellipsis")
         (ok (search "${chosen.length} selected" body) "the picker counts what is selected")
         (ok (search "<dialog id=\"media-picker\"" body))
-        (ok (search (format nil "n-scope=\"koya.mediaPicker(this, &quot;~a&quot;)\"" (media-picker :space "website")) body)
+        (ok (search (format nil "n-scope=\"koya.mediaPicker($el, &quot;~a&quot;)\"" (media-picker :space "website")) body)
             "and the picker who opened it")
-        (ok (search "n-on-click=\"e.target === this &amp;&amp; close()\" n-on-openpicker=\"open(e.detail)\""
+        (ok (search "n-on-click=\"e.target === $el &amp;&amp; close()\" n-on-openpicker=\"open(e.detail)\""
                     body)
             "the picker opens itself, from whichever control asks")
         (ok (search (media-picker :space "website") body) "dialog knows the picker URL")))
@@ -133,9 +133,9 @@
         (ok (search "</svg>Upload<input type=\"file\"" body) "it uploads, with no ellipsis")
         (ok (search "data-pick-url=\"/media/website/" body))
         (ok (not (search "<html" body)) "a fragment, not a page")
-        (ok (search "n-on-click=\"pick(this)\" " body) "a card hands its file over")
+        (ok (search "n-on-click=\"pick($el)\" " body) "a card hands its file over")
         (ok (search (searching (media-picker-search :space "website")) body) "the box searches as the typing stops")
-        (ok (search (format nil "n-scope=\"koya.uploader(this)\" n-on-change=\"upload(e.target)\" data-upload-url=\"~a\""
+        (ok (search (format nil "n-scope=\"koya.uploader($el)\" n-on-change=\"upload(e.target)\" data-upload-url=\"~a\""
                             (escaped (upload-media :space "website")))
                     body)
             "it sends what is chosen to the library's upload")
@@ -177,7 +177,7 @@
       (let ((id (media-id (first (list-media "website" :search "cover")))))
         (multiple-value-bind (status body) (call-action :get (preview-media :space "website" :id id))
           (ok (= status 200))
-          (ok (search "<dialog id=\"media-preview\" closedby=\"any\" n-on-init=\"this.showModal()\"" body)
+          (ok (search "<dialog id=\"media-preview\" closedby=\"any\" n-on-init=\"$el.showModal()\"" body)
               "the dialog is drawn for the file, and opens itself")
           (ok (search "4×4" body))
           (ok (search "value=\"\"" body) "with its alt text"))

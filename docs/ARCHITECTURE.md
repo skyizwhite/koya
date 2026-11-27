@@ -280,7 +280,7 @@ answer in where the element of its id is, a refused answer too; what it cannot d
 A form is sent as the browser would send it, files included, and a list with its name
 once for each value; the actions read a value joined with commas as a list too. A part
 of a page that holds state in the browser is a Nagi scope made by a factory in
-`assets/js/koya.js` (`n-scope="koya.bulk(this)"`), and its elements bind with
+`assets/js/koya.js` (`n-scope="koya.bulk($el)"`), and its elements bind with
 `n-bind-*` and `n-on-*`. See
 `adr/2026-11-27-nagi-replaces-nomini.md`,
 `adr/2026-11-21-a-scope-adds-elements-the-server-drew.md`,

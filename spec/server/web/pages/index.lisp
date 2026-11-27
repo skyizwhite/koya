@@ -89,7 +89,7 @@
     (let ((body (nth-value 1 (request :get "/"))))
       (ok (search "commandfor=\"delete-space-blog\" command=\"show-modal\"" body))
       (ok (search "<dialog id=\"delete-space-blog\" closedby=\"any\"" body))
-      (ok (search "<dialog id=\"delete-space-blog\" closedby=\"any\" class=\"koya-dialog max-w-sm\" n-scope=\"koya.phrase(this)\"" body)
+      (ok (search "<dialog id=\"delete-space-blog\" closedby=\"any\" class=\"koya-dialog max-w-sm\" n-scope=\"koya.phrase($el)\"" body)
           "the dialog holds what is typed")
       (ok (search "data-confirm-phrase=\"delete blog\"" body))
       (ok (search "<input type=\"text\" id=\"delete-phrase-blog\"" body))

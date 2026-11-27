@@ -392,7 +392,7 @@
         (multiple-value-bind (status body) (request :get url :query "revision=999999")
           (ok (= status 200))
           (ok (search "does not exist for this content" body))
-          (ok (search "koya.editor(this, false)" body) "the current data, which is stored already")
+          (ok (search "koya.editor($el, false)" body) "the current data, which is stored already")
           (ng (search "Restoring the version of" body)))
         (dolist (revision '("9223372036854775808" "99999999999999999999" "-1" "first"))
           (multiple-value-bind (status body) (request :get url :query (format nil "revision=~a" revision))
@@ -432,7 +432,7 @@
           (multiple-value-bind (status body) (request :get "/s/website/m/blog/new" :query (format nil "from=~a" id))
             (ok (= status 200))
             (ok (search "A copy of Original, edited." body))
-            (ok (search "koya.editor(this, true)" body) "a copy is unsaved until it is saved")
+            (ok (search "koya.editor($el, true)" body) "a copy is unsaved until it is saved")
             (ok (search (format nil "href=\"~a\" class=\"btn\"" url) body) "Cancel goes back to the original")
             (ok (search "value=\"Original, edited\"" body) "the draft, not the published version")
             (ok (search "name=\"f-body\" value=\"<p>Body</p>\"" body))
@@ -463,7 +463,7 @@
             (multiple-value-bind (status body) (request :get "/s/website/m/blog/new" :query (format nil "from=~a" from))
               (ok (= status 200) from)
               (ok (search "does not exist in this model; this is an empty content" body))
-              (ok (search "koya.editor(this, false)" body) "and holds nothing to save")
+              (ok (search "koya.editor($el, false)" body) "and holds nothing to save")
               (ng (search "A copy of" body))
               (ng (search "value=\"only\"" body))))))
       (testing "an existing content's editor does not take a duplicate"
@@ -594,9 +594,9 @@
          (form '(("f-title" . "Live") ("f-slug" . "live"))))
     (testing "the editor holds what the form was drawn with, and Save draft waits for a change"
       (let ((body (nth-value 1 (request :get path))))
-        (ok (search "<div id=\"editor\" n-scope=\"koya.editor(this, false)\"" body)
+        (ok (search "<div id=\"editor\" n-scope=\"koya.editor($el, false)\"" body)
             "what is shown is what is stored")
-        (ok (search "n-scope=\"koya.editor(this, false)\" n-on-fetchredirect.window=\"koya.leave()\">" body)
+        (ok (search "n-scope=\"koya.editor($el, false)\" n-on-fetchredirect.window=\"koya.leave()\">" body)
             "and moving on after its own write leaves without asking")
         (ok (search "n-on-input=\"track()\" n-on-change=\"track()\"" body)
             "the form tells it of every change")
@@ -619,7 +619,7 @@
           "and it went as a discard, which has something to show"))
     (testing "a restore is marked unsaved"
       (let ((revision (revision-id (car (last (list-revisions "website" id))))))
-        (ok (search "koya.editor(this, true)" (nth-value 1 (request :get path :query (format nil "revision=~a" revision)))))))))
+        (ok (search "koya.editor($el, true)" (nth-value 1 (request :get path :query (format nil "revision=~a" revision)))))))))
 
 (deftest an-unknown-editor-action-is-refused
   (exec "DELETE FROM contents")
@@ -670,10 +670,10 @@
            (id (content-id (create space model (list :title "Refers" :related (vector second first "gone1")) :publish t)))
            (body (nth-value 1 (request :get (format nil "/s/website/m/blog/~a" id)))))
       (ng (search "<select" body) "no reference draws a dropdown")
-      (ok (search "<div class=\"space-y-2\" n-scope=\"koya.references(this, &quot;blog&quot;, true)\">" body)
+      (ok (search "<div class=\"space-y-2\" n-scope=\"koya.references($el, &quot;blog&quot;, true)\">" body)
           "a many reference knows the model it picks from")
       (ok (search (format nil "<ul id=\"f-related\" class=\"space-y-2 empty:hidden\" data-reference-list ~a>"
-                          "n-on-init=\"koya.sortable(this)\"")
+                          "n-on-init=\"koya.sortable($el)\"")
                   body)
           "and its cards are sorted as a repeater's rows are")
       (ok (< (search (format nil "name=\"f-related\" value=\"~a\"" second) body)
@@ -691,7 +691,7 @@
       (ok (search "n-on-click=\"choose()\"" body) "the field adds from the picker")
       (ok (search "</svg>Add</button>" body) "its button says what it does, with no ellipsis")
       (ok (search "<dialog id=\"reference-picker\"" body) "which the editor holds")
-      (ok (search (format nil "n-scope=\"koya.referencePicker(this, &quot;~a&quot;)\""
+      (ok (search (format nil "n-scope=\"koya.referencePicker($el, &quot;~a&quot;)\""
                           (reference-picker :space "website"))
                   body)))
     (with-schema ("website" (with-link))
@@ -699,7 +699,7 @@
         (let* ((target (content-id (create space model (list :title "Target") :publish t)))
                (id (content-id (create space note (list :title "N" :link target))))
                (body (nth-value 1 (request :get (format nil "/s/website/m/note/~a" id)))))
-          (ok (search "n-scope=\"koya.references(this, &quot;blog&quot;, false)\"" body)
+          (ok (search "n-scope=\"koya.references($el, &quot;blog&quot;, false)\"" body)
               "a single reference picks one")
           (ok (search "<ul id=\"f-link\" class=\"space-y-2 empty:hidden\" data-reference-list>" body) "and sorts nothing")
           (ok (search (format nil "<input type=\"hidden\" name=\"f-link\" value=\"~a\">" target) body) "its card holds it")
@@ -729,7 +729,7 @@
           (ok (search (format nil "data-pick-id=\"~a\"" drafted) body))
           (ok (search "Drafted only" body) "each by its label")
           (ok (search ">draft</span>" body) "and how it stands")
-          (ok (search "n-on-click=\"pick(this)\" n-bind-class.ring-2=\"has(this.dataset.pickId)\" n-bind-disabled=\"taken(this.dataset.pickId)\" n-bind-ariapressed=\"many ? String(has(this.dataset.pickId)) : null\""
+          (ok (search "n-on-click=\"pick($el)\" n-bind-class.ring-2=\"has($el.dataset.pickId)\" n-bind-disabled=\"taken($el.dataset.pickId)\" n-bind-ariapressed=\"many ? String(has($el.dataset.pickId)) : null\""
                       body)
               "a content is picked by a click, and one the field holds is not offered again")
           (ok (search (format nil "<input type=\"hidden\" name=\"\" value=\"~a\">" published) body)
