@@ -92,6 +92,7 @@
       (ok (search "<dialog id=\"delete-space-blog\" closedby=\"any\" class=\"koya-dialog max-w-sm\" n-scope=\"koya.phrase($el)\"" body)
           "the dialog holds what is typed")
       (ok (search "data-confirm-phrase=\"delete blog\"" body))
+      (ok (search "n-bind-value=\"typed\" n-on-input=\"typed = $el.value\"" body) "what is typed is the field's own value")
       (ok (search "<input type=\"text\" id=\"delete-phrase-blog\"" body))
       (ok (search "type=\"submit\" class=\"btn btn-danger\" disabled" body)
           "its button waits for the phrase")))
