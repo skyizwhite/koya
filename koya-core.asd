@@ -1,5 +1,5 @@
 (defsystem "koya-core"
-  :version "0.24.0"
+  :version "0.24.1"
   :description "koya - a small headless CMS in Common Lisp (core: the schema, its validation and diff, content data, JSON and name conversion, time and ULIDs)"
   :author "Akira Tempaku <paku@skyizwhite.dev>"
   :license "MIT"
