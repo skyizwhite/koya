@@ -76,8 +76,8 @@
     (let ((*cookie* (if (string= path "/login") nil *cookie*)))
       (let ((body (nth-value 1 (request :get path))))
         (testing path
-          (ok (search "/assets/js/nagi.js?" body))
-          (ok (< (search "/assets/js/nagi.js?" body) (search "/assets/js/koya.js?" body))
+          (ok (search "/assets/js/nagi.min.js?" body))
+          (ok (< (search "/assets/js/nagi.min.js?" body) (search "/assets/js/koya.js?" body))
               "then what the pages do with it")
           (ng (search "htmx" body))
           (ng (search "n-scope" (subseq body 0 (search "<body" body))) "the page itself is no scope")
