@@ -222,12 +222,6 @@
 
   koya.references = (el, model, many) => {
     const list = el.querySelector("[data-reference-list]");
-    list.addEventListener("click", (event) => {
-      const button = event.target.closest?.("[data-action]");
-      if (!button) return;
-      if (button.dataset.action === "remove") koya.removeRow(button);
-      else koya.moveRow(button, button.dataset.action === "up" ? -1 : 1);
-    });
     return {
       choose() {
         openPicker("reference-picker", {
@@ -238,8 +232,10 @@
             const cards = many ? picked : [picked];
             if (!cards.length) return;
             for (const card of cards) card.querySelector("input").name = list.id;
+            if (!many) for (const card of list.children) nagi.destroy(card);
             if (many) list.append(...cards);
             else list.replaceChildren(...cards);
+            for (const card of cards) nagi.init(card);
             changed(list);
           },
         });
@@ -282,6 +278,7 @@
   koya.removeRow = (button) => {
     const row = rowOf(button);
     const list = row.parentElement;
+    nagi.destroy(row);
     row.remove();
     changed(list);
   };
@@ -411,13 +408,8 @@
       entry.querySelector("[data-media-name]").title = item.name;
       entry.querySelector("input").value = item.id;
       list.append(entry);
+      nagi.init(entry);
     };
-    list.addEventListener("click", (event) => {
-      const button = event.target.closest?.("[data-action]");
-      if (!button) return;
-      if (button.dataset.action === "remove") koya.removeRow(button);
-      else koya.moveRow(button, button.dataset.action === "left" ? -1 : 1);
-    });
     return {
       add() {
         openPicker("media-picker", {
