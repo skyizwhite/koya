@@ -35,11 +35,11 @@
          (hsx (span :class "min-w-0 flex-1 truncate text-sm text-muted" label)))
      (when status (hsx (~status-badge :status status)))
      (when many
-       (hsx (<> (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Move ~a up" label) :data-action "up"
+       (hsx (<> (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Move ~a up" label) :n-on-click "koya.moveRow($el, -1)"
                   (~icon :name :up))
-                (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Move ~a down" label) :data-action "down"
+                (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Move ~a down" label) :n-on-click "koya.moveRow($el, 1)"
                   (~icon :name :down)))))
-     (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Remove ~a" label) :data-action "remove"
+     (button :type "button" :class "btn btn-icon py-1" :aria-label (format nil "Remove ~a" label) :n-on-click "koya.removeRow($el)"
        (~icon :name :close))
      (input :type "hidden" :name name :value id))))
 
@@ -91,11 +91,11 @@
           :title (cond (media (media-filename media)) (id (format nil "~a (missing)" id)) (t ""))
        (cond (media (media-filename media)) (id (format nil "~a (missing)" id)) (t "")))
      (div :class "flex gap-1"
-       (button :type "button" :class "btn btn-icon py-1" :aria-label "Move image left" :data-action "left"
+       (button :type "button" :class "btn btn-icon py-1" :aria-label "Move image left" :n-on-click "koya.moveRow($el, -1)"
          (~icon :name :prev))
-       (button :type "button" :class "btn btn-icon py-1" :aria-label "Move image right" :data-action "right"
+       (button :type "button" :class "btn btn-icon py-1" :aria-label "Move image right" :n-on-click "koya.moveRow($el, 1)"
          (~icon :name :next))
-       (button :type "button" :class "btn btn-icon py-1" :aria-label "Remove image" :data-action "remove"
+       (button :type "button" :class "btn btn-icon py-1" :aria-label "Remove image" :n-on-click "koya.removeRow($el)"
          (~icon :name :close)))
      (input :type "hidden" :name name :value (or id "")))))
 
